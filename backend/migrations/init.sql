@@ -284,6 +284,7 @@ CREATE TABLE invoice_items (
     invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
     test_id UUID REFERENCES tests(id),
     package_id UUID REFERENCES packages(id),
+    animal_id UUID REFERENCES animals(id),
     description VARCHAR(255),
     quantity INTEGER DEFAULT 1,
     unit_price DECIMAL(10,2),

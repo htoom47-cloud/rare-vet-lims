@@ -73,6 +73,7 @@ const invoiceSchema = Joi.object({
   items: Joi.array().items(Joi.object({
     test_id: Joi.string().uuid().allow(null),
     package_id: Joi.string().uuid().allow(null),
+    animal_id: Joi.string().uuid().allow(null),
     description: Joi.string().required(),
     quantity: Joi.number().integer().min(1).default(1),
     unit_price: Joi.number().min(0).required(),

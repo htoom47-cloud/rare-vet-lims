@@ -123,7 +123,10 @@ const create = async (data, userId) => {
     }
 
     if (data.invoice_id) {
-      await client.query('UPDATE invoices SET sample_id = $1 WHERE id = $2', [sample.id, data.invoice_id]);
+      await client.query(
+        'UPDATE invoices SET sample_id = $1 WHERE id = $2 AND sample_id IS NULL',
+        [sample.id, data.invoice_id]
+      );
     }
 
     await client.query('COMMIT');

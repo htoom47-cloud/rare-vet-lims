@@ -59,9 +59,9 @@ const createInvoice = async (data, userId) => {
 
     for (const item of data.items) {
       await client.query(
-        `INSERT INTO invoice_items (invoice_id, test_id, package_id, description, quantity, unit_price, total_price)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [invoice.id, item.test_id, item.package_id, item.description, item.quantity, item.unit_price, item.unit_price * item.quantity]
+        `INSERT INTO invoice_items (invoice_id, test_id, package_id, animal_id, description, quantity, unit_price, total_price)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [invoice.id, item.test_id, item.package_id, item.animal_id || null, item.description, item.quantity, item.unit_price, item.unit_price * item.quantity]
       );
     }
 
