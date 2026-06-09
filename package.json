@@ -4,7 +4,7 @@
   "private": true,
   "description": "Rare Veterinary Care LIMS — cloud deployment",
   "scripts": {
-    "build:cloud": "cd frontend && npm ci && VITE_API_URL=/api npm run build && cd ../backend && npm ci",
+    "build:cloud": "cd frontend && npm ci --include=dev && VITE_API_URL=/api npm run build && cd ../backend && npm ci --omit=dev",
     "start:cloud": "cd backend && node src/scripts/cloud-start.js",
     "seed:cloud": "cd backend && node src/scripts/seed.js"
   },
