@@ -2,9 +2,16 @@ import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 import { getWorkflowProgress } from '../../utils/workflow';
 
-export default function WorkflowStepper({ context, compact = false }) {
+export const RECEPTION_STEP_COUNT = 5;
+
+export default function WorkflowStepper({ context, compact = false, receptionOnly = false }) {
   const { t } = useTranslation();
-  const { steps, percent } = getWorkflowProgress(context);
+  const { steps: allSteps, percent: fullPercent } = getWorkflowProgress(context);
+  const steps = receptionOnly ? allSteps.slice(0, RECEPTION_STEP_COUNT) : allSteps;
+  const doneCount = steps.filter((s) => s.done).length;
+  const percent = receptionOnly
+    ? Math.round((doneCount / RECEPTION_STEP_COUNT) * 100)
+    : fullPercent;
 
   if (compact) {
     return (
@@ -30,6 +37,34 @@ export default function WorkflowStepper({ context, compact = false }) {
               }`}
             >
               {step.number}. {t(step.labelKey)}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (receptionOnly) {
+    const current = steps.find((s) => s.current) || steps[steps.length - 1];
+    return (
+      <div className="card p-4 mb-6">
+        <div className="flex justify-between text-sm mb-2">
+          <span className="font-semibold">{t('reception.stepOf', { current: current.number, total: RECEPTION_STEP_COUNT })}</span>
+          <span className="text-primary-500">{percent}%</span>
+        </div>
+        <div className="h-2.5 bg-primary-100 rounded-full overflow-hidden mb-3">
+          <div className="h-full bg-primary-500 transition-all" style={{ width: `${percent}%` }} />
+        </div>
+        <p className="text-center font-bold text-primary-800 dark:text-primary-200">{t(current.labelKey)}</p>
+        <div className="flex justify-center gap-1.5 mt-3 flex-wrap">
+          {steps.map((step) => (
+            <span
+              key={step.key}
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                step.done ? 'bg-green-600 text-white' : step.current ? 'bg-primary-600 text-white' : 'bg-primary-100 text-primary-400'
+              }`}
+            >
+              {step.done ? <Check size={14} /> : step.number}
             </span>
           ))}
         </div>

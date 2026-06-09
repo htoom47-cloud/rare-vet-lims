@@ -5,7 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import RoleHome from './components/layout/RoleHome';
 import Customers from './pages/Customers';
 import Animals from './pages/Animals';
 import Samples from './pages/Samples';
@@ -30,7 +30,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<Dashboard />} />
+              <Route index element={<RoleHome />} />
               <Route path="customers" element={<ProtectedRoute permission="customers.view"><Customers /></ProtectedRoute>} />
               <Route path="animals" element={<ProtectedRoute permission="animals.view"><Animals /></ProtectedRoute>} />
               <Route path="samples" element={<ProtectedRoute permission="samples.view"><Samples /></ProtectedRoute>} />

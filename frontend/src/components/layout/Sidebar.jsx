@@ -5,7 +5,20 @@ import {
   CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { isReception } from '../../utils/roles';
 import AppLogo from '../ui/AppLogo';
+
+const receptionNavSections = [
+  {
+    section: 'nav.sections.reception',
+    items: [
+      { path: '/', icon: LayoutDashboard, label: 'reception.home', permission: 'dashboard.view' },
+      { path: '/workflow', icon: Route, label: 'reception.newCase', permission: 'samples.create' },
+      { path: '/samples', icon: FlaskConical, label: 'reception.viewSamples', permission: 'samples.view' },
+      { path: '/billing', icon: CreditCard, label: 'reception.billing', permission: 'billing.view' },
+    ],
+  },
+];
 
 const navSections = [
   {
@@ -81,7 +94,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
       )}
 
       <nav className="p-2 space-y-4 overflow-y-auto" style={{ height: 'calc(100vh - 80px)' }}>
-        {navSections.map((group) => {
+        {(isReception(user) ? receptionNavSections : navSections).map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (item.adminOnly && user?.role !== 'admin') return false;
             return hasPermission(item.permission);

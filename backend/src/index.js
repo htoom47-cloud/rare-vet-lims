@@ -5,12 +5,23 @@ const { pool } = require('./config/database');
 
 const start = async () => {
   try {
-    await pool.query('SELECT 1');
-    logger.info('Database connected');
+    let connected = false;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        await pool.query('SELECT 1');
+        connected = true;
+        break;
+      } catch (err) {
+        logger.warn(`Database connection attempt ${attempt}/5 failed`, { error: err.message });
+        if (attempt < 5) await new Promise((r) => setTimeout(r, 3000));
+        else throw err;
+      }
+    }
+    if (connected) logger.info('Database connected');
 
-    app.listen(env.port, () => {
+    app.listen(env.port, '0.0.0.0', () => {
       logger.info(`Rare Vet LIMS API running on port ${env.port}`);
-      logger.info(`API docs: http://localhost:${env.port}/api/docs`);
+      if (env.serveFrontend) logger.info('Serving frontend from /frontend/dist');
     });
   } catch (err) {
     logger.error('Failed to start server', { error: err.message });

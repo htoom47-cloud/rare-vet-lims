@@ -2,24 +2,24 @@ const { Pool } = require('pg');
 const env = require('./env');
 const logger = require('./logger');
 
-const pool = env.databaseUrl
-  ? new Pool({
-      connectionString: env.databaseUrl,
-      ssl: env.nodeEnv === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    })
-  : new Pool({
-      host: env.db.host,
-      port: env.db.port,
-      user: env.db.user,
-      password: env.db.password,
-      database: env.db.database,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    });
+const buildPoolConfig = () => {
+  const ssl = env.nodeEnv === 'production' ? { rejectUnauthorized: false } : false;
+  const common = { max: 20, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, ssl };
+
+  if (env.databaseUrl) {
+    return { connectionString: env.databaseUrl, ...common };
+  }
+
+  const host = process.env.PGHOST || env.db.host;
+  const port = parseInt(process.env.PGPORT, 10) || env.db.port;
+  const user = process.env.PGUSER || env.db.user;
+  const password = process.env.PGPASSWORD || env.db.password;
+  const database = process.env.PGDATABASE || env.db.database;
+
+  return { host, port, user, password, database, ...common };
+};
+
+const pool = new Pool(buildPoolConfig());
 
 pool.on('error', (err) => {
   logger.error('Unexpected database pool error', { error: err.message });
