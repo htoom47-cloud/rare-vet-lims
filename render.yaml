@@ -1,0 +1,40 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: connect GitHub repo → New Blueprint → select this file
+
+databases:
+  - name: rare-vet-db
+    databaseName: rare_vet_lims
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: rare-vet-lims
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm run build:cloud
+    startCommand: npm run start:cloud
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_FRONTEND
+        value: true
+      - key: RUN_SEED
+        value: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: STORAGE_TYPE
+        value: local
+      - key: STORAGE_PATH
+        value: ./uploads
+      - key: LAB_NAME
+        value: مركز رعاية النوادر البيطري
+      - key: LAB_NAME_AR
+        value: مركز رعاية النوادر البيطري
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rare-vet-db
+          property: connectionString

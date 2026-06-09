@@ -1,0 +1,118 @@
+const Joi = require('joi');
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+});
+
+const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).required(),
+  full_name: Joi.string().min(2).required(),
+  full_name_ar: Joi.string().allow('', null),
+  phone: Joi.string().allow('', null),
+  role_id: Joi.number().integer().required(),
+});
+
+const customerSchema = Joi.object({
+  full_name: Joi.string().min(2).required(),
+  full_name_ar: Joi.string().allow('', null),
+  mobile: Joi.string().required(),
+  city: Joi.string().allow('', null),
+  farm_company: Joi.string().allow('', null),
+  notes: Joi.string().allow('', null),
+  credit_limit: Joi.number().min(0).default(0),
+});
+
+const animalSchema = Joi.object({
+  animal_type: Joi.string().valid('camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog').required(),
+  name_tag: Joi.string().allow('', null),
+  age: Joi.string().allow('', null),
+  gender: Joi.string().valid('male', 'female', 'unknown').default('unknown'),
+  weight: Joi.number().allow(null),
+  color: Joi.string().allow('', null),
+  rfid_chip: Joi.string().allow('', null),
+  owner_id: Joi.string().uuid().required(),
+  medical_history: Joi.string().allow('', null),
+});
+
+const sampleSchema = Joi.object({
+  customer_id: Joi.string().uuid().required(),
+  animal_id: Joi.string().uuid().required(),
+  test_ids: Joi.array().items(Joi.string().uuid()).min(1).required(),
+  invoice_id: Joi.string().uuid().allow(null),
+  department: Joi.string().allow('', null),
+  priority: Joi.string().valid('normal', 'urgent', 'stat').default('normal'),
+  notes: Joi.string().allow('', null),
+});
+
+const testSchema = Joi.object({
+  code: Joi.string().required(),
+  name: Joi.string().required(),
+  name_ar: Joi.string().allow('', null),
+  category_id: Joi.number().integer().required(),
+  description: Joi.string().allow('', null),
+  price: Joi.number().min(0).default(0),
+  turnaround_hours: Joi.number().integer().min(1).default(24),
+  unit: Joi.string().allow('', null),
+  method: Joi.string().allow('', null),
+});
+
+const resultEntrySchema = Joi.object({
+  sample_test_id: Joi.string().uuid().required(),
+  values: Joi.array().items(Joi.object({
+    parameter_id: Joi.string().uuid().required(),
+    value: Joi.string().required(),
+  })).min(1).required(),
+  technician_notes: Joi.string().allow('', null),
+});
+
+const invoiceSchema = Joi.object({
+  customer_id: Joi.string().uuid().required(),
+  sample_id: Joi.string().uuid().allow(null),
+  items: Joi.array().items(Joi.object({
+    test_id: Joi.string().uuid().allow(null),
+    package_id: Joi.string().uuid().allow(null),
+    description: Joi.string().required(),
+    quantity: Joi.number().integer().min(1).default(1),
+    unit_price: Joi.number().min(0).required(),
+  })).min(1).required(),
+  discount_amount: Joi.number().min(0).default(0),
+  notes: Joi.string().allow('', null),
+});
+
+const paymentSchema = Joi.object({
+  invoice_id: Joi.string().uuid().required(),
+  amount: Joi.number().positive().required(),
+  method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit').required(),
+  reference_number: Joi.string().allow('', null),
+  notes: Joi.string().allow('', null),
+});
+
+const inventorySchema = Joi.object({
+  sku: Joi.string().required(),
+  name: Joi.string().required(),
+  name_ar: Joi.string().allow('', null),
+  category: Joi.string().valid('reagent', 'tube', 'slide', 'consumable', 'chemical', 'other').required(),
+  unit: Joi.string().default('unit'),
+  quantity: Joi.number().min(0).default(0),
+  min_quantity: Joi.number().min(0).default(0),
+  lot_number: Joi.string().allow('', null),
+  expiry_date: Joi.date().allow(null),
+  location: Joi.string().allow('', null),
+  supplier: Joi.string().allow('', null),
+  cost_per_unit: Joi.number().min(0).allow(null),
+});
+
+module.exports = {
+  loginSchema,
+  registerSchema,
+  customerSchema,
+  animalSchema,
+  sampleSchema,
+  testSchema,
+  resultEntrySchema,
+  invoiceSchema,
+  paymentSchema,
+  inventorySchema,
+};

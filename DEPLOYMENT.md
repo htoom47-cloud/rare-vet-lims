@@ -1,0 +1,283 @@
+# Deployment Guide - Rare Veterinary Care LIMS
+
+## Production Architecture
+
+```
+                    ┌─────────────┐
+                    │   Nginx /   │
+                    │   CDN       │
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+       ┌──────▼──────┐ ┌───▼───┐ ┌─────▼─────┐
+       │  Frontend   │ │  API  │ │ PostgreSQL│
+       │  (React)    │ │(Node) │ │    16     │
+       └─────────────┘ └───┬───┘ └───────────┘
+                           │
+                    ┌──────▼──────┐
+                    │   Storage   │
+                    │ Local / S3  │
+                    └─────────────┘
+```
+
+---
+
+## Docker Production Deployment
+
+### 1. Server Requirements
+
+- Ubuntu 22.04+ or similar Linux
+- 4 GB RAM minimum (8 GB recommended)
+- 50 GB SSD
+- Docker 24+ and Docker Compose v2
+
+### 2. Prepare Environment
+
+```bash
+# On production server
+git clone <repository-url> /opt/rare-vet-lims
+cd /opt/rare-vet-lims
+
+# Create production env file
+cat > .env << 'EOF'
+DB_USER=lims_user
+DB_PASSWORD=<strong-db-password>
+DB_NAME=rare_vet_lims
+JWT_SECRET=<64-char-random-secret>
+CORS_ORIGIN=https://lims.rarevetcare.com
+VITE_API_URL=https://api.lims.rarevetcare.com/api
+API_PORT=5000
+WEB_PORT=80
+EOF
+```
+
+### 3. Build and Deploy
+
+```bash
+docker-compose up -d --build
+docker exec rare-vet-lims-api node src/scripts/seed.js
+```
+
+### 4. SSL with Reverse Proxy
+
+Use Nginx or Traefik in front of Docker services:
+
+```nginx
+# /etc/nginx/sites-available/rare-vet-lims
+server {
+    listen 443 ssl http2;
+    server_name lims.rarevetcare.com;
+
+    ssl_certificate /etc/letsencrypt/live/lims.rarevetcare.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/lims.rarevetcare.com/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:5173;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /api {
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /uploads {
+        proxy_pass http://localhost:5000;
+    }
+}
+```
+
+---
+
+## Cloud Deployment (Render — Recommended)
+
+Fastest way to go online with one URL for frontend + API.
+
+### Prerequisites
+
+- GitHub account
+- [Render](https://render.com) account (free tier available)
+- Project pushed to a GitHub repository
+
+### Steps
+
+1. Push the project to GitHub:
+   ```bash
+   git init
+   git add .
+   git commit -m "Prepare cloud deployment"
+   git remote add origin https://github.com/YOUR_USER/rare-vet-lims.git
+   git push -u origin main
+   ```
+
+2. In Render: **New → Blueprint** → connect the repo → Render reads `render.yaml`.
+
+3. Wait for deploy (5–10 minutes on first build).
+
+4. Open your app URL, e.g. `https://rare-vet-lims.onrender.com`
+
+5. Login: `admin@rarevetcare.com` / `Admin@123` — **change password immediately**.
+
+6. After first successful deploy, set `RUN_SEED=false` in Render environment variables (so seed does not run on every restart).
+
+### Environment variables (Render)
+
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `SERVE_FRONTEND` | `true` |
+| `RUN_SEED` | `true` (first deploy only) |
+| `DATABASE_URL` | Auto from PostgreSQL addon |
+| `JWT_SECRET` | Auto-generated |
+| `APP_URL` | Your Render URL (optional, auto-detected) |
+
+### Railway (alternative)
+
+1. [railway.app](https://railway.app) → New Project → Deploy from GitHub.
+2. Add **PostgreSQL** plugin → copy `DATABASE_URL` to the web service.
+3. Set env: `SERVE_FRONTEND=true`, `RUN_SEED=true`, `JWT_SECRET=<random>`.
+4. Build: `npm run build:cloud` — Start: `npm run start:cloud` (see `railway.toml`).
+
+### Notes
+
+- **Uploads**: Cloud disks are ephemeral on free tiers. For production files use S3 (`STORAGE_TYPE=s3`).
+- **Cold start**: Free Render plan sleeps after inactivity; first visit may take ~30s.
+- **HTTPS**: Provided automatically by Render/Railway.
+
+---
+
+## Cloud Deployment Options
+
+### AWS
+
+| Service | Purpose |
+|---------|---------|
+| ECS / EKS | Container orchestration |
+| RDS PostgreSQL | Managed database |
+| S3 | File storage for reports/images |
+| ALB | Load balancing |
+| CloudFront | CDN for frontend |
+
+Set in `.env`:
+```env
+STORAGE_TYPE=s3
+S3_BUCKET=rare-vet-lims-prod
+S3_REGION=me-south-1
+S3_ACCESS_KEY=<key>
+S3_SECRET_KEY=<secret>
+```
+
+### Azure
+
+- Azure Container Apps for API/Frontend
+- Azure Database for PostgreSQL
+- Azure Blob Storage for files
+
+### Google Cloud
+
+- Cloud Run for containers
+- Cloud SQL PostgreSQL
+- Cloud Storage for files
+
+---
+
+## Security Checklist
+
+- [ ] Change all default passwords
+- [ ] Set strong `JWT_SECRET` (64+ random characters)
+- [ ] Enable HTTPS/TLS everywhere
+- [ ] Restrict database port (no public exposure)
+- [ ] Set `NODE_ENV=production`
+- [ ] Configure firewall (only 80/443 open)
+- [ ] Enable database backups (daily)
+- [ ] Set up log aggregation
+- [ ] Review role permissions
+- [ ] Disable demo accounts or change passwords
+
+---
+
+## Database Backups
+
+### Automated backup script
+
+```bash
+#!/bin/bash
+# /opt/scripts/backup-lims.sh
+DATE=$(date +%Y%m%d_%H%M%S)
+docker exec rare-vet-lims-db pg_dump -U lims_user rare_vet_lims | gzip > /backups/lims_$DATE.sql.gz
+find /backups -name "lims_*.sql.gz" -mtime +30 -delete
+```
+
+Add to crontab:
+```bash
+0 2 * * * /opt/scripts/backup-lims.sh
+```
+
+### Restore
+
+```bash
+gunzip -c /backups/lims_20260101_020000.sql.gz | docker exec -i rare-vet-lims-db psql -U lims_user rare_vet_lims
+```
+
+---
+
+## Monitoring
+
+### Health Checks
+
+- API: `GET /api/health`
+- Database: Docker healthcheck in compose file
+
+### Recommended Tools
+
+- **Uptime**: UptimeRobot, Pingdom
+- **Logs**: ELK Stack, Grafana Loki
+- **Metrics**: Prometheus + Grafana
+- **Errors**: Sentry
+
+---
+
+## Scaling
+
+### Horizontal API Scaling
+
+```yaml
+# docker-compose.override.yml
+services:
+  backend:
+    deploy:
+      replicas: 3
+```
+
+Use a load balancer in front of multiple API instances. All instances share the same PostgreSQL and S3 storage.
+
+### Database
+
+- Enable connection pooling (PgBouncer)
+- Read replicas for reporting queries
+- Regular VACUUM and index maintenance
+
+---
+
+## Future Integrations
+
+### WhatsApp Notifications
+Set `WHATSAPP_ENABLED=true` and configure provider API keys in settings.
+
+### Lab Device Integration
+Configure devices via `/api/devices` endpoint. Supported protocols:
+- HL7 (Norma CBC)
+- ASTM (Diasys Respons 910, Mini Vidas)
+- TCP/IP and Serial COM
+
+### Thermal Printers
+Barcode labels and receipts support browser print API. For direct thermal printer integration, configure ESC/POS drivers on the client workstation.
+
+---
+
+## Support
+
+For deployment assistance, contact the development team at lab@rarevetcare.com.

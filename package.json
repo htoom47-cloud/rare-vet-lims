@@ -1,0 +1,14 @@
+{
+  "name": "rare-vet-lims",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rare Veterinary Care LIMS — cloud deployment",
+  "scripts": {
+    "build:cloud": "cd frontend && npm ci && VITE_API_URL=/api npm run build && cd ../backend && npm ci",
+    "start:cloud": "cd backend && node src/scripts/cloud-start.js",
+    "seed:cloud": "cd backend && node src/scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

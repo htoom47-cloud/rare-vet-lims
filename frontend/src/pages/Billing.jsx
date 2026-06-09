@@ -1,0 +1,234 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Plus, CreditCard } from 'lucide-react';
+import toast from 'react-hot-toast';
+import DataTable from '../components/ui/DataTable';
+import StatusBadge from '../components/ui/StatusBadge';
+import Modal from '../components/ui/Modal';
+import CustomerSearch from '../components/customers/CustomerSearch';
+import { billingAPI, testsAPI } from '../services/api';
+
+export default function Billing() {
+  const { t } = useTranslation();
+  const [invoices, setInvoices] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('invoices');
+  const [invoiceModal, setInvoiceModal] = useState(false);
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [invoiceForm, setInvoiceForm] = useState({
+    customer_id: '', sample_id: '', discount_amount: 0, notes: '', items: [],
+  });
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '', method: 'cash', reference_number: '', notes: '',
+  });
+  const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
+
+  const load = () => {
+    setLoading(true);
+    billingAPI.invoices().then(({ data }) => setInvoices(data.data)).finally(() => setLoading(false));
+    billingAPI.packages().then(({ data }) => setPackages(data.data));
+  };
+
+  useEffect(() => {
+    load();
+    testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
+  }, []);
+
+  const addItem = () => {
+    if (!newItem.description || !newItem.unit_price) return toast.error('أدخل وصف البند والسعر');
+    const test = tests.find((t) => t.id === newItem.test_id);
+    setInvoiceForm({
+      ...invoiceForm,
+      items: [...invoiceForm.items, {
+        test_id: newItem.test_id || null,
+        description: newItem.description || test?.name,
+        quantity: Number(newItem.quantity) || 1,
+        unit_price: Number(newItem.unit_price),
+      }],
+    });
+    setNewItem({ test_id: '', description: '', quantity: 1, unit_price: 0 });
+  };
+
+  const createInvoice = async (e) => {
+    e.preventDefault();
+    if (!invoiceForm.customer_id || !invoiceForm.items.length) return toast.error('اختر العميل وأضف بنود الفاتورة');
+    try {
+      await billingAPI.createInvoice(invoiceForm);
+      toast.success('تم إنشاء الفاتورة');
+      setInvoiceModal(false);
+      setInvoiceForm({ customer_id: '', sample_id: '', discount_amount: 0, notes: '', items: [] });
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const recordPayment = async (e) => {
+    e.preventDefault();
+    try {
+      await billingAPI.recordPayment({
+        invoice_id: selectedInvoice.id,
+        amount: Number(paymentForm.amount),
+        method: paymentForm.method,
+        reference_number: paymentForm.reference_number,
+        notes: paymentForm.notes,
+      });
+      toast.success('تم تسجيل الدفع');
+      setPaymentModal(false);
+      setPaymentForm({ amount: '', method: 'cash', reference_number: '', notes: '' });
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const openPayment = (invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentForm({ amount: invoice.total, method: 'cash', reference_number: '', notes: '' });
+    setPaymentModal(true);
+  };
+
+  const columns = [
+    { key: 'invoice_number', label: t('billing.invoice') },
+    { key: 'customer_name', label: t('customers.fullName') },
+    { key: 'subtotal', label: 'المجموع', render: (r) => `SAR ${parseFloat(r.subtotal).toFixed(2)}` },
+    { key: 'tax_amount', label: 'ض.ق.م 15%', render: (r) => `SAR ${parseFloat(r.tax_amount).toFixed(2)}` },
+    { key: 'total', label: 'الإجمالي', render: (r) => `SAR ${parseFloat(r.total).toFixed(2)}` },
+    { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
+    { key: 'actions', label: t('common.actions'), render: (r) => (
+      r.status !== 'paid' && r.status !== 'cancelled' ? (
+        <button onClick={(e) => { e.stopPropagation(); openPayment(r); }} className="text-primary-600 text-sm flex items-center gap-1">
+          <CreditCard size={14} /> دفع
+        </button>
+      ) : null
+    )},
+  ];
+
+  const subtotal = invoiceForm.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+  const afterDiscount = subtotal - (Number(invoiceForm.discount_amount) || 0);
+  const tax = afterDiscount * 0.15;
+  const total = afterDiscount + tax;
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl font-bold">{t('billing.title')}</h1>
+        <button onClick={() => setInvoiceModal(true)} className="btn-primary flex items-center gap-2">
+          <Plus size={18} /> فاتورة جديدة
+        </button>
+      </div>
+
+      <div className="flex gap-2 mb-6">
+        <button onClick={() => setTab('invoices')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'invoices' ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
+          {t('billing.invoice')}
+        </button>
+        <button onClick={() => setTab('packages')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'packages' ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
+          {t('billing.packages')}
+        </button>
+      </div>
+
+      {tab === 'invoices' ? (
+        <DataTable columns={columns} data={invoices} loading={loading} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {packages.map((pkg) => (
+            <div key={pkg.id} className="card">
+              <h3 className="font-semibold">{pkg.name}</h3>
+              <p className="text-2xl font-bold text-primary-600 mt-2">SAR {pkg.price}</p>
+              {pkg.test_names?.filter(Boolean).length > 0 && (
+                <p className="text-sm text-gray-500 mt-2">{pkg.test_names.join(', ')}</p>
+              )}
+            </div>
+          ))}
+          {!packages.length && <p className="text-gray-500">{t('common.noData')}</p>}
+        </div>
+      )}
+
+      <Modal isOpen={invoiceModal} onClose={() => setInvoiceModal(false)} title="فاتورة جديدة" size="xl">
+        <form onSubmit={createInvoice} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.fullName')}</label>
+              <CustomerSearch
+                value={invoiceForm.customer_id}
+                onChange={(id) => setInvoiceForm({ ...invoiceForm, customer_id: id })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">خصم (SAR)</label>
+              <input type="number" min="0" value={invoiceForm.discount_amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, discount_amount: e.target.value })} className="input-field" />
+            </div>
+          </div>
+
+          <div className="border rounded-lg p-4 space-y-3">
+            <h4 className="font-medium">إضافة بند</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <select value={newItem.test_id} onChange={(e) => {
+                const test = tests.find((t) => t.id === e.target.value);
+                setNewItem({ ...newItem, test_id: e.target.value, description: test?.name || '', unit_price: test?.price || 0 });
+              }} className="input-field">
+                <option value="">فحص (اختياري)</option>
+                {tests.map((t) => <option key={t.id} value={t.id}>{t.name} - SAR {t.price}</option>)}
+              </select>
+              <input placeholder="الوصف" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} className="input-field" />
+              <input type="number" min="1" placeholder="الكمية" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} className="input-field" />
+              <input type="number" min="0" placeholder="السعر" value={newItem.unit_price} onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })} className="input-field" />
+            </div>
+            <button type="button" onClick={addItem} className="btn-secondary text-sm">+ إضافة بند</button>
+            {invoiceForm.items.length > 0 && (
+              <div className="text-sm space-y-1 mt-2">
+                {invoiceForm.items.map((item, i) => (
+                  <div key={i} className="flex justify-between bg-gray-50 dark:bg-gray-700/50 p-2 rounded">
+                    <span>{item.description} x{item.quantity}</span>
+                    <span>SAR {(item.unit_price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
+            <div className="flex justify-between"><span>المجموع:</span><span>SAR {subtotal.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span>ض.ق.م 15%:</span><span>SAR {tax.toFixed(2)}</span></div>
+            <div className="flex justify-between font-bold text-base"><span>الإجمالي:</span><span>SAR {total.toFixed(2)}</span></div>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setInvoiceModal(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary">{t('common.save')}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={paymentModal} onClose={() => setPaymentModal(false)} title={`تسجيل دفع - ${selectedInvoice?.invoice_number}`}>
+        <form onSubmit={recordPayment} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">المبلغ (SAR)</label>
+            <input type="number" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">طريقة الدفع</label>
+            <select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })} className="input-field">
+              <option value="cash">نقدي</option>
+              <option value="card">بطاقة</option>
+              <option value="bank_transfer">تحويل بنكي</option>
+              <option value="credit">آجل / حساب</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">رقم المرجع</label>
+            <input value={paymentForm.reference_number} onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })} className="input-field" />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setPaymentModal(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary">تسجيل الدفع</button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
