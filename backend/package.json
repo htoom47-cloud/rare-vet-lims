@@ -8,6 +8,7 @@
     "dev": "nodemon src/index.js",
     "migrate": "node src/scripts/migrate.js",
     "seed": "node src/scripts/seed.js",
+    "reset-admin": "node src/scripts/reset-admin.js",
     "test": "echo \"No tests configured\" && exit 0"
   },
   "dependencies": {
