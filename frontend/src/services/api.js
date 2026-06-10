@@ -105,6 +105,7 @@ export const notificationsAPI = {
 
 export const billingAPI = {
   invoices: (params) => api.get('/billing/invoices', { params }),
+  getInvoice: (id) => api.get(`/billing/invoices/${id}`),
   createInvoice: (data) => api.post('/billing/invoices', data),
   recordPayment: (data) => api.post('/billing/payments', data),
   packages: () => api.get('/billing/packages'),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -7,6 +7,32 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import { billingAPI, testsAPI } from '../services/api';
+
+function groupItemsByAnimal(items, t) {
+  const groups = new Map();
+  for (const item of items || []) {
+    const key = item.animal_id || '__general__';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        animal_id: item.animal_id,
+        name_tag: item.name_tag,
+        animal_type: item.animal_type,
+        animal_code: item.animal_code,
+        items: [],
+      });
+    }
+    groups.get(key).items.push(item);
+  }
+  return [...groups.values()].map((g) => ({
+    ...g,
+    label: g.animal_id
+      ? t('billing.animalLabel', {
+          type: t(`animals.types.${g.animal_type}`, { defaultValue: g.animal_type }),
+          tag: g.name_tag || g.animal_code || '—',
+        })
+      : t('billing.generalItems'),
+  }));
+}
 
 export default function Billing() {
   const { t } = useTranslation();
@@ -17,6 +43,8 @@ export default function Billing() {
   const [tab, setTab] = useState('invoices');
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
+  const [detailInvoice, setDetailInvoice] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [invoiceForm, setInvoiceForm] = useState({
     customer_id: '', sample_id: '', discount_amount: 0, notes: '', items: [],
@@ -36,6 +64,24 @@ export default function Billing() {
     load();
     testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
   }, []);
+
+  const openInvoiceDetail = async (invoice) => {
+    setDetailLoading(true);
+    setDetailInvoice(null);
+    try {
+      const { data } = await billingAPI.getInvoice(invoice.id);
+      setDetailInvoice(data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const animalGroups = useMemo(
+    () => groupItemsByAnimal(detailInvoice?.items, t),
+    [detailInvoice?.items, t]
+  );
 
   const addItem = () => {
     if (!newItem.description || !newItem.unit_price) return toast.error('أدخل وصف البند والسعر');
@@ -80,6 +126,7 @@ export default function Billing() {
       setPaymentModal(false);
       setPaymentForm({ amount: '', method: 'cash', reference_number: '', notes: '' });
       load();
+      if (detailInvoice?.id === selectedInvoice.id) openInvoiceDetail(selectedInvoice);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
     }
@@ -94,15 +141,15 @@ export default function Billing() {
   const columns = [
     { key: 'invoice_number', label: t('billing.invoice') },
     { key: 'customer_name', label: t('customers.fullName') },
-    { key: 'subtotal', label: 'المجموع', render: (r) => `SAR ${parseFloat(r.subtotal).toFixed(2)}` },
-    { key: 'tax_amount', label: 'ض.ق.م 15%', render: (r) => `SAR ${parseFloat(r.tax_amount).toFixed(2)}` },
-    { key: 'total', label: 'الإجمالي', render: (r) => `SAR ${parseFloat(r.total).toFixed(2)}` },
+    { key: 'subtotal', label: t('billing.subtotal'), render: (r) => `SAR ${parseFloat(r.subtotal).toFixed(2)}` },
+    { key: 'tax_amount', label: t('billing.tax'), render: (r) => `SAR ${parseFloat(r.tax_amount).toFixed(2)}` },
+    { key: 'total', label: t('billing.total'), render: (r) => `SAR ${parseFloat(r.total).toFixed(2)}` },
     { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} /> },
     { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
     { key: 'actions', label: t('common.actions'), render: (r) => (
       r.status !== 'paid' && r.status !== 'cancelled' ? (
         <button onClick={(e) => { e.stopPropagation(); openPayment(r); }} className="text-primary-600 text-sm flex items-center gap-1">
-          <CreditCard size={14} /> دفع
+          <CreditCard size={14} /> {t('billing.payment')}
         </button>
       ) : null
     )},
@@ -118,7 +165,7 @@ export default function Billing() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t('billing.title')}</h1>
         <button onClick={() => setInvoiceModal(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={18} /> فاتورة جديدة
+          <Plus size={18} /> {t('billing.invoice')}
         </button>
       </div>
 
@@ -132,7 +179,7 @@ export default function Billing() {
       </div>
 
       {tab === 'invoices' ? (
-        <DataTable columns={columns} data={invoices} loading={loading} />
+        <DataTable columns={columns} data={invoices} loading={loading} onRowClick={openInvoiceDetail} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {packages.map((pkg) => (
@@ -148,7 +195,65 @@ export default function Billing() {
         </div>
       )}
 
-      <Modal isOpen={invoiceModal} onClose={() => setInvoiceModal(false)} title="فاتورة جديدة" size="xl">
+      <Modal
+        isOpen={!!detailInvoice || detailLoading}
+        onClose={() => { setDetailInvoice(null); setDetailLoading(false); }}
+        title={detailInvoice ? `${t('billing.invoiceDetails')} — ${detailInvoice.invoice_number}` : t('billing.invoiceDetails')}
+        size="xl"
+      >
+        {detailLoading ? (
+          <p className="text-center py-8 text-gray-500">{t('common.loading')}</p>
+        ) : detailInvoice && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailInvoice.customer_name}</div>
+              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={detailInvoice.status} /></div>
+              <div><span className="text-gray-500">{t('common.date')}:</span> {new Date(detailInvoice.created_at).toLocaleString()}</div>
+              <div><span className="text-gray-500">{t('billing.total')}:</span> <strong>SAR {parseFloat(detailInvoice.total).toFixed(2)}</strong></div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">{t('billing.itemsByAnimal')}</h4>
+              <div className="space-y-3">
+                {animalGroups.map((group) => (
+                  <div key={group.animal_id || 'general'} className="border rounded-lg overflow-hidden">
+                    <div className="bg-primary-50 dark:bg-primary-900/30 px-3 py-2 font-medium text-sm">
+                      {group.label}
+                    </div>
+                    <div className="divide-y">
+                      {group.items.map((item) => (
+                        <div key={item.id} className="flex justify-between px-3 py-2 text-sm">
+                          <span>{item.description || item.test_name} × {item.quantity}</span>
+                          <span>SAR {parseFloat(item.total_price).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
+              <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>SAR {parseFloat(detailInvoice.subtotal).toFixed(2)}</span></div>
+              {parseFloat(detailInvoice.discount_amount) > 0 && (
+                <div className="flex justify-between"><span>خصم:</span><span>- SAR {parseFloat(detailInvoice.discount_amount).toFixed(2)}</span></div>
+              )}
+              <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>SAR {parseFloat(detailInvoice.tax_amount).toFixed(2)}</span></div>
+              <div className="flex justify-between font-bold"><span>{t('billing.total')}:</span><span>SAR {parseFloat(detailInvoice.total).toFixed(2)}</span></div>
+            </div>
+
+            {detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
+              <div className="flex justify-end">
+                <button onClick={() => openPayment(detailInvoice)} className="btn-primary flex items-center gap-2">
+                  <CreditCard size={16} /> {t('billing.payment')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={invoiceModal} onClose={() => setInvoiceModal(false)} title={t('billing.invoice')} size="xl">
         <form onSubmit={createInvoice} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -192,9 +297,9 @@ export default function Billing() {
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
-            <div className="flex justify-between"><span>المجموع:</span><span>SAR {subtotal.toFixed(2)}</span></div>
-            <div className="flex justify-between"><span>ض.ق.م 15%:</span><span>SAR {tax.toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold text-base"><span>الإجمالي:</span><span>SAR {total.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>SAR {subtotal.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>SAR {tax.toFixed(2)}</span></div>
+            <div className="flex justify-between font-bold text-base"><span>{t('billing.total')}:</span><span>SAR {total.toFixed(2)}</span></div>
           </div>
 
           <div className="flex gap-2 justify-end">
@@ -204,7 +309,7 @@ export default function Billing() {
         </form>
       </Modal>
 
-      <Modal isOpen={paymentModal} onClose={() => setPaymentModal(false)} title={`تسجيل دفع - ${selectedInvoice?.invoice_number}`}>
+      <Modal isOpen={paymentModal} onClose={() => setPaymentModal(false)} title={`${t('billing.payment')} — ${selectedInvoice?.invoice_number}`}>
         <form onSubmit={recordPayment} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">المبلغ (SAR)</label>
@@ -225,7 +330,7 @@ export default function Billing() {
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setPaymentModal(false)} className="btn-secondary">{t('common.cancel')}</button>
-            <button type="submit" className="btn-primary">تسجيل الدفع</button>
+            <button type="submit" className="btn-primary">{t('billing.payment')}</button>
           </div>
         </form>
       </Modal>

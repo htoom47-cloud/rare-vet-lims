@@ -473,8 +473,10 @@ export default function WorkflowCase() {
             </div>
             {!receptionMode && samples[0] && (
               <div className="flex flex-wrap justify-center gap-2 mt-4 pt-4 border-t">
-                <button onClick={() => navigate(`/workbench?sample=${samples[0].id}`)} className="btn-secondary text-sm">{t('workflow.goResults')}</button>
-                <button onClick={() => navigate('/reports')} className="btn-secondary text-sm">{t('workflow.goReports')}</button>
+                <p className="w-full text-sm text-primary-500 mb-1">{t('workflow.labStepsNote')}</p>
+                <button onClick={() => navigate(`/workbench?sample=${samples[0].id}`)} className="btn-secondary text-sm">{t('workflow.goEnterResults')}</button>
+                <button onClick={() => navigate(`/vet-review?sample=${samples[0].id}`)} className="btn-secondary text-sm">{t('workflow.goApprove')}</button>
+                <button onClick={() => navigate('/reports')} className="btn-secondary text-sm">{t('workflow.goExtract')}</button>
               </div>
             )}
           </div>

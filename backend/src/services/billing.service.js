@@ -36,6 +36,38 @@ const listInvoices = async ({ status, customer_id, page, limit }) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
+const getInvoiceById = async (id) => {
+  const invoiceResult = await query(
+    `SELECT i.*, c.full_name as customer_name, c.mobile as customer_mobile
+     FROM invoices i
+     LEFT JOIN customers c ON i.customer_id = c.id
+     WHERE i.id = $1`,
+    [id]
+  );
+  if (!invoiceResult.rows[0]) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+
+  const itemsResult = await query(
+    `SELECT ii.*, a.name_tag, a.animal_code, a.animal_type, t.name as test_name
+     FROM invoice_items ii
+     LEFT JOIN animals a ON ii.animal_id = a.id
+     LEFT JOIN tests t ON ii.test_id = t.id
+     WHERE ii.invoice_id = $1
+     ORDER BY a.name_tag NULLS LAST, ii.description`,
+    [id]
+  );
+
+  const paymentsResult = await query(
+    `SELECT * FROM payments WHERE invoice_id = $1 ORDER BY created_at DESC`,
+    [id]
+  );
+
+  return {
+    ...invoiceResult.rows[0],
+    items: itemsResult.rows,
+    payments: paymentsResult.rows,
+  };
+};
+
 const createInvoice = async (data, userId) => {
   const client = await getClient();
   try {
@@ -139,4 +171,4 @@ const processRefund = async (data, userId) => {
   return result.rows[0];
 };
 
-module.exports = { listInvoices, createInvoice, recordPayment, listPackages, processRefund, generateVatQR };
+module.exports = { listInvoices, getInvoiceById, createInvoice, recordPayment, listPackages, processRefund, generateVatQR };

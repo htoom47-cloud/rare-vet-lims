@@ -4,8 +4,8 @@ export const WORKFLOW_STEPS = [
   { key: 'invoice', labelKey: 'workflow.steps.invoice' },
   { key: 'barcode', labelKey: 'workflow.steps.barcode' },
   { key: 'deliver', labelKey: 'workflow.steps.deliver' },
-  { key: 'results', labelKey: 'workflow.steps.results' },
   { key: 'approve', labelKey: 'workflow.steps.approve' },
+  { key: 'results', labelKey: 'workflow.steps.results' },
   { key: 'send', labelKey: 'workflow.steps.send' },
 ];
 
@@ -27,9 +27,9 @@ export function getWorkflowProgress(ctx = {}) {
     invoice: !!invoiceId || wf.has_invoice,
     barcode: !!sample?.barcode || wf.has_barcode,
     deliver: sampleStatus ? sampleStatus !== 'pending' : wf.delivered,
-    results: wf.has_results || ['running', 'completed'].includes(sampleStatus),
-    approve: wf.all_validated || sampleStatus === 'completed',
-    send: wf.sent_to_customer || wf.has_report,
+    approve: !!wf.all_validated,
+    results: !!wf.has_report,
+    send: !!wf.sent_to_customer,
   };
 
   const steps = WORKFLOW_STEPS.map((step, index) => ({

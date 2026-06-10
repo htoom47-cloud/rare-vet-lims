@@ -15,6 +15,13 @@ router.get('/invoices', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, ne
   } catch (err) { next(err); }
 });
 
+router.get('/invoices/:id', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.getInvoiceById(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/packages', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     const data = await service.listPackages();

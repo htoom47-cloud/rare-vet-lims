@@ -231,32 +231,33 @@ export default function Samples() {
 
 
 
-  const generateAndSend = async () => {
-
+  const generateReportOnly = async () => {
     if (!detailSample) return;
-
     setSending(true);
-
     try {
-
-      await reportsAPI.generate(detailSample.id, 'ar');
-
-      await notificationsAPI.sendReport(detailSample.id, 'sms', detailSample.customer_mobile);
-
-      toast.success(t('workflow.sentToCustomer'));
-
+      const { data } = await reportsAPI.generate(detailSample.id, 'ar');
+      toast.success(t('workflow.reportExtracted'));
+      if (data.data.pdf_url) window.open(data.data.pdf_url, '_blank');
       viewDetail(detailSample);
-
     } catch (err) {
-
       toast.error(err.response?.data?.error?.message || 'تأكد من اعتماد جميع النتائج أولاً');
-
     } finally {
-
       setSending(false);
-
     }
+  };
 
+  const sendReportToCustomer = async () => {
+    if (!detailSample) return;
+    setSending(true);
+    try {
+      await notificationsAPI.sendReport(detailSample.id, 'sms', detailSample.customer_mobile);
+      toast.success(t('workflow.sentToCustomer'));
+      viewDetail(detailSample);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    } finally {
+      setSending(false);
+    }
   };
 
 
@@ -511,9 +512,9 @@ export default function Samples() {
 
               )}
 
-              {['received', 'running'].includes(detailSample.status) && (
+              {['received', 'running'].includes(detailSample.status) && !detailSample.workflow?.all_validated && (
 
-                <button onClick={() => { setDetailSample(null); navigate(`/workbench?sample=${detailSample.id}`); }} className="btn-secondary text-sm">{t('workflow.goResults')}</button>
+                <button onClick={() => { setDetailSample(null); navigate(`/workbench?sample=${detailSample.id}`); }} className="btn-secondary text-sm">{t('workflow.goEnterResults')}</button>
 
               )}
 
@@ -523,9 +524,15 @@ export default function Samples() {
 
               )}
 
-              {detailSample.workflow?.all_validated && !detailSample.workflow?.sent_to_customer && (
+              {detailSample.workflow?.all_validated && !detailSample.workflow?.has_report && (
 
-                <button onClick={generateAndSend} disabled={sending} className="btn-primary text-sm">{t('workflow.generateAndSend')}</button>
+                <button onClick={generateReportOnly} disabled={sending} className="btn-primary text-sm">{t('workflow.goExtract')}</button>
+
+              )}
+
+              {detailSample.workflow?.has_report && !detailSample.workflow?.sent_to_customer && (
+
+                <button onClick={sendReportToCustomer} disabled={sending} className="btn-primary text-sm">{t('workflow.sendToCustomer')}</button>
 
               )}
 
