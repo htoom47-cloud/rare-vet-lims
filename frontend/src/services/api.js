@@ -152,6 +152,14 @@ export const auditAPI = {
   list: (params) => api.get('/audit', { params }),
 };
 
+export const devicesAPI = {
+  list: () => api.get('/devices'),
+  create: (data) => api.post('/devices', data),
+  update: (id, data) => api.put(`/devices/${id}`, data),
+  regenerateKey: (id) => api.post(`/devices/${id}/regenerate-key`),
+  messages: (id) => api.get(`/devices/${id}/messages`),
+};
+
 export const settingsAPI = {
   get: () => api.get('/settings'),
   update: (key, value) => api.put(`/settings/${key}`, { value }),

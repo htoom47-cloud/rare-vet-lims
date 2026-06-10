@@ -17,6 +17,7 @@ import Quality from './pages/Quality';
 import Users from './pages/Users';
 import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
+import Devices from './pages/Devices';
 import TechnicianWorkbench from './pages/TechnicianWorkbench';
 import VetReview from './pages/VetReview';
 import WorkflowCase from './pages/WorkflowCase';
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="users" element={<ProtectedRoute permission="users.view" adminOnly><Users /></ProtectedRoute>} />
               <Route path="audit" element={<ProtectedRoute permission="audit.view"><AuditLogs /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute permission="settings.view"><Settings /></ProtectedRoute>} />
+              <Route path="devices" element={<ProtectedRoute permission="devices.view"><Devices /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,51 +1,141 @@
+const crypto = require('crypto');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../config/logger');
+const { parseHl7 } = require('../utils/hl7');
+const { parseAstm } = require('../utils/astm');
+const deviceImport = require('./device-import.service');
 
 const SUPPORTED_DEVICES = [
-  { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp' },
-  { name: 'Norma CBC', model: 'Norma', protocol: 'HL7', connection_type: 'serial' },
+  { name: 'Norma CBC', model: 'iVet-5 / Icon-5', protocol: 'HL7', connection_type: 'tcp', default_port: 2575 },
+  { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp', default_port: 5000 },
   { name: 'Mini Vidas', model: 'Mini Vidas', protocol: 'ASTM', connection_type: 'serial' },
 ];
+
+const generateApiKey = () => crypto.randomBytes(24).toString('hex');
+
+const parseMessage = (raw, protocol) => {
+  const p = (protocol || '').toUpperCase();
+  if (p === 'ASTM') return parseAstm(raw);
+  return parseHl7(raw);
+};
 
 const list = async () => {
   const result = await query('SELECT * FROM device_integrations ORDER BY name');
   return { configured: result.rows, supported: SUPPORTED_DEVICES };
 };
 
+const getById = async (id) => {
+  const result = await query('SELECT * FROM device_integrations WHERE id = $1', [id]);
+  if (!result.rows[0]) throw new AppError('Device not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
 const create = async (data) => {
+  const config = { ...(data.config || {}), api_key: data.config?.api_key || generateApiKey() };
   const result = await query(
     `INSERT INTO device_integrations (name, model, protocol, connection_type, host, port, serial_port, config, is_active)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [data.name, data.model, data.protocol, data.connection_type, data.host, data.port, data.serial_port, JSON.stringify(data.config || {}), data.is_active || false]
+    [
+      data.name,
+      data.model,
+      data.protocol || 'HL7',
+      data.connection_type || 'tcp',
+      data.host,
+      data.port || 2575,
+      data.serial_port,
+      JSON.stringify(config),
+      data.is_active ?? false,
+    ]
   );
   return result.rows[0];
 };
 
 const update = async (id, data) => {
+  const existing = await getById(id);
+  const config = { ...(existing.config || {}), ...(data.config || {}) };
+  if (!config.api_key) config.api_key = generateApiKey();
+
   const result = await query(
     `UPDATE device_integrations SET name=$1, model=$2, protocol=$3, connection_type=$4, host=$5, port=$6,
-     serial_port=$7, config=$8, is_active=$9 WHERE id=$10 RETURNING *`,
-    [data.name, data.model, data.protocol, data.connection_type, data.host, data.port, data.serial_port, JSON.stringify(data.config || {}), data.is_active, id]
+     serial_port=$7, config=$8, is_active=$9, last_connected=CASE WHEN $9 = true THEN NOW() ELSE last_connected END
+     WHERE id=$10 RETURNING *`,
+    [
+      data.name ?? existing.name,
+      data.model ?? existing.model,
+      data.protocol ?? existing.protocol,
+      data.connection_type ?? existing.connection_type,
+      data.host ?? existing.host,
+      data.port ?? existing.port,
+      data.serial_port ?? existing.serial_port,
+      JSON.stringify(config),
+      data.is_active ?? existing.is_active,
+      id,
+    ]
   );
-  if (!result.rows[0]) throw new AppError('Device not found', 404, 'NOT_FOUND');
   return result.rows[0];
 };
 
-const receiveMessage = async (deviceId, rawMessage, direction = 'inbound') => {
+const regenerateApiKey = async (id) => {
+  const existing = await getById(id);
+  const config = { ...(existing.config || {}), api_key: generateApiKey() };
   const result = await query(
-    `INSERT INTO device_messages (device_id, direction, raw_message, status) VALUES ($1,$2,$3,'received') RETURNING *`,
-    [deviceId, direction, rawMessage]
+    `UPDATE device_integrations SET config = $1 WHERE id = $2 RETURNING *`,
+    [JSON.stringify(config), id]
+  );
+  return result.rows[0];
+};
+
+const processInboundMessage = async (device, rawMessage) => {
+  const parsed = parseMessage(rawMessage, device.protocol);
+  const msgResult = await query(
+    `INSERT INTO device_messages (device_id, direction, raw_message, parsed_data, status)
+     VALUES ($1, 'inbound', $2, $3, 'received') RETURNING *`,
+    [device.id, rawMessage, JSON.stringify(parsed)]
   );
 
-  logger.info('Device message received', { deviceId, direction });
+  await query('UPDATE device_integrations SET last_connected = NOW() WHERE id = $1', [device.id]);
 
-  // Placeholder for HL7/ASTM parsing
-  return {
-    message: result.rows[0],
-    parsed: null,
-    note: 'Message stored. Protocol parser ready for HL7/ASTM/TCP/Serial integration.',
-  };
+  if (!parsed.sampleId || !parsed.results?.length) {
+    await query(`UPDATE device_messages SET status = 'unmatched', parsed_data = $1 WHERE id = $2`, [
+      JSON.stringify({ ...parsed, error: 'Missing sample ID or results' }),
+      msgResult.rows[0].id,
+    ]);
+    return {
+      message: msgResult.rows[0],
+      parsed,
+      imported: null,
+      warning: 'Message stored but sample ID or results missing',
+    };
+  }
+
+  try {
+    const imported = await deviceImport.importFromParsed(parsed, device);
+    await query(
+      `UPDATE device_messages SET status = 'imported', parsed_data = $1, sample_id = $2 WHERE id = $3`,
+      [JSON.stringify({ ...parsed, import: imported }), imported.sample_id, msgResult.rows[0].id]
+    );
+    logger.info('Norma CBC results imported', { deviceId: device.id, sample: imported.sample_code, count: imported.imported });
+    return { message: msgResult.rows[0], parsed, imported };
+  } catch (err) {
+    await query(
+      `UPDATE device_messages SET status = 'failed', parsed_data = $1 WHERE id = $2`,
+      [JSON.stringify({ ...parsed, error: err.message, code: err.code }), msgResult.rows[0].id]
+    );
+    throw err;
+  }
+};
+
+const receiveMessage = async (deviceId, rawMessage, direction = 'inbound', device = null) => {
+  const dev = device || await getById(deviceId);
+  if (direction !== 'inbound') {
+    const result = await query(
+      `INSERT INTO device_messages (device_id, direction, raw_message, status) VALUES ($1,$2,$3,'sent') RETURNING *`,
+      [deviceId, direction, rawMessage]
+    );
+    return { message: result.rows[0] };
+  }
+  return processInboundMessage(dev, rawMessage);
 };
 
 const getMessages = async (deviceId, limit = 50) => {
@@ -56,4 +146,6 @@ const getMessages = async (deviceId, limit = 50) => {
   return result.rows;
 };
 
-module.exports = { list, create, update, receiveMessage, getMessages, SUPPORTED_DEVICES };
+module.exports = {
+  list, getById, create, update, regenerateApiKey, receiveMessage, getMessages, SUPPORTED_DEVICES, generateApiKey,
+};

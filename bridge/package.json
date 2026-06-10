@@ -1,0 +1,9 @@
+{
+  "name": "rare-vet-norma-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Norma CBC HL7 bridge for Rare Vet LIMS",
+  "scripts": {
+    "start": "node norma-listener.js"
+  }
+}

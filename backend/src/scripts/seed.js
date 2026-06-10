@@ -37,10 +37,20 @@ const TESTS = [
 
 const CBC_PARAMS = [
   { code: 'WBC', name: 'White Blood Cells', name_ar: 'كريات الدم البيضاء', unit: '10³/µL' },
+  { code: 'LYM', name: 'Lymphocytes', name_ar: 'اللمفاويات', unit: '10³/µL' },
+  { code: 'MON', name: 'Monocytes', name_ar: 'الوحيدات', unit: '10³/µL' },
+  { code: 'NEU', name: 'Neutrophils', name_ar: 'العدلات', unit: '10³/µL' },
+  { code: 'EOS', name: 'Eosinophils', name_ar: 'الحمضات', unit: '10³/µL' },
+  { code: 'BAS', name: 'Basophils', name_ar: 'القعدات', unit: '10³/µL' },
   { code: 'RBC', name: 'Red Blood Cells', name_ar: 'كريات الدم الحمراء', unit: '10⁶/µL' },
   { code: 'HGB', name: 'Hemoglobin', name_ar: 'الهيموجلوبين', unit: 'g/dL' },
   { code: 'HCT', name: 'Hematocrit', name_ar: 'الهيماتوكريت', unit: '%' },
+  { code: 'MCV', name: 'MCV', name_ar: 'حجم الكرية الوسطي', unit: 'fL' },
+  { code: 'MCH', name: 'MCH', name_ar: 'هيموجلوبين الكرية', unit: 'pg' },
+  { code: 'MCHC', name: 'MCHC', name_ar: 'تركيز الهيموجلوبين', unit: 'g/dL' },
   { code: 'PLT', name: 'Platelets', name_ar: 'الصفائح الدموية', unit: '10³/µL' },
+  { code: 'MPV', name: 'MPV', name_ar: 'حجم الصفيح الوسطي', unit: 'fL' },
+  { code: 'RDW', name: 'RDW', name_ar: 'توزع كريات الدم الحمراء', unit: '%' },
 ];
 
 const CHEM_PARAMS = [
@@ -223,17 +233,22 @@ async function seed() {
   // Device integrations (inactive, ready for future)
   const devices = [
     { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp', host: '192.168.1.100', port: 5000 },
-    { name: 'Norma CBC', model: 'Norma', protocol: 'HL7', connection_type: 'serial', serial_port: 'COM3' },
+    { name: 'Norma CBC', model: 'iVet-5', protocol: 'HL7', connection_type: 'tcp', host: '0.0.0.0', port: 2575 },
     { name: 'Mini Vidas', model: 'Mini Vidas', protocol: 'ASTM', connection_type: 'serial', serial_port: 'COM4' },
   ];
 
+  const crypto = require('crypto');
   for (const device of devices) {
+    const config = JSON.stringify({
+      api_key: crypto.randomBytes(24).toString('hex'),
+      test_code: device.name === 'Norma CBC' ? 'CBC-FULL' : undefined,
+    });
     const exists = await query('SELECT id FROM device_integrations WHERE name = $1', [device.name]);
     if (!exists.rows[0]) {
       await query(
-        `INSERT INTO device_integrations (name, model, protocol, connection_type, host, port, serial_port, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, false)`,
-        [device.name, device.model, device.protocol, device.connection_type, device.host, device.port, device.serial_port]
+        `INSERT INTO device_integrations (name, model, protocol, connection_type, host, port, serial_port, config, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [device.name, device.model, device.protocol, device.connection_type, device.host, device.port, device.serial_port, config, device.name === 'Norma CBC']
       );
     }
   }
