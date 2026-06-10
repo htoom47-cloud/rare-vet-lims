@@ -193,6 +193,10 @@ const resources = {
         email: 'Email', lastLogin: 'Last Login', active: 'Active', inactive: 'Inactive',
         selectRole: 'Select role', fullNameAr: 'Name (Arabic)', password: 'Password',
         newPassword: 'New password (optional)', activeAccount: 'Active account',
+        removeUser: 'Remove user', removed: 'User removed',
+        confirmRemove: 'Remove this user? They will no longer be able to sign in.',
+        purgeDemo: 'Remove demo accounts', purgeDemoHint: 'Deletes reception, technician, vet, accountant, and manager demo logins',
+        demoPurged: '{{count}} demo account(s) removed',
       },
       permissions: {
         modules: {
@@ -417,6 +421,10 @@ const resources = {
         email: 'البريد الإلكتروني', lastLogin: 'آخر دخول', active: 'نشط', inactive: 'معطل',
         selectRole: 'اختر الدور', fullNameAr: 'الاسم بالعربي', password: 'كلمة المرور',
         newPassword: 'كلمة مرور جديدة (اختياري)', activeAccount: 'حساب نشط',
+        removeUser: 'حذف المستخدم', removed: 'تم حذف المستخدم',
+        confirmRemove: 'حذف هذا المستخدم؟ لن يتمكن من تسجيل الدخول.',
+        purgeDemo: 'حذف حسابات التجربة', purgeDemoHint: 'يحذف حسابات الاستقبال والفني والأخصائي والمحاسب والمدير التجريبية',
+        demoPurged: 'تم حذف {{count}} حساب تجريبي',
       },
       permissions: {
         modules: {

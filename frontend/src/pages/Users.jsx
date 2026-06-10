@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Shield, Save } from 'lucide-react';
+import { Plus, Pencil, Shield, Save, Trash2, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -107,6 +107,29 @@ export default function Users() {
     setEditOpen(true);
   };
 
+  const handleRemove = async (user) => {
+    if (user.role_name === 'admin') return;
+    if (!window.confirm(t('users.confirmRemove'))) return;
+    try {
+      await usersAPI.remove(user.id);
+      toast.success(t('users.removed'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const handlePurgeDemo = async () => {
+    if (!window.confirm(`${t('users.purgeDemo')}\n\n${t('users.purgeDemoHint')}`)) return;
+    try {
+      const { data } = await usersAPI.purgeDemo();
+      toast.success(t('users.demoPurged', { count: data.data.count }));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (!editingUser) return;
@@ -154,9 +177,16 @@ export default function Users() {
       key: 'actions',
       label: t('common.actions'),
       render: (r) => (
-        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="text-primary-600 text-sm flex items-center gap-1">
-          <Pencil size={14} /> {t('common.edit')}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="text-primary-600 text-sm flex items-center gap-1">
+            <Pencil size={14} /> {t('common.edit')}
+          </button>
+          {r.role_name !== 'admin' && r.is_active && (
+            <button onClick={(e) => { e.stopPropagation(); handleRemove(r); }} className="text-red-600 text-sm flex items-center gap-1">
+              <Trash2 size={14} /> {t('users.removeUser')}
+            </button>
+          )}
+        </div>
       ),
     },
   ];
@@ -177,10 +207,16 @@ export default function Users() {
           <h1 className="text-2xl font-bold">{t('users.title')}</h1>
           <p className="text-sm text-primary-500 mt-1">{t('users.adminOnlyHint')}</p>
         </div>
-        <button onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={18} /> {t('users.newUser')}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={handlePurgeDemo} className="btn-secondary flex items-center gap-2 text-red-700 border-red-200">
+            <UserX size={18} /> {t('users.purgeDemo')}
+          </button>
+          <button onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> {t('users.newUser')}
+          </button>
+        </div>
       </div>
+      <p className="text-xs text-primary-500 -mt-4 mb-6">{t('users.purgeDemoHint')}</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

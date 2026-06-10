@@ -117,12 +117,13 @@ async function seedTestParameters(testId, config) {
 }
 
 const USERS = [
-  { email: 'admin@rarevetcare.com', password: 'Admin@123', full_name: 'System Admin', full_name_ar: 'مدير النظام', role: 'admin' },
-  { email: 'reception@rarevetcare.com', password: 'Reception@123', full_name: 'Reception Desk', full_name_ar: 'الاستقبال', role: 'reception' },
-  { email: 'tech@rarevetcare.com', password: 'Tech@123', full_name: 'Lab Technician', full_name_ar: 'فني المختبر', role: 'lab_technician' },
-  { email: 'vet@rarevetcare.com', password: 'Vet@123', full_name: 'Dr. Veterinarian', full_name_ar: 'الطبيب البيطري', role: 'veterinarian' },
-  { email: 'accountant@rarevetcare.com', password: 'Account@123', full_name: 'Accountant', full_name_ar: 'المحاسب', role: 'accountant' },
-  { email: 'manager@rarevetcare.com', password: 'Manager@123', full_name: 'Lab Manager', full_name_ar: 'مدير المختبر', role: 'manager' },
+  {
+    email: process.env.ADMIN_EMAIL || 'admin@rarevetcare.com',
+    password: process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123',
+    full_name: 'System Admin',
+    full_name_ar: 'مدير النظام',
+    role: 'admin',
+  },
 ];
 
 async function seed() {
@@ -192,14 +193,14 @@ async function seed() {
     await seedTestParameters(testIdMap[code], config);
   }
 
-  // Users
+  // Admin only — demo accounts are created from the Users page
   for (const user of USERS) {
     const roleResult = await query('SELECT id FROM roles WHERE name = $1', [user.role]);
     const hash = await bcrypt.hash(user.password, 12);
     await query(
       `INSERT INTO users (email, password_hash, full_name, full_name_ar, role_id)
        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING`,
-      [user.email, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id]
+      [user.email.toLowerCase(), hash, user.full_name, user.full_name_ar, roleResult.rows[0].id]
     );
   }
 
@@ -244,7 +245,7 @@ async function seed() {
   );
 
   logger.info('Seed completed successfully!');
-  logger.info('Default login: admin@rarevetcare.com / Admin@123');
+  logger.info(`Admin login: ${USERS[0].email} (set ADMIN_INITIAL_PASSWORD to customize on first seed)`);
 }
 
 seed()

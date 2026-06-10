@@ -102,6 +102,13 @@ router.post('/', validate(registerSchema), async (req, res, next) => {
 
 
 
+router.post('/purge-demo', async (req, res, next) => {
+  try {
+    const data = await service.purgeDemoUsers();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.put('/:id', async (req, res, next) => {
 
   try {
@@ -114,7 +121,12 @@ router.put('/:id', async (req, res, next) => {
 
 });
 
-
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const data = await service.archive(req.params.id, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
 
 module.exports = router;
 

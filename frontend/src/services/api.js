@@ -144,6 +144,8 @@ export const usersAPI = {
   updateRolePermissions: (roleId, permissions) => api.put(`/users/roles/${roleId}/permissions`, { permissions }),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
+  remove: (id) => api.delete(`/users/${id}`),
+  purgeDemo: () => api.post('/users/purge-demo'),
 };
 
 export const auditAPI = {

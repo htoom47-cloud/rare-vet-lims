@@ -3,6 +3,14 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 
+const DEMO_EMAILS = [
+  'reception@rarevetcare.com',
+  'tech@rarevetcare.com',
+  'vet@rarevetcare.com',
+  'accountant@rarevetcare.com',
+  'manager@rarevetcare.com',
+];
+
 const list = async ({ page, limit, role_id }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
@@ -139,4 +147,46 @@ const update = async (id, data, actorId) => {
   return result.rows[0];
 };
 
-module.exports = { list, getRoles, getPermissions, listAllPermissions, updateRolePermissions, create, update };
+const archive = async (id, actorId) => {
+  const existing = await query(
+    `SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+    [id]
+  );
+  if (!existing.rows[0]) throw new AppError('User not found', 404, 'NOT_FOUND');
+  if (existing.rows[0].role_name === 'admin') {
+    throw new AppError('Cannot remove admin account', 403, 'FORBIDDEN');
+  }
+  if (id === actorId) throw new AppError('Cannot remove your own account', 403, 'FORBIDDEN');
+
+  const archivedEmail = `archived.${id.replace(/-/g, '')}@removed.local`;
+  const result = await query(
+    `UPDATE users SET is_active = false, email = $1, updated_at = NOW()
+     WHERE id = $2
+     RETURNING id, email, full_name, is_active`,
+    [archivedEmail, id]
+  );
+  return result.rows[0];
+};
+
+const purgeDemoUsers = async () => {
+  const archived = [];
+  for (const email of DEMO_EMAILS) {
+    const user = await query(
+      `SELECT u.id, u.email, r.name as role_name FROM users u
+       JOIN roles r ON u.role_id = r.id WHERE u.email = $1`,
+      [email.toLowerCase()]
+    );
+    if (!user.rows[0] || user.rows[0].role_name === 'admin') continue;
+    const archivedEmail = `archived.${user.rows[0].id.replace(/-/g, '')}@removed.local`;
+    await query(
+      `UPDATE users SET is_active = false, email = $1, updated_at = NOW() WHERE id = $2`,
+      [archivedEmail, user.rows[0].id]
+    );
+    archived.push(email);
+  }
+  return { archived, count: archived.length };
+};
+
+module.exports = {
+  list, getRoles, getPermissions, listAllPermissions, updateRolePermissions, create, update, archive, purgeDemoUsers,
+};
