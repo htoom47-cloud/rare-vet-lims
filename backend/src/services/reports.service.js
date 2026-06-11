@@ -123,7 +123,9 @@ const ensurePdfFile = async (reportRow) => {
   if (!filename) throw new AppError('Report file not found', 404, 'NOT_FOUND');
 
   const filePath = path.join(ensureUploadDir(), 'reports', filename);
-  if (fs.existsSync(filePath)) return filePath;
+  if (fs.existsSync(filePath)) {
+    await fs.promises.unlink(filePath);
+  }
 
   const reportData = await buildReportData(reportRow.sample_id, {
     reportNumber: reportRow.report_number,

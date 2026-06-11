@@ -5,8 +5,21 @@ const { v4: uuidv4 } = require('uuid');
 const env = require('../config/env');
 const { generateQR } = require('./barcode');
 
-const ARABIC_FONT_PATH = path.join(__dirname, '../assets/fonts/NotoSansArabic-Regular.ttf');
+const ARABIC_FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
 const HAS_ARABIC_FONT = fs.existsSync(ARABIC_FONT_PATH);
+
+const reshapeArabic = (text) => {
+  if (!text) return '';
+  try {
+    // eslint-disable-next-line global-require
+    const arabicReshaper = require('arabic-reshaper');
+    return arabicReshaper.reshape(String(text));
+  } catch {
+    return String(text);
+  }
+};
+
+const ar = (text, useArabic) => (useArabic ? reshapeArabic(text) : text);
 
 const FLAG_LABELS = {
   en: { NORMAL: 'NORMAL', HIGH: 'HIGH', LOW: 'LOW', CRIT_HIGH: 'CRIT HIGH', CRIT_LOW: 'CRIT LOW' },
@@ -98,7 +111,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       doc.fontSize(20).fillColor('#0d9488').text(env.lab.name, { align: 'center' });
       if (isArabic && env.lab.nameAr) {
         setupFonts(doc, useArabicFont);
-        doc.fontSize(14).fillColor('#333').text(env.lab.nameAr, { align: 'center' });
+        doc.fontSize(14).fillColor('#333').text(ar(env.lab.nameAr, useArabicFont), { align: 'center' });
       }
       doc.moveDown(0.5);
       doc.fontSize(10).fillColor('#666')
@@ -110,30 +123,30 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       doc.moveDown();
 
       setupFonts(doc, useArabicFont);
-      doc.fontSize(16).fillColor('#111').text(labels.reportTitle, { align: 'center' });
+      doc.fontSize(16).fillColor('#111').text(ar(labels.reportTitle, useArabicFont), { align: 'center' });
       doc.moveDown();
 
       const infoY = doc.y;
       setupFonts(doc, useArabicFont);
       doc.fontSize(10).fillColor('#333');
-      doc.text(`${labels.reportNo}: ${reportData.reportNumber}`, 50, infoY);
-      doc.text(`${labels.sampleId}: ${reportData.sampleCode}`, 300, infoY);
-      doc.text(`${labels.date}: ${new Date(reportData.date).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US')}`, 50, infoY + 15);
-      doc.text(`${labels.client}: ${reportData.customerName || '-'}`, 300, infoY + 15);
+      doc.text(`${ar(labels.reportNo, useArabicFont)}: ${reportData.reportNumber}`, 50, infoY);
+      doc.text(`${ar(labels.sampleId, useArabicFont)}: ${reportData.sampleCode}`, 300, infoY);
+      doc.text(`${ar(labels.date, useArabicFont)}: ${new Date(reportData.date).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US')}`, 50, infoY + 15);
+      doc.text(`${ar(labels.client, useArabicFont)}: ${ar(reportData.customerName || '-', useArabicFont)}`, 300, infoY + 15);
       doc.moveDown(2);
 
       const animalType = ANIMAL_TYPES[reportData.animalType]?.[isArabic ? 'ar' : 'en'] || reportData.animalType;
       const animalGender = GENDERS[reportData.animalGender]?.[isArabic ? 'ar' : 'en'] || reportData.animalGender || '-';
 
       setupFonts(doc, useArabicFont);
-      doc.fontSize(12).fillColor('#0d9488').text(labels.animalInfo);
+      doc.fontSize(12).fillColor('#0d9488').text(ar(labels.animalInfo, useArabicFont));
       doc.fontSize(10).fillColor('#333');
-      doc.text(`${labels.animalId}: ${reportData.animalCode} | ${labels.type}: ${animalType}`);
-      doc.text(`${labels.name}: ${reportData.animalName || '-'} | ${labels.gender}: ${animalGender}`);
+      doc.text(`${ar(labels.animalId, useArabicFont)}: ${reportData.animalCode} | ${ar(labels.type, useArabicFont)}: ${ar(animalType, useArabicFont)}`);
+      doc.text(`${ar(labels.name, useArabicFont)}: ${ar(reportData.animalName || '-', useArabicFont)} | ${ar(labels.gender, useArabicFont)}: ${ar(animalGender, useArabicFont)}`);
       doc.moveDown();
 
       setupFonts(doc, useArabicFont);
-      doc.fontSize(12).fillColor('#0d9488').text(labels.testResults);
+      doc.fontSize(12).fillColor('#0d9488').text(ar(labels.testResults, useArabicFont));
       doc.moveDown(0.5);
 
       const tableTop = doc.y;
@@ -144,7 +157,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       labels.headers.forEach((h, i) => {
         setupFonts(doc, useArabicFont);
         doc.rect(x, tableTop, colWidths[i], 20).fill('#0d9488');
-        doc.fillColor('#fff').text(h, x + 5, tableTop + 5, { width: colWidths[i] - 10 });
+        doc.fillColor('#fff').text(ar(h, useArabicFont), x + 5, tableTop + 5, { width: colWidths[i] - 10 });
         x += colWidths[i];
       });
 
@@ -155,9 +168,15 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
         doc.rect(50, rowY, 460, 18).fill(bg);
         doc.fillColor('#333');
         const flagText = flagLabels[row.flag] || row.flag || '-';
-        const values = [row.name, row.value, row.unit || '-', row.reference || '-', flagText];
+        const values = [
+          ar(row.name, useArabicFont),
+          row.value,
+          row.unit || '-',
+          row.reference || '-',
+          ar(flagText, useArabicFont),
+        ];
         values.forEach((v, i) => {
-          setupFonts(doc, useArabicFont && i !== 4 && i !== 2);
+          setupFonts(doc, useArabicFont && (i === 0 || i === 4));
           if (row.isCritical && i === 4) doc.fillColor('#dc2626');
           else doc.fillColor('#333');
           doc.text(String(v), x + 5, rowY + 4, { width: colWidths[i] - 10 });
@@ -170,8 +189,8 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
 
       if (reportData.doctorNotes) {
         setupFonts(doc, useArabicFont);
-        doc.fontSize(11).fillColor('#0d9488').text(labels.doctorNotes);
-        doc.fontSize(10).fillColor('#333').text(reportData.doctorNotes);
+        doc.fontSize(11).fillColor('#0d9488').text(ar(labels.doctorNotes, useArabicFont));
+        doc.fontSize(10).fillColor('#333').text(ar(reportData.doctorNotes, useArabicFont));
         doc.moveDown();
       }
 
@@ -185,19 +204,19 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       doc.image(qrBuffer, 50, doc.y, { width: 80 });
       setupFonts(doc, useArabicFont);
       doc.fontSize(8).fillColor('#666')
-        .text(labels.scanVerify, 140, doc.y + 30);
+        .text(ar(labels.scanVerify, useArabicFont), 140, doc.y + 30);
 
       setupFonts(doc, useArabicFont);
       doc.fontSize(10).fillColor('#333')
-        .text(labels.specialistSignature, 350, doc.y);
+        .text(ar(labels.specialistSignature, useArabicFont), 350, doc.y);
       if (reportData.specialistName) {
-        doc.text(reportData.specialistName, 350, doc.y + 15);
+        doc.text(ar(reportData.specialistName, useArabicFont), 350, doc.y + 15);
       }
 
       doc.moveDown(4);
       setupFonts(doc, useArabicFont);
       doc.fontSize(8).fillColor('#999')
-        .text(`${labels.issuedBy} ${isArabic && env.lab.nameAr ? env.lab.nameAr : env.lab.name}`, { align: 'center' });
+        .text(`${ar(labels.issuedBy, useArabicFont)} ${isArabic && env.lab.nameAr ? ar(env.lab.nameAr, useArabicFont) : env.lab.name}`, { align: 'center' });
 
       doc.end();
 
