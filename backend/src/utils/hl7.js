@@ -9,39 +9,108 @@ function splitSegments(raw) {
     .filter(Boolean);
 }
 
+const pickId = (field) => {
+  if (!field) return null;
+  const primary = String(field).split('^')[0]?.trim();
+  return primary || null;
+};
+
+const normalizeSampleId = (id) => {
+  const value = String(id || '').trim();
+  return value || null;
+};
+
+const extractFromRaw = (raw) => {
+  const patterns = [
+    /\b(BC-\d{6}-\d+)\b/i,
+    /\b(SMP-\d{6}-\d+)\b/i,
+    /\b(SMP-[A-Z0-9-]+)\b/i,
+    /\b(BC-[A-Z0-9-]+)\b/i,
+  ];
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+};
+
+const firstId = (...candidates) => {
+  for (const candidate of candidates) {
+    const id = normalizeSampleId(candidate);
+    if (id) return id;
+  }
+  return null;
+};
+
 function parseHl7(raw) {
   const segments = splitSegments(raw);
-  let sampleId = null;
+  let sampleId = extractFromRaw(raw);
   const results = [];
 
   for (const segment of segments) {
     const fields = segment.split('|');
     const type = fields[0];
 
-    if (type === 'PID' && !sampleId) {
-      sampleId = (fields[3] || fields[2] || '').split('^')[0] || null;
+    if (type === 'PID') {
+      sampleId = sampleId || firstId(
+        pickId(fields[3]),
+        pickId(fields[2]),
+        pickId(fields[4]),
+        pickId(fields[18]),
+        pickId(fields[19])
+      );
+    }
+
+    if (type === 'ORC') {
+      sampleId = sampleId || firstId(
+        pickId(fields[2]),
+        pickId(fields[3]),
+        pickId(fields[4])
+      );
     }
 
     if (type === 'OBR') {
-      sampleId = sampleId
-        || (fields[2] || '').split('^')[0]
-        || (fields[3] || '').split('^')[0]
-        || (fields[4] || '').split('^')[0]
-        || null;
+      sampleId = sampleId || firstId(
+        pickId(fields[2]),
+        pickId(fields[3]),
+        pickId(fields[4]),
+        pickId(fields[18]),
+        pickId(fields[19]),
+        pickId(fields[20])
+      );
+    }
+
+    if (type === 'SPM') {
+      sampleId = sampleId || firstId(
+        pickId(fields[2]),
+        pickId(fields[1]),
+        pickId(fields[4])
+      );
+    }
+
+    if (type === 'PV1') {
+      sampleId = sampleId || firstId(pickId(fields[19]));
     }
 
     if (type === 'OBX') {
-      const idField = fields[3] || '';
-      const code = idField.split('^')[0]?.trim();
-      const value = (fields[5] ?? '').trim();
-      const unit = (fields[6] || '').trim();
-      if (code && value !== '') {
+      const idField = fields[3] || fields[4] || '';
+      const code = idField.split('^')[0]?.trim()
+        || idField.split('^')[1]?.trim()
+        || fields[4]?.split('^')[0]?.trim();
+      const value = (fields[5] ?? fields[6] ?? '').trim();
+      const unit = (fields[6] || fields[7] || '').trim();
+      if (code && value !== '' && !Number.isNaN(Number(value))) {
         results.push({ code, value, unit });
       }
     }
   }
 
-  return { protocol: 'HL7', sampleId, results, segments: segments.length };
+  return {
+    protocol: 'HL7',
+    sampleId: normalizeSampleId(sampleId),
+    results,
+    segments: segments.length,
+  };
 }
 
-module.exports = { parseHl7, splitSegments };
+module.exports = { parseHl7, splitSegments, normalizeSampleId, extractFromRaw };

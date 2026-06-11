@@ -8,9 +8,9 @@ const findSampleByBarcode = async (barcode) => {
   if (!id) return null;
   const result = await query(
     `SELECT id, sample_code, barcode, status FROM samples
-     WHERE barcode = $1 OR sample_code = $1 OR sample_code ILIKE $2
+     WHERE barcode = $1 OR sample_code = $1 OR barcode ILIKE $2 OR sample_code ILIKE $2
      ORDER BY created_at DESC LIMIT 1`,
-    [id, `%${id}%`]
+    [id, id]
   );
   return result.rows[0] || null;
 };

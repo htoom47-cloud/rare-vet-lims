@@ -15,6 +15,8 @@ const SUPPORTED_DEVICES = [
 const generateApiKey = () => crypto.randomBytes(24).toString('hex');
 
 const parseMessage = (raw, protocol) => {
+  const trimmed = String(raw || '').trim();
+  if (trimmed.startsWith('H|') || trimmed.startsWith('1H|')) return parseAstm(raw);
   const p = (protocol || '').toUpperCase();
   if (p === 'ASTM') return parseAstm(raw);
   return parseHl7(raw);
@@ -96,18 +98,25 @@ const processInboundMessage = async (device, rawMessage) => {
 
   await query('UPDATE device_integrations SET last_connected = NOW() WHERE id = $1', [device.id]);
 
-  if (!parsed.sampleId || !parsed.results?.length) {
+  const sampleId = String(parsed.sampleId || '').trim();
+  if (!sampleId || !parsed.results?.length) {
     await query(`UPDATE device_messages SET status = 'unmatched', parsed_data = $1 WHERE id = $2`, [
-      JSON.stringify({ ...parsed, error: 'Missing sample ID or results' }),
+      JSON.stringify({
+        ...parsed,
+        sampleId: sampleId || null,
+        error: !sampleId ? 'Missing sample ID in HL7 message' : 'Missing results in HL7 message',
+        hint: 'Enter BC-... or SMP-... on Norma and enable Repeat Sample ID as Patient ID',
+      }),
       msgResult.rows[0].id,
     ]);
     return {
       message: msgResult.rows[0],
-      parsed,
+      parsed: { ...parsed, sampleId: sampleId || null },
       imported: null,
       warning: 'Message stored but sample ID or results missing',
     };
   }
+  parsed.sampleId = sampleId;
 
   try {
     const imported = await deviceImport.importFromParsed(parsed, device);
