@@ -18,11 +18,13 @@ try {
   }
 
   run('src/scripts/migrate.js');
-  run('src/scripts/ensure-admin.js');
 
   if (process.env.RUN_SEED === 'true') {
     run('src/scripts/seed.js');
   }
+
+  // Run last so admin username/password always win over seed defaults.
+  run('src/scripts/ensure-admin.js');
 
   const distPath = path.join(backendRoot, '../frontend/dist');
   if (!fs.existsSync(distPath)) {

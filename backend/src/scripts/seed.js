@@ -224,10 +224,17 @@ async function seed() {
       [username, email]
     );
     if (existing.rows[0]) {
-      await query(
-        `UPDATE users SET username = $1, password_hash = $2, full_name = $3, full_name_ar = $4, role_id = $5, email = $6, is_active = true WHERE id = $7`,
-        [username, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id, email, existing.rows[0].id]
-      );
+      if (user.role === 'admin') {
+        await query(
+          `UPDATE users SET username = $1, full_name = $2, full_name_ar = $3, role_id = $4, email = $5, is_active = true WHERE id = $6`,
+          [username, user.full_name, user.full_name_ar, roleResult.rows[0].id, email, existing.rows[0].id]
+        );
+      } else {
+        await query(
+          `UPDATE users SET username = $1, password_hash = $2, full_name = $3, full_name_ar = $4, role_id = $5, email = $6, is_active = true WHERE id = $7`,
+          [username, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id, email, existing.rows[0].id]
+        );
+      }
     } else {
       await query(
         `INSERT INTO users (username, email, password_hash, full_name, full_name_ar, role_id, is_active)

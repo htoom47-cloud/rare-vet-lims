@@ -54,6 +54,8 @@ export default function Login() {
         toast.error(t('auth.serverUnreachable'));
       } else if (status === 429) {
         toast.error(t('auth.tooManyRequests'));
+      } else if (status === 401) {
+        toast.error(t('auth.loginFailed'));
       } else {
         toast.error(msg || t('auth.loginFailed'));
       }

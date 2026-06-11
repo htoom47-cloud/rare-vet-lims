@@ -6,7 +6,8 @@ const logger = require('../config/logger');
 async function ensureAdmin() {
   const username = (process.env.ADMIN_USERNAME || 'admin').toLowerCase();
   const email = (process.env.ADMIN_EMAIL || 'admin@rarevetcare.com').toLowerCase();
-  const password = process.env.ADMIN_INITIAL_PASSWORD;
+  // Sync admin password on every deploy so cloud login stays predictable.
+  const password = process.env.ADMIN_INITIAL_PASSWORD || 'RareVet2026';
 
   const role = await pool.query("SELECT id FROM roles WHERE name = 'admin'");
   if (!role.rows[0]) {
@@ -41,11 +42,9 @@ async function ensureAdmin() {
     params.push(email);
     fields.push('is_active = true');
 
-    if (password) {
-      const hash = await bcrypt.hash(password, 12);
-      fields.push(`password_hash = $${idx++}`);
-      params.push(hash);
-    }
+    const hash = await bcrypt.hash(password, 12);
+    fields.push(`password_hash = $${idx++}`);
+    params.push(hash);
 
     fields.push('updated_at = NOW()');
     params.push(userId);
@@ -54,11 +53,6 @@ async function ensureAdmin() {
       params
     );
     logger.info('Admin account verified', { username, passwordReset: Boolean(password) });
-    return;
-  }
-
-  if (!password) {
-    logger.warn('No admin user found and ADMIN_INITIAL_PASSWORD not set');
     return;
   }
 
