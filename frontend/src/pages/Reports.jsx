@@ -215,18 +215,18 @@ export default function Reports() {
               <button type="button" onClick={() => { setLanguage('en'); reloadAiPreview('en'); }} className={`flex-1 py-2 rounded-lg text-sm ${language === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}>English</button>
             </div>
 
-            <div className="border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
-              <div className="bg-blue-600 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
+            <div className="border border-primary-300/50 rounded-lg overflow-hidden">
+              <div className="bg-primary-600 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
                 <Sparkles size={16} /> {t('reports.aiSection')}
               </div>
-              <div className="p-3 text-sm bg-blue-50 dark:bg-blue-900/10 min-h-[100px] whitespace-pre-wrap">
+              <div className="p-3 text-sm bg-primary-50 dark:bg-primary-900/10 min-h-[100px] whitespace-pre-wrap">
                 {loadingAi ? t('common.loading') : (aiPreview || t('reports.aiEmpty'))}
               </div>
-              <p className="text-xs text-blue-600 px-3 py-2 bg-blue-50/50">{t('reports.aiHint')}</p>
+              <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">{t('reports.aiHint')}</p>
             </div>
 
-            <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden">
-              <div className="bg-emerald-700 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
+            <div className="border border-primary-300/50 rounded-lg overflow-hidden">
+              <div className="bg-primary-400 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
                 <Stethoscope size={16} /> {t('reports.treatmentSection')}
               </div>
               <textarea
@@ -236,7 +236,7 @@ export default function Reports() {
                 placeholder={t('reports.treatmentPlaceholder')}
                 rows={5}
               />
-              <p className="text-xs text-emerald-700 px-3 py-2 bg-emerald-50/50">{t('reports.treatmentHint')}</p>
+              <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">{t('reports.treatmentHint')}</p>
             </div>
 
             <button type="button" onClick={generateReport} disabled={generating} className="btn-primary w-full py-3">

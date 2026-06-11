@@ -10,8 +10,16 @@ const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 const HAS_ARABIC_FONT = fs.existsSync(ARABIC_FONT_PATH);
 const HAS_LOGO = fs.existsSync(LOGO_PATH);
 
-const BRAND = '#0d9488';
-const BRAND_DARK = '#0f766e';
+const BRAND = {
+  brown: '#4A3728',
+  brownDark: '#3D2E22',
+  brownLight: '#302419',
+  gold: '#C5A059',
+  goldLight: '#E8D5B5',
+  goldPale: '#F5EDE0',
+  cream: '#FDFAF3',
+  creamDark: '#F8F2E8',
+};
 
 const FLAG_COLORS = {
   HIGH: '#dc2626',
@@ -34,8 +42,10 @@ const LABELS = {
     animalInfo: 'Patient Information', animalId: 'Animal ID', type: 'Species', name: 'Name', gender: 'Gender',
     testResults: 'Laboratory Results',
     headers: ['Parameter', 'Result', 'Unit', 'Reference', 'Status'],
-    aiSection: 'Laboratory Interpretation (AI Generated)',
-    treatmentSection: 'Treatment Recommendations (Veterinarian)',
+    aiSection: 'Laboratory Description & Interpretation',
+    aiSectionSub: 'Electronic record — AI generated',
+    treatmentSection: 'Treatment Recommendations',
+    treatmentSectionSub: 'Veterinarian — manual entry',
     aiBadge: 'AI',
     scanVerify: 'Scan to verify authenticity',
     specialistSignature: 'Veterinarian Signature',
@@ -45,18 +55,20 @@ const LABELS = {
   },
   ar: {
     reportTitle: 'تقرير نتائج المختبر',
-    labSubtitle: 'مختبر طبي بحثي بيطري',
+    labSubtitle: 'للتحاليل الطبية والبحثية البيطرية',
     reportNo: 'رقم التقرير', sampleId: 'رقم العينة', date: 'التاريخ', client: 'العميل',
     animalInfo: 'بيانات الحالة', animalId: 'رقم الحيوان', type: 'النوع', name: 'الاسم', gender: 'الجنس',
     testResults: 'نتائج الفحوصات المخبرية',
     headers: ['الفحص', 'النتيجة', 'الوحدة', 'المدى المرجعي', 'الحالة'],
-    aiSection: 'الوصف والتفسير المخبري (تسجيل إلكتروني — ذكاء اصطناعي)',
-    treatmentSection: 'التوصيات العلاجية (الطبيب البيطري — إدخال يدوي)',
-    aiBadge: 'ذكاء اصطناعي',
+    aiSection: 'الوصف والتفسير المخبري',
+    aiSectionSub: 'تسجيل إلكتروني - ذكاء اصطناعي',
+    treatmentSection: 'التوصيات العلاجية',
+    treatmentSectionSub: 'الطبيب البيطري - إدخال يدوي',
+    aiBadge: 'AI',
     scanVerify: 'امسح للتحقق من صحة التقرير',
     specialistSignature: 'توقيع الطبيب البيطري',
     issuedBy: 'صادر من',
-    emptyTreatment: 'لم تُسجَّل توصيات علاجية بعد.',
+    emptyTreatment: 'لم تسجل توصيات علاجية بعد.',
     emptyAi: 'لا يوجد تفسير إلكتروني.',
   },
 };
@@ -77,121 +89,163 @@ const registerFonts = (doc) => {
   doc.registerFont('Latin-Bold', 'Helvetica-Bold');
 };
 
-const prepareArabic = (text) => {
-  if (!text) return '';
+const sanitizeText = (text) => String(text ?? '')
+  .replace(/•/g, '-')
+  .replace(/—/g, '-')
+  .replace(/\u2013/g, '-')
+  .replace(/\u00A0/g, ' ');
+
+const reshapeWord = (word) => {
+  if (!/[\u0600-\u06FF\u0750-\u077F]/.test(word)) return word;
   try {
     // eslint-disable-next-line global-require
     const arabicReshaper = require('arabic-reshaper');
-    return arabicReshaper.reshape(String(text)).split(/\s+/).reverse().join(' ');
+    return arabicReshaper.reshape(word).split('').reverse().join('');
   } catch {
-    return String(text);
+    return word;
   }
 };
 
-const isLatinOnly = (text) => /^[\x00-\x7F\s.,:;|+\-/()°µ³⁶⁹\n\r\t]+$/.test(String(text || ''));
+const prepareArabic = (text) => sanitizeText(text)
+  .split('\n')
+  .map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return '';
+    const words = trimmed.split(/\s+/);
+    return words.map(reshapeWord).reverse().join('  ');
+  })
+  .join('\n');
+
+const isLatinOnly = (text) => /^[\x00-\x7F\s.,:;|+\-/()°µ³⁶⁹\n\r\t0-9%]+$/.test(String(text || ''));
 const hasArabicChars = (text) => /[\u0600-\u06FF]/.test(String(text || ''));
 
 const setLatin = (doc, bold = false) => doc.font(bold ? 'Latin-Bold' : 'Latin');
 const setArabic = (doc) => { if (HAS_ARABIC_FONT) doc.font('Arabic'); else doc.font('Latin'); };
 
+const textAlign = (align, arabicMode) => {
+  if (align === 'center') return 'center';
+  return arabicMode ? 'right' : align;
+};
+
+const measureTextHeight = (doc, text, width, { arabicMode = false, size = 9 } = {}) => {
+  doc.fontSize(size);
+  const value = sanitizeText(text);
+  if (arabicMode && hasArabicChars(value)) {
+    setArabic(doc);
+    return doc.heightOfString(prepareArabic(value), { width, align: 'right', lineGap: 3 });
+  }
+  setLatin(doc);
+  return doc.heightOfString(value, { width, align: 'left', lineGap: 3 });
+};
+
 const drawTextSmart = (doc, text, x, y, width, { arabicMode = false, color = '#333', bold = false, align = 'left', size = 10 } = {}) => {
   doc.fontSize(size).fillColor(color);
-  const value = String(text ?? '-');
+  const value = sanitizeText(text ?? '-');
+  const resolvedAlign = textAlign(align, arabicMode && !isLatinOnly(value));
+
   if (arabicMode && !isLatinOnly(value)) {
     setArabic(doc);
-    doc.text(prepareArabic(value), x, y, { width, align: align === 'right' ? 'right' : 'right' });
+    doc.text(prepareArabic(value), x, y, { width, align: resolvedAlign, lineGap: 2 });
   } else {
     setLatin(doc, bold);
-    doc.text(value, x, y, { width, align });
+    doc.text(value, x, y, { width, align: resolvedAlign, lineGap: 2 });
   }
 };
 
 const drawHeader = (doc, isArabic) => {
-  const top = 35;
-  doc.rect(0, 0, 595, 95).fill(BRAND);
+  const top = 28;
+  doc.rect(0, 0, 595, 4).fill(BRAND.gold);
+  doc.rect(0, 4, 595, 102).fill(BRAND.cream);
 
-  doc.roundedRect(42, top - 8, 78, 78, 10).fill('#ffffff');
+  doc.roundedRect(42, top, 78, 78, 10).lineWidth(2).strokeColor(BRAND.gold).stroke();
+  doc.roundedRect(42, top, 78, 78, 10).fill('#ffffff');
   if (HAS_LOGO) {
-    doc.image(LOGO_PATH, 48, top - 2, { width: 66, height: 66 });
-  } else {
-    doc.fillColor(BRAND_DARK).fontSize(22).text('+', 72, top + 20);
+    doc.image(LOGO_PATH, 48, top + 6, { width: 66, height: 66 });
   }
 
   const centerX = 130;
-  const centerW = 335;
+  const centerW = 420;
   const labNameAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
 
   if (isArabic) {
-    drawTextSmart(doc, labNameAr, centerX, top + 4, centerW, { arabicMode: true, color: '#ffffff', bold: true, align: 'center', size: 18 });
-    setLatin(doc, true);
-    doc.fontSize(11).fillColor('#e6fffa').text('Al-Nawadir Veterinary Care Center', centerX, top + 30, { width: centerW, align: 'center' });
-    drawTextSmart(doc, LABELS.ar.labSubtitle, centerX, top + 46, centerW, { arabicMode: true, color: '#ccfbf1', align: 'center', size: 9 });
+    drawTextSmart(doc, labNameAr, centerX, top + 6, centerW, { arabicMode: true, color: BRAND.brown, bold: true, align: 'center', size: 20 });
+    setLatin(doc);
+    doc.fontSize(10).fillColor(BRAND.gold).text('Al-Nawadir Veterinary Care Center', centerX, top + 32, { width: centerW, align: 'center' });
+    drawTextSmart(doc, LABELS.ar.labSubtitle, centerX, top + 48, centerW, { arabicMode: true, color: BRAND.brownLight, align: 'center', size: 10 });
   } else {
     setLatin(doc, true);
-    doc.fontSize(18).fillColor('#ffffff').text(env.lab.name || 'Al-Nawadir Veterinary Care Center', centerX, top + 8, { width: centerW, align: 'center' });
-    drawTextSmart(doc, labNameAr, centerX, top + 30, centerW, { arabicMode: true, color: '#e6fffa', align: 'center', size: 11 });
+    doc.fontSize(18).fillColor(BRAND.brown).text(env.lab.name || 'Al-Nawadir Veterinary Care Center', centerX, top + 10, { width: centerW, align: 'center' });
+    drawTextSmart(doc, labNameAr, centerX, top + 32, centerW, { arabicMode: true, color: BRAND.gold, align: 'center', size: 12 });
     setLatin(doc);
-    doc.fontSize(9).fillColor('#ccfbf1').text(LABELS.en.labSubtitle, centerX, top + 48, { width: centerW, align: 'center' });
+    doc.fontSize(10).fillColor(BRAND.brownLight).text(LABELS.en.labSubtitle, centerX, top + 50, { width: centerW, align: 'center' });
   }
 
-  setLatin(doc);
-  doc.fontSize(8).fillColor('#f0fdfa')
-    .text(`${env.lab.phone}  |  ${env.lab.email}`, centerX, top + 66, { width: centerW, align: 'center' });
+  const lineY = top + 72;
+  doc.moveTo(centerX + 80, lineY).lineTo(centerX + centerW - 80, lineY).lineWidth(1).strokeColor(BRAND.goldLight).stroke();
+  doc.circle(centerX + centerW / 2, lineY, 2.5).fill(BRAND.gold);
 
-  doc.y = 108;
+  setLatin(doc);
+  doc.fontSize(8).fillColor(BRAND.brown)
+    .text(`${env.lab.phone}  |  ${env.lab.email}`, centerX, lineY + 8, { width: centerW, align: 'center' });
+
+  doc.rect(0, 106, 595, 1).fill(BRAND.goldLight);
+  doc.y = 118;
 };
 
 const drawInfoCard = (doc, title, rows, isArabic) => {
   const cardY = doc.y;
   const cardH = 18 + rows.length * 16 + 10;
-  doc.roundedRect(45, cardY, 505, cardH, 6).lineWidth(1).strokeColor('#d1d5db').stroke();
-  doc.rect(45, cardY, 505, 22).fill('#f0fdfa');
-  drawTextSmart(doc, title, 55, cardY + 6, 485, { arabicMode: isArabic, color: BRAND_DARK, bold: true, size: 11 });
+  doc.roundedRect(45, cardY, 505, cardH, 6).lineWidth(1).strokeColor(BRAND.goldLight).stroke();
+  doc.rect(45, cardY, 505, 22).fill(BRAND.goldPale);
+  drawTextSmart(doc, title, 55, cardY + 6, 485, { arabicMode: isArabic, color: BRAND.brown, bold: true, size: 11 });
 
   let y = cardY + 28;
   rows.forEach(([label, value]) => {
     if (isArabic) {
       drawTextSmart(doc, label, 55, y, 140, { arabicMode: true, color: '#6b7280', size: 9 });
       const v = String(value ?? '-');
-      if (hasArabicChars(v)) drawTextSmart(doc, v, 200, y, 340, { arabicMode: true, color: '#111', size: 9 });
-      else { setLatin(doc); doc.fontSize(9).fillColor('#111').text(v, 200, y, { width: 340 }); }
+      if (hasArabicChars(v)) drawTextSmart(doc, v, 200, y, 340, { arabicMode: true, color: BRAND.brown, size: 9 });
+      else { setLatin(doc); doc.fontSize(9).fillColor(BRAND.brown).text(v, 200, y, { width: 340 }); }
     } else {
       setLatin(doc);
       doc.fontSize(9).fillColor('#6b7280').text(`${label}:`, 55, y, { width: 120, continued: true });
-      doc.fillColor('#111').text(` ${value ?? '-'}`, { width: 360 });
+      doc.fillColor(BRAND.brown).text(` ${value ?? '-'}`, { width: 360 });
     }
     y += 16;
   });
   doc.y = cardY + cardH + 10;
 };
 
-const drawSectionBox = (doc, title, badge, content, isArabic, accentColor, emptyText) => {
+const drawSectionBox = (doc, title, subtitle, badge, content, isArabic, accentColor, emptyText) => {
   const startY = doc.y;
   const body = (content && String(content).trim()) ? String(content) : emptyText;
   const textWidth = 475;
-  setLatin(doc);
-  doc.fontSize(9);
-  const bodyHeight = doc.heightOfString(body, { width: textWidth });
-  const boxH = Math.max(56, bodyHeight + 38);
+  const bodyHeight = measureTextHeight(doc, body, textWidth, { arabicMode: isArabic, size: 9 });
+  const boxH = Math.max(64, bodyHeight + 48);
 
-  doc.roundedRect(45, startY, 505, boxH, 6).fill('#fafafa');
-  doc.rect(45, startY, 505, 24).fill(accentColor);
-  drawTextSmart(doc, title, 55, startY + 7, 380, { arabicMode: isArabic, color: '#ffffff', bold: true, size: 10 });
+  doc.roundedRect(45, startY, 505, boxH, 6).lineWidth(1).strokeColor(BRAND.goldLight).stroke();
+  doc.rect(45, startY, 505, 28).fill(accentColor);
+
+  drawTextSmart(doc, title, 55, startY + 6, 360, { arabicMode: isArabic, color: '#ffffff', bold: true, size: 10 });
+  if (subtitle) {
+    drawTextSmart(doc, subtitle, 55, startY + 17, 360, { arabicMode: isArabic, color: BRAND.goldPale, size: 7 });
+  }
 
   if (badge) {
     setLatin(doc, true);
     doc.fontSize(7);
-    const badgeW = doc.widthOfString(badge) + 12;
+    const badgeW = doc.widthOfString(badge) + 14;
     const badgeX = 505 - badgeW - 10;
-    doc.roundedRect(badgeX, startY + 5, badgeW, 14, 3).fill('#ffffff');
-    doc.fillColor(accentColor).text(badge, badgeX + 6, startY + 8, { width: badgeW - 12 });
+    doc.roundedRect(badgeX, startY + 7, badgeW, 14, 3).fill('#ffffff');
+    doc.fillColor(accentColor).text(badge, badgeX + 7, startY + 10, { width: badgeW - 14 });
   }
 
-  drawTextSmart(doc, body, 55, startY + 30, textWidth, { arabicMode: isArabic, color: '#374151', size: 9 });
+  doc.rect(45, startY + 28, 505, boxH - 28).fill(BRAND.cream);
+  drawTextSmart(doc, body, 55, startY + 36, textWidth, { arabicMode: isArabic, color: BRAND.brown, size: 9 });
   doc.y = startY + boxH + 12;
 };
 
-const resultColor = (flag) => FLAG_COLORS[flag] || '#333333';
+const resultColor = (flag) => FLAG_COLORS[flag] || BRAND.brown;
 const formatDate = (date) => new Date(date).toLocaleDateString('en-GB');
 
 const generateReportPDF = async (reportData, outputDir, options = {}) => {
@@ -211,9 +265,9 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
 
       drawHeader(doc, isArabic);
 
-      doc.roundedRect(45, doc.y, 505, 28, 4).fill(BRAND);
-      drawTextSmart(doc, labels.reportTitle, 55, doc.y + 8, 485, { arabicMode: isArabic, color: '#ffffff', bold: true, size: 14, align: 'center' });
-      doc.y += 36;
+      doc.roundedRect(45, doc.y, 505, 30, 4).fill(BRAND.brown);
+      drawTextSmart(doc, labels.reportTitle, 55, doc.y + 9, 485, { arabicMode: isArabic, color: '#ffffff', bold: true, size: 14, align: 'center' });
+      doc.y += 38;
 
       const animalType = ANIMAL_TYPES[reportData.animalType]?.[isArabic ? 'ar' : 'en'] || reportData.animalType;
       const animalGender = GENDERS[reportData.animalGender]?.[isArabic ? 'ar' : 'en'] || reportData.animalGender || '-';
@@ -232,7 +286,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
         [labels.gender, animalGender],
       ], isArabic);
 
-      drawTextSmart(doc, labels.testResults, 45, doc.y, 505, { arabicMode: isArabic, color: BRAND_DARK, bold: true, size: 12 });
+      drawTextSmart(doc, labels.testResults, 45, doc.y, 505, { arabicMode: isArabic, color: BRAND.brown, bold: true, size: 12 });
       doc.moveDown(0.4);
 
       const tableTop = doc.y;
@@ -240,19 +294,19 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       const colX = [45, 190, 265, 320, 425];
 
       labels.headers.forEach((h, i) => {
-        doc.rect(colX[i], tableTop, colWidths[i], 24).fill(BRAND_DARK);
-        drawTextSmart(doc, h, colX[i] + 4, tableTop + 7, colWidths[i] - 8, { arabicMode: isArabic, color: '#ffffff', size: 8 });
+        doc.rect(colX[i], tableTop, colWidths[i], 24).fill(BRAND.brown);
+        drawTextSmart(doc, h, colX[i] + 4, tableTop + 7, colWidths[i] - 8, { arabicMode: isArabic, color: BRAND.goldPale, size: 8 });
       });
 
       let rowY = tableTop + 24;
       reportData.results.forEach((row, idx) => {
-        const bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
+        const bg = idx % 2 === 0 ? BRAND.cream : '#ffffff';
         const color = resultColor(row.flag);
         doc.rect(45, rowY, 505, 22).fill(bg);
 
         const flagText = flagLabels[row.flag] || row.flag || '-';
         const cells = [
-          { text: row.name, arabic: isArabic, color: '#1f2937' },
+          { text: row.name, arabic: isArabic, color: BRAND.brown },
           { text: row.value, arabic: false, color, bold: true },
           { text: row.unit || '-', arabic: false, color: '#4b5563' },
           { text: row.reference || '-', arabic: false, color: '#4b5563' },
@@ -269,14 +323,14 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       doc.y = rowY + 14;
 
       drawSectionBox(
-        doc, labels.aiSection, labels.aiBadge,
-        reportData.aiInterpretation, isArabic, '#0369a1',
+        doc, labels.aiSection, labels.aiSectionSub, labels.aiBadge,
+        reportData.aiInterpretation, isArabic, BRAND.brown,
         labels.emptyAi
       );
 
       drawSectionBox(
-        doc, labels.treatmentSection, null,
-        reportData.treatmentRecommendations, isArabic, '#047857',
+        doc, labels.treatmentSection, labels.treatmentSectionSub, null,
+        reportData.treatmentRecommendations, isArabic, BRAND.gold,
         labels.emptyTreatment
       );
 
@@ -293,10 +347,10 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       setLatin(doc);
       doc.fontSize(7).fillColor('#9ca3af').text(reportData.verificationCode, 125, footerY + 38, { width: 180 });
 
-      doc.rect(330, footerY + 30, 200, 1).strokeColor('#9ca3af').stroke();
-      drawTextSmart(doc, labels.specialistSignature, 330, footerY + 8, 200, { arabicMode: isArabic, color: '#374151', size: 9 });
+      doc.rect(330, footerY + 30, 200, 1).strokeColor(BRAND.gold).stroke();
+      drawTextSmart(doc, labels.specialistSignature, 330, footerY + 8, 200, { arabicMode: isArabic, color: BRAND.brown, size: 9 });
       if (reportData.specialistName) {
-        drawTextSmart(doc, reportData.specialistName, 330, footerY + 36, 200, { arabicMode: isArabic, color: '#111', size: 9 });
+        drawTextSmart(doc, reportData.specialistName, 330, footerY + 36, 200, { arabicMode: isArabic, color: BRAND.brown, size: 9 });
       }
 
       const labName = isArabic ? (env.lab.nameAr || 'مركز رعاية النوادر البيطري') : env.lab.name;
