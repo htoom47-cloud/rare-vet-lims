@@ -4,6 +4,7 @@ import { Plus, Pencil, Shield, Save, Trash2, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
+import PasswordInput from '../components/ui/PasswordInput';
 import { usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -289,7 +290,6 @@ export default function Users() {
             { key: 'full_name', label: t('common.name') },
             { key: 'full_name_ar', label: t('users.fullNameAr') },
             { key: 'email', label: t('users.email'), type: 'email' },
-            { key: 'password', label: t('users.password'), type: 'password' },
             { key: 'phone', label: t('common.phone') },
           ].map((f) => (
             <div key={f.key}>
@@ -299,10 +299,19 @@ export default function Users() {
                 value={form[f.key]}
                 onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                 className="input-field"
-                required={['full_name', 'email', 'password'].includes(f.key)}
+                required={['full_name', 'email'].includes(f.key)}
               />
             </div>
           ))}
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('users.password')}</label>
+            <PasswordInput
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+              autoComplete="new-password"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('users.role')}</label>
             <select value={form.role_id} onChange={(e) => setForm({ ...form, role_id: e.target.value })} className="input-field" required>
@@ -327,12 +336,11 @@ export default function Users() {
               { key: 'full_name', label: t('common.name') },
               { key: 'full_name_ar', label: t('users.fullNameAr') },
               { key: 'phone', label: t('common.phone') },
-              { key: 'password', label: t('users.newPassword'), type: 'password' },
             ].map((f) => (
               <div key={f.key}>
                 <label className="block text-sm font-medium mb-1">{f.label}</label>
                 <input
-                  type={f.type || 'text'}
+                  type="text"
                   value={editForm[f.key]}
                   onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
                   className="input-field"
@@ -340,6 +348,14 @@ export default function Users() {
                 />
               </div>
             ))}
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('users.newPassword')}</label>
+              <PasswordInput
+                value={editForm.password}
+                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                autoComplete="new-password"
+              />
+            </div>
             {editingUser.role_name !== 'admin' && (
               <div>
                 <label className="block text-sm font-medium mb-1">{t('users.role')}</label>
