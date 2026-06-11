@@ -1,67 +1,62 @@
-require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const { pool, query } = require('../config/database');
-const logger = require('../config/logger');
+const { Pool } = require('pg');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@rarevetcare.com').toLowerCase();
 const NEW_PASSWORD = process.env.ADMIN_NEW_PASSWORD || process.argv[2];
 
+function getPool() {
+  const url = process.env.DATABASE_URL;
+  if (!url || url.includes('@base')) {
+    console.error('ERROR: DATABASE_URL not set or invalid.');
+    console.error('In CMD run first (with your Render External Database URL):');
+    console.error('  set "DATABASE_URL=postgresql://..."');
+    process.exit(1);
+  }
+  return new Pool({
+    connectionString: url,
+    ssl: url.includes('localhost') || url.includes('127.0.0.1') ? false : { rejectUnauthorized: false },
+  });
+}
+
 async function resetAdmin() {
   if (!NEW_PASSWORD || NEW_PASSWORD.length < 6) {
     console.error('Usage: node src/scripts/reset-admin.js <new-password>');
-    console.error('Or set ADMIN_NEW_PASSWORD in environment (min 6 characters).');
     process.exit(1);
   }
 
-  const roleResult = await query(`SELECT id FROM roles WHERE name = 'admin'`);
-  if (!roleResult.rows[0]) {
-    throw new Error('Admin role not found — run migrate and seed first.');
+  const pool = getPool();
+  try {
+    await pool.query('SELECT 1');
+    console.log('DB connected OK');
+
+    const roleResult = await pool.query(`SELECT id FROM roles WHERE name = 'admin'`);
+    if (!roleResult.rows[0]) throw new Error('Admin role not found — run seed first');
+
+    const hash = await bcrypt.hash(NEW_PASSWORD, 12);
+    const existing = await pool.query('SELECT id, email FROM users WHERE email = $1', [ADMIN_EMAIL]);
+
+    if (existing.rows[0]) {
+      await pool.query(
+        'UPDATE users SET password_hash = $1, is_active = true, updated_at = NOW() WHERE id = $2',
+        [hash, existing.rows[0].id]
+      );
+      console.log('Password reset for:', existing.rows[0].email);
+    } else {
+      await pool.query(
+        `INSERT INTO users (email, password_hash, full_name, full_name_ar, role_id, is_active)
+         VALUES ($1, $2, 'System Admin', 'مدير النظام', $3, true)`,
+        [ADMIN_EMAIL, hash, roleResult.rows[0].id]
+      );
+      console.log('Admin created:', ADMIN_EMAIL);
+    }
+
+    console.log('LOGIN:', ADMIN_EMAIL, '/', NEW_PASSWORD);
+  } finally {
+    await pool.end();
   }
-  const roleId = roleResult.rows[0].id;
-
-  const admins = await query(
-    `SELECT u.id, u.email, u.is_active FROM users u WHERE u.role_id = $1 ORDER BY u.created_at`,
-    [roleId]
-  );
-
-  if (admins.rows.length) {
-    console.log('Admin account(s) in database:');
-    admins.rows.forEach((a) => console.log(`  - ${a.email} (${a.is_active ? 'active' : 'inactive'})`));
-  }
-
-  const hash = await bcrypt.hash(NEW_PASSWORD, 12);
-  let target = admins.rows.find((a) => a.email === ADMIN_EMAIL);
-
-  if (target) {
-    await query(
-      `UPDATE users SET password_hash = $1, is_active = true, updated_at = NOW() WHERE id = $2`,
-      [hash, target.id]
-    );
-    console.log(`\nPassword reset for: ${target.email}`);
-  } else if (admins.rows.length) {
-    target = admins.rows[0];
-    await query(
-      `UPDATE users SET password_hash = $1, is_active = true, updated_at = NOW() WHERE id = $2`,
-      [hash, target.id]
-    );
-    console.log(`\nPassword reset for existing admin: ${target.email}`);
-  } else {
-    await query(
-      `INSERT INTO users (email, password_hash, full_name, full_name_ar, role_id, is_active)
-       VALUES ($1, $2, 'System Admin', 'مدير النظام', $3, true)`,
-      [ADMIN_EMAIL, hash, roleId]
-    );
-    console.log(`\nAdmin account created: ${ADMIN_EMAIL}`);
-  }
-
-  console.log('\nYou can now sign in with the email above and your new password.');
 }
 
-resetAdmin()
-  .then(() => pool.end())
-  .catch((err) => {
-    logger.error('Reset failed', { error: err.message });
-    console.error(err.message);
-    pool.end();
-    process.exit(1);
-  });
+resetAdmin().catch((err) => {
+  console.error('FAILED:', err.message);
+  process.exit(1);
+});

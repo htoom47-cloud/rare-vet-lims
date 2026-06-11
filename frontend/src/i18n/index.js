@@ -130,6 +130,8 @@ const resources = {
       auth: {
         login: 'Sign In', email: 'Email', password: 'Password', forgotPassword: 'Forgot Password?',
         welcome: 'Welcome back', signIn: 'Sign in to your account',
+        showPassword: 'Show password',
+        hidePassword: 'Hide password',
         loginFailed: 'Login failed — check email and password',
         serverUnreachable: 'Cannot reach server — make sure the backend is running on port 5000',
         tooManyRequests: 'Too many requests — wait a moment and try again',
@@ -375,6 +377,8 @@ const resources = {
       auth: {
         login: 'تسجيل الدخول', email: 'البريد الإلكتروني', password: 'كلمة المرور', forgotPassword: 'نسيت كلمة المرور؟',
         welcome: 'مرحباً بعودتك', signIn: 'سجل الدخول إلى حسابك',
+        showPassword: 'إظهار كلمة المرور',
+        hidePassword: 'إخفاء كلمة المرور',
         loginFailed: 'فشل تسجيل الدخول — تحقق من البريد وكلمة المرور',
         serverUnreachable: 'تعذّر الاتصال بالخادم — تأكد أن الـ Backend يعمل على المنفذ 5000',
         tooManyRequests: 'طلبات كثيرة — انتظر قليلاً ثم حاول مرة أخرى',

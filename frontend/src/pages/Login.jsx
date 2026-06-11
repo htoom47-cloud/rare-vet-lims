@@ -10,6 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 
 import toast from 'react-hot-toast';
 
+import { Eye, EyeOff } from 'lucide-react';
 import AppLogo from '../components/ui/AppLogo';
 
 
@@ -27,6 +28,7 @@ export default function Login() {
   const [email, setEmail] = useState('admin@rarevetcare.com');
 
   const [password, setPassword] = useState('Admin@123');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -133,7 +135,25 @@ export default function Login() {
 
               <label className="block text-sm font-medium mb-1 text-primary-700 dark:text-primary-200">{t('auth.password')}</label>
 
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-field" required />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-field pe-11"
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 end-0 flex items-center px-3 text-primary-500 hover:text-primary-700 dark:hover:text-primary-300"
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
 
             </div>
 

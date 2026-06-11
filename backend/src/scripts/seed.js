@@ -126,6 +126,14 @@ async function seedTestParameters(testId, config) {
   }
 }
 
+const DEMO_USERS = [
+  { email: 'reception@rarevetcare.com', password: 'Reception@123', full_name: 'Reception Desk', full_name_ar: 'الاستقبال', role: 'reception' },
+  { email: 'tech@rarevetcare.com', password: 'Tech@123', full_name: 'Lab Technician', full_name_ar: 'فني المختبر', role: 'lab_technician' },
+  { email: 'vet@rarevetcare.com', password: 'Vet@123', full_name: 'Dr. Veterinarian', full_name_ar: 'الطبيب البيطري', role: 'veterinarian' },
+  { email: 'accountant@rarevetcare.com', password: 'Account@123', full_name: 'Accountant', full_name_ar: 'المحاسب', role: 'accountant' },
+  { email: 'manager@rarevetcare.com', password: 'Manager@123', full_name: 'Lab Manager', full_name_ar: 'مدير المختبر', role: 'manager' },
+];
+
 const USERS = [
   {
     email: process.env.ADMIN_EMAIL || 'admin@rarevetcare.com',
@@ -134,6 +142,7 @@ const USERS = [
     full_name_ar: 'مدير النظام',
     role: 'admin',
   },
+  ...DEMO_USERS,
 ];
 
 async function seed() {
@@ -203,15 +212,24 @@ async function seed() {
     await seedTestParameters(testIdMap[code], config);
   }
 
-  // Admin only — demo accounts are created from the Users page
   for (const user of USERS) {
     const roleResult = await query('SELECT id FROM roles WHERE name = $1', [user.role]);
+    if (!roleResult.rows[0]) continue;
     const hash = await bcrypt.hash(user.password, 12);
-    await query(
-      `INSERT INTO users (email, password_hash, full_name, full_name_ar, role_id)
-       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING`,
-      [user.email.toLowerCase(), hash, user.full_name, user.full_name_ar, roleResult.rows[0].id]
-    );
+    const email = user.email.toLowerCase();
+    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows[0]) {
+      await query(
+        `UPDATE users SET password_hash = $1, full_name = $2, full_name_ar = $3, role_id = $4, is_active = true WHERE id = $5`,
+        [hash, user.full_name, user.full_name_ar, roleResult.rows[0].id, existing.rows[0].id]
+      );
+    } else {
+      await query(
+        `INSERT INTO users (email, password_hash, full_name, full_name_ar, role_id, is_active)
+         VALUES ($1, $2, $3, $4, $5, true)`,
+        [email, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id]
+      );
+    }
   }
 
   // Sample inventory items
