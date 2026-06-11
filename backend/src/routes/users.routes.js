@@ -123,7 +123,7 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const data = await service.archive(req.params.id, req.user.id);
+    const data = await service.remove(req.params.id, req.user.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

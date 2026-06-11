@@ -189,7 +189,7 @@ export default function Users() {
           <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="text-primary-600 text-sm flex items-center gap-1">
             <Pencil size={14} /> {t('common.edit')}
           </button>
-          {r.role_name !== 'admin' && r.is_active && (
+          {r.role_name !== 'admin' && r.id !== currentUser?.id && (
             <button onClick={(e) => { e.stopPropagation(); handleRemove(r); }} className="text-red-600 text-sm flex items-center gap-1">
               <Trash2 size={14} /> {t('users.removeUser')}
             </button>

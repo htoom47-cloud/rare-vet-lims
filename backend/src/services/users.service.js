@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { query } = require('../config/database');
+const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 
@@ -14,7 +14,7 @@ const DEMO_ACCOUNTS = [
 const list = async ({ page, limit, role_id }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
-  let where = 'WHERE 1=1';
+  let where = "WHERE NOT (u.username LIKE 'archived.%')";
 
   if (role_id) { params.push(role_id); where += ` AND u.role_id = $${params.length}`; }
 
@@ -174,51 +174,78 @@ const update = async (id, data, actorId) => {
   return result.rows[0];
 };
 
-const archive = async (id, actorId) => {
+const USER_REF_UPDATES = [
+  ['customers', 'created_by'],
+  ['animals', 'created_by'],
+  ['samples', 'assigned_technician'],
+  ['samples', 'created_by'],
+  ['sample_tests', 'technician_id'],
+  ['results', 'entered_by'],
+  ['results', 'validated_by'],
+  ['reports', 'generated_by'],
+  ['invoices', 'created_by'],
+  ['payments', 'received_by'],
+  ['refunds', 'processed_by'],
+  ['inventory_transactions', 'performed_by'],
+  ['qc_records', 'performed_by'],
+  ['calibration_logs', 'performed_by'],
+  ['temperature_logs', 'recorded_by'],
+  ['settings', 'updated_by'],
+  ['audit_logs', 'user_id'],
+];
+
+const assertCanRemove = async (id, actorId) => {
   const existing = await query(
-    `SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+    `SELECT u.id, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
     [id]
   );
   if (!existing.rows[0]) throw new AppError('User not found', 404, 'NOT_FOUND');
   if (existing.rows[0].role_name === 'admin') {
     throw new AppError('Cannot remove admin account', 403, 'FORBIDDEN');
   }
-  if (id === actorId) throw new AppError('Cannot remove your own account', 403, 'FORBIDDEN');
+  if (actorId && id === actorId) throw new AppError('Cannot remove your own account', 403, 'FORBIDDEN');
+  return existing.rows[0];
+};
 
-  const suffix = id.replace(/-/g, '');
-  const archivedUsername = `archived.${suffix}`;
-  const archivedEmail = `archived.${suffix}@removed.local`;
-  const result = await query(
-    `UPDATE users SET is_active = false, username = $1, email = $2, updated_at = NOW()
-     WHERE id = $3
-     RETURNING id, username, email, full_name, is_active`,
-    [archivedUsername, archivedEmail, id]
-  );
-  return result.rows[0];
+const remove = async (id, actorId) => {
+  await assertCanRemove(id, actorId);
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    for (const [table, column] of USER_REF_UPDATES) {
+      await client.query(`UPDATE ${table} SET ${column} = NULL WHERE ${column} = $1`, [id]);
+    }
+    const result = await client.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, username, full_name',
+      [id]
+    );
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const purgeDemoUsers = async () => {
-  const archived = [];
+  const removed = [];
   for (const demo of DEMO_ACCOUNTS) {
     const user = await query(
-      `SELECT u.id, u.username, u.email, r.name as role_name FROM users u
+      `SELECT u.id, r.name as role_name FROM users u
        JOIN roles r ON u.role_id = r.id
        WHERE LOWER(u.username) = $1 OR LOWER(u.email) = $2`,
       [demo.username, demo.email.toLowerCase()]
     );
     if (!user.rows[0] || user.rows[0].role_name === 'admin') continue;
-    const suffix = user.rows[0].id.replace(/-/g, '');
-    const archivedUsername = `archived.${suffix}`;
-    const archivedEmail = `archived.${suffix}@removed.local`;
-    await query(
-      `UPDATE users SET is_active = false, username = $1, email = $2, updated_at = NOW() WHERE id = $3`,
-      [archivedUsername, archivedEmail, user.rows[0].id]
-    );
-    archived.push(demo.username);
+    await remove(user.rows[0].id, null);
+    removed.push(demo.username);
   }
-  return { archived, count: archived.length };
+  return { removed, count: removed.length };
 };
 
 module.exports = {
-  list, getRoles, getPermissions, listAllPermissions, updateRolePermissions, create, update, archive, purgeDemoUsers,
+  list, getRoles, getPermissions, listAllPermissions, updateRolePermissions, create, update, remove, purgeDemoUsers,
 };
