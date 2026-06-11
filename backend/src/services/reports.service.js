@@ -29,7 +29,8 @@ const list = async ({ page, limit }) => {
 
 const buildReportData = async (sampleId, { reportNumber, verificationCode, language, generatedBy }) => {
   const sampleResult = await query(
-    `SELECT s.*, c.full_name as customer_name, a.animal_code, a.animal_type, a.name_tag as animal_name, a.gender as animal_gender
+    `SELECT s.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar,
+            a.animal_code, a.animal_type, a.name_tag as animal_name, a.gender as animal_gender
      FROM samples s
      JOIN customers c ON s.customer_id = c.id
      JOIN animals a ON s.animal_id = a.id
@@ -44,16 +45,22 @@ const buildReportData = async (sampleId, { reportNumber, verificationCode, langu
   const sample = sampleResult.rows[0];
 
   const resultsData = await query(
-    `SELECT t.name as test_name, tp.name as parameter_name, rv.value, tp.unit,
-            tr.min_value, tr.max_value, rv.flag, rv.is_critical, r.doctor_notes
+    `SELECT tp.id as parameter_id, t.name as test_name, tp.name as parameter_name, tp.name_ar as parameter_name_ar,
+            rv.value, rv.numeric_value, tp.unit, tr.min_value, tr.max_value, rv.flag, rv.is_critical, res.doctor_notes
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
-     JOIN results res ON res.sample_test_id = st.id
+     JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
      JOIN result_values rv ON rv.result_id = res.id
      JOIN test_parameters tp ON rv.parameter_id = tp.id
-     LEFT JOIN test_reference_ranges tr ON tr.parameter_id = tp.id AND (tr.animal_type = $2 OR tr.animal_type IS NULL)
-     LEFT JOIN results r ON r.sample_test_id = st.id
-     WHERE st.sample_id = $1 AND res.is_validated = true`,
+     LEFT JOIN LATERAL (
+       SELECT min_value, max_value
+       FROM test_reference_ranges
+       WHERE parameter_id = tp.id AND (animal_type = $2 OR animal_type IS NULL)
+       ORDER BY CASE WHEN animal_type = $2 THEN 0 ELSE 1 END
+       LIMIT 1
+     ) tr ON true
+     WHERE st.sample_id = $1
+     ORDER BY tp.id`,
     [sampleId, sample.animal_type]
   );
 
@@ -65,11 +72,29 @@ const buildReportData = async (sampleId, { reportNumber, verificationCode, langu
     ? await query('SELECT full_name FROM users WHERE id = $1', [generatedBy])
     : { rows: [] };
 
+  const formatNumber = (value) => {
+    if (value == null || value === '') return null;
+    const num = Number(value);
+    if (Number.isNaN(num)) return String(value);
+    return Number.isInteger(num) ? String(num) : num.toFixed(2).replace(/\.?0+$/, '');
+  };
+
+  const uniqueByParameter = [];
+  const seenParameters = new Set();
+  for (const row of resultsData.rows) {
+    if (seenParameters.has(row.parameter_id)) continue;
+    seenParameters.add(row.parameter_id);
+    uniqueByParameter.push(row);
+  }
+
+  const isArabic = language === 'ar';
   return {
     reportNumber,
     sampleCode: sample.sample_code,
     date: sample.completed_date || new Date(),
-    customerName: sample.customer_name,
+    customerName: isArabic
+      ? (sample.customer_name_ar || sample.customer_name)
+      : sample.customer_name,
     animalCode: sample.animal_code,
     animalType: sample.animal_type,
     animalName: sample.animal_name,
@@ -77,12 +102,16 @@ const buildReportData = async (sampleId, { reportNumber, verificationCode, langu
     language,
     verificationCode,
     specialistName: userResult.rows[0]?.full_name,
-    doctorNotes: resultsData.rows[0]?.doctor_notes,
-    results: resultsData.rows.map((r) => ({
-      name: r.parameter_name || r.test_name,
-      value: r.value,
+    doctorNotes: uniqueByParameter[0]?.doctor_notes,
+    results: uniqueByParameter.map((r) => ({
+      name: isArabic
+        ? (r.parameter_name_ar || r.parameter_name || r.test_name)
+        : (r.parameter_name || r.test_name),
+      value: formatNumber(r.numeric_value ?? r.value) ?? '-',
       unit: r.unit,
-      reference: r.min_value != null ? `${r.min_value} - ${r.max_value}` : '-',
+      reference: r.min_value != null
+        ? `${formatNumber(r.min_value)} - ${formatNumber(r.max_value)}`
+        : '-',
       flag: r.flag,
       isCritical: r.is_critical,
     })),
