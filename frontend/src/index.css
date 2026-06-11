@@ -59,7 +59,12 @@
   }
 }
 
+.label-preview {
+  display: block;
+}
+
 @media print {
   .no-print { display: none !important; }
-  .print-only { display: block !important; }
+  .print-only,
+  .label-preview { display: block !important; }
 }
