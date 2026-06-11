@@ -127,15 +127,16 @@ async function seedTestParameters(testId, config) {
 }
 
 const DEMO_USERS = [
-  { email: 'reception@rarevetcare.com', password: 'Reception@123', full_name: 'Reception Desk', full_name_ar: 'الاستقبال', role: 'reception' },
-  { email: 'tech@rarevetcare.com', password: 'Tech@123', full_name: 'Lab Technician', full_name_ar: 'فني المختبر', role: 'lab_technician' },
-  { email: 'vet@rarevetcare.com', password: 'Vet@123', full_name: 'Dr. Veterinarian', full_name_ar: 'الطبيب البيطري', role: 'veterinarian' },
-  { email: 'accountant@rarevetcare.com', password: 'Account@123', full_name: 'Accountant', full_name_ar: 'المحاسب', role: 'accountant' },
-  { email: 'manager@rarevetcare.com', password: 'Manager@123', full_name: 'Lab Manager', full_name_ar: 'مدير المختبر', role: 'manager' },
+  { username: 'reception', email: 'reception@rarevetcare.com', password: 'Reception@123', full_name: 'Reception Desk', full_name_ar: 'الاستقبال', role: 'reception' },
+  { username: 'tech', email: 'tech@rarevetcare.com', password: 'Tech@123', full_name: 'Lab Technician', full_name_ar: 'فني المختبر', role: 'lab_technician' },
+  { username: 'vet', email: 'vet@rarevetcare.com', password: 'Vet@123', full_name: 'Dr. Veterinarian', full_name_ar: 'الطبيب البيطري', role: 'veterinarian' },
+  { username: 'accountant', email: 'accountant@rarevetcare.com', password: 'Account@123', full_name: 'Accountant', full_name_ar: 'المحاسب', role: 'accountant' },
+  { username: 'manager', email: 'manager@rarevetcare.com', password: 'Manager@123', full_name: 'Lab Manager', full_name_ar: 'مدير المختبر', role: 'manager' },
 ];
 
 const USERS = [
   {
+    username: 'admin',
     email: process.env.ADMIN_EMAIL || 'admin@rarevetcare.com',
     password: process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123',
     full_name: 'System Admin',
@@ -216,18 +217,22 @@ async function seed() {
     const roleResult = await query('SELECT id FROM roles WHERE name = $1', [user.role]);
     if (!roleResult.rows[0]) continue;
     const hash = await bcrypt.hash(user.password, 12);
+    const username = user.username.toLowerCase();
     const email = user.email.toLowerCase();
-    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await query(
+      'SELECT id FROM users WHERE LOWER(username) = $1 OR LOWER(email) = $2',
+      [username, email]
+    );
     if (existing.rows[0]) {
       await query(
-        `UPDATE users SET password_hash = $1, full_name = $2, full_name_ar = $3, role_id = $4, is_active = true WHERE id = $5`,
-        [hash, user.full_name, user.full_name_ar, roleResult.rows[0].id, existing.rows[0].id]
+        `UPDATE users SET username = $1, password_hash = $2, full_name = $3, full_name_ar = $4, role_id = $5, email = $6, is_active = true WHERE id = $7`,
+        [username, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id, email, existing.rows[0].id]
       );
     } else {
       await query(
-        `INSERT INTO users (email, password_hash, full_name, full_name_ar, role_id, is_active)
-         VALUES ($1, $2, $3, $4, $5, true)`,
-        [email, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id]
+        `INSERT INTO users (username, email, password_hash, full_name, full_name_ar, role_id, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, true)`,
+        [username, email, hash, user.full_name, user.full_name_ar, roleResult.rows[0].id]
       );
     }
   }

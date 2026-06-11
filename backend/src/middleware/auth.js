@@ -14,7 +14,7 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, env.jwt.secret);
 
     const result = await query(
-      `SELECT u.id, u.email, u.full_name, u.full_name_ar, u.role_id, u.language, u.theme, u.is_active,
+      `SELECT u.id, u.username, u.email, u.full_name, u.full_name_ar, u.role_id, u.language, u.theme, u.is_active,
               r.name as role_name
        FROM users u JOIN roles r ON u.role_id = r.id
        WHERE u.id = $1`,

@@ -22,8 +22,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => { loadUser(); }, [loadUser]);
 
-  const login = async (email, password) => {
-    const { data } = await authAPI.login(email, password);
+  const login = async (username, password) => {
+    const { data } = await authAPI.login(username, password);
     localStorage.setItem('accessToken', data.data.accessToken);
     localStorage.setItem('refreshToken', data.data.refreshToken);
     setUser(data.data.user);

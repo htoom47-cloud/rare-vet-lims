@@ -3,12 +3,12 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 
-const DEMO_EMAILS = [
-  'reception@rarevetcare.com',
-  'tech@rarevetcare.com',
-  'vet@rarevetcare.com',
-  'accountant@rarevetcare.com',
-  'manager@rarevetcare.com',
+const DEMO_ACCOUNTS = [
+  { username: 'reception', email: 'reception@rarevetcare.com' },
+  { username: 'tech', email: 'tech@rarevetcare.com' },
+  { username: 'vet', email: 'vet@rarevetcare.com' },
+  { username: 'accountant', email: 'accountant@rarevetcare.com' },
+  { username: 'manager', email: 'manager@rarevetcare.com' },
 ];
 
 const list = async ({ page, limit, role_id }) => {
@@ -23,7 +23,7 @@ const list = async ({ page, limit, role_id }) => {
 
   params.push(l, offset);
   const result = await query(
-    `SELECT u.id, u.email, u.full_name, u.full_name_ar, u.phone, u.role_id, u.language, u.theme, u.is_active, u.last_login, u.created_at,
+    `SELECT u.id, u.username, u.email, u.full_name, u.full_name_ar, u.phone, u.role_id, u.language, u.theme, u.is_active, u.last_login, u.created_at,
             r.name as role_name
      FROM users u JOIN roles r ON u.role_id = r.id
      ${where} ORDER BY u.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -73,9 +73,17 @@ const updateRolePermissions = async (roleId, permissionCodes) => {
   return getPermissions(roleId);
 };
 
+const normalizeUsername = (value) => value.trim().toLowerCase();
+
 const create = async (data) => {
-  const existing = await query('SELECT id FROM users WHERE email = $1', [data.email.toLowerCase()]);
-  if (existing.rows[0]) throw new AppError('Email already exists', 400, 'DUPLICATE_EMAIL');
+  const username = normalizeUsername(data.username);
+  const email = (data.email || `${username}@rarevetcare.local`).toLowerCase().trim();
+
+  const dupUser = await query('SELECT id FROM users WHERE LOWER(username) = $1', [username]);
+  if (dupUser.rows[0]) throw new AppError('Username already exists', 400, 'DUPLICATE_USERNAME');
+
+  const dupEmail = await query('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
+  if (dupEmail.rows[0]) throw new AppError('Email already exists', 400, 'DUPLICATE_EMAIL');
 
   const roleResult = await query('SELECT name FROM roles WHERE id = $1', [data.role_id]);
   if (!roleResult.rows[0]) throw new AppError('Role not found', 404, 'NOT_FOUND');
@@ -85,9 +93,10 @@ const create = async (data) => {
 
   const hash = await bcrypt.hash(data.password, 12);
   const result = await query(
-    `INSERT INTO users (email, password_hash, full_name, full_name_ar, phone, role_id)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, email, full_name, full_name_ar, phone, role_id, is_active, created_at`,
-    [data.email.toLowerCase(), hash, data.full_name, data.full_name_ar, data.phone, data.role_id]
+    `INSERT INTO users (username, email, password_hash, full_name, full_name_ar, phone, role_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     RETURNING id, username, email, full_name, full_name_ar, phone, role_id, is_active, created_at`,
+    [username, email, hash, data.full_name, data.full_name_ar, data.phone, data.role_id]
   );
   return result.rows[0];
 };
@@ -122,6 +131,24 @@ const update = async (id, data, actorId) => {
   const params = [];
   let idx = 1;
 
+  if (data.username && existing.rows[0].role_name !== 'admin') {
+    const username = normalizeUsername(data.username);
+    const dup = await query('SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2', [username, id]);
+    if (dup.rows[0]) throw new AppError('Username already exists', 400, 'DUPLICATE_USERNAME');
+    fields.push(`username = $${idx}`);
+    params.push(username);
+    idx++;
+  }
+
+  if (data.email) {
+    const email = data.email.toLowerCase().trim();
+    const dup = await query('SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2', [email, id]);
+    if (dup.rows[0]) throw new AppError('Email already exists', 400, 'DUPLICATE_EMAIL');
+    fields.push(`email = $${idx}`);
+    params.push(email);
+    idx++;
+  }
+
   ['full_name', 'full_name_ar', 'phone', 'role_id', 'language', 'theme', 'is_active'].forEach((field) => {
     if (data[field] !== undefined) {
       fields.push(`${field} = $${idx}`);
@@ -139,7 +166,7 @@ const update = async (id, data, actorId) => {
   params.push(id);
   const result = await query(
     `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${idx}
-     RETURNING id, email, full_name, full_name_ar, phone, role_id, language, theme, is_active`,
+     RETURNING id, username, email, full_name, full_name_ar, phone, role_id, language, theme, is_active`,
     params
   );
 
@@ -158,31 +185,36 @@ const archive = async (id, actorId) => {
   }
   if (id === actorId) throw new AppError('Cannot remove your own account', 403, 'FORBIDDEN');
 
-  const archivedEmail = `archived.${id.replace(/-/g, '')}@removed.local`;
+  const suffix = id.replace(/-/g, '');
+  const archivedUsername = `archived.${suffix}`;
+  const archivedEmail = `archived.${suffix}@removed.local`;
   const result = await query(
-    `UPDATE users SET is_active = false, email = $1, updated_at = NOW()
-     WHERE id = $2
-     RETURNING id, email, full_name, is_active`,
-    [archivedEmail, id]
+    `UPDATE users SET is_active = false, username = $1, email = $2, updated_at = NOW()
+     WHERE id = $3
+     RETURNING id, username, email, full_name, is_active`,
+    [archivedUsername, archivedEmail, id]
   );
   return result.rows[0];
 };
 
 const purgeDemoUsers = async () => {
   const archived = [];
-  for (const email of DEMO_EMAILS) {
+  for (const demo of DEMO_ACCOUNTS) {
     const user = await query(
-      `SELECT u.id, u.email, r.name as role_name FROM users u
-       JOIN roles r ON u.role_id = r.id WHERE u.email = $1`,
-      [email.toLowerCase()]
+      `SELECT u.id, u.username, u.email, r.name as role_name FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(u.username) = $1 OR LOWER(u.email) = $2`,
+      [demo.username, demo.email.toLowerCase()]
     );
     if (!user.rows[0] || user.rows[0].role_name === 'admin') continue;
-    const archivedEmail = `archived.${user.rows[0].id.replace(/-/g, '')}@removed.local`;
+    const suffix = user.rows[0].id.replace(/-/g, '');
+    const archivedUsername = `archived.${suffix}`;
+    const archivedEmail = `archived.${suffix}@removed.local`;
     await query(
-      `UPDATE users SET is_active = false, email = $1, updated_at = NOW() WHERE id = $2`,
-      [archivedEmail, user.rows[0].id]
+      `UPDATE users SET is_active = false, username = $1, email = $2, updated_at = NOW() WHERE id = $3`,
+      [archivedUsername, archivedEmail, user.rows[0].id]
     );
-    archived.push(email);
+    archived.push(demo.username);
   }
   return { archived, count: archived.length };
 };

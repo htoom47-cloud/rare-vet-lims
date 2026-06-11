@@ -36,10 +36,10 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState(null);
 
   const [form, setForm] = useState({
-    email: '', password: '', full_name: '', full_name_ar: '', phone: '', role_id: '',
+    username: '', email: '', password: '', full_name: '', full_name_ar: '', phone: '', role_id: '',
   });
   const [editForm, setEditForm] = useState({
-    full_name: '', full_name_ar: '', phone: '', role_id: '', password: '', is_active: true,
+    username: '', email: '', full_name: '', full_name_ar: '', phone: '', role_id: '', password: '', is_active: true,
   });
 
   const load = () => {
@@ -88,7 +88,7 @@ export default function Users() {
       await usersAPI.create({ ...form, role_id: Number(form.role_id) });
       toast.success(t('users.created'));
       setCreateOpen(false);
-      setForm({ email: '', password: '', full_name: '', full_name_ar: '', phone: '', role_id: '' });
+      setForm({ username: '', email: '', password: '', full_name: '', full_name_ar: '', phone: '', role_id: '' });
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -98,6 +98,8 @@ export default function Users() {
   const openEdit = (user) => {
     setEditingUser(user);
     setEditForm({
+      username: user.username || '',
+      email: user.email || '',
       full_name: user.full_name || '',
       full_name_ar: user.full_name_ar || '',
       phone: user.phone || '',
@@ -141,6 +143,10 @@ export default function Users() {
         phone: editForm.phone,
         is_active: editForm.is_active,
       };
+      if (editingUser.role_name !== 'admin') {
+        if (editForm.username) payload.username = editForm.username;
+        if (editForm.email) payload.email = editForm.email;
+      }
       if (editForm.password) payload.password = editForm.password;
       if (editingUser.role_name !== 'admin' && editForm.role_id) {
         payload.role_id = Number(editForm.role_id);
@@ -169,6 +175,7 @@ export default function Users() {
 
   const columns = [
     { key: 'full_name', label: t('common.name') },
+    { key: 'username', label: t('users.username') },
     { key: 'email', label: t('users.email') },
     { key: 'role_name', label: t('users.role'), render: (r) => <span>{roleLabel(r.role_name)}</span> },
     { key: 'phone', label: t('common.phone') },
@@ -289,6 +296,7 @@ export default function Users() {
           {[
             { key: 'full_name', label: t('common.name') },
             { key: 'full_name_ar', label: t('users.fullNameAr') },
+            { key: 'username', label: t('users.username') },
             { key: 'email', label: t('users.email'), type: 'email' },
             { key: 'phone', label: t('common.phone') },
           ].map((f) => (
@@ -299,7 +307,8 @@ export default function Users() {
                 value={form[f.key]}
                 onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                 className="input-field"
-                required={['full_name', 'email'].includes(f.key)}
+                required={['full_name', 'username'].includes(f.key)}
+                autoComplete={f.key === 'username' ? 'username' : undefined}
               />
             </div>
           ))}
@@ -331,7 +340,25 @@ export default function Users() {
       <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title={t('users.editUser')}>
         {editingUser && (
           <form onSubmit={handleUpdate} className="space-y-4">
-            <p className="text-sm text-primary-500">{editingUser.email}</p>
+            {editingUser.role_name === 'admin' ? (
+              <p className="text-sm text-primary-500">{editingUser.username} — {editingUser.email}</p>
+            ) : (
+              [
+                { key: 'username', label: t('users.username') },
+                { key: 'email', label: t('users.email'), type: 'email' },
+              ].map((f) => (
+                <div key={f.key}>
+                  <label className="block text-sm font-medium mb-1">{f.label}</label>
+                  <input
+                    type={f.type || 'text'}
+                    value={editForm[f.key]}
+                    onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
+                    className="input-field"
+                    required={f.key === 'username'}
+                  />
+                </div>
+              ))
+            )}
             {[
               { key: 'full_name', label: t('common.name') },
               { key: 'full_name_ar', label: t('users.fullNameAr') },

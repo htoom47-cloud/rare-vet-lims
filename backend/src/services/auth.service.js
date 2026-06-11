@@ -6,20 +6,24 @@ const env = require('../config/env');
 const { AppError } = require('../middleware/errorHandler');
 const { hashToken } = require('../utils/helpers');
 
-const login = async (email, password) => {
+const login = async (username, password) => {
+  const identifier = username.trim().toLowerCase();
   const result = await query(
-    `SELECT u.*, r.name as role_name FROM users u
-     JOIN roles r ON u.role_id = r.id WHERE u.email = $1`,
-    [email.toLowerCase()]
+    identifier.includes('@')
+      ? `SELECT u.*, r.name as role_name FROM users u
+         JOIN roles r ON u.role_id = r.id WHERE LOWER(u.email) = $1`
+      : `SELECT u.*, r.name as role_name FROM users u
+         JOIN roles r ON u.role_id = r.id WHERE LOWER(u.username) = $1`,
+    [identifier]
   );
 
   const user = result.rows[0];
   if (!user || !user.is_active) {
-    throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
   }
 
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+  if (!valid) throw new AppError('Invalid username or password', 401, 'INVALID_CREDENTIALS');
 
   await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
@@ -41,6 +45,7 @@ const login = async (email, password) => {
   return {
     user: {
       id: user.id,
+      username: user.username,
       email: user.email,
       full_name: user.full_name,
       full_name_ar: user.full_name_ar,

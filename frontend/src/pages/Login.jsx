@@ -25,9 +25,9 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('admin@rarevetcare.com');
+  const [username, setUsername] = useState('admin');
 
-  const [password, setPassword] = useState('Admin@123');
+  const [password, setPassword] = useState('RareVet2026');
 
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +41,7 @@ export default function Login() {
 
     try {
 
-      await login(email, password);
+      await login(username, password);
 
       toast.success('Welcome!');
 
@@ -124,9 +124,9 @@ export default function Login() {
 
             <div>
 
-              <label className="block text-sm font-medium mb-1 text-primary-700 dark:text-primary-200">{t('auth.email')}</label>
+              <label className="block text-sm font-medium mb-1 text-primary-700 dark:text-primary-200">{t('auth.username')}</label>
 
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" required />
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input-field" required autoComplete="username" />
 
             </div>
 
@@ -157,11 +157,11 @@ export default function Login() {
 
             <p className="font-medium mb-1">Demo Accounts:</p>
 
-            <p>admin@rarevetcare.com / Admin@123</p>
+            <p>admin / RareVet2026</p>
 
-            <p>reception@rarevetcare.com / Reception@123</p>
+            <p>reception / Reception@123</p>
 
-            <p>tech@rarevetcare.com / Tech@123</p>
+            <p>tech / Tech@123</p>
 
           </div>
 
