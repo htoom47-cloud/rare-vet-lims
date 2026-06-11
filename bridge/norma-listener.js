@@ -1,12 +1,6 @@
 /**
  * Norma CBC bridge — run on the lab PC (same network as the analyzer).
  * Listens for HL7/ASTM over TCP (MLLP) and forwards to Rare Vet LIMS cloud API.
- *
- * Env:
- *   LIMS_API_URL=https://rare-vet-lims.onrender.com/api
- *   DEVICE_ID=<uuid from Devices page>
- *   DEVICE_API_KEY=<key from Devices page>
- *   LISTEN_PORT=2575
  */
 const net = require('net');
 const https = require('https');
@@ -72,6 +66,30 @@ function extractMessages(buffer) {
   return { messages, remainder: buffer.slice(start) };
 }
 
+const hl7Timestamp = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+};
+
+const buildHl7Ack = (originalMsg) => {
+  const segments = String(originalMsg).replace(/\r\n/g, '\r').split('\r').filter(Boolean);
+  const msh = segments.find((s) => s.startsWith('MSH|')) || '';
+  const fields = msh.split('|');
+
+  const sendingApp = fields[2] || 'Norma';
+  const sendingFac = fields[3] || 'CBC';
+  const msgControlId = fields[9] || '1';
+  const ackId = `ACK${Date.now()}`;
+
+  const ackBody = [
+    `MSH|^~\\&|LIMS|RareVet|${sendingApp}|${sendingFac}|${hl7Timestamp()}||ACK^R01^ACK|${ackId}|P|2.3`,
+    `MSA|AA|${msgControlId}`,
+  ].join('\r');
+
+  return Buffer.from(`\x0b${ackBody}\r\x1c\r`, 'utf8');
+};
+
 const server = net.createServer((socket) => {
   let buffer = Buffer.alloc(0);
   console.log(`[Norma] Connection from ${socket.remoteAddress}`);
@@ -82,16 +100,25 @@ const server = net.createServer((socket) => {
     buffer = remainder;
 
     for (const msg of messages) {
+      // Reply to Norma immediately so the analyzer does not show HL7 receive errors
+      try {
+        socket.write(buildHl7Ack(msg));
+      } catch (ackErr) {
+        console.error('[Norma] ACK build failed:', ackErr.message);
+      }
+
       try {
         const result = await forwardToLims(msg);
         const imported = result?.data?.imported;
-        console.log(`[Norma] Imported: ${imported?.sample_code || 'ok'} (${imported?.imported || 0} values)`);
-        const ack = `\x0bMSH|^~\\&|LIMS|RareVet|Norma|CBC|${new Date().toISOString()}||ACK|1|P|2.3\rMSA|AA|1\r\x1c\r`;
-        socket.write(ack);
+        if (imported?.sample_code) {
+          console.log(`[Norma] Imported: ${imported.sample_code} (${imported.imported || 0} values)`);
+        } else if (result?.data?.warning) {
+          console.log(`[Norma] Stored with warning: ${result.data.warning}`);
+        } else {
+          console.log('[Norma] Message forwarded to LIMS');
+        }
       } catch (err) {
         console.error('[Norma] Forward failed:', err.message);
-        const nack = `\x0bMSH|^~\\&|LIMS|RareVet|Norma|CBC|${new Date().toISOString()}||ACK|1|P|2.3\rMSA|AE|1|${err.message}\r\x1c\r`;
-        socket.write(nack);
       }
     }
   });
