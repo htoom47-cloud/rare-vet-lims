@@ -18,6 +18,7 @@ try {
   }
 
   run('src/scripts/migrate.js');
+  run('src/scripts/ensure-admin.js');
 
   if (process.env.RUN_SEED === 'true') {
     run('src/scripts/seed.js');

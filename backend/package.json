@@ -9,6 +9,7 @@
     "migrate": "node src/scripts/migrate.js",
     "seed": "node src/scripts/seed.js",
     "reset-admin": "node src/scripts/reset-admin.js",
+    "ensure-admin": "node src/scripts/ensure-admin.js",
     "restore-demo": "node src/scripts/restore-demo-users.js",
     "test": "echo \"No tests configured\" && exit 0"
   },
