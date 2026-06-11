@@ -93,14 +93,21 @@ function parseHl7(raw) {
     }
 
     if (type === 'OBX') {
-      const idField = fields[3] || fields[4] || '';
-      const code = idField.split('^')[0]?.trim()
-        || idField.split('^')[1]?.trim()
-        || fields[4]?.split('^')[0]?.trim();
-      const value = (fields[5] ?? fields[6] ?? '').trim();
+      const components = `${fields[3] || ''}^${fields[4] || ''}`
+        .split('^')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const code = components.find((c) => /^[A-Z][A-Z0-9%#.-]{1,9}$/i.test(c))
+        || components.find((c) => !/^\d+$/.test(c) && c.length <= 12)
+        || components[0];
+
+      const rawValue = (fields[5] ?? fields[4] ?? '').trim().replace(',', '.');
+      const numeric = parseFloat(rawValue);
       const unit = (fields[6] || fields[7] || '').trim();
-      if (code && value !== '' && !Number.isNaN(Number(value))) {
-        results.push({ code, value, unit });
+
+      if (code && rawValue !== '' && !Number.isNaN(numeric)) {
+        results.push({ code, value: String(numeric), unit });
       }
     }
   }

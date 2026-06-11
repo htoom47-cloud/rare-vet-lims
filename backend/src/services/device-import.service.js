@@ -59,7 +59,8 @@ const importCbcResults = async ({ sampleId, results, testCode = DEFAULT_CBC_TEST
   }
 
   if (!values.length) {
-    throw new AppError('No matching CBC parameters found in message', 400, 'NO_MAPPED_PARAMS');
+    const codes = (results || []).map((r) => r.code).join(', ') || 'none';
+    throw new AppError(`No matching CBC parameters found in message (received: ${codes})`, 400, 'NO_MAPPED_PARAMS');
   }
 
   const saved = await resultsService.enterResults({
