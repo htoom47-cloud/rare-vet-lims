@@ -8,22 +8,17 @@ const { generateQR } = require('./barcode');
 const ARABIC_FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
 const HAS_ARABIC_FONT = fs.existsSync(ARABIC_FONT_PATH);
 
-const reshapeArabic = (text) => {
-  if (!text) return '';
-  try {
-    // eslint-disable-next-line global-require
-    const arabicReshaper = require('arabic-reshaper');
-    return arabicReshaper.reshape(String(text));
-  } catch {
-    return String(text);
-  }
+const FLAG_COLORS = {
+  HIGH: '#dc2626',
+  CRIT_HIGH: '#991b1b',
+  NORMAL: '#16a34a',
+  LOW: '#2563eb',
+  CRIT_LOW: '#1d4ed8',
 };
 
-const ar = (text, useArabic) => (useArabic ? reshapeArabic(text) : text);
-
 const FLAG_LABELS = {
-  en: { NORMAL: 'NORMAL', HIGH: 'HIGH', LOW: 'LOW', CRIT_HIGH: 'CRIT HIGH', CRIT_LOW: 'CRIT LOW' },
-  ar: { NORMAL: 'طبيعي', HIGH: 'مرتفع', LOW: 'منخفض', CRIT_HIGH: 'حرج مرتفع', CRIT_LOW: 'حرج منخفض' },
+  en: { NORMAL: 'Normal', HIGH: 'High', LOW: 'Low', CRIT_HIGH: 'Crit High', CRIT_LOW: 'Crit Low' },
+  ar: { NORMAL: 'معتدل', HIGH: 'مرتفع', LOW: 'منخفض', CRIT_HIGH: 'مرتفع حرج', CRIT_LOW: 'منخفض حرج' },
 };
 
 const LABELS = {
@@ -81,14 +76,62 @@ const GENDERS = {
   unknown: { en: 'Unknown', ar: 'غير محدد' },
 };
 
-const setupFonts = (doc, useArabic) => {
-  if (useArabic && HAS_ARABIC_FONT) {
-    doc.registerFont('Arabic', ARABIC_FONT_PATH);
-    doc.font('Arabic');
+const registerFonts = (doc) => {
+  if (HAS_ARABIC_FONT) doc.registerFont('Arabic', ARABIC_FONT_PATH);
+  doc.registerFont('Latin', 'Helvetica');
+  doc.registerFont('Latin-Bold', 'Helvetica-Bold');
+};
+
+const prepareArabic = (text) => {
+  if (!text) return '';
+  try {
+    // eslint-disable-next-line global-require
+    const arabicReshaper = require('arabic-reshaper');
+    const reshaped = arabicReshaper.reshape(String(text));
+    return reshaped.split(/\s+/).reverse().join(' ');
+  } catch {
+    return String(text);
+  }
+};
+
+const isLatinOnly = (text) => /^[\x00-\x7F\s.,:;|+\-/()]+$/.test(String(text || ''));
+const hasArabicChars = (text) => /[\u0600-\u06FF]/.test(String(text || ''));
+
+const setLatin = (doc, bold = false) => doc.font(bold ? 'Latin-Bold' : 'Latin');
+const setArabic = (doc) => { if (HAS_ARABIC_FONT) doc.font('Arabic'); else doc.font('Latin'); };
+
+const drawTextSmart = (doc, text, x, y, width, { arabicMode = false, color = '#333', bold = false } = {}) => {
+  doc.fillColor(color);
+  const value = String(text ?? '-');
+  if (arabicMode && !isLatinOnly(value)) {
+    setArabic(doc);
+    doc.text(prepareArabic(value), x, y, { width, align: 'right' });
+  } else {
+    setLatin(doc, bold);
+    doc.text(value, x, y, { width });
+  }
+};
+
+const drawField = (doc, label, value, x, y, width, arabicMode) => {
+  const displayValue = String(value ?? '-');
+  if (arabicMode) {
+    doc.fillColor('#333');
+    const valueText = hasArabicChars(displayValue) ? prepareArabic(displayValue) : displayValue;
+    if (hasArabicChars(displayValue)) setArabic(doc);
+    else setLatin(doc);
+    const valueWidth = Math.min(width * 0.5, doc.widthOfString(valueText) + 8);
+    doc.text(valueText, x, y, { width: valueWidth, align: 'left' });
+    setArabic(doc);
+    doc.text(` :${prepareArabic(label)}`, x + valueWidth, y, { width: width - valueWidth, align: 'right' });
     return;
   }
-  doc.font('Helvetica');
+  setLatin(doc);
+  doc.fillColor('#333').text(`${label}: ${displayValue}`, x, y, { width });
 };
+
+const resultColor = (flag) => FLAG_COLORS[flag] || '#333333';
+
+const formatDate = (date) => new Date(date).toLocaleDateString('en-GB');
 
 const generateReportPDF = async (reportData, outputDir, options = {}) => {
   const filename = options.filename
@@ -100,97 +143,130 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
+      registerFonts(doc);
 
       const isArabic = reportData.language === 'ar';
-      const useArabicFont = isArabic && HAS_ARABIC_FONT;
       const labels = isArabic ? LABELS.ar : LABELS.en;
       const flagLabels = isArabic ? FLAG_LABELS.ar : FLAG_LABELS.en;
 
-      setupFonts(doc, useArabicFont);
-
+      setLatin(doc, true);
       doc.fontSize(20).fillColor('#0d9488').text(env.lab.name, { align: 'center' });
+
       if (isArabic && env.lab.nameAr) {
-        setupFonts(doc, useArabicFont);
-        doc.fontSize(14).fillColor('#333').text(ar(env.lab.nameAr, useArabicFont), { align: 'center' });
+        doc.fontSize(14).fillColor('#333');
+        drawTextSmart(doc, env.lab.nameAr, 50, doc.y, 495, { arabicMode: true });
+        doc.moveDown(0.3);
       }
-      doc.moveDown(0.5);
+
+      setLatin(doc);
       doc.fontSize(10).fillColor('#666')
         .text(`${env.lab.address} | ${env.lab.phone} | ${env.lab.email}`, { align: 'center' });
       doc.moveDown();
 
-      doc.strokeColor('#0d9488').lineWidth(2)
-        .moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.strokeColor('#0d9488').lineWidth(2).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown();
 
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(16).fillColor('#111').text(ar(labels.reportTitle, useArabicFont), { align: 'center' });
+      doc.fontSize(16).fillColor('#111');
+      drawTextSmart(doc, labels.reportTitle, 50, doc.y, 495, { arabicMode: isArabic, bold: true });
       doc.moveDown();
 
       const infoY = doc.y;
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(10).fillColor('#333');
-      doc.text(`${ar(labels.reportNo, useArabicFont)}: ${reportData.reportNumber}`, 50, infoY);
-      doc.text(`${ar(labels.sampleId, useArabicFont)}: ${reportData.sampleCode}`, 300, infoY);
-      doc.text(`${ar(labels.date, useArabicFont)}: ${new Date(reportData.date).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US')}`, 50, infoY + 15);
-      doc.text(`${ar(labels.client, useArabicFont)}: ${ar(reportData.customerName || '-', useArabicFont)}`, 300, infoY + 15);
-      doc.moveDown(2);
+      doc.fontSize(10);
+      if (isArabic) {
+        drawField(doc, labels.reportNo, reportData.reportNumber, 50, infoY, 220, true);
+        drawField(doc, labels.sampleId, reportData.sampleCode, 300, infoY, 220, true);
+        drawField(doc, labels.date, formatDate(reportData.date), 50, infoY + 16, 220, true);
+        drawField(doc, labels.client, reportData.customerName || '-', 300, infoY + 16, 220, true);
+      } else {
+        setLatin(doc);
+        doc.fillColor('#333');
+        doc.text(`${labels.reportNo}: ${reportData.reportNumber}`, 50, infoY);
+        doc.text(`${labels.sampleId}: ${reportData.sampleCode}`, 300, infoY);
+        doc.text(`${labels.date}: ${formatDate(reportData.date)}`, 50, infoY + 16);
+        doc.text(`${labels.client}: ${reportData.customerName || '-'}`, 300, infoY + 16);
+      }
+      doc.y = infoY + 36;
 
       const animalType = ANIMAL_TYPES[reportData.animalType]?.[isArabic ? 'ar' : 'en'] || reportData.animalType;
       const animalGender = GENDERS[reportData.animalGender]?.[isArabic ? 'ar' : 'en'] || reportData.animalGender || '-';
 
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(12).fillColor('#0d9488').text(ar(labels.animalInfo, useArabicFont));
+      doc.fontSize(12).fillColor('#0d9488');
+      drawTextSmart(doc, labels.animalInfo, 50, doc.y, 495, { arabicMode: isArabic });
+      doc.moveDown(0.3);
+
       doc.fontSize(10).fillColor('#333');
-      doc.text(`${ar(labels.animalId, useArabicFont)}: ${reportData.animalCode} | ${ar(labels.type, useArabicFont)}: ${ar(animalType, useArabicFont)}`);
-      doc.text(`${ar(labels.name, useArabicFont)}: ${ar(reportData.animalName || '-', useArabicFont)} | ${ar(labels.gender, useArabicFont)}: ${ar(animalGender, useArabicFont)}`);
+      if (isArabic) {
+        drawField(doc, labels.animalId, reportData.animalCode, 50, doc.y, 220, true);
+        drawField(doc, labels.type, animalType, 300, doc.y, 220, true);
+        doc.y += 16;
+        drawField(doc, labels.name, reportData.animalName || '-', 50, doc.y, 220, true);
+        drawField(doc, labels.gender, animalGender, 300, doc.y, 220, true);
+        doc.y += 16;
+      } else {
+        setLatin(doc);
+        doc.text(`${labels.animalId}: ${reportData.animalCode} | ${labels.type}: ${animalType}`);
+        doc.text(`${labels.name}: ${reportData.animalName || '-'} | ${labels.gender}: ${animalGender}`);
+      }
       doc.moveDown();
 
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(12).fillColor('#0d9488').text(ar(labels.testResults, useArabicFont));
+      doc.fontSize(12).fillColor('#0d9488');
+      drawTextSmart(doc, labels.testResults, 50, doc.y, 495, { arabicMode: isArabic });
       doc.moveDown(0.5);
 
       const tableTop = doc.y;
       const colWidths = [140, 80, 60, 100, 80];
+      const colX = [50, 190, 270, 330, 430];
 
-      doc.fontSize(9).fillColor('#fff');
-      let x = 50;
+      doc.fontSize(9);
       labels.headers.forEach((h, i) => {
-        setupFonts(doc, useArabicFont);
-        doc.rect(x, tableTop, colWidths[i], 20).fill('#0d9488');
-        doc.fillColor('#fff').text(ar(h, useArabicFont), x + 5, tableTop + 5, { width: colWidths[i] - 10 });
-        x += colWidths[i];
-      });
-
-      let rowY = tableTop + 20;
-      reportData.results.forEach((row, idx) => {
-        const bg = idx % 2 === 0 ? '#f8fafc' : '#fff';
-        x = 50;
-        doc.rect(50, rowY, 460, 18).fill(bg);
-        doc.fillColor('#333');
-        const flagText = flagLabels[row.flag] || row.flag || '-';
-        const values = [
-          ar(row.name, useArabicFont),
-          row.value,
-          row.unit || '-',
-          row.reference || '-',
-          ar(flagText, useArabicFont),
-        ];
-        values.forEach((v, i) => {
-          setupFonts(doc, useArabicFont && (i === 0 || i === 4));
-          if (row.isCritical && i === 4) doc.fillColor('#dc2626');
-          else doc.fillColor('#333');
-          doc.text(String(v), x + 5, rowY + 4, { width: colWidths[i] - 10 });
-          x += colWidths[i];
+        doc.rect(colX[i], tableTop, colWidths[i], 22).fill('#0d9488');
+        drawTextSmart(doc, h, colX[i] + 4, tableTop + 6, colWidths[i] - 8, {
+          arabicMode: isArabic,
+          color: '#ffffff',
         });
-        rowY += 18;
       });
 
-      doc.y = rowY + 20;
+      let rowY = tableTop + 22;
+      reportData.results.forEach((row, idx) => {
+        const bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
+        const color = resultColor(row.flag);
+        doc.rect(50, rowY, 460, 20).fill(bg);
+
+        const flagText = flagLabels[row.flag] || row.flag || '-';
+        const cells = [
+          { text: row.name, arabic: isArabic, color: '#333333', bold: false },
+          { text: row.value, arabic: false, color, bold: true },
+          { text: row.unit || '-', arabic: false, color: '#333333', bold: false },
+          { text: row.reference || '-', arabic: false, color: '#333333', bold: false },
+          { text: flagText, arabic: isArabic, color, bold: true },
+        ];
+
+        cells.forEach((cell, i) => {
+          drawTextSmart(doc, cell.text, colX[i] + 4, rowY + 5, colWidths[i] - 8, {
+            arabicMode: cell.arabic,
+            color: cell.color,
+            bold: cell.bold,
+          });
+        });
+
+        if (row.flag && row.flag !== 'NORMAL') {
+          doc.rect(colX[1], rowY + 3, colWidths[1] - 6, 14)
+            .lineWidth(0.8)
+            .strokeColor(color)
+            .stroke();
+        }
+
+        rowY += 20;
+      });
+
+      doc.y = rowY + 16;
 
       if (reportData.doctorNotes) {
-        setupFonts(doc, useArabicFont);
-        doc.fontSize(11).fillColor('#0d9488').text(ar(labels.doctorNotes, useArabicFont));
-        doc.fontSize(10).fillColor('#333').text(ar(reportData.doctorNotes, useArabicFont));
+        doc.fontSize(11).fillColor('#0d9488');
+        drawTextSmart(doc, labels.doctorNotes, 50, doc.y, 495, { arabicMode: isArabic });
+        doc.moveDown(0.3);
+        doc.fontSize(10);
+        drawTextSmart(doc, reportData.doctorNotes, 50, doc.y, 495, { arabicMode: isArabic });
         doc.moveDown();
       }
 
@@ -202,21 +278,22 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       const qrBase64 = qrData.replace(/^data:image\/png;base64,/, '');
       const qrBuffer = Buffer.from(qrBase64, 'base64');
       doc.image(qrBuffer, 50, doc.y, { width: 80 });
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(8).fillColor('#666')
-        .text(ar(labels.scanVerify, useArabicFont), 140, doc.y + 30);
 
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(10).fillColor('#333')
-        .text(ar(labels.specialistSignature, useArabicFont), 350, doc.y);
+      doc.fontSize(8).fillColor('#666');
+      drawTextSmart(doc, labels.scanVerify, 140, doc.y + 28, 200, { arabicMode: isArabic });
+
+      doc.fontSize(10).fillColor('#333');
+      drawTextSmart(doc, labels.specialistSignature, 350, doc.y, 180, { arabicMode: isArabic });
       if (reportData.specialistName) {
-        doc.text(ar(reportData.specialistName, useArabicFont), 350, doc.y + 15);
+        drawTextSmart(doc, reportData.specialistName, 350, doc.y + 14, 180, { arabicMode: isArabic });
       }
 
       doc.moveDown(4);
-      setupFonts(doc, useArabicFont);
-      doc.fontSize(8).fillColor('#999')
-        .text(`${ar(labels.issuedBy, useArabicFont)} ${isArabic && env.lab.nameAr ? ar(env.lab.nameAr, useArabicFont) : env.lab.name}`, { align: 'center' });
+      doc.fontSize(8).fillColor('#999');
+      const footer = isArabic && env.lab.nameAr
+        ? `${labels.issuedBy} ${env.lab.nameAr}`
+        : `${labels.issuedBy} ${env.lab.name}`;
+      drawTextSmart(doc, footer, 50, doc.y, 495, { arabicMode: isArabic });
 
       doc.end();
 
