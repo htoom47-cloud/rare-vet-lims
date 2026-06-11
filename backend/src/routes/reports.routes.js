@@ -1,9 +1,7 @@
 const express = require('express');
-const path = require('path');
 const service = require('../services/reports.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { PERMISSIONS } = require('../utils/permissions');
-const { ensureUploadDir } = require('../config/storage');
 
 const router = express.Router();
 
@@ -30,9 +28,10 @@ router.post('/generate/:sampleId', authorize(PERMISSIONS.REPORTS_GENERATE), asyn
   } catch (err) { next(err); }
 });
 
-router.get('/download/:filename', authorize(PERMISSIONS.REPORTS_VIEW), (req, res) => {
-  const filePath = path.join(ensureUploadDir(), 'reports', req.params.filename);
-  res.download(filePath);
+router.get('/download/:filename', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
+  try {
+    await service.servePdf(req.params.filename, res);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

@@ -92,10 +92,32 @@ export const resultsAPI = {
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
 };
 
+export const openReportPdf = async (pdfUrl) => {
+  const filename = pdfUrl?.split('/').pop();
+  if (!filename) throw new Error('Missing report file');
+
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${API_URL}/reports/download/${encodeURIComponent(filename)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!response.ok) {
+    const err = new Error('Report PDF not found');
+    err.response = { status: response.status };
+    throw err;
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, '_blank');
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+};
+
 export const reportsAPI = {
   list: (params) => api.get('/reports', { params }),
   generate: (sampleId, language) => api.post(`/reports/generate/${sampleId}`, { language }),
   verify: (code) => api.get(`/reports/verify/${code}`),
+  openPdf: openReportPdf,
 };
 
 export const notificationsAPI = {

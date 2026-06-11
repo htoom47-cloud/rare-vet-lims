@@ -237,7 +237,7 @@ export default function Samples() {
     try {
       const { data } = await reportsAPI.generate(detailSample.id, 'ar');
       toast.success(t('workflow.reportExtracted'));
-      if (data.data.pdf_url) window.open(data.data.pdf_url, '_blank');
+      if (data.data.pdf_url) await reportsAPI.openPdf(data.data.pdf_url);
       viewDetail(detailSample);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'تأكد من اعتماد جميع النتائج أولاً');

@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../config/database');
@@ -5,7 +6,8 @@ const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir } = require('../config/storage');
-const env = require('../config/env');
+
+const extractFilename = (pdfUrl) => (pdfUrl ? pdfUrl.split('/').pop() : null);
 
 const list = async ({ page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -25,18 +27,18 @@ const list = async ({ page, limit }) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
-const generate = async (sampleId, userId, language = 'en') => {
+const buildReportData = async (sampleId, { reportNumber, verificationCode, language, generatedBy }) => {
   const sampleResult = await query(
     `SELECT s.*, c.full_name as customer_name, a.animal_code, a.animal_type, a.name_tag as animal_name, a.gender as animal_gender
      FROM samples s
      JOIN customers c ON s.customer_id = c.id
      JOIN animals a ON s.animal_id = a.id
-     WHERE s.id = $1 AND s.status = 'completed'`,
+     WHERE s.id = $1`,
     [sampleId]
   );
 
   if (!sampleResult.rows[0]) {
-    throw new AppError('Sample not found or not completed', 400, 'INVALID_SAMPLE');
+    throw new AppError('Sample not found', 404, 'NOT_FOUND');
   }
 
   const sample = sampleResult.rows[0];
@@ -59,12 +61,11 @@ const generate = async (sampleId, userId, language = 'en') => {
     throw new AppError('No validated results found', 400, 'NO_RESULTS');
   }
 
-  const reportNumber = generateCode('RPT');
-  const verificationCode = uuidv4().slice(0, 12).toUpperCase();
+  const userResult = generatedBy
+    ? await query('SELECT full_name FROM users WHERE id = $1', [generatedBy])
+    : { rows: [] };
 
-  const userResult = await query('SELECT full_name FROM users WHERE id = $1', [userId]);
-
-  const reportData = {
+  return {
     reportNumber,
     sampleCode: sample.sample_code,
     date: sample.completed_date || new Date(),
@@ -86,6 +87,47 @@ const generate = async (sampleId, userId, language = 'en') => {
       isCritical: r.is_critical,
     })),
   };
+};
+
+const ensurePdfFile = async (reportRow) => {
+  const filename = extractFilename(reportRow.pdf_url);
+  if (!filename) throw new AppError('Report file not found', 404, 'NOT_FOUND');
+
+  const filePath = path.join(ensureUploadDir(), 'reports', filename);
+  if (fs.existsSync(filePath)) return filePath;
+
+  const reportData = await buildReportData(reportRow.sample_id, {
+    reportNumber: reportRow.report_number,
+    verificationCode: reportRow.qr_verification_code,
+    language: reportRow.language,
+    generatedBy: reportRow.generated_by,
+  });
+
+  const pdf = await generateReportPDF(
+    reportData,
+    path.join(ensureUploadDir(), 'reports'),
+    { filename }
+  );
+  return pdf.filePath;
+};
+
+const generate = async (sampleId, userId, language = 'en') => {
+  const sampleResult = await query(
+    'SELECT id FROM samples WHERE id = $1 AND status = $2',
+    [sampleId, 'completed']
+  );
+  if (!sampleResult.rows[0]) {
+    throw new AppError('Sample not found or not completed', 400, 'INVALID_SAMPLE');
+  }
+
+  const reportNumber = generateCode('RPT');
+  const verificationCode = uuidv4().slice(0, 12).toUpperCase();
+  const reportData = await buildReportData(sampleId, {
+    reportNumber,
+    verificationCode,
+    language,
+    generatedBy: userId,
+  });
 
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);
@@ -97,6 +139,22 @@ const generate = async (sampleId, userId, language = 'en') => {
   );
 
   return { ...result.rows[0], pdf_url: pdf.url };
+};
+
+const servePdf = async (filename, res) => {
+  const report = await query('SELECT * FROM reports WHERE pdf_url LIKE $1', [`%${filename}`]);
+  if (!report.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
+
+  const filePath = await ensurePdfFile(report.rows[0]);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+  await new Promise((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', reject);
+    stream.on('end', resolve);
+    stream.pipe(res);
+  });
 };
 
 const verify = async (code) => {
@@ -119,4 +177,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, generate, verify };
+module.exports = { list, generate, verify, servePdf };

@@ -5,8 +5,9 @@ const { v4: uuidv4 } = require('uuid');
 const env = require('../config/env');
 const { generateQR } = require('./barcode');
 
-const generateReportPDF = async (reportData, outputDir) => {
-  const filename = `report-${reportData.reportNumber}-${uuidv4().slice(0, 8)}.pdf`;
+const generateReportPDF = async (reportData, outputDir, options = {}) => {
+  const filename = options.filename
+    || `report-${reportData.reportNumber}-${uuidv4().slice(0, 8)}.pdf`;
   const filePath = path.join(outputDir, filename);
 
   return new Promise(async (resolve, reject) => {

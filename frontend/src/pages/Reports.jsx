@@ -48,6 +48,14 @@ export default function Reports() {
     }
   };
 
+  const openPdf = async (pdfUrl) => {
+    try {
+      await reportsAPI.openPdf(pdfUrl);
+    } catch {
+      toast.error('تعذّر فتح التقرير — حاول إنشاءه من جديد');
+    }
+  };
+
   const generateReport = async (sampleId, lang) => {
     setGenerating(true);
     try {
@@ -55,7 +63,7 @@ export default function Reports() {
       toast.success(`تم إنشاء التقرير ${data.data.report_number}`);
       setGenerateOpen(false);
       load();
-      if (data.data.pdf_url) window.open(data.data.pdf_url, '_blank');
+      if (data.data.pdf_url) await reportsAPI.openPdf(data.data.pdf_url);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'تأكد من اعتماد جميع النتائج أولاً');
     } finally {
@@ -72,9 +80,13 @@ export default function Reports() {
     { key: 'actions', label: t('common.actions'), render: (r) => (
       <div className="flex gap-2">
         {r.pdf_url && (
-          <a href={r.pdf_url} target="_blank" rel="noreferrer" className="text-primary-600 flex items-center gap-1 text-sm">
-            <Download size={14} /> {t('common.download')}
-          </a>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openPdf(r.pdf_url); }}
+            className="text-primary-600 flex items-center gap-1 text-sm"
+          >
+            <Download size={14} /> {t('common.print')}
+          </button>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); sendToCustomer(r); }}

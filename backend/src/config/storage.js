@@ -5,7 +5,9 @@ const env = require('./env');
 const logger = require('./logger');
 
 const ensureUploadDir = () => {
-  const uploadPath = path.resolve(env.storage.path);
+  const uploadPath = path.isAbsolute(env.storage.path)
+    ? env.storage.path
+    : path.resolve(__dirname, '../..', env.storage.path.replace(/^\.\//, ''));
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
   }
