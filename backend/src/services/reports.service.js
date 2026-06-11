@@ -6,6 +6,7 @@ const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir } = require('../config/storage');
+const { generateInterpretation } = require('./ai-interpretation.service');
 
 const extractFilename = (pdfUrl) => (pdfUrl ? pdfUrl.split('/').pop() : null);
 
@@ -27,7 +28,12 @@ const list = async ({ page, limit }) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
-const buildReportData = async (sampleId, { reportNumber, verificationCode, language, generatedBy }) => {
+const buildReportData = async (sampleId, opts) => {
+  const {
+    reportNumber, verificationCode, language, generatedBy,
+    aiInterpretation, treatmentRecommendations,
+  } = opts;
+
   const sampleResult = await query(
     `SELECT s.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar,
             a.animal_code, a.animal_type, a.name_tag as animal_name, a.gender as animal_gender
@@ -69,7 +75,7 @@ const buildReportData = async (sampleId, { reportNumber, verificationCode, langu
   }
 
   const userResult = generatedBy
-    ? await query('SELECT full_name FROM users WHERE id = $1', [generatedBy])
+    ? await query('SELECT full_name, full_name_ar FROM users WHERE id = $1', [generatedBy])
     : { rows: [] };
 
   const formatNumber = (value) => {
@@ -88,6 +94,20 @@ const buildReportData = async (sampleId, { reportNumber, verificationCode, langu
   }
 
   const isArabic = language === 'ar';
+  const results = uniqueByParameter.map((r) => ({
+    name: isArabic
+      ? (r.parameter_name_ar || r.parameter_name || r.test_name)
+      : (r.parameter_name || r.test_name),
+    value: formatNumber(r.numeric_value ?? r.value) ?? '-',
+    unit: r.unit,
+    reference: r.min_value != null
+      ? `${formatNumber(r.min_value)} - ${formatNumber(r.max_value)}`
+      : '-',
+    flag: r.flag,
+    isCritical: r.is_critical,
+  }));
+
+  const specialist = userResult.rows[0];
   return {
     reportNumber,
     sampleCode: sample.sample_code,
@@ -101,21 +121,24 @@ const buildReportData = async (sampleId, { reportNumber, verificationCode, langu
     animalGender: sample.animal_gender,
     language,
     verificationCode,
-    specialistName: userResult.rows[0]?.full_name,
+    specialistName: isArabic
+      ? (specialist?.full_name_ar || specialist?.full_name)
+      : specialist?.full_name,
     doctorNotes: uniqueByParameter[0]?.doctor_notes,
-    results: uniqueByParameter.map((r) => ({
-      name: isArabic
-        ? (r.parameter_name_ar || r.parameter_name || r.test_name)
-        : (r.parameter_name || r.test_name),
-      value: formatNumber(r.numeric_value ?? r.value) ?? '-',
-      unit: r.unit,
-      reference: r.min_value != null
-        ? `${formatNumber(r.min_value)} - ${formatNumber(r.max_value)}`
-        : '-',
-      flag: r.flag,
-      isCritical: r.is_critical,
-    })),
+    aiInterpretation: aiInterpretation ?? null,
+    treatmentRecommendations: treatmentRecommendations ?? null,
+    results,
   };
+};
+
+const previewInterpretation = async (sampleId, language = 'ar') => {
+  const data = await buildReportData(sampleId, {
+    reportNumber: 'PREVIEW',
+    verificationCode: 'PREVIEW',
+    language,
+    generatedBy: null,
+  });
+  return generateInterpretation(data.results, language, data.animalType);
 };
 
 const ensurePdfFile = async (reportRow) => {
@@ -132,6 +155,8 @@ const ensurePdfFile = async (reportRow) => {
     verificationCode: reportRow.qr_verification_code,
     language: reportRow.language,
     generatedBy: reportRow.generated_by,
+    aiInterpretation: reportRow.ai_interpretation,
+    treatmentRecommendations: reportRow.treatment_recommendations,
   });
 
   const pdf = await generateReportPDF(
@@ -142,7 +167,7 @@ const ensurePdfFile = async (reportRow) => {
   return pdf.filePath;
 };
 
-const generate = async (sampleId, userId, language = 'en') => {
+const generate = async (sampleId, userId, language = 'ar', options = {}) => {
   const sampleResult = await query(
     'SELECT id FROM samples WHERE id = $1 AND status = $2',
     [sampleId, 'completed']
@@ -153,20 +178,31 @@ const generate = async (sampleId, userId, language = 'en') => {
 
   const reportNumber = generateCode('RPT');
   const verificationCode = uuidv4().slice(0, 12).toUpperCase();
-  const reportData = await buildReportData(sampleId, {
+
+  const baseData = await buildReportData(sampleId, {
     reportNumber,
     verificationCode,
     language,
     generatedBy: userId,
   });
 
+  const aiInterpretation = generateInterpretation(baseData.results, language, baseData.animalType);
+  const treatmentRecommendations = (options.treatment_recommendations || '').trim();
+
+  const reportData = {
+    ...baseData,
+    aiInterpretation,
+    treatmentRecommendations,
+  };
+
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);
 
   const result = await query(
-    `INSERT INTO reports (report_number, sample_id, pdf_url, qr_verification_code, generated_by, language, is_final)
-     VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING *`,
-    [reportNumber, sampleId, pdf.url, verificationCode, userId, language]
+    `INSERT INTO reports (report_number, sample_id, pdf_url, qr_verification_code, generated_by, language,
+                         ai_interpretation, treatment_recommendations, is_final)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true) RETURNING *`,
+    [reportNumber, sampleId, pdf.url, verificationCode, userId, language, aiInterpretation, treatmentRecommendations || null]
   );
 
   return { ...result.rows[0], pdf_url: pdf.url };
@@ -208,4 +244,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, generate, verify, servePdf };
+module.exports = { list, generate, verify, servePdf, previewInterpretation };

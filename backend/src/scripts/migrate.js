@@ -43,6 +43,8 @@ async function applyPatches() {
       'ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS animal_id UUID REFERENCES animals(id)'
     );
     await backfillUsernames(client);
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS ai_interpretation TEXT');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS treatment_recommendations TEXT');
   } finally {
     client.release();
   }

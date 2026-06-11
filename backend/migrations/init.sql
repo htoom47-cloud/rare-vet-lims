@@ -237,6 +237,8 @@ CREATE TABLE reports (
     generated_by UUID REFERENCES users(id),
     specialist_signature TEXT,
     language VARCHAR(5) DEFAULT 'en',
+    ai_interpretation TEXT,
+    treatment_recommendations TEXT,
     is_final BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

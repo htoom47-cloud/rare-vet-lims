@@ -19,7 +19,7 @@ import BarcodeLabel from '../components/barcode/BarcodeLabel';
 import WorkflowStepper from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
 
-import { samplesAPI, animalsAPI, testsAPI, billingAPI, reportsAPI, notificationsAPI } from '../services/api';
+import { samplesAPI, animalsAPI, testsAPI, billingAPI, notificationsAPI } from '../services/api';
 
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -231,19 +231,10 @@ export default function Samples() {
 
 
 
-  const generateReportOnly = async () => {
+  const generateReportOnly = () => {
     if (!detailSample) return;
-    setSending(true);
-    try {
-      const { data } = await reportsAPI.generate(detailSample.id, 'ar');
-      toast.success(t('workflow.reportExtracted'));
-      if (data.data.pdf_url) await reportsAPI.openPdf(data.data.pdf_url);
-      viewDetail(detailSample);
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'تأكد من اعتماد جميع النتائج أولاً');
-    } finally {
-      setSending(false);
-    }
+    setDetailSample(null);
+    navigate(`/reports?generate=${detailSample.id}`);
   };
 
   const sendReportToCustomer = async () => {

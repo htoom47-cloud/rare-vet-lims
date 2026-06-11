@@ -37,7 +37,7 @@ services:
       - key: STORAGE_PATH
         value: ./uploads
       - key: LAB_NAME
-        value: مركز رعاية النوادر البيطري
+        value: Al-Nawadir Veterinary Care Center
       - key: LAB_NAME_AR
         value: مركز رعاية النوادر البيطري
       - key: DATABASE_URL

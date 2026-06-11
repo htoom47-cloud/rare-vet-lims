@@ -38,8 +38,8 @@ const env = {
     },
   },
   lab: {
-    name: process.env.LAB_NAME || 'Rare Veterinary Care',
-    nameAr: process.env.LAB_NAME_AR || 'رير للرعاية البيطرية',
+    name: process.env.LAB_NAME || 'Al-Nawadir Veterinary Care Center',
+    nameAr: process.env.LAB_NAME_AR || 'مركز رعاية النوادر البيطري',
     address: process.env.LAB_ADDRESS || 'Kingdom of Saudi Arabia',
     phone: process.env.LAB_PHONE || '+966500000000',
     email: process.env.LAB_EMAIL || 'lab@rarevetcare.com',

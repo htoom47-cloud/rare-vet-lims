@@ -115,7 +115,9 @@ export const openReportPdf = async (pdfUrl) => {
 
 export const reportsAPI = {
   list: (params) => api.get('/reports', { params }),
-  generate: (sampleId, language) => api.post(`/reports/generate/${sampleId}`, { language }),
+  interpret: (sampleId, language = 'ar') => api.post(`/reports/interpret/${sampleId}`, { language }),
+  generate: (sampleId, { language = 'ar', treatment_recommendations = '' } = {}) =>
+    api.post(`/reports/generate/${sampleId}`, { language, treatment_recommendations }),
   verify: (code) => api.get(`/reports/verify/${code}`),
   openPdf: openReportPdf,
 };
