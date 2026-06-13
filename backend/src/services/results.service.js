@@ -1,10 +1,10 @@
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const { evaluateFlag } = require('../utils/helpers');
+const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
-    `SELECT r.*, rv.*, tp.name as parameter_name, tp.code as parameter_code, tp.unit,
+    `SELECT r.*, rv.*, tp.name as parameter_name, tp.code as parameter_code, tp.unit, tp.sort_order,
             tr.min_value, tr.max_value, tr.critical_low, tr.critical_high
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
@@ -12,7 +12,8 @@ const getBySampleTest = async (sampleTestId) => {
      LEFT JOIN test_reference_ranges tr ON tr.parameter_id = tp.id
      LEFT JOIN samples s ON s.id = (SELECT sample_id FROM sample_tests WHERE id = $1)
      LEFT JOIN animals a ON s.animal_id = a.id AND (tr.animal_type = a.animal_type OR tr.animal_type IS NULL)
-     WHERE r.sample_test_id = $1`,
+     WHERE r.sample_test_id = $1
+     ORDER BY tp.sort_order, tp.id`,
     [sampleTestId]
   );
 
@@ -35,7 +36,8 @@ const getBySampleTest = async (sampleTestId) => {
       flag: r.flag,
       is_critical: r.is_critical,
       reference: r.min_value != null ? `${r.min_value} - ${r.max_value}` : null,
-    })),
+      sort_order: r.sort_order,
+    })).sort(compareByNormaOrder),
   };
 
   return grouped;

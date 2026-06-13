@@ -44,13 +44,13 @@ const CBC_PARAMS = [
   { code: 'BAS', name: 'Basophils', name_ar: 'القعدات', unit: '10³/µL' },
   { code: 'RBC', name: 'Red Blood Cells', name_ar: 'كريات الدم الحمراء', unit: '10⁶/µL' },
   { code: 'HGB', name: 'Hemoglobin', name_ar: 'الهيموجلوبين', unit: 'g/dL' },
-  { code: 'HCT', name: 'Hematocrit', name_ar: 'الهيماتوكريت', unit: '%' },
   { code: 'MCV', name: 'MCV', name_ar: 'حجم الكرية الوسطي', unit: 'fL' },
+  { code: 'HCT', name: 'Hematocrit', name_ar: 'الهيماتوكريت', unit: '%' },
   { code: 'MCH', name: 'MCH', name_ar: 'هيموجلوبين الكرية', unit: 'pg' },
   { code: 'MCHC', name: 'MCHC', name_ar: 'تركيز الهيموجلوبين', unit: 'g/dL' },
+  { code: 'RDW', name: 'RDW', name_ar: 'توزع كريات الدم الحمراء', unit: '%' },
   { code: 'PLT', name: 'Platelets', name_ar: 'الصفائح الدموية', unit: '10³/µL' },
   { code: 'MPV', name: 'MPV', name_ar: 'حجم الصفيح الوسطي', unit: 'fL' },
-  { code: 'RDW', name: 'RDW', name_ar: 'توزع كريات الدم الحمراء', unit: '%' },
 ];
 
 const CHEM_PARAMS = [
@@ -108,6 +108,11 @@ async function seedTestParameters(testId, config) {
         [testId, param.code, param.name, param.name_ar, param.unit, i]
       );
       paramId = inserted.rows[0].id;
+    } else {
+      await query(
+        'UPDATE test_parameters SET sort_order = $1 WHERE id = $2',
+        [i, paramId]
+      );
     }
     const r = config.ranges?.[param.code];
     if (r && paramId) {
@@ -286,7 +291,13 @@ async function seed() {
   // Settings
   await query(
     `INSERT INTO settings (key, value) VALUES ('lab_info', $1) ON CONFLICT (key) DO NOTHING`,
-    [JSON.stringify({ name: 'Rare Veterinary Care', name_ar: 'رير للرعاية البيطرية', vat: '300000000000003' })]
+    [JSON.stringify({
+      name: 'Rare Animals Veterinary Care Center',
+      name_ar: 'مركز رعاية النوادر البيطري',
+      phone: '+966539779328',
+      email: 'alnwader.10hz@gmail.com',
+      vat: '300000000000003',
+    })]
   );
 
   logger.info('Seed completed successfully!');

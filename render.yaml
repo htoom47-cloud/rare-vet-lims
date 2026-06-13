@@ -37,9 +37,17 @@ services:
       - key: STORAGE_PATH
         value: ./uploads
       - key: LAB_NAME
-        value: Al-Nawadir Veterinary Care Center
+        value: Rare Animals Veterinary Care Center
       - key: LAB_NAME_AR
         value: مركز رعاية النوادر البيطري
+      - key: LAB_SUBTITLE
+        value: Veterinary Medical & Research Laboratory
+      - key: LAB_SUBTITLE_AR
+        value: للتحاليل البيطرية والبحثية
+      - key: LAB_PHONE
+        value: +966539779328
+      - key: LAB_EMAIL
+        value: alnwader.10hz@gmail.com
       - key: DATABASE_URL
         fromDatabase:
           name: rare-vet-db

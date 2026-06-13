@@ -37,9 +37,10 @@ const generateInterpretation = (results, language = 'ar', animalType = 'camel') 
   const lines = abnormal.map((r) => {
     const status = flags[r.flag] || r.flag;
     const unit = r.unit ? ` ${r.unit}` : '';
+    const label = r.nameAr || r.name || r.nameEn;
     return isArabic
-      ? `- ${r.name}: القيمة ${r.value}${unit} (${status}) | المرجع: ${r.reference}`
-      : `- ${r.name}: value ${r.value}${unit} (${status}) | reference: ${r.reference}`;
+      ? `- ${label}: القيمة ${r.value}${unit} (${status}) | المرجع: ${r.reference}`
+      : `- ${r.nameEn || label}: value ${r.value}${unit} (${status}) | reference: ${r.reference}`;
   });
 
   const intro = isArabic

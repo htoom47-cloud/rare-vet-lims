@@ -7,6 +7,7 @@ const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir } = require('../config/storage');
 const { generateInterpretation } = require('./ai-interpretation.service');
+const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
 const extractFilename = (pdfUrl) => (pdfUrl ? pdfUrl.split('/').pop() : null);
 
@@ -51,7 +52,9 @@ const buildReportData = async (sampleId, opts) => {
   const sample = sampleResult.rows[0];
 
   const resultsData = await query(
-    `SELECT tp.id as parameter_id, t.name as test_name, tp.name as parameter_name, tp.name_ar as parameter_name_ar,
+    `SELECT tp.id as parameter_id, tp.code as parameter_code, tp.sort_order,
+            t.name as test_name, t.name_ar as test_name_ar, t.code as test_code,
+            tp.name as parameter_name, tp.name_ar as parameter_name_ar,
             rv.value, rv.numeric_value, tp.unit, tr.min_value, tr.max_value, rv.flag, rv.is_critical, res.doctor_notes
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
@@ -66,7 +69,7 @@ const buildReportData = async (sampleId, opts) => {
        LIMIT 1
      ) tr ON true
      WHERE st.sample_id = $1
-     ORDER BY tp.id`,
+     ORDER BY tp.sort_order, tp.id`,
     [sampleId, sample.animal_type]
   );
 
@@ -87,7 +90,8 @@ const buildReportData = async (sampleId, opts) => {
 
   const uniqueByParameter = [];
   const seenParameters = new Set();
-  for (const row of resultsData.rows) {
+  const sortedRows = [...resultsData.rows].sort(compareByNormaOrder);
+  for (const row of sortedRows) {
     if (seenParameters.has(row.parameter_id)) continue;
     seenParameters.add(row.parameter_id);
     uniqueByParameter.push(row);
@@ -95,11 +99,15 @@ const buildReportData = async (sampleId, opts) => {
 
   const isArabic = language === 'ar';
   const results = uniqueByParameter.map((r) => ({
-    name: isArabic
-      ? (r.parameter_name_ar || r.parameter_name || r.test_name)
-      : (r.parameter_name || r.test_name),
+    nameAr: r.parameter_name_ar || r.parameter_name || r.test_name,
+    nameEn: r.parameter_name || r.test_name,
+    testNameAr: r.test_name_ar || r.test_name,
+    testNameEn: r.test_name,
     value: formatNumber(r.numeric_value ?? r.value) ?? '-',
+    numericValue: r.numeric_value != null ? Number(r.numeric_value) : null,
     unit: r.unit,
+    minValue: r.min_value != null ? Number(r.min_value) : null,
+    maxValue: r.max_value != null ? Number(r.max_value) : null,
     reference: r.min_value != null
       ? `${formatNumber(r.min_value)} - ${formatNumber(r.max_value)}`
       : '-',

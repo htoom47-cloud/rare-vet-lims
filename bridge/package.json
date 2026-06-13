@@ -4,6 +4,9 @@
   "private": true,
   "description": "Norma CBC HL7 bridge for Rare Vet LIMS",
   "scripts": {
-    "start": "node norma-listener.js"
+    "start": "node norma-listener.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop norma-bridge",
+    "pm2:logs": "pm2 logs norma-bridge"
   }
 }

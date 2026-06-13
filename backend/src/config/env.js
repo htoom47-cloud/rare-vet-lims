@@ -38,11 +38,13 @@ const env = {
     },
   },
   lab: {
-    name: process.env.LAB_NAME || 'Al-Nawadir Veterinary Care Center',
+    name: process.env.LAB_NAME || 'Rare Animals Veterinary Care Center',
     nameAr: process.env.LAB_NAME_AR || 'مركز رعاية النوادر البيطري',
+    subtitle: process.env.LAB_SUBTITLE || 'Veterinary Medical & Research Laboratory',
+    subtitleAr: process.env.LAB_SUBTITLE_AR || 'للتحاليل البيطرية والبحثية',
     address: process.env.LAB_ADDRESS || 'Kingdom of Saudi Arabia',
-    phone: process.env.LAB_PHONE || '+966500000000',
-    email: process.env.LAB_EMAIL || 'lab@rarevetcare.com',
+    phone: process.env.LAB_PHONE || '+966539779328',
+    email: process.env.LAB_EMAIL || 'alnwader.10hz@gmail.com',
     vatNumber: process.env.VAT_NUMBER || '300000000000003',
   },
   notifications: {
