@@ -25,9 +25,8 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState('admin');
-
-  const [password, setPassword] = useState('RareVet2026');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
 
@@ -160,20 +159,6 @@ export default function Login() {
             </button>
 
           </form>
-
-
-
-          <div className="mt-6 p-3 bg-primary-100 dark:bg-primary-800/50 rounded-lg text-xs text-primary-600 dark:text-primary-300 border border-primary-200/50">
-
-            <p className="font-medium mb-1">Demo Accounts:</p>
-
-            <p>admin / RareVet2026</p>
-
-            <p>reception / Reception@123</p>
-
-            <p>tech / Tech@123</p>
-
-          </div>
 
         </div>
 
