@@ -222,6 +222,7 @@ const resources = {
         usernamePlaceholder: 'e.g. DM',
         emailPlaceholder: 'Optional — auto-generated if empty',
         selectRole: 'Select role', fullNameAr: 'Name (Arabic)', password: 'Password',
+        passwordHint: 'At least 8 characters (e.g. DDmm1234)',
         newPassword: 'New password (optional)', activeAccount: 'Active account',
         removeUser: 'Delete user', removed: 'User deleted permanently',
         confirmRemove: 'Permanently delete this user? This cannot be undone and they will disappear from the list.',
@@ -237,7 +238,7 @@ const resources = {
         },
         roles: {
           admin: 'System Admin', manager: 'Lab Manager', reception: 'Reception',
-          lab_technician: 'Lab Technician', veterinarian: 'Veterinarian', accountant: 'Accountant',
+          lab_technician: 'Lab Technician', lab_specialist: 'Lab Specialist', veterinarian: 'Veterinarian', accountant: 'Accountant',
         },
         codes: {
           dashboard: { view: 'View dashboard', admin: 'Admin statistics' },
@@ -496,6 +497,7 @@ const resources = {
         usernamePlaceholder: 'مثال: DM',
         emailPlaceholder: 'اختياري — يُولَّد تلقائياً إن تُرك فارغاً',
         selectRole: 'اختر الدور', fullNameAr: 'الاسم بالعربي', password: 'كلمة المرور',
+        passwordHint: '8 أحرف على الأقل (مثال: DDmm1234)',
         newPassword: 'كلمة مرور جديدة (اختياري)', activeAccount: 'حساب نشط',
         removeUser: 'حذف نهائي', removed: 'تم حذف المستخدم نهائياً',
         confirmRemove: 'حذف هذا المستخدم نهائياً؟ لا يمكن التراجع وسيختفي من القائمة.',
@@ -511,7 +513,7 @@ const resources = {
         },
         roles: {
           admin: 'مدير النظام', manager: 'مدير المختبر', reception: 'الاستقبال',
-          lab_technician: 'فني المختبر', veterinarian: 'الطبيب البيطري', accountant: 'المحاسب',
+          lab_technician: 'فني المختبر', lab_specialist: 'أخصائي مختبر', veterinarian: 'الطبيب البيطري', accountant: 'المحاسب',
         },
         codes: {
           dashboard: { view: 'عرض لوحة التحكم', admin: 'إحصائيات الإدارة' },

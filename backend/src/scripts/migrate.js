@@ -4,6 +4,7 @@ const path = require('path');
 const { pool } = require('../config/database');
 const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
+const { ROLE_PERMISSIONS } = require('../utils/permissions');
 
 async function backfillUsernames(client) {
   const hasCol = await client.query(
@@ -44,6 +45,32 @@ async function disableUpdatedAtTriggers(client) {
   }
 }
 
+async function ensureLabSpecialistRole(client) {
+  await client.query(
+    `INSERT INTO roles (name, name_ar, description)
+     VALUES ('lab_specialist', 'أخصائي مختبر', 'Laboratory specialist')
+     ON CONFLICT (name) DO UPDATE SET name_ar = EXCLUDED.name_ar, description = EXCLUDED.description`
+  );
+
+  const perms = ROLE_PERMISSIONS.lab_specialist;
+  if (!perms?.length) return;
+
+  const roleResult = await client.query("SELECT id FROM roles WHERE name = 'lab_specialist'");
+  if (!roleResult.rows[0]) return;
+  const roleId = roleResult.rows[0].id;
+
+  await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
+  for (const code of perms) {
+    const perm = await client.query('SELECT id FROM permissions WHERE code = $1', [code]);
+    if (perm.rows[0]) {
+      await client.query(
+        'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [roleId, perm.rows[0].id]
+      );
+    }
+  }
+}
+
 async function applyPatches() {
   const client = await pool.connect();
   try {
@@ -58,6 +85,7 @@ async function applyPatches() {
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS lab_specialist_approved_at TIMESTAMPTZ');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_by UUID REFERENCES users(id)');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_at TIMESTAMPTZ');
+    await ensureLabSpecialistRole(client);
     await ensureAdmin();
   } finally {
     client.release();

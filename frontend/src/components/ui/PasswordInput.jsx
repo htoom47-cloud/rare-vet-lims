@@ -9,6 +9,7 @@ export default function PasswordInput({
   required = false,
   autoComplete = 'current-password',
   placeholder,
+  minLength,
 }) {
   const { t } = useTranslation();
   const [show, setShow] = useState(false);
@@ -23,6 +24,7 @@ export default function PasswordInput({
         required={required}
         autoComplete={autoComplete}
         placeholder={placeholder}
+        minLength={minLength}
       />
       <button
         type="button"

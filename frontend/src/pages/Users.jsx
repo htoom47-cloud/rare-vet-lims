@@ -8,6 +8,14 @@ import PasswordInput from '../components/ui/PasswordInput';
 import { usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+const apiError = (err, fallback = 'خطأ') => {
+  const details = err.response?.data?.error?.details;
+  if (Array.isArray(details) && details.length) {
+    return details.map((d) => d.message).join(' — ');
+  }
+  return err.response?.data?.error?.message || fallback;
+};
+
 export default function Users() {
   const { t, i18n } = useTranslation();
   const { user: currentUser } = useAuth();
@@ -76,7 +84,7 @@ export default function Users() {
       toast.success(t('users.permsSaved'));
       await viewPermissions(selectedRole);
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      toast.error(apiError(err));
     } finally {
       setSavingPerms(false);
     }
@@ -91,7 +99,7 @@ export default function Users() {
       setForm({ username: '', email: '', password: '', full_name: '', full_name_ar: '', phone: '', role_id: '' });
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      toast.error(apiError(err));
     }
   };
 
@@ -118,7 +126,7 @@ export default function Users() {
       toast.success(t('users.removed'));
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      toast.error(apiError(err));
     }
   };
 
@@ -129,7 +137,7 @@ export default function Users() {
       toast.success(t('users.demoPurged', { count: data.data.count }));
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      toast.error(apiError(err));
     }
   };
 
@@ -156,7 +164,7 @@ export default function Users() {
       setEditOpen(false);
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      toast.error(apiError(err));
     }
   };
 
@@ -334,8 +342,10 @@ export default function Users() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
+              minLength={8}
               autoComplete="new-password"
             />
+            <p className="text-xs text-primary-500 mt-1">{t('users.passwordHint')}</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('users.role')}</label>

@@ -9,7 +9,8 @@ const ROLES = [
   { name: 'admin', name_ar: 'مدير النظام', description: 'Full system access' },
   { name: 'manager', name_ar: 'مدير', description: 'Laboratory manager' },
   { name: 'reception', name_ar: 'استقبال', description: 'Front desk reception' },
-  { name: 'lab_technician', name_ar: 'فني مختبر', description: 'Lab technician' },
+  { name: 'lab_technician', name_ar: 'فني المختبر', description: 'Lab technician' },
+  { name: 'lab_specialist', name_ar: 'أخصائي مختبر', description: 'Laboratory specialist' },
   { name: 'veterinarian', name_ar: 'طبيب بيطري', description: 'Veterinarian' },
   { name: 'accountant', name_ar: 'محاسب', description: 'Accountant' },
 ];

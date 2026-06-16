@@ -8,7 +8,7 @@ import Modal from '../components/ui/Modal';
 import { reportsAPI, samplesAPI, notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const LAB_ROLES = new Set(['lab_technician', 'manager', 'admin']);
+const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
 
 function ApprovalLine({ label, approved, approverName, canApprove, onApprove, approving }) {

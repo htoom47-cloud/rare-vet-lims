@@ -8,7 +8,7 @@ const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir } = require('../config/storage');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
-const LAB_APPROVER_ROLES = new Set(['lab_technician', 'manager', 'admin']);
+const LAB_APPROVER_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_APPROVER_ROLES = new Set(['veterinarian', 'manager', 'admin']);
 
 const extractFilename = (pdfUrl) => (pdfUrl ? pdfUrl.split('/').pop() : null);
