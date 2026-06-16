@@ -346,8 +346,8 @@ const drawApprovalCell = (doc, x, y, w, h, titleEn, titleAr, approval) => {
     if (hasAr(approval.name)) cellArabic(doc, approval.name, nameX, bodyY, nameW, 12, { size: 7, align: 'right' });
     else cellLatin(doc, approval.name, nameX, bodyY, nameW, 12, { size: 7 });
     if (approval.approvedAt) {
-      const dateStr = new Date(approval.approvedAt).toLocaleDateString('en-GB');
-      cellLatin(doc, dateStr, nameX, bodyY + 12, nameW, 8, { size: 5.5, color: BRAND.muted, align: 'right' });
+      const stamp = formatApprovalStamp(approval.approvedAt);
+      cellLatin(doc, stamp, nameX, bodyY + 12, nameW, 8, { size: 5.5, color: BRAND.muted, align: 'right' });
     }
   } else {
     doc.moveTo(x + 6, y + h - 6).lineTo(x + w - 6, y + h - 6).strokeColor(BRAND.gold).lineWidth(0.6).stroke();
@@ -390,7 +390,18 @@ const drawFooter = async (doc, reportData) => {
   doc.y = y + 44;
 };
 
-const formatDate = (date) => new Date(date).toLocaleDateString('en-GB');
+const formatShortDate = (date) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+};
+
+const formatApprovalStamp = (date) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${formatShortDate(d)}  ${time}`;
+};
 
 const generateReportPDF = async (reportData, outputDir, options = {}) => {
   const filename = options.filename || `report-${reportData.reportNumber}-${uuidv4().slice(0, 8)}.pdf`;
@@ -409,7 +420,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       drawPatientTable(doc, {
         reportNumber: reportData.reportNumber,
         sampleCode: reportData.sampleCode,
-        dateStr: formatDate(reportData.date),
+        dateStr: formatShortDate(reportData.date),
         customerName: reportData.customerName || '-',
         animalCode: reportData.animalCode,
         animalName: reportData.animalName || '-',

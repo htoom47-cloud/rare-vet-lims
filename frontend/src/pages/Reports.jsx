@@ -11,18 +11,34 @@ import { useAuth } from '../context/AuthContext';
 const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
 
-function ApprovalLine({ label, approved, approverName, canApprove, onApprove, approving }) {
-  const { t } = useTranslation();
+function ApprovalLine({ label, approved, approverName, approvedAt, canApprove, onApprove, approving }) {
+  const { t, i18n } = useTranslation();
+
+  const formatApprovalAt = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-GB';
+    const date = d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' });
+    const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${date} ${time}`;
+  };
 
   return (
     <div className="flex items-center justify-between gap-3 p-3 border border-primary-200/60 rounded-lg bg-white dark:bg-gray-900/40">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-primary-800 dark:text-primary-200">{label}</p>
         {approved ? (
-          <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5 mt-1">
-            <CheckCircle2 size={16} className="shrink-0" />
-            <span>{t('reports.approvedBy')}: {approverName}</span>
-          </p>
+          <div className="text-sm text-green-600 dark:text-green-400 mt-1">
+            <p className="flex items-center gap-1.5">
+              <CheckCircle2 size={16} className="shrink-0" />
+              <span>{t('reports.approvedBy')}: {approverName}</span>
+            </p>
+            {approvedAt && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">
+                {formatApprovalAt(approvedAt)}
+              </p>
+            )}
+          </div>
         ) : (
           <p className="text-xs text-gray-500 mt-1">{t('reports.pendingApproval')}</p>
         )}
@@ -172,7 +188,10 @@ export default function Reports() {
     { key: 'sample_code', label: t('reports.sampleNo') },
     { key: 'customer_name', label: t('customers.fullName') },
     { key: 'language', label: t('reports.language'), render: (r) => (r.language === 'ar' ? 'عربي' : 'EN') },
-    { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
+    { key: 'created_at', label: t('common.date'), render: (r) => {
+      const d = new Date(r.created_at);
+      return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+    } },
     {
       key: 'approvals',
       label: t('reports.labApproval'),
@@ -182,6 +201,7 @@ export default function Reports() {
             label={t('reports.labApproval')}
             approved={!!r.lab_specialist_approved_by}
             approverName={approverName(r, 'lab')}
+            approvedAt={r.lab_specialist_approved_at}
             canApprove={canApproveLab}
             approving={approvingKey === `${r.id}-lab`}
             onApprove={() => handleApprove(r.id, 'lab')}
@@ -190,6 +210,7 @@ export default function Reports() {
             label={t('reports.vetApproval')}
             approved={!!r.vet_approved_by}
             approverName={approverName(r, 'vet')}
+            approvedAt={r.vet_approved_at}
             canApprove={canApproveVet}
             approving={approvingKey === `${r.id}-vet`}
             onApprove={() => handleApprove(r.id, 'vet')}
