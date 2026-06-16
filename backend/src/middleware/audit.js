@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const logger = require('../config/logger');
+const { uuidv4 } = require('../utils/uuid');
 
 const auditLog = (action, module) => async (req, res, next) => {
   const originalJson = res.json.bind(res);
@@ -8,9 +9,10 @@ const auditLog = (action, module) => async (req, res, next) => {
     if (res.statusCode < 400 && req.user) {
       try {
         await query(
-          `INSERT INTO audit_logs (user_id, action, module, entity_type, entity_id, new_values, ip_address, user_agent)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, new_values, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
+            uuidv4(),
             req.user.id,
             action,
             module,

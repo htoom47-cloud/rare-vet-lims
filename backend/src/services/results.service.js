@@ -1,17 +1,28 @@
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
+const { evaluateFlag } = require('../utils/helpers');
+const { uuidv4 } = require('../utils/uuid');
 
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
-    `SELECT r.*, rv.*, tp.name as parameter_name, tp.code as parameter_code, tp.unit, tp.sort_order,
-            tr.min_value, tr.max_value, tr.critical_low, tr.critical_high
+    `SELECT r.id AS result_id, r.sample_test_id, r.is_validated, r.doctor_notes, r.technician_notes, r.has_critical,
+            rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical,
+            tp.name AS parameter_name, tp.code AS parameter_code, tp.unit, tp.sort_order,
+            tr.min_value, tr.max_value
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
      LEFT JOIN test_parameters tp ON rv.parameter_id = tp.id
-     LEFT JOIN test_reference_ranges tr ON tr.parameter_id = tp.id
-     LEFT JOIN samples s ON s.id = (SELECT sample_id FROM sample_tests WHERE id = $1)
-     LEFT JOIN animals a ON s.animal_id = a.id AND (tr.animal_type = a.animal_type OR tr.animal_type IS NULL)
+     LEFT JOIN sample_tests st ON r.sample_test_id = st.id
+     LEFT JOIN samples s ON st.sample_id = s.id
+     LEFT JOIN animals a ON s.animal_id = a.id
+     LEFT JOIN LATERAL (
+       SELECT min_value, max_value
+       FROM test_reference_ranges
+       WHERE parameter_id = tp.id AND (animal_type = a.animal_type OR animal_type IS NULL)
+       ORDER BY CASE WHEN animal_type = a.animal_type THEN 0 ELSE 1 END
+       LIMIT 1
+     ) tr ON true
      WHERE r.sample_test_id = $1
      ORDER BY tp.sort_order, tp.id`,
     [sampleTestId]
@@ -19,32 +30,40 @@ const getBySampleTest = async (sampleTestId) => {
 
   if (!result.rows.length) return null;
 
-  const grouped = {
-    id: result.rows[0].id,
-    sample_test_id: sampleTestId,
-    is_validated: result.rows[0].is_validated,
-    doctor_notes: result.rows[0].doctor_notes,
-    technician_notes: result.rows[0].technician_notes,
-    has_critical: result.rows[0].has_critical,
-    values: result.rows.filter((r) => r.parameter_id).map((r) => ({
-      parameter_id: r.parameter_id,
-      parameter_name: r.parameter_name,
-      parameter_code: r.parameter_code,
-      value: r.value,
-      numeric_value: r.numeric_value,
-      unit: r.unit,
-      flag: r.flag,
-      is_critical: r.is_critical,
-      reference: r.min_value != null ? `${r.min_value} - ${r.max_value}` : null,
-      sort_order: r.sort_order,
-    })).sort(compareByNormaOrder),
-  };
+  const head = result.rows[0];
+  const seen = new Set();
+  const values = [];
+  for (const row of result.rows) {
+    if (!row.parameter_id || seen.has(row.parameter_id)) continue;
+    seen.add(row.parameter_id);
+    values.push({
+      parameter_id: row.parameter_id,
+      parameter_name: row.parameter_name,
+      parameter_code: row.parameter_code,
+      value: row.value,
+      numeric_value: row.numeric_value,
+      unit: row.unit,
+      flag: row.flag,
+      is_critical: row.is_critical,
+      reference: row.min_value != null ? `${row.min_value} - ${row.max_value}` : null,
+      sort_order: row.sort_order,
+    });
+  }
 
-  return grouped;
+  return {
+    id: head.result_id,
+    sample_test_id: sampleTestId,
+    is_validated: head.is_validated,
+    doctor_notes: head.doctor_notes,
+    technician_notes: head.technician_notes,
+    has_critical: head.has_critical,
+    values: values.sort(compareByNormaOrder),
+  };
 };
 
 const enterResults = async (data, userId) => {
   const client = await getClient();
+  let committed = false;
   try {
     await client.query('BEGIN');
 
@@ -68,26 +87,30 @@ const enterResults = async (data, userId) => {
       await client.query('DELETE FROM result_values WHERE result_id = $1', [resultId]);
       await client.query(
         `UPDATE results SET technician_notes = $1, entered_by = $2, updated_at = NOW() WHERE id = $3`,
-        [data.technician_notes, userId, resultId]
+        [data.technician_notes ?? null, userId, resultId]
       );
     } else {
-      const r = await client.query(
-        `INSERT INTO results (sample_test_id, entered_by, technician_notes) VALUES ($1, $2, $3) RETURNING id`,
-        [data.sample_test_id, userId, data.technician_notes]
+      resultId = uuidv4();
+      await client.query(
+        `INSERT INTO results (id, sample_test_id, entered_by, technician_notes) VALUES ($1, $2, $3, $4)`,
+        [resultId, data.sample_test_id, userId, data.technician_notes ?? null]
       );
-      resultId = r.rows[0].id;
     }
 
     for (const val of data.values) {
-      const numericValue = parseFloat(val.value);
-      const isNumeric = !isNaN(numericValue);
+      const raw = String(val.value ?? '').trim();
+      const numericValue = parseFloat(raw);
+      const isNumeric = raw !== '' && !Number.isNaN(numericValue);
 
       let flag = '';
       let isCritical = false;
 
       if (isNumeric) {
         const rangeResult = await client.query(
-          `SELECT * FROM test_reference_ranges WHERE parameter_id = $1 AND (animal_type = $2 OR animal_type IS NULL) LIMIT 1`,
+          `SELECT * FROM test_reference_ranges
+           WHERE parameter_id = $1 AND (animal_type = $2 OR animal_type IS NULL)
+           ORDER BY CASE WHEN animal_type = $2 THEN 0 ELSE 1 END
+           LIMIT 1`,
           [val.parameter_id, animal_type]
         );
         const range = rangeResult.rows[0];
@@ -100,9 +123,9 @@ const enterResults = async (data, userId) => {
       }
 
       await client.query(
-        `INSERT INTO result_values (result_id, parameter_id, value, numeric_value, flag, is_critical)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [resultId, val.parameter_id, val.value, isNumeric ? numericValue : null, flag, isCritical]
+        `INSERT INTO result_values (id, result_id, parameter_id, value, numeric_value, flag, is_critical)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [uuidv4(), resultId, val.parameter_id, raw, isNumeric ? numericValue : null, flag, isCritical]
       );
     }
 
@@ -117,14 +140,16 @@ const enterResults = async (data, userId) => {
     );
 
     await client.query(
-      `UPDATE samples SET status = 'running' WHERE id = (SELECT sample_id FROM sample_tests WHERE id = $1) AND status IN ('received', 'pending')`,
+      `UPDATE samples SET status = 'running', updated_at = NOW()
+       WHERE id = (SELECT sample_id FROM sample_tests WHERE id = $1) AND status IN ('received', 'pending')`,
       [data.sample_test_id]
     );
 
     await client.query('COMMIT');
+    committed = true;
     return getBySampleTest(data.sample_test_id);
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!committed) await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
@@ -152,7 +177,7 @@ const validateResults = async (sampleTestId, userId, doctorNotes) => {
   );
 
   if (parseInt(pending.rows[0].count, 10) === 0) {
-    await query(`UPDATE samples SET status = 'completed', completed_date = NOW() WHERE id = $1`, [st.rows[0].sample_id]);
+    await query(`UPDATE samples SET status = 'completed', completed_date = NOW(), updated_at = NOW() WHERE id = $1`, [st.rows[0].sample_id]);
   }
 
   return getBySampleTest(sampleTestId);

@@ -1,11 +1,11 @@
 // Norma iVet / Icon CBC parameter codes → LIMS test_parameters.code
 const NORMA_CBC_MAP = {
   WBC: 'WBC', 'WBC#': 'WBC', 'WBC%': 'WBC',
-  LYM: 'LYM', 'LYM#': 'LYM', 'LYM%': 'LYM',
-  MON: 'MON', 'MON#': 'MON', 'MON%': 'MON',
-  NEU: 'NEU', 'NEU#': 'NEU', 'NEU%': 'NEU', GRAN: 'NEU', 'GRAN#': 'NEU', 'GRAN%': 'NEU',
-  EOS: 'EOS', 'EOS#': 'EOS', 'EOS%': 'EOS',
-  BAS: 'BAS', 'BAS#': 'BAS', 'BAS%': 'BAS',
+  LYM: 'LYM', 'LYM#': 'LYM', 'LYM%': 'LYM_PCT',
+  MON: 'MON', 'MON#': 'MON', 'MON%': 'MON_PCT',
+  NEU: 'NEU', 'NEU#': 'NEU', 'NEU%': 'NEU_PCT', GRAN: 'NEU', 'GRAN#': 'NEU', 'GRAN%': 'NEU_PCT',
+  EOS: 'EOS', 'EOS#': 'EOS', 'EOS%': 'EOS_PCT',
+  BAS: 'BAS', 'BAS#': 'BAS', 'BAS%': 'BAS_PCT',
   RBC: 'RBC', 'RBC#': 'RBC',
   HGB: 'HGB', HGB: 'HGB', HB: 'HGB',
   HCT: 'HCT', HCT: 'HCT', HCT_PCT: 'HCT',
@@ -14,20 +14,22 @@ const NORMA_CBC_MAP = {
   MCHC: 'MCHC',
   PLT: 'PLT', 'PLT#': 'PLT', PLT: 'PLT',
   MPV: 'MPV',
-  RDW: 'RDW', 'RDW-CV': 'RDW', 'RDW-SD': 'RDW', RDWCV: 'RDW', RDWSD: 'RDW',
-  'RDWsd': 'RDW', 'RDWcv': 'RDW',
-  PCT: 'PCT', PDW: 'PDW', 'PDW-CV': 'PDW', 'PDW-SD': 'PDW', PDWSD: 'PDW', PDWCV: 'PDW',
-  'PDWsd': 'PDW', 'PDWcv': 'PDW',
+  RDW: 'RDW-CV', 'RDW-CV': 'RDW-CV', RDWCV: 'RDW-CV', 'RDWcv': 'RDW-CV',
+  'RDW-SD': 'RDW-SD', RDWSD: 'RDW-SD', 'RDWsd': 'RDW-SD',
+  PCT: 'PCT',
+  PDW: 'PDW-CV', 'PDW-CV': 'PDW-CV', PDWCV: 'PDW-CV', 'PDWcv': 'PDW-CV',
+  'PDW-SD': 'PDW-SD', PDWSD: 'PDW-SD', 'PDWsd': 'PDW-SD',
   'PLC-R': 'PLC-R', 'PLC-C': 'PLC-C',
 };
 
 const DEFAULT_CBC_TEST_CODE = 'CBC-FULL';
 
-// Norma iVet screen layout: WBC block → RBC block → PLT block
+// Norma iVet screen: WBC → RBC → PLT (incl. % differentials and PLT indices)
 const NORMA_CBC_ORDER = [
-  'WBC', 'LYM', 'MON', 'NEU', 'EOS', 'BAS',
-  'RBC', 'HGB', 'MCV', 'HCT', 'MCH', 'MCHC', 'RDW',
-  'PLT', 'MPV', 'PCT', 'PDW', 'PLC-R', 'PLC-C',
+  'WBC', 'LYM', 'LYM_PCT', 'MON', 'MON_PCT', 'NEU', 'NEU_PCT', 'EOS', 'EOS_PCT', 'BAS', 'BAS_PCT',
+  'RBC', 'HGB', 'MCV', 'HCT', 'MCH', 'MCHC', 'RDW-SD', 'RDW-CV',
+  'PLT', 'MPV', 'PCT', 'PDW-SD', 'PDW-CV', 'PLC-R', 'PLC-C',
+  'RDW', // legacy parameter id in older samples
 ];
 
 const NORMA_CBC_SORT_INDEX = Object.fromEntries(
@@ -36,8 +38,9 @@ const NORMA_CBC_SORT_INDEX = Object.fromEntries(
 
 function mapNormaCode(deviceCode) {
   if (!deviceCode) return null;
-  const normalized = deviceCode.trim().toUpperCase();
-  return NORMA_CBC_MAP[normalized] || NORMA_CBC_MAP[deviceCode.trim()] || normalized;
+  const raw = deviceCode.trim();
+  const normalized = raw.toUpperCase();
+  return NORMA_CBC_MAP[normalized] || NORMA_CBC_MAP[raw] || normalized;
 }
 
 function normaSortIndex(parameterCode) {
@@ -53,7 +56,8 @@ function compareByNormaOrder(a, b) {
   if (diff !== 0) return diff;
   const sortDiff = (a.sortOrder ?? a.sort_order ?? 0) - (b.sortOrder ?? b.sort_order ?? 0);
   if (sortDiff !== 0) return sortDiff;
-  return (a.parameterId ?? a.parameter_id ?? 0) - (b.parameterId ?? b.parameter_id ?? 0);
+  return (a.parameterId ?? a.parameter_id ?? '').toString()
+    .localeCompare((b.parameterId ?? b.parameter_id ?? '').toString());
 }
 
 module.exports = {

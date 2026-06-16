@@ -5,6 +5,7 @@ const { query } = require('../config/database');
 const env = require('../config/env');
 const { AppError } = require('../middleware/errorHandler');
 const { hashToken } = require('../utils/helpers');
+const { uuidv4 } = require('../utils/uuid');
 
 const login = async (username, password) => {
   const identifier = username.trim().toLowerCase();
@@ -40,8 +41,8 @@ const login = async (username, password) => {
 
   const refreshToken = crypto.randomBytes(40).toString('hex');
   await query(
-    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '7 days')`,
-    [user.id, hashToken(refreshToken)]
+    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '7 days')`,
+    [uuidv4(), user.id, hashToken(refreshToken)]
   );
 
   return {

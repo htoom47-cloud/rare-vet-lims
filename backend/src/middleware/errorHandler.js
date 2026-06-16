@@ -26,7 +26,9 @@ const errorHandler = (err, req, res, _next) => {
     success: false,
     error: {
       code,
-      message: err.isOperational ? err.message : 'An unexpected error occurred',
+      message: err.isOperational
+        ? err.message
+        : (process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'),
       ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     },
   });

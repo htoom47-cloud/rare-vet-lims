@@ -77,7 +77,10 @@ export default function TechnicianWorkbench() {
       setSelectedSample(null);
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
+      const msg = err.response?.data?.error?.message
+        || err.response?.data?.error?.details?.[0]?.message
+        || 'Error';
+      toast.error(msg);
     }
   };
 

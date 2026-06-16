@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const { pool, query } = require('../config/database');
 const { PERMISSIONS, ROLE_PERMISSIONS } = require('../utils/permissions');
 const logger = require('../config/logger');
+const { NORMA_CBC_REFERENCES } = require('../utils/norma-cbc-references');
 
 const ROLES = [
   { name: 'admin', name_ar: 'مدير النظام', description: 'Full system access' },
@@ -36,21 +37,32 @@ const TESTS = [
 ];
 
 const CBC_PARAMS = [
-  { code: 'WBC', name: 'White Blood Cells', name_ar: 'كريات الدم البيضاء', unit: '10³/µL' },
+  { code: 'WBC', name: 'WBC', name_ar: 'كريات الدم البيضاء', unit: '10³/µL' },
   { code: 'LYM', name: 'Lymphocytes', name_ar: 'اللمفاويات', unit: '10³/µL' },
+  { code: 'LYM_PCT', name: 'Lymphocytes %', name_ar: 'نسبة اللمفاويات', unit: '%' },
   { code: 'MON', name: 'Monocytes', name_ar: 'الوحيدات', unit: '10³/µL' },
+  { code: 'MON_PCT', name: 'Monocytes %', name_ar: 'نسبة الوحيدات', unit: '%' },
   { code: 'NEU', name: 'Neutrophils', name_ar: 'العدلات', unit: '10³/µL' },
+  { code: 'NEU_PCT', name: 'Neutrophils %', name_ar: 'نسبة العدلات', unit: '%' },
   { code: 'EOS', name: 'Eosinophils', name_ar: 'الحمضات', unit: '10³/µL' },
+  { code: 'EOS_PCT', name: 'Eosinophils %', name_ar: 'نسبة الحمضات', unit: '%' },
   { code: 'BAS', name: 'Basophils', name_ar: 'القعدات', unit: '10³/µL' },
-  { code: 'RBC', name: 'Red Blood Cells', name_ar: 'كريات الدم الحمراء', unit: '10⁶/µL' },
+  { code: 'BAS_PCT', name: 'Basophils %', name_ar: 'نسبة القعدات', unit: '%' },
+  { code: 'RBC', name: 'RBC', name_ar: 'كريات الدم الحمراء', unit: '10⁶/µL' },
   { code: 'HGB', name: 'Hemoglobin', name_ar: 'الهيموجلوبين', unit: 'g/dL' },
   { code: 'MCV', name: 'MCV', name_ar: 'حجم الكرية الوسطي', unit: 'fL' },
   { code: 'HCT', name: 'Hematocrit', name_ar: 'الهيماتوكريت', unit: '%' },
   { code: 'MCH', name: 'MCH', name_ar: 'هيموجلوبين الكرية', unit: 'pg' },
   { code: 'MCHC', name: 'MCHC', name_ar: 'تركيز الهيموجلوبين', unit: 'g/dL' },
-  { code: 'RDW', name: 'RDW', name_ar: 'توزع كريات الدم الحمراء', unit: '%' },
+  { code: 'RDW-SD', name: 'RDW-SD', name_ar: 'انحراف توزع الكريات', unit: 'fL' },
+  { code: 'RDW-CV', name: 'RDW-CV', name_ar: 'تباين توزع الكريات', unit: '%' },
   { code: 'PLT', name: 'Platelets', name_ar: 'الصفائح الدموية', unit: '10³/µL' },
   { code: 'MPV', name: 'MPV', name_ar: 'حجم الصفيح الوسطي', unit: 'fL' },
+  { code: 'PCT', name: 'Plateletcrit', name_ar: 'النسبة الصفية', unit: '%' },
+  { code: 'PDW-SD', name: 'PDW-SD', name_ar: 'انحراف توزع الصفائح', unit: 'fL' },
+  { code: 'PDW-CV', name: 'PDW-CV', name_ar: 'تباين توزع الصفائح', unit: '%' },
+  { code: 'PLC-R', name: 'Platelet Large Cell Ratio', name_ar: 'نسبة الصفائح الكبيرة', unit: '%' },
+  { code: 'PLC-C', name: 'Platelet Large Cell Count', name_ar: 'عدد الصفائح الكبيرة', unit: '10³/µL' },
 ];
 
 const CHEM_PARAMS = [
@@ -65,13 +77,7 @@ const CHEM_PARAMS = [
 ];
 
 const TEST_PARAMS = {
-  'CBC-FULL': { params: CBC_PARAMS, ranges: {
-    WBC: { min: 4, max: 15, crit_low: 2, crit_high: 30 },
-    RBC: { min: 5, max: 12, crit_low: 3, crit_high: 15 },
-    HGB: { min: 8, max: 18, crit_low: 5, crit_high: 22 },
-    HCT: { min: 24, max: 46, crit_low: 15, crit_high: 55 },
-    PLT: { min: 100, max: 800, crit_low: 50, crit_high: 1000 },
-  }},
+  'CBC-FULL': { params: CBC_PARAMS, ranges: NORMA_CBC_REFERENCES.camel },
   'CHEM-BASIC': { params: CHEM_PARAMS, ranges: {
     GLU: { min: 60, max: 120, crit_low: 40, crit_high: 400 },
     BUN: { min: 10, max: 30, crit_low: 5, crit_high: 80 },
@@ -110,8 +116,10 @@ async function seedTestParameters(testId, config) {
       paramId = inserted.rows[0].id;
     } else {
       await query(
-        'UPDATE test_parameters SET sort_order = $1 WHERE id = $2',
-        [i, paramId]
+        `UPDATE test_parameters
+         SET sort_order = $1, name = $2, name_ar = $3, unit = $4
+         WHERE id = $5`,
+        [i, param.name, param.name_ar, param.unit, paramId]
       );
     }
     const r = config.ranges?.[param.code];
@@ -120,11 +128,22 @@ async function seedTestParameters(testId, config) {
         `SELECT id FROM test_reference_ranges WHERE parameter_id = $1 AND animal_type = 'camel'`,
         [paramId]
       );
-      if (!rangeExists.rows[0]) {
+      const min = r.min ?? r.min_value;
+      const max = r.max ?? r.max_value;
+      const critLow = r.crit_low ?? r.critical_low;
+      const critHigh = r.crit_high ?? r.critical_high;
+      if (rangeExists.rows[0]) {
+        await query(
+          `UPDATE test_reference_ranges
+           SET min_value = $1, max_value = $2, critical_low = $3, critical_high = $4, unit = $5
+           WHERE id = $6`,
+          [min, max, critLow, critHigh, param.unit, rangeExists.rows[0].id]
+        );
+      } else {
         await query(
           `INSERT INTO test_reference_ranges (parameter_id, animal_type, min_value, max_value, critical_low, critical_high, unit)
            VALUES ($1, 'camel', $2, $3, $4, $5, $6)`,
-          [paramId, r.min, r.max, r.crit_low, r.crit_high, param.unit]
+          [paramId, min, max, critLow, critHigh, param.unit]
         );
       }
     }
@@ -143,7 +162,7 @@ const USERS = [
   {
     username: 'admin',
     email: process.env.ADMIN_EMAIL || 'admin@rarevetcare.com',
-    password: process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123',
+    password: process.env.ADMIN_INITIAL_PASSWORD || 'RareVet2026',
     full_name: 'System Admin',
     full_name_ar: 'مدير النظام',
     role: 'admin',

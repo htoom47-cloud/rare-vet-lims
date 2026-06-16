@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../config/database');
 const logger = require('../config/logger');
+const { ensureAdmin } = require('./ensure-admin');
 
 async function backfillUsernames(client) {
   const hasCol = await client.query(
@@ -36,15 +37,24 @@ async function backfillUsernames(client) {
   );
 }
 
+async function disableUpdatedAtTriggers(client) {
+  const tables = ['users', 'customers', 'animals', 'samples', 'tests', 'invoices', 'inventory_items'];
+  for (const table of tables) {
+    await client.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+  }
+}
+
 async function applyPatches() {
   const client = await pool.connect();
   try {
+    await disableUpdatedAtTriggers(client);
     await client.query(
       'ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS animal_id UUID REFERENCES animals(id)'
     );
     await backfillUsernames(client);
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS ai_interpretation TEXT');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS treatment_recommendations TEXT');
+    await ensureAdmin();
   } finally {
     client.release();
   }

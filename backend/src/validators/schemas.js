@@ -63,7 +63,7 @@ const resultEntrySchema = Joi.object({
   sample_test_id: Joi.string().uuid().required(),
   values: Joi.array().items(Joi.object({
     parameter_id: Joi.string().uuid().required(),
-    value: Joi.string().required(),
+    value: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
   })).min(1).required(),
   technician_notes: Joi.string().allow('', null),
 });
