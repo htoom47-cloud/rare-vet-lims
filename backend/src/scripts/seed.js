@@ -151,14 +151,6 @@ async function seedTestParameters(testId, config) {
   }
 }
 
-const DEMO_USERS = [
-  { username: 'reception', email: 'reception@rarevetcare.com', password: 'Reception@123', full_name: 'Reception Desk', full_name_ar: 'الاستقبال', role: 'reception' },
-  { username: 'tech', email: 'tech@rarevetcare.com', password: 'Tech@123', full_name: 'Lab Technician', full_name_ar: 'فني المختبر', role: 'lab_technician' },
-  { username: 'vet', email: 'vet@rarevetcare.com', password: 'Vet@123', full_name: 'Dr. Veterinarian', full_name_ar: 'الطبيب البيطري', role: 'veterinarian' },
-  { username: 'accountant', email: 'accountant@rarevetcare.com', password: 'Account@123', full_name: 'Accountant', full_name_ar: 'المحاسب', role: 'accountant' },
-  { username: 'manager', email: 'manager@rarevetcare.com', password: 'Manager@123', full_name: 'Lab Manager', full_name_ar: 'مدير المختبر', role: 'manager' },
-];
-
 const USERS = [
   {
     username: 'admin',
@@ -168,7 +160,6 @@ const USERS = [
     full_name_ar: 'مدير النظام',
     role: 'admin',
   },
-  ...DEMO_USERS,
 ];
 
 async function seed() {

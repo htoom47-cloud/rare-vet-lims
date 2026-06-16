@@ -25,6 +25,7 @@ try {
 
   // Run last so admin username/password always win over seed defaults.
   run('src/scripts/ensure-admin.js');
+  run('src/scripts/purge-demo-users.js');
 
   const distPath = path.join(backendRoot, '../frontend/dist');
   if (!fs.existsSync(distPath)) {
