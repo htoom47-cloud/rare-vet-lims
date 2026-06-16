@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, FilePlus, Sparkles, Stethoscope } from 'lucide-react';
+import { Download, FileText, FilePlus, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -22,8 +22,6 @@ export default function Reports() {
   const [selectedSample, setSelectedSample] = useState(null);
   const [language, setLanguage] = useState('ar');
   const [treatment, setTreatment] = useState('');
-  const [aiPreview, setAiPreview] = useState('');
-  const [loadingAi, setLoadingAi] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -71,34 +69,11 @@ export default function Reports() {
     }
   };
 
-  const openGenerateForSample = async (sample) => {
+  const openGenerateForSample = (sample) => {
     setSelectedSample(sample);
     setTreatment('');
     setLanguage('ar');
-    setAiPreview('');
     setGenerateOpen(true);
-    setLoadingAi(true);
-    try {
-      const { data } = await reportsAPI.interpret(sample.id, 'ar');
-      setAiPreview(data.data.interpretation);
-    } catch {
-      setAiPreview('');
-    } finally {
-      setLoadingAi(false);
-    }
-  };
-
-  const reloadAiPreview = async (lang) => {
-    if (!selectedSample) return;
-    setLoadingAi(true);
-    try {
-      const { data } = await reportsAPI.interpret(selectedSample.id, lang);
-      setAiPreview(data.data.interpretation);
-    } catch {
-      toast.error(t('reports.aiFailed'));
-    } finally {
-      setLoadingAi(false);
-    }
   };
 
   const generateReport = async () => {
@@ -211,18 +186,8 @@ export default function Reports() {
             </div>
 
             <div className="flex gap-2">
-              <button type="button" onClick={() => { setLanguage('ar'); reloadAiPreview('ar'); }} className={`flex-1 py-2 rounded-lg text-sm ${language === 'ar' ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}>عربي</button>
-              <button type="button" onClick={() => { setLanguage('en'); reloadAiPreview('en'); }} className={`flex-1 py-2 rounded-lg text-sm ${language === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}>English</button>
-            </div>
-
-            <div className="border border-primary-300/50 rounded-lg overflow-hidden">
-              <div className="bg-primary-600 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
-                <Sparkles size={16} /> {t('reports.aiSection')}
-              </div>
-              <div className="p-3 text-sm bg-primary-50 dark:bg-primary-900/10 min-h-[100px] whitespace-pre-wrap">
-                {loadingAi ? t('common.loading') : (aiPreview || t('reports.aiEmpty'))}
-              </div>
-              <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">{t('reports.aiHint')}</p>
+              <button type="button" onClick={() => setLanguage('ar')} className={`flex-1 py-2 rounded-lg text-sm ${language === 'ar' ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}>عربي</button>
+              <button type="button" onClick={() => setLanguage('en')} className={`flex-1 py-2 rounded-lg text-sm ${language === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}>English</button>
             </div>
 
             <div className="border border-primary-300/50 rounded-lg overflow-hidden">
@@ -232,7 +197,8 @@ export default function Reports() {
               <textarea
                 value={treatment}
                 onChange={(e) => setTreatment(e.target.value)}
-                className="input-field border-0 rounded-none min-h-[120px]"
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
+                className={`input-field border-0 rounded-none min-h-[120px] ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={t('reports.treatmentPlaceholder')}
                 rows={5}
               />

@@ -177,7 +177,7 @@ const resources = {
         paramAdded: 'Parameter added', rangeAdded: 'Reference range added',
       },
       reports: {
-        title: 'Reports', subtitle: 'Professional lab reports with AI interpretation',
+        title: 'Reports', subtitle: 'Professional laboratory reports',
         generate: 'Generate Report', verify: 'Verify Report', reportNo: 'Report No', sampleNo: 'Sample No', language: 'Language',
         selectSampleHint: 'Select a completed and validated sample',
         noCompleted: 'No completed samples available', changeSample: 'Change sample',
@@ -439,7 +439,7 @@ const resources = {
         paramAdded: 'تم إضافة المعامل', rangeAdded: 'تم إضافة المدى المرجعي',
       },
       reports: {
-        title: 'التقارير المخبرية', subtitle: 'تقارير احترافية مع تفسير ذكاء اصطناعي',
+        title: 'التقارير المخبرية', subtitle: 'تقارير مخبرية احترافية',
         generate: 'إنشاء تقرير', verify: 'التحقق من التقرير', reportNo: 'رقم التقرير', sampleNo: 'رقم العينة', language: 'اللغة',
         selectSampleHint: 'اختر عينة مكتملة ومعتمدة',
         noCompleted: 'لا توجد عينات مكتملة', changeSample: 'تغيير العينة',

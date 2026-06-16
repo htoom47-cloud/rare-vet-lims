@@ -1,7 +1,6 @@
 const path = require('path');
 const fs = require('fs');
 const { generateReportPDF } = require('../utils/pdf');
-const { generateInterpretation } = require('../services/ai-interpretation.service');
 const { NORMA_CBC_ORDER } = require('../utils/norma-cbc-map');
 
 const mk = (code, nameEn, nameAr, value, unit, min, max, flag) => ({
@@ -42,7 +41,6 @@ generateReportPDF({
   language: 'ar',
   verificationCode: 'CC2C7F4A-44A',
   specialistName: 'مدير النظام',
-  aiInterpretation: generateInterpretation(results.map((r) => ({ ...r, name: r.nameEn })), 'ar', 'camel'),
   treatmentRecommendations: '',
   results,
 }, path.join(__dirname, '../../uploads/reports'), { filename: 'test-compact-15.pdf' })

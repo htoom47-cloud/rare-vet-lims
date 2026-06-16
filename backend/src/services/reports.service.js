@@ -1,12 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { uuidv4 } = require('../utils/uuid');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir } = require('../config/storage');
-const { generateInterpretation } = require('./ai-interpretation.service');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
 const extractFilename = (pdfUrl) => (pdfUrl ? pdfUrl.split('/').pop() : null);
@@ -37,7 +36,9 @@ const buildReportData = async (sampleId, opts) => {
 
   const sampleResult = await query(
     `SELECT s.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar,
-            a.animal_code, a.animal_type, a.name_tag as animal_name, a.gender as animal_gender
+            c.mobile as customer_mobile,
+            a.animal_code, a.animal_type, a.name_tag as animal_name,
+            a.gender as animal_gender, a.rfid_chip as animal_chip
      FROM samples s
      JOIN customers c ON s.customer_id = c.id
      JOIN animals a ON s.animal_id = a.id
@@ -99,6 +100,7 @@ const buildReportData = async (sampleId, opts) => {
 
   const isArabic = language === 'ar';
   const results = uniqueByParameter.map((r) => ({
+    code: r.parameter_code,
     nameAr: r.parameter_name_ar || r.parameter_name || r.test_name,
     nameEn: r.parameter_name || r.test_name,
     testNameAr: r.test_name_ar || r.test_name,
@@ -123,10 +125,13 @@ const buildReportData = async (sampleId, opts) => {
     customerName: isArabic
       ? (sample.customer_name_ar || sample.customer_name)
       : sample.customer_name,
+    customerMobile: sample.customer_mobile,
+    nationalId: '-',
     animalCode: sample.animal_code,
     animalType: sample.animal_type,
     animalName: sample.animal_name,
     animalGender: sample.animal_gender,
+    animalChip: sample.animal_chip,
     language,
     verificationCode,
     specialistName: isArabic
@@ -137,16 +142,6 @@ const buildReportData = async (sampleId, opts) => {
     treatmentRecommendations: treatmentRecommendations ?? null,
     results,
   };
-};
-
-const previewInterpretation = async (sampleId, language = 'ar') => {
-  const data = await buildReportData(sampleId, {
-    reportNumber: 'PREVIEW',
-    verificationCode: 'PREVIEW',
-    language,
-    generatedBy: null,
-  });
-  return generateInterpretation(data.results, language, data.animalType);
 };
 
 const ensurePdfFile = async (reportRow) => {
@@ -194,12 +189,10 @@ const generate = async (sampleId, userId, language = 'ar', options = {}) => {
     generatedBy: userId,
   });
 
-  const aiInterpretation = generateInterpretation(baseData.results, language, baseData.animalType);
   const treatmentRecommendations = (options.treatment_recommendations || '').trim();
 
   const reportData = {
     ...baseData,
-    aiInterpretation,
     treatmentRecommendations,
   };
 
@@ -207,10 +200,10 @@ const generate = async (sampleId, userId, language = 'ar', options = {}) => {
   const pdf = await generateReportPDF(reportData, outputDir);
 
   const result = await query(
-    `INSERT INTO reports (report_number, sample_id, pdf_url, qr_verification_code, generated_by, language,
+    `INSERT INTO reports (id, report_number, sample_id, pdf_url, qr_verification_code, generated_by, language,
                          ai_interpretation, treatment_recommendations, is_final)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true) RETURNING *`,
-    [reportNumber, sampleId, pdf.url, verificationCode, userId, language, aiInterpretation, treatmentRecommendations || null]
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, true) RETURNING *`,
+    [uuidv4(), reportNumber, sampleId, pdf.url, verificationCode, userId, language, treatmentRecommendations || null]
   );
 
   return { ...result.rows[0], pdf_url: pdf.url };
@@ -252,4 +245,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, generate, verify, servePdf, previewInterpretation };
+module.exports = { list, generate, verify, servePdf };

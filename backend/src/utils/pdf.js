@@ -4,7 +4,6 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('../config/env');
 const { generateQR } = require('./barcode');
-const { generateInterpretation } = require('../services/ai-interpretation.service');
 
 const ARABIC_FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
@@ -53,6 +52,7 @@ const GENDERS = {
 };
 
 const ARABIC_RUN = /[\u0600-\u06FF\u0750-\u077F]+/g;
+const arabicReshaper = require('arabic-reshaper');
 
 const registerFonts = (doc) => {
   if (HAS_ARABIC_FONT) doc.registerFont('Arabic', ARABIC_FONT_PATH);
@@ -66,20 +66,18 @@ const clean = (t) => String(t ?? '')
 
 const hasAr = (t) => /[\u0600-\u06FF]/.test(String(t || ''));
 
-const reshapeWord = (word) => {
-  if (!/[\u0600-\u06FF]/.test(word)) return word;
-  try {
-    // eslint-disable-next-line global-require
-    const arabicReshaper = require('arabic-reshaper');
-    return arabicReshaper.reshape(word).split('').reverse().join('');
-  } catch { return word; }
-};
-
+/** Shape Arabic for PDFKit LTR engine — no character/word reversal. */
 const arLine = (text) => {
   const line = clean(text).trim();
   if (!line || !hasAr(line)) return line;
-  if (/[0-9A-Za-z]/.test(line)) return line.replace(ARABIC_RUN, (m) => reshapeWord(m));
-  return line.split(/\s+/).map(reshapeWord).reverse().join(' ');
+  try {
+    if (/[0-9A-Za-z]/.test(line)) {
+      return line.replace(ARABIC_RUN, (m) => arabicReshaper.convertArabic(m));
+    }
+    return arabicReshaper.convertArabic(line);
+  } catch {
+    return line;
+  }
 };
 
 const setLatin = (doc, bold = false) => doc.font(bold ? 'Latin-Bold' : 'Latin');
@@ -294,30 +292,16 @@ const drawResultsTable = (doc, results) => {
   doc.y = y + 4;
 };
 
-const shortSummary = (text, lang) => {
-  if (!text) return '';
-  const marker = lang === 'ar' ? 'ملخص:' : 'Summary:';
-  const idx = text.indexOf(marker);
-  return (idx === -1 ? text : text.slice(idx)).split('\n').filter(Boolean)[0] || '';
-};
+const drawNotes = (doc, treatment) => {
+  const treat = (treatment || '').trim();
+  if (!treat) return;
 
-const drawNotes = (doc, aiEn, aiAr, treatment) => {
   ensureSpace(doc, 30);
   const y = doc.y;
-  bilingualBar(doc, TX, y, TW, 14, 'Interpretation', 'التفسير المخبري', BRAND.brown, { size: 7 });
+  bilingualBar(doc, TX, y, TW, 14, 'Recommendations', 'التوصيات العلاجية', BRAND.gold, { size: 7 });
   doc.y = y + 16;
-  if (aiEn) { ensureSpace(doc, 10); flowLatin(doc, aiEn, TW - 8); }
-  if (aiAr) { ensureSpace(doc, 10); flowArabic(doc, aiAr, TW - 8); }
-
-  const treat = (treatment || '').trim();
-  if (treat) {
-    ensureSpace(doc, 20);
-    const ty = doc.y;
-    bilingualBar(doc, TX, ty, TW, 14, 'Recommendations', 'التوصيات العلاجية', BRAND.gold, { size: 7 });
-    doc.y = ty + 16;
-    if (hasAr(treat)) flowArabic(doc, treat, TW - 8);
-    else flowLatin(doc, treat, TW - 8);
-  }
+  if (hasAr(treat)) flowArabic(doc, treat, TW - 8);
+  else flowLatin(doc, treat, TW - 8);
   doc.y += 4;
 };
 
@@ -368,13 +352,6 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       registerFonts(doc);
       doc.y = MARGIN;
 
-      const aiRows = reportData.results.map((r) => ({ ...r, name: r.nameEn || r.nameAr }));
-      const aiEn = shortSummary(generateInterpretation(aiRows, 'en', reportData.animalType), 'en');
-      const aiAr = shortSummary(
-        reportData.aiInterpretation || generateInterpretation(aiRows, 'ar', reportData.animalType),
-        'ar'
-      );
-
       drawHeader(doc);
       drawTitleBanner(doc);
       drawPatientTable(doc, {
@@ -395,7 +372,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       });
 
       drawResultsTable(doc, reportData.results);
-      drawNotes(doc, aiEn, aiAr, reportData.treatmentRecommendations);
+      drawNotes(doc, reportData.treatmentRecommendations);
       await drawFooter(doc, reportData);
 
       doc.end();
