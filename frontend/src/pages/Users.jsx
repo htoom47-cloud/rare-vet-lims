@@ -293,12 +293,27 @@ export default function Users() {
 
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title={t('users.newUser')}>
         <form onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('users.username')}</label>
+            <input
+              type="text"
+              value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              className="input-field font-mono"
+              required
+              minLength={2}
+              maxLength={50}
+              pattern="[A-Za-z0-9._-]+"
+              placeholder={t('users.usernamePlaceholder')}
+              autoComplete="username"
+            />
+            <p className="text-xs text-primary-500 mt-1">{t('users.usernameHint')}</p>
+          </div>
           {[
             { key: 'full_name', label: t('common.name') },
             { key: 'full_name_ar', label: t('users.fullNameAr') },
-            { key: 'username', label: t('users.username') },
-            { key: 'email', label: t('users.email'), type: 'email' },
-            { key: 'phone', label: t('common.phone') },
+            { key: 'email', label: t('users.email'), type: 'email', optional: true },
+            { key: 'phone', label: t('common.phone'), optional: true },
           ].map((f) => (
             <div key={f.key}>
               <label className="block text-sm font-medium mb-1">{f.label}</label>
@@ -307,8 +322,9 @@ export default function Users() {
                 value={form[f.key]}
                 onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                 className="input-field"
-                required={['full_name', 'username'].includes(f.key)}
-                autoComplete={f.key === 'username' ? 'username' : undefined}
+                required={f.key === 'full_name'}
+                placeholder={f.key === 'email' ? t('users.emailPlaceholder') : undefined}
+                autoComplete={f.key === 'email' ? 'email' : undefined}
               />
             </div>
           ))}
@@ -345,7 +361,7 @@ export default function Users() {
             ) : (
               [
                 { key: 'username', label: t('users.username') },
-                { key: 'email', label: t('users.email'), type: 'email' },
+                { key: 'email', label: t('users.email'), type: 'email', optional: true },
               ].map((f) => (
                 <div key={f.key}>
                   <label className="block text-sm font-medium mb-1">{f.label}</label>
@@ -353,9 +369,16 @@ export default function Users() {
                     type={f.type || 'text'}
                     value={editForm[f.key]}
                     onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
-                    className="input-field"
+                    className={`input-field ${f.key === 'username' ? 'font-mono' : ''}`}
                     required={f.key === 'username'}
+                    minLength={f.key === 'username' ? 2 : undefined}
+                    maxLength={f.key === 'username' ? 50 : undefined}
+                    pattern={f.key === 'username' ? '[A-Za-z0-9._-]+' : undefined}
+                    placeholder={f.key === 'email' ? t('users.emailPlaceholder') : t('users.usernamePlaceholder')}
                   />
+                  {f.key === 'username' && (
+                    <p className="text-xs text-primary-500 mt-1">{t('users.usernameHint')}</p>
+                  )}
                 </div>
               ))
             )}

@@ -1,12 +1,12 @@
 const Joi = require('joi');
 
 const loginSchema = Joi.object({
-  username: Joi.string().min(3).max(50).required(),
+  username: Joi.string().min(2).max(50).required(),
   password: Joi.string().min(6).required(),
 });
 
 const registerSchema = Joi.object({
-  username: Joi.string().min(3).max(50).pattern(/^[a-zA-Z0-9._-]+$/).required(),
+  username: Joi.string().min(2).max(50).pattern(/^[a-zA-Z0-9._-]+$/).required(),
   email: Joi.string().email().allow('', null),
   password: Joi.string().min(8).required(),
   full_name: Joi.string().min(2).required(),

@@ -73,13 +73,23 @@ const updateRolePermissions = async (roleId, permissionCodes) => {
   return getPermissions(roleId);
 };
 
-const normalizeUsername = (value) => value.trim().toLowerCase();
+const normalizeUsername = (value) => String(value || '').trim();
+
+const assertUsername = (username) => {
+  if (username.length < 2 || username.length > 50) {
+    throw new AppError('Username must be 2–50 characters', 400, 'INVALID_USERNAME');
+  }
+  if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+    throw new AppError('Username may only contain letters, numbers, dots, dashes, and underscores', 400, 'INVALID_USERNAME');
+  }
+};
 
 const create = async (data) => {
   const username = normalizeUsername(data.username);
-  const email = (data.email || `${username}@rarevetcare.local`).toLowerCase().trim();
+  assertUsername(username);
+  const email = (data.email || `${username.toLowerCase()}@rarevetcare.local`).toLowerCase().trim();
 
-  const dupUser = await query('SELECT id FROM users WHERE LOWER(username) = $1', [username]);
+  const dupUser = await query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
   if (dupUser.rows[0]) throw new AppError('Username already exists', 400, 'DUPLICATE_USERNAME');
 
   const dupEmail = await query('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
@@ -133,7 +143,8 @@ const update = async (id, data, actorId) => {
 
   if (data.username && existing.rows[0].role_name !== 'admin') {
     const username = normalizeUsername(data.username);
-    const dup = await query('SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2', [username, id]);
+    assertUsername(username);
+    const dup = await query('SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2', [username, id]);
     if (dup.rows[0]) throw new AppError('Username already exists', 400, 'DUPLICATE_USERNAME');
     fields.push(`username = $${idx}`);
     params.push(username);

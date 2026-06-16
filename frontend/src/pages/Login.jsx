@@ -128,7 +128,15 @@ export default function Login() {
 
               <label className="block text-sm font-medium mb-1 text-primary-700 dark:text-primary-200">{t('auth.username')}</label>
 
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input-field" required autoComplete="username" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="input-field font-mono"
+                placeholder={t('auth.usernamePlaceholder')}
+                required
+                autoComplete="username"
+              />
 
             </div>
 
