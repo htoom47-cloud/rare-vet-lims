@@ -14,6 +14,7 @@ export default function TechnicianWorkbench() {
   const [selectedSample, setSelectedSample] = useState(null);
   const [resultForm, setResultForm] = useState({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -63,16 +64,28 @@ export default function TechnicianWorkbench() {
     setResultForm(form);
   };
 
-  const submitResults = async (sampleTestId) => {
-    const fields = resultForm[sampleTestId] || [];
-    if (!fields.length) return toast.error(t('workbench.noParameters'));
-    const values = fields.filter((v) => v.value);
-    if (!values.length) return toast.error(t('workbench.enterOneValue'));
+  const submitAllResults = async () => {
+    if (!selectedSample?.tests?.length) return;
+
+    const payloads = selectedSample.tests
+      .map((test) => {
+        const fields = resultForm[test.id] || [];
+        const values = fields.filter((v) => String(v.value ?? '').trim() !== '');
+        if (!values.length) return null;
+        return {
+          sample_test_id: test.id,
+          values: values.map((v) => ({ parameter_id: v.parameter_id, value: v.value })),
+        };
+      })
+      .filter(Boolean);
+
+    if (!payloads.length) return toast.error(t('workbench.enterOneValue'));
+
+    setSaving(true);
     try {
-      await resultsAPI.enter({
-        sample_test_id: sampleTestId,
-        values: values.map((v) => ({ parameter_id: v.parameter_id, value: v.value })),
-      });
+      for (const payload of payloads) {
+        await resultsAPI.enter(payload);
+      }
       toast.success(t('workbench.saved'));
       setSelectedSample(null);
       load();
@@ -81,8 +94,14 @@ export default function TechnicianWorkbench() {
         || err.response?.data?.error?.details?.[0]?.message
         || 'Error';
       toast.error(msg);
+    } finally {
+      setSaving(false);
     }
   };
+
+  const hasEnterableFields = selectedSample?.tests?.some(
+    (test) => (resultForm[test.id] || []).length > 0
+  );
 
   if (loading) return <div className="text-center py-20">{t('common.loading')}</div>;
 
@@ -128,29 +147,38 @@ export default function TechnicianWorkbench() {
                   </Link>
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {fields.map((param, idx) => (
-                      <div key={param.parameter_id}>
-                        <label className="text-sm font-medium">{param.name} {param.unit && `(${param.unit})`}</label>
-                        <input
-                          value={param.value}
-                          onChange={(e) => {
-                            const updated = [...resultForm[test.id]];
-                            updated[idx] = { ...param, value: e.target.value };
-                            setResultForm({ ...resultForm, [test.id]: updated });
-                          }}
-                          className="input-field mt-1"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => submitResults(test.id)} className="btn-primary mt-3">{t('workbench.save')}</button>
-                </>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {fields.map((param, idx) => (
+                    <div key={param.parameter_id}>
+                      <label className="text-sm font-medium">{param.name} {param.unit && `(${param.unit})`}</label>
+                      <input
+                        value={param.value}
+                        onChange={(e) => {
+                          const updated = [...resultForm[test.id]];
+                          updated[idx] = { ...param, value: e.target.value };
+                          setResultForm({ ...resultForm, [test.id]: updated });
+                        }}
+                        className="input-field mt-1"
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           );
         })}
+        {hasEnterableFields && (
+          <div className="pt-4 mt-2 border-t border-primary-200 dark:border-primary-700">
+            <button
+              type="button"
+              onClick={submitAllResults}
+              disabled={saving}
+              className="btn-primary w-full py-3"
+            >
+              {saving ? t('common.loading') : t('workbench.save')}
+            </button>
+          </div>
+        )}
       </Modal>
     </div>
   );
