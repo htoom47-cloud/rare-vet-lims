@@ -54,6 +54,10 @@ async function applyPatches() {
     await backfillUsernames(client);
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS ai_interpretation TEXT');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS treatment_recommendations TEXT');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS lab_specialist_approved_by UUID REFERENCES users(id)');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS lab_specialist_approved_at TIMESTAMPTZ');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_by UUID REFERENCES users(id)');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_at TIMESTAMPTZ');
     await ensureAdmin();
   } finally {
     client.release();

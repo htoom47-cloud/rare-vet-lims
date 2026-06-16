@@ -41,6 +41,8 @@ generateReportPDF({
   language: 'ar',
   verificationCode: 'CC2C7F4A-44A',
   specialistName: 'مدير النظام',
+  labApproval: { approved: true, name: 'أخصائي المختبر', approvedAt: new Date() },
+  vetApproval: { approved: true, name: 'الطبيب البيطري', approvedAt: new Date() },
   treatmentRecommendations: '',
   results,
 }, path.join(__dirname, '../../uploads/reports'), { filename: 'test-compact-15.pdf' })

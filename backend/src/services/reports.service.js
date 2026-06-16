@@ -8,7 +8,56 @@ const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir } = require('../config/storage');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
+const LAB_APPROVER_ROLES = new Set(['lab_technician', 'manager', 'admin']);
+const VET_APPROVER_ROLES = new Set(['veterinarian', 'manager', 'admin']);
+
 const extractFilename = (pdfUrl) => (pdfUrl ? pdfUrl.split('/').pop() : null);
+
+const canApproveAsLab = (role) => LAB_APPROVER_ROLES.has(role);
+const canApproveAsVet = (role) => VET_APPROVER_ROLES.has(role);
+
+const displayName = (user, isArabic) => {
+  if (!user) return null;
+  return isArabic ? (user.full_name_ar || user.full_name) : user.full_name;
+};
+
+const buildApprovalFields = (reportRow, isArabic) => ({
+  labApproval: reportRow.lab_specialist_approved_by
+    ? {
+      approved: true,
+      name: displayName(
+        { full_name: reportRow.lab_specialist_name, full_name_ar: reportRow.lab_specialist_name_ar },
+        isArabic
+      ),
+      approvedAt: reportRow.lab_specialist_approved_at,
+    }
+    : { approved: false },
+  vetApproval: reportRow.vet_approved_by
+    ? {
+      approved: true,
+      name: displayName(
+        { full_name: reportRow.vet_name, full_name_ar: reportRow.vet_name_ar },
+        isArabic
+      ),
+      approvedAt: reportRow.vet_approved_at,
+    }
+    : { approved: false },
+});
+
+const REPORT_SELECT = `
+  SELECT r.*, s.sample_code, c.full_name as customer_name,
+         u.full_name as generated_by_name,
+         lab_u.full_name as lab_specialist_name,
+         lab_u.full_name_ar as lab_specialist_name_ar,
+         vet_u.full_name as vet_name,
+         vet_u.full_name_ar as vet_name_ar
+  FROM reports r
+  LEFT JOIN samples s ON r.sample_id = s.id
+  LEFT JOIN customers c ON s.customer_id = c.id
+  LEFT JOIN users u ON r.generated_by = u.id
+  LEFT JOIN users lab_u ON r.lab_specialist_approved_by = lab_u.id
+  LEFT JOIN users vet_u ON r.vet_approved_by = vet_u.id
+`;
 
 const list = async ({ page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -16,11 +65,7 @@ const list = async ({ page, limit }) => {
   const total = parseInt(countResult.rows[0].count, 10);
 
   const result = await query(
-    `SELECT r.*, s.sample_code, c.full_name as customer_name, u.full_name as generated_by_name
-     FROM reports r
-     LEFT JOIN samples s ON r.sample_id = s.id
-     LEFT JOIN customers c ON s.customer_id = c.id
-     LEFT JOIN users u ON r.generated_by = u.id
+    `${REPORT_SELECT}
      ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`,
     [l, offset]
   );
@@ -28,10 +73,16 @@ const list = async ({ page, limit }) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
+const getById = async (id) => {
+  const result = await query(`${REPORT_SELECT} WHERE r.id = $1`, [id]);
+  if (!result.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
 const buildReportData = async (sampleId, opts) => {
   const {
     reportNumber, verificationCode, language, generatedBy,
-    aiInterpretation, treatmentRecommendations,
+    aiInterpretation, treatmentRecommendations, labApproval, vetApproval,
   } = opts;
 
   const sampleResult = await query(
@@ -78,10 +129,6 @@ const buildReportData = async (sampleId, opts) => {
     throw new AppError('No validated results found', 400, 'NO_RESULTS');
   }
 
-  const userResult = generatedBy
-    ? await query('SELECT full_name, full_name_ar FROM users WHERE id = $1', [generatedBy])
-    : { rows: [] };
-
   const formatNumber = (value) => {
     if (value == null || value === '') return null;
     const num = Number(value);
@@ -117,7 +164,6 @@ const buildReportData = async (sampleId, opts) => {
     isCritical: r.is_critical,
   }));
 
-  const specialist = userResult.rows[0];
   return {
     reportNumber,
     sampleCode: sample.sample_code,
@@ -134,17 +180,30 @@ const buildReportData = async (sampleId, opts) => {
     animalChip: sample.animal_chip,
     language,
     verificationCode,
-    specialistName: isArabic
-      ? (specialist?.full_name_ar || specialist?.full_name)
-      : specialist?.full_name,
     doctorNotes: uniqueByParameter[0]?.doctor_notes,
     aiInterpretation: aiInterpretation ?? null,
     treatmentRecommendations: treatmentRecommendations ?? null,
+    labApproval: labApproval ?? { approved: false },
+    vetApproval: vetApproval ?? { approved: false },
     results,
   };
 };
 
-const ensurePdfFile = async (reportRow) => {
+const buildPdfPayload = async (reportRow) => {
+  const isArabic = reportRow.language === 'ar';
+  const base = await buildReportData(reportRow.sample_id, {
+    reportNumber: reportRow.report_number,
+    verificationCode: reportRow.qr_verification_code,
+    language: reportRow.language,
+    generatedBy: reportRow.generated_by,
+    aiInterpretation: reportRow.ai_interpretation,
+    treatmentRecommendations: reportRow.treatment_recommendations,
+    ...buildApprovalFields(reportRow, isArabic),
+  });
+  return base;
+};
+
+const regeneratePdf = async (reportRow) => {
   const filename = extractFilename(reportRow.pdf_url);
   if (!filename) throw new AppError('Report file not found', 404, 'NOT_FOUND');
 
@@ -153,24 +212,18 @@ const ensurePdfFile = async (reportRow) => {
     await fs.promises.unlink(filePath);
   }
 
-  const reportData = await buildReportData(reportRow.sample_id, {
-    reportNumber: reportRow.report_number,
-    verificationCode: reportRow.qr_verification_code,
-    language: reportRow.language,
-    generatedBy: reportRow.generated_by,
-    aiInterpretation: reportRow.ai_interpretation,
-    treatmentRecommendations: reportRow.treatment_recommendations,
-  });
-
-  const pdf = await generateReportPDF(
+  const reportData = await buildPdfPayload(reportRow);
+  await generateReportPDF(
     reportData,
     path.join(ensureUploadDir(), 'reports'),
     { filename }
   );
-  return pdf.filePath;
+  return filePath;
 };
 
-const generate = async (sampleId, userId, language = 'ar', options = {}) => {
+const ensurePdfFile = async (reportRow) => regeneratePdf(reportRow);
+
+const generate = async (sampleId, userId, userRole, language = 'ar', options = {}) => {
   const sampleResult = await query(
     'SELECT id FROM samples WHERE id = $1 AND status = $2',
     [sampleId, 'completed']
@@ -181,36 +234,98 @@ const generate = async (sampleId, userId, language = 'ar', options = {}) => {
 
   const reportNumber = generateCode('RPT');
   const verificationCode = uuidv4().slice(0, 12).toUpperCase();
+  const treatmentRecommendations = (options.treatment_recommendations || '').trim();
 
-  const baseData = await buildReportData(sampleId, {
+  const approveLab = options.approve_lab && canApproveAsLab(userRole);
+  const approveVet = options.approve_vet && canApproveAsVet(userRole);
+
+  const userResult = await query(
+    'SELECT full_name, full_name_ar FROM users WHERE id = $1',
+    [userId]
+  );
+  const user = userResult.rows[0];
+  const isArabic = language === 'ar';
+  const now = new Date();
+
+  const labApproval = approveLab
+    ? { approved: true, name: displayName(user, isArabic), approvedAt: now }
+    : { approved: false };
+  const vetApproval = approveVet
+    ? { approved: true, name: displayName(user, isArabic), approvedAt: now }
+    : { approved: false };
+
+  const reportData = await buildReportData(sampleId, {
     reportNumber,
     verificationCode,
     language,
     generatedBy: userId,
-  });
-
-  const treatmentRecommendations = (options.treatment_recommendations || '').trim();
-
-  const reportData = {
-    ...baseData,
     treatmentRecommendations,
-  };
+    labApproval,
+    vetApproval,
+  });
 
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);
 
   const result = await query(
-    `INSERT INTO reports (id, report_number, sample_id, pdf_url, qr_verification_code, generated_by, language,
-                         ai_interpretation, treatment_recommendations, is_final)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, true) RETURNING *`,
-    [uuidv4(), reportNumber, sampleId, pdf.url, verificationCode, userId, language, treatmentRecommendations || null]
+    `INSERT INTO reports (
+       id, report_number, sample_id, pdf_url, qr_verification_code, generated_by, language,
+       ai_interpretation, treatment_recommendations,
+       lab_specialist_approved_by, lab_specialist_approved_at,
+       vet_approved_by, vet_approved_at,
+       is_final
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11, $12, true)
+     RETURNING *`,
+    [
+      uuidv4(), reportNumber, sampleId, pdf.url, verificationCode, userId, language,
+      treatmentRecommendations || null,
+      approveLab ? userId : null,
+      approveLab ? now : null,
+      approveVet ? userId : null,
+      approveVet ? now : null,
+    ]
   );
 
-  return { ...result.rows[0], pdf_url: pdf.url };
+  return getById(result.rows[0].id);
+};
+
+const approve = async (reportId, userId, userRole, type) => {
+  const report = await getById(reportId);
+
+  if (type === 'lab') {
+    if (!canApproveAsLab(userRole)) {
+      throw new AppError('Only lab specialists can approve as lab specialist', 403, 'FORBIDDEN');
+    }
+    if (report.lab_specialist_approved_by) {
+      throw new AppError('Lab specialist approval already recorded', 400, 'ALREADY_APPROVED');
+    }
+    await query(
+      `UPDATE reports SET lab_specialist_approved_by = $1, lab_specialist_approved_at = NOW() WHERE id = $2`,
+      [userId, reportId]
+    );
+  } else if (type === 'vet') {
+    if (!canApproveAsVet(userRole)) {
+      throw new AppError('Only veterinarians can approve as veterinarian', 403, 'FORBIDDEN');
+    }
+    if (report.vet_approved_by) {
+      throw new AppError('Veterinarian approval already recorded', 400, 'ALREADY_APPROVED');
+    }
+    await query(
+      `UPDATE reports SET vet_approved_by = $1, vet_approved_at = NOW() WHERE id = $2`,
+      [userId, reportId]
+    );
+  } else {
+    throw new AppError('Invalid approval type', 400, 'INVALID_TYPE');
+  }
+
+  const updated = await getById(reportId);
+  await regeneratePdf(updated);
+  return updated;
 };
 
 const servePdf = async (filename, res) => {
-  const report = await query('SELECT * FROM reports WHERE pdf_url LIKE $1', [`%${filename}`]);
+  const report = await query(`${REPORT_SELECT} WHERE r.pdf_url LIKE $1`, [`%${filename}`]);
   if (!report.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
 
   const filePath = await ensurePdfFile(report.rows[0]);
@@ -245,4 +360,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, generate, verify, servePdf };
+module.exports = { list, generate, approve, verify, servePdf };

@@ -1,7 +1,8 @@
 -- Rare Veterinary Care LIMS - Database Schema
 -- PostgreSQL 16+
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- UUIDs are generated in application code (uuid-ossp is blocked on some Windows hosts)
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ==================== ROLES & PERMISSIONS ====================
@@ -236,6 +237,10 @@ CREATE TABLE reports (
     qr_verification_code VARCHAR(100) UNIQUE,
     generated_by UUID REFERENCES users(id),
     specialist_signature TEXT,
+    lab_specialist_approved_by UUID REFERENCES users(id),
+    lab_specialist_approved_at TIMESTAMPTZ,
+    vet_approved_by UUID REFERENCES users(id),
+    vet_approved_at TIMESTAMPTZ,
     language VARCHAR(5) DEFAULT 'en',
     ai_interpretation TEXT,
     treatment_recommendations TEXT,
@@ -465,19 +470,4 @@ CREATE INDEX idx_audit_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_module ON audit_logs(module);
 CREATE INDEX idx_audit_created ON audit_logs(created_at);
 
--- ==================== FUNCTIONS ====================
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER animals_updated_at BEFORE UPDATE ON animals FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER samples_updated_at BEFORE UPDATE ON samples FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER tests_updated_at BEFORE UPDATE ON tests FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER inventory_updated_at BEFORE UPDATE ON inventory_items FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+-- updated_at is set in application code (plpgsql triggers break under Windows Application Control)

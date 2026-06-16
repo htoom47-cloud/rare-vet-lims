@@ -66,15 +66,23 @@ const clean = (t) => String(t ?? '')
 
 const hasAr = (t) => /[\u0600-\u06FF]/.test(String(t || ''));
 
-/** Shape Arabic for PDFKit LTR engine — no character/word reversal. */
+/** PDFKit draws RTL text LTR — reverse word order before shaping so phrases read correctly. */
+const reverseArWords = (text) => {
+  const words = String(text).trim().split(/\s+/);
+  return words.length > 1 ? words.reverse().join(' ') : String(text).trim();
+};
+
+const shapeAr = (text) => arabicReshaper.convertArabic(reverseArWords(text));
+
+/** Shape Arabic for PDFKit LTR engine. */
 const arLine = (text) => {
   const line = clean(text).trim();
   if (!line || !hasAr(line)) return line;
   try {
     if (/[0-9A-Za-z]/.test(line)) {
-      return line.replace(ARABIC_RUN, (m) => arabicReshaper.convertArabic(m));
+      return line.replace(ARABIC_RUN, (m) => shapeAr(m));
     }
-    return arabicReshaper.convertArabic(line);
+    return shapeAr(line);
   } catch {
     return line;
   }
@@ -98,7 +106,13 @@ const cellArabic = (doc, text, x, y, w, h, opts = {}) => {
   const { size = 6.5, color = BRAND.brown, bold = false, align = 'right' } = opts;
   setArabic(doc);
   doc.fontSize(size).fillColor(color);
-  doc.text(arLine(text), x, y, { width: w, height: h, align, lineBreak: false, ellipsis: true });
+  const shaped = arLine(text);
+  if (!shaped) return;
+  const tw = doc.widthOfString(shaped);
+  let tx = x;
+  if (align === 'right') tx = x + Math.max(0, w - tw);
+  else if (align === 'center') tx = x + Math.max(0, (w - tw) / 2);
+  doc.text(shaped, tx, y, { lineBreak: false });
 };
 
 const strokeCell = (doc, x, y, w, h, fill) => {
@@ -126,8 +140,16 @@ const flowLatin = (doc, text, width, opts = {}) => {
 const flowArabic = (doc, text, width, opts = {}) => {
   if (!text) return;
   setArabic(doc);
-  doc.fontSize(opts.size || 6.5).fillColor(opts.color || BRAND.brown);
-  doc.text(arLine(text), TX + 4, doc.y, { width, align: 'right', lineGap: 0.5 });
+  const size = opts.size || 6.5;
+  doc.fontSize(size).fillColor(opts.color || BRAND.brown);
+  const lines = String(text).split('\n');
+  for (const line of lines) {
+    if (!line.trim()) { doc.y += size * 0.5; continue; }
+    const shaped = arLine(line);
+    const tw = doc.widthOfString(shaped);
+    doc.text(shaped, TX + 4 + width - tw, doc.y, { lineBreak: false });
+    doc.y += size + 2;
+  }
 };
 
 const drawHeader = (doc) => {
@@ -305,8 +327,46 @@ const drawNotes = (doc, treatment) => {
   doc.y += 4;
 };
 
+const drawCheck = (doc, x, y, size = 10) => {
+  setLatin(doc, true);
+  doc.fontSize(size).fillColor('#16a34a');
+  doc.text('\u2713', x, y, { lineBreak: false });
+};
+
+const drawApprovalCell = (doc, x, y, w, h, titleEn, titleAr, approval) => {
+  const headerH = 14;
+  strokeCell(doc, x, y, w, h, BRAND.cream);
+  bilingualBar(doc, x, y, w, headerH, titleEn, titleAr, BRAND.brown, { size: 5.5 });
+
+  const bodyY = y + headerH + 5;
+  if (approval?.approved && approval.name) {
+    drawCheck(doc, x + 6, bodyY, 11);
+    const nameX = x + 20;
+    const nameW = w - 26;
+    if (hasAr(approval.name)) cellArabic(doc, approval.name, nameX, bodyY, nameW, 12, { size: 7, align: 'right' });
+    else cellLatin(doc, approval.name, nameX, bodyY, nameW, 12, { size: 7 });
+    if (approval.approvedAt) {
+      const dateStr = new Date(approval.approvedAt).toLocaleDateString('en-GB');
+      cellLatin(doc, dateStr, nameX, bodyY + 12, nameW, 8, { size: 5.5, color: BRAND.muted, align: 'right' });
+    }
+  } else {
+    doc.moveTo(x + 6, y + h - 6).lineTo(x + w - 6, y + h - 6).strokeColor(BRAND.gold).lineWidth(0.6).stroke();
+  }
+};
+
+const drawApprovals = (doc, reportData) => {
+  ensureSpace(doc, 48);
+  const y = doc.y;
+  const half = TW / 2;
+  const rowH = 42;
+
+  drawApprovalCell(doc, TX, y, half, rowH, 'Lab Specialist Approval', 'موافقة أخصائي المختبر', reportData.labApproval);
+  drawApprovalCell(doc, TX + half, y, half, rowH, 'Veterinarian Approval', 'موافقة الطبيب البيطري', reportData.vetApproval);
+  doc.y = y + rowH + 6;
+};
+
 const drawFooter = async (doc, reportData) => {
-  ensureSpace(doc, 54);
+  ensureSpace(doc, 44);
   const y = doc.y;
 
   const qrData = await generateQR({
@@ -318,24 +378,16 @@ const drawFooter = async (doc, reportData) => {
 
   doc.moveTo(TX, y).lineTo(TX + TW, y).strokeColor(BRAND.border).stroke();
   doc.image(qrBuffer, TX, y + 4, { width: 38 });
-  cellLatin(doc, 'Scan to verify', TX + 42, y + 8, 110, 8, { size: 5.5, color: BRAND.muted });
-  cellArabic(doc, 'امسح للتحقق', TX + 42, y + 16, 110, 8, { size: 5.5, color: BRAND.muted });
-  cellLatin(doc, reportData.verificationCode, TX + 42, y + 24, 110, 8, { size: 5.5, color: '#9ca3af' });
-
-  const sigX = TX + 195;
-  cellLatin(doc, 'Veterinarian Signature', sigX, y + 6, 145, 8, { size: 6, bold: true });
-  cellArabic(doc, 'توقيع الطبيب البيطري', sigX, y + 14, 145, 8, { size: 6, bold: true });
-  doc.moveTo(sigX, y + 30).lineTo(sigX + 130, y + 30).strokeColor(BRAND.gold).stroke();
-  if (reportData.specialistName) {
-    if (hasAr(reportData.specialistName)) cellArabic(doc, reportData.specialistName, sigX, y + 32, 145, 10, { size: 6.5 });
-    else cellLatin(doc, reportData.specialistName, sigX, y + 32, 145, 10, { size: 6.5 });
-  }
+  cellLatin(doc, 'Scan to verify', TX + 44, y + 6, 95, 8, { size: 5.5, color: BRAND.muted });
+  cellArabic(doc, 'امسح للتحقق', TX + 44, y + 14, 95, 8, { size: 5.5, color: BRAND.muted, align: 'right' });
+  cellLatin(doc, reportData.verificationCode, TX + 44, y + 22, 95, 8, { size: 5.5, color: '#9ca3af' });
 
   const labEn = env.lab.name || 'Rare Animals Veterinary Care Center';
   const labAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
-  cellLatin(doc, `Issued by ${labEn}`, TX, y + 40, TW / 2, 8, { size: 5.5, color: '#9ca3af', align: 'center' });
-  cellArabic(doc, `صادر من ${labAr}`, TX + TW / 2, y + 40, TW / 2, 8, { size: 5.5, color: '#9ca3af', align: 'center' });
-  doc.y = y + 50;
+  const issuedY = y + 32;
+  cellLatin(doc, `Issued by ${labEn}`, TX, issuedY, TW / 2 - 4, 8, { size: 5.5, color: '#9ca3af', align: 'center' });
+  cellArabic(doc, `صادر من ${labAr}`, TX + TW / 2 + 4, issuedY, TW / 2 - 4, 8, { size: 5.5, color: '#9ca3af', align: 'center' });
+  doc.y = y + 44;
 };
 
 const formatDate = (date) => new Date(date).toLocaleDateString('en-GB');
@@ -373,6 +425,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
 
       drawResultsTable(doc, reportData.results);
       drawNotes(doc, reportData.treatmentRecommendations);
+      drawApprovals(doc, reportData);
       await drawFooter(doc, reportData);
 
       doc.end();

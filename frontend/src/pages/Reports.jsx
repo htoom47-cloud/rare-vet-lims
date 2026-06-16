@@ -1,14 +1,49 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, FilePlus, Stethoscope } from 'lucide-react';
+import { CheckCircle2, Download, FileText, FilePlus, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { reportsAPI, samplesAPI, notificationsAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+
+const LAB_ROLES = new Set(['lab_technician', 'manager', 'admin']);
+const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
+
+function ApprovalLine({ label, approved, approverName, canApprove, onApprove, approving }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center justify-between gap-3 p-3 border border-primary-200/60 rounded-lg bg-white dark:bg-gray-900/40">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-primary-800 dark:text-primary-200">{label}</p>
+        {approved ? (
+          <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5 mt-1">
+            <CheckCircle2 size={16} className="shrink-0" />
+            <span>{t('reports.approvedBy')}: {approverName}</span>
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-1">{t('reports.pendingApproval')}</p>
+        )}
+      </div>
+      {!approved && canApprove && (
+        <button
+          type="button"
+          onClick={onApprove}
+          disabled={approving}
+          className="shrink-0 px-3 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+        >
+          {approving ? t('common.loading') : t('reports.approvalDone')}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function Reports() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [reports, setReports] = useState([]);
   const [completedSamples, setCompletedSamples] = useState([]);
@@ -18,10 +53,19 @@ export default function Reports() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sendingId, setSendingId] = useState(null);
+  const [approvingKey, setApprovingKey] = useState(null);
 
   const [selectedSample, setSelectedSample] = useState(null);
   const [language, setLanguage] = useState('ar');
   const [treatment, setTreatment] = useState('');
+  const [approveLabOnGenerate, setApproveLabOnGenerate] = useState(false);
+  const [approveVetOnGenerate, setApproveVetOnGenerate] = useState(false);
+
+  const canApproveLab = LAB_ROLES.has(user?.role);
+  const canApproveVet = VET_ROLES.has(user?.role);
+  const userDisplayName = i18n.language === 'ar'
+    ? (user?.full_name_ar || user?.full_name)
+    : user?.full_name;
 
   const load = () => {
     setLoading(true);
@@ -73,7 +117,22 @@ export default function Reports() {
     setSelectedSample(sample);
     setTreatment('');
     setLanguage('ar');
+    setApproveLabOnGenerate(false);
+    setApproveVetOnGenerate(false);
     setGenerateOpen(true);
+  };
+
+  const handleApprove = async (reportId, type) => {
+    setApprovingKey(`${reportId}-${type}`);
+    try {
+      await reportsAPI.approve(reportId, type);
+      toast.success(t('reports.approvalDone'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('reports.approvalFailed'));
+    } finally {
+      setApprovingKey(null);
+    }
   };
 
   const generateReport = async () => {
@@ -83,6 +142,8 @@ export default function Reports() {
       const { data } = await reportsAPI.generate(selectedSample.id, {
         language,
         treatment_recommendations: treatment,
+        approve_lab: approveLabOnGenerate,
+        approve_vet: approveVetOnGenerate,
       });
       toast.success(`${t('reports.created')} ${data.data.report_number}`);
       setGenerateOpen(false);
@@ -96,6 +157,16 @@ export default function Reports() {
     }
   };
 
+  const approverName = (report, type) => {
+    const isAr = i18n.language === 'ar';
+    if (type === 'lab') {
+      return isAr
+        ? (report.lab_specialist_name_ar || report.lab_specialist_name)
+        : report.lab_specialist_name;
+    }
+    return isAr ? (report.vet_name_ar || report.vet_name) : report.vet_name;
+  };
+
   const columns = [
     { key: 'report_number', label: t('reports.reportNo') },
     { key: 'sample_code', label: t('reports.sampleNo') },
@@ -103,16 +174,40 @@ export default function Reports() {
     { key: 'language', label: t('reports.language'), render: (r) => (r.language === 'ar' ? 'عربي' : 'EN') },
     { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
     {
+      key: 'approvals',
+      label: t('reports.labApproval'),
+      render: (r) => (
+        <div className="space-y-2 min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+          <ApprovalLine
+            label={t('reports.labApproval')}
+            approved={!!r.lab_specialist_approved_by}
+            approverName={approverName(r, 'lab')}
+            canApprove={canApproveLab}
+            approving={approvingKey === `${r.id}-lab`}
+            onApprove={() => handleApprove(r.id, 'lab')}
+          />
+          <ApprovalLine
+            label={t('reports.vetApproval')}
+            approved={!!r.vet_approved_by}
+            approverName={approverName(r, 'vet')}
+            canApprove={canApproveVet}
+            approving={approvingKey === `${r.id}-vet`}
+            onApprove={() => handleApprove(r.id, 'vet')}
+          />
+        </div>
+      ),
+    },
+    {
       key: 'actions',
       label: t('common.actions'),
       render: (r) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
           {r.pdf_url && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); openPdf(r.pdf_url); }} className="text-primary-600 flex items-center gap-1 text-sm">
+            <button type="button" onClick={() => openPdf(r.pdf_url)} className="text-primary-600 flex items-center gap-1 text-sm">
               <Download size={14} /> {t('common.print')}
             </button>
           )}
-          <button onClick={(e) => { e.stopPropagation(); sendToCustomer(r); }} disabled={sendingId === r.id} className="text-green-600 text-sm">
+          <button onClick={() => sendToCustomer(r)} disabled={sendingId === r.id} className="text-green-600 text-sm">
             {t('workflow.sendToCustomer')}
           </button>
         </div>
@@ -203,6 +298,43 @@ export default function Reports() {
                 rows={5}
               />
               <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">{t('reports.treatmentHint')}</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-primary-800">{t('reports.labApproval')} / {t('reports.vetApproval')}</p>
+              {canApproveLab && (
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-green-50/50 dark:hover:bg-green-900/10">
+                  <input
+                    type="checkbox"
+                    checked={approveLabOnGenerate}
+                    onChange={(e) => setApproveLabOnGenerate(e.target.checked)}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{t('reports.approveLab')}</p>
+                    <p className="text-xs text-gray-500">{userDisplayName}</p>
+                  </div>
+                  {approveLabOnGenerate && <CheckCircle2 size={20} className="text-green-600 shrink-0" />}
+                </label>
+              )}
+              {canApproveVet && (
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-green-50/50 dark:hover:bg-green-900/10">
+                  <input
+                    type="checkbox"
+                    checked={approveVetOnGenerate}
+                    onChange={(e) => setApproveVetOnGenerate(e.target.checked)}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{t('reports.approveVet')}</p>
+                    <p className="text-xs text-gray-500">{userDisplayName}</p>
+                  </div>
+                  {approveVetOnGenerate && <CheckCircle2 size={20} className="text-green-600 shrink-0" />}
+                </label>
+              )}
+              {!canApproveLab && !canApproveVet && (
+                <p className="text-xs text-gray-500">{t('reports.pendingApproval')}</p>
+              )}
             </div>
 
             <button type="button" onClick={generateReport} disabled={generating} className="btn-primary w-full py-3">
