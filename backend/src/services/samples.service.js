@@ -2,16 +2,18 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
+const { uuidv4 } = require('../utils/uuid');
 
 const list = async ({ status, search, awaiting_validation, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
   let where = 'WHERE 1=1';
 
-  if (awaiting_validation === 'true') {
+  if (awaiting_validation === 'true' || awaiting_validation === true || awaiting_validation === '1') {
     where += ` AND EXISTS (
       SELECT 1 FROM sample_tests st
       JOIN results r ON r.sample_test_id = st.id
+      JOIN result_values rv ON rv.result_id = r.id
       WHERE st.sample_id = s.id AND r.is_validated = false
     )`;
   }
@@ -107,9 +109,9 @@ const create = async (data, userId) => {
     const barcode = generateCode('BC');
 
     const sampleResult = await client.query(
-      `INSERT INTO samples (sample_code, barcode, customer_id, animal_id, department, priority, notes, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8) RETURNING *`,
-      [sampleCode, barcode, data.customer_id, data.animal_id, data.department, data.priority, data.notes, userId]
+      `INSERT INTO samples (id, sample_code, barcode, customer_id, animal_id, department, priority, notes, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9) RETURNING *`,
+      [uuidv4(), sampleCode, barcode, data.customer_id, data.animal_id, data.department, data.priority, data.notes, userId]
     );
 
     const sample = sampleResult.rows[0];
@@ -117,8 +119,8 @@ const create = async (data, userId) => {
     for (const testId of data.test_ids) {
       const testPrice = await client.query('SELECT price FROM tests WHERE id = $1', [testId]);
       await client.query(
-        `INSERT INTO sample_tests (sample_id, test_id, price, status) VALUES ($1, $2, $3, 'pending')`,
-        [sample.id, testId, testPrice.rows[0]?.price || 0]
+        `INSERT INTO sample_tests (id, sample_id, test_id, price, status) VALUES ($1, $2, $3, $4, 'pending')`,
+        [uuidv4(), sample.id, testId, testPrice.rows[0]?.price || 0]
       );
     }
 

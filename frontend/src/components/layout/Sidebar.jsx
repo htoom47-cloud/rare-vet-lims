@@ -5,7 +5,7 @@ import {
   CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { isReception } from '../../utils/roles';
+import { isReception, userRole } from '../../utils/roles';
 import AppLogo from '../ui/AppLogo';
 
 const receptionNavSections = [
@@ -97,7 +97,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
       <nav className="p-2 space-y-4 overflow-y-auto" style={{ height: 'calc(100vh - 80px)' }}>
         {(isReception(user) ? receptionNavSections : navSections).map((group) => {
           const visibleItems = group.items.filter((item) => {
-            if (item.adminOnly && user?.role !== 'admin') return false;
+            if (item.adminOnly && userRole(user) !== 'admin') return false;
             return hasPermission(item.permission);
           });
           if (!visibleItems.length) return null;

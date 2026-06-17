@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -15,10 +15,13 @@ export default function VetReview() {
   const [results, setResults] = useState({});
   const [doctorNotes, setDoctorNotes] = useState('');
   const [loading, setLoading] = useState(true);
+  const [validating, setValidating] = useState(false);
 
   const load = () => {
     setLoading(true);
-    samplesAPI.list({ awaiting_validation: true }).then(({ data }) => setSamples(data.data)).finally(() => setLoading(false));
+    samplesAPI.list({ awaiting_validation: true })
+      .then(({ data }) => setSamples(data.data))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -48,14 +51,35 @@ export default function VetReview() {
     setDoctorNotes('');
   };
 
-  const validateTest = async (sampleTestId) => {
+  const pendingTests = (sample) => (sample?.tests || []).filter((test) => {
+    const res = results[test.id];
+    return res && !res.is_validated && res.values?.length > 0;
+  });
+
+  const validateTest = async (sampleTestId, closeAfter = true) => {
+    await resultsAPI.validate(sampleTestId, doctorNotes);
+    if (closeAfter) {
+      toast.success(t('vetReview.approved'));
+      setSelected(null);
+      load();
+    }
+  };
+
+  const validateAll = async () => {
+    const tests = pendingTests(selected);
+    if (!tests.length) return toast.error(t('vetReview.nothingToApprove'));
+    setValidating(true);
     try {
-      await resultsAPI.validate(sampleTestId, doctorNotes);
-      toast.success('تم اعتماد النتائج');
+      for (const test of tests) {
+        await validateTest(test.id, false);
+      }
+      toast.success(t('vetReview.approvedAll'));
       setSelected(null);
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
+    } finally {
+      setValidating(false);
     }
   };
 
@@ -63,7 +87,8 @@ export default function VetReview() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">اعتماد النتائج — الطبيب البيطري</h1>
+      <h1 className="text-2xl font-bold mb-2">{t('resultValidation.title')}</h1>
+      <p className="text-sm text-primary-500 mb-6">{t('resultValidation.subtitle')}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {samples.map((s) => (
@@ -76,43 +101,78 @@ export default function VetReview() {
             <p className="text-sm">{s.animal_code}</p>
           </div>
         ))}
-        {!samples.length && <p className="text-gray-500 col-span-full text-center py-8">لا توجد عينات بانتظار الاعتماد</p>}
+        {!samples.length && (
+          <div className="col-span-full card text-center py-10">
+            <p className="text-gray-600 dark:text-gray-300 font-medium mb-3">{t('resultValidation.emptyTitle')}</p>
+            <ol className="text-sm text-gray-500 space-y-2 max-w-md mx-auto text-start list-decimal list-inside mb-4">
+              <li>{t('resultValidation.emptyStep1')}</li>
+              <li>{t('resultValidation.emptyStep2')}</li>
+              <li>{t('resultValidation.emptyStep3')}</li>
+            </ol>
+            <Link to="/workbench" className="btn-primary inline-block">{t('nav.workbench')}</Link>
+          </div>
+        )}
       </div>
 
-      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`مراجعة: ${selected?.sample_code}`} size="xl">
+      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`${t('resultValidation.review')}: ${selected?.sample_code}`} size="xl">
         {selected?.tests?.map((test) => {
           const res = results[test.id];
           return (
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="font-semibold">{test.test_name}</h4>
-                {res?.is_validated && <span className="text-green-600 text-sm flex items-center gap-1"><CheckCircle size={14} /> معتمد</span>}
+                {res?.is_validated && (
+                  <span className="text-green-600 text-sm flex items-center gap-1">
+                    <CheckCircle size={14} /> {t('resultValidation.approvedBadge')}
+                  </span>
+                )}
               </div>
               {res?.values?.length > 0 ? (
                 <table className="w-full text-sm mb-3">
-                  <thead><tr className="text-gray-500"><th className="text-start py-1">المعامل</th><th className="text-start">النتيجة</th><th className="text-start">الحالة</th></tr></thead>
+                  <thead>
+                    <tr className="text-gray-500">
+                      <th className="text-start py-1">{t('resultValidation.parameter')}</th>
+                      <th className="text-start">{t('resultValidation.result')}</th>
+                      <th className="text-start">{t('resultValidation.flag')}</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {res.values.map((v) => (
                       <tr key={v.parameter_id} className="border-t">
                         <td className="py-1">{v.parameter_name}</td>
                         <td>{v.value} {v.unit}</td>
-                        <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || 'طبيعي'} /></td>
+                        <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || t('vetReview.normal')} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-500 text-sm mb-3">لم تُدخل النتائج بعد</p>
+                <p className="text-gray-500 text-sm mb-3">{t('resultValidation.noResultsYet')}</p>
               )}
               {res && !res.is_validated && res.values?.length > 0 && (
-                <button onClick={() => validateTest(test.id)} className="btn-primary text-sm">اعتماد هذا الفحص</button>
+                <button type="button" onClick={() => validateTest(test.id)} className="btn-secondary text-sm">
+                  {t('resultValidation.approveTest')}
+                </button>
               )}
             </div>
           );
         })}
-        <div>
-          <label className="block text-sm font-medium mb-1">ملاحظات الطبيب</label>
-          <textarea value={doctorNotes} onChange={(e) => setDoctorNotes(e.target.value)} className="input-field" rows={2} placeholder="ملاحظات اختيارية..." />
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('resultValidation.notes')}</label>
+            <textarea
+              value={doctorNotes}
+              onChange={(e) => setDoctorNotes(e.target.value)}
+              className="input-field"
+              rows={2}
+              placeholder={t('resultValidation.notesPlaceholder')}
+            />
+          </div>
+          {pendingTests(selected).length > 0 && (
+            <button type="button" onClick={validateAll} disabled={validating} className="btn-primary w-full py-3">
+              {validating ? t('common.loading') : t('vetReview.approveAll')}
+            </button>
+          )}
         </div>
       </Modal>
     </div>
