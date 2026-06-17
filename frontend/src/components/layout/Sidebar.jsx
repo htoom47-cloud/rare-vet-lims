@@ -60,9 +60,9 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
 
   return (
     <aside
-      className={`fixed top-0 start-0 z-40 h-screen bg-white dark:bg-primary-900 border-e border-primary-200 dark:border-primary-700 transition-all duration-300
+      className={`fixed top-0 start-0 z-40 h-screen bg-white dark:bg-primary-900 border-e border-primary-200 dark:border-primary-700 transition-transform duration-300
         ${collapsed ? 'w-[4.5rem]' : 'w-72'}
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${mobileOpen ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full'}
         lg:translate-x-0`}
     >
       <div className={`flex items-center border-b border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-900 ${collapsed ? 'justify-center p-3' : 'gap-3 p-4'}`}>

@@ -16,7 +16,7 @@ export default function Header({ onMenuClick, sidebarCollapsed }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-primary-50/90 dark:bg-primary-900/90 backdrop-blur border-b border-primary-200 dark:border-primary-700 px-4 py-3">
+    <header className="sticky top-0 z-30 bg-primary-50/90 dark:bg-primary-900/90 backdrop-blur border-b border-primary-200 dark:border-primary-700 px-3 sm:px-4 py-2.5 sm:py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={onMenuClick} className="p-2 hover:bg-primary-100 dark:hover:bg-primary-800 rounded-lg lg:hidden text-primary-700">

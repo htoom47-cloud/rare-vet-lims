@@ -24,7 +24,7 @@ function ApprovalLine({ label, approved, approverName, approvedAt, canApprove, o
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 p-3 border border-primary-200/60 rounded-lg bg-white dark:bg-gray-900/40">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border border-primary-200/60 rounded-lg bg-white dark:bg-gray-900/40">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-primary-800 dark:text-primary-200">{label}</p>
         {approved ? (
@@ -196,7 +196,7 @@ export default function Reports() {
       key: 'approvals',
       label: t('reports.labApproval'),
       render: (r) => (
-        <div className="space-y-2 min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-2 min-w-0 w-full sm:min-w-[220px]" onClick={(e) => e.stopPropagation()}>
           <ApprovalLine
             label={t('reports.labApproval')}
             approved={!!r.lab_specialist_approved_by}
@@ -222,7 +222,7 @@ export default function Reports() {
       key: 'actions',
       label: t('common.actions'),
       render: (r) => (
-        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
           {r.pdf_url && (
             <button type="button" onClick={() => openPdf(r.pdf_url)} className="text-primary-600 flex items-center gap-1 text-sm">
               <Download size={14} /> {t('common.print')}
