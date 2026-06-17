@@ -18,7 +18,7 @@ const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
 export default function WorkflowCase() {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const receptionMode = isReception(user);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -182,7 +182,8 @@ export default function WorkflowCase() {
       setStep(3);
       toast.success(`${t('workflow.invoiceCreated')}: ${data.data.invoice_number}`);
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      const msg = err.response?.data?.error?.message;
+      toast.error(msg === 'Insufficient permissions' ? t('auth.insufficientPermissions') : (msg || 'خطأ'));
     } finally {
       setCreating(false);
     }
@@ -396,7 +397,12 @@ export default function WorkflowCase() {
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="font-bold text-primary-800">{t('workflow.total')}: {invoiceTotal().toFixed(0)} {t('reception.sar')}</span>
-                  <button onClick={createInvoice} disabled={creating || invoiceTotal() === 0} className="btn-primary py-3 px-6">
+                  <button
+                    onClick={createInvoice}
+                    disabled={creating || invoiceTotal() === 0 || !hasPermission('billing.create')}
+                    className="btn-primary py-3 px-6"
+                    title={!hasPermission('billing.create') ? t('auth.insufficientPermissions') : undefined}
+                  >
                     {t('workflow.issueInvoice')}
                   </button>
                 </div>
