@@ -77,8 +77,8 @@ export default function Reports() {
   const [approveLabOnGenerate, setApproveLabOnGenerate] = useState(false);
   const [approveVetOnGenerate, setApproveVetOnGenerate] = useState(false);
 
-  const canApproveLab = LAB_ROLES.has(user?.role);
-  const canApproveVet = VET_ROLES.has(user?.role);
+  const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
+  const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)
     : user?.full_name;

@@ -34,6 +34,7 @@ const authenticate = async (req, res, next) => {
 
     req.user = {
       ...result.rows[0],
+      role: result.rows[0].role_name,
       permissions: perms.rows.map((p) => p.code),
     };
     next();
