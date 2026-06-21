@@ -26,7 +26,8 @@ const list = async ({ category_id, search, page, limit }) => {
 
   params.push(l, offset);
   const result = await query(
-    `SELECT t.*, tc.name as category_name, tc.code as category_code
+    `SELECT t.*, tc.name as category_name, tc.name_ar as category_name_ar,
+            tc.code as category_code, tc.department as category_department
      FROM tests t LEFT JOIN test_categories tc ON t.category_id = tc.id
      ${where} ORDER BY tc.sort_order, t.name LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
@@ -37,7 +38,8 @@ const list = async ({ category_id, search, page, limit }) => {
 
 const getById = async (id) => {
   const result = await query(
-    `SELECT t.*, tc.name as category_name FROM tests t
+    `SELECT t.*, tc.name as category_name, tc.code as category_code, tc.department as category_department
+     FROM tests t
      LEFT JOIN test_categories tc ON t.category_id = tc.id WHERE t.id = $1`,
     [id]
   );

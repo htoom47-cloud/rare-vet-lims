@@ -6,6 +6,7 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { getCategoryEmoji } from '../utils/testCategoryIcons';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -189,7 +190,16 @@ export default function Tests() {
         </div>
       ),
     },
-    { key: 'category_name', label: t('tests.category') },
+    {
+      key: 'category_name',
+      label: t('tests.category'),
+      render: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-base leading-none" aria-hidden="true">{getCategoryEmoji(r)}</span>
+          {r.category_name || '—'}
+        </span>
+      ),
+    },
     { key: 'price', label: t('tests.price'), render: (r) => `${Number(r.price).toFixed(2)} SAR` },
     { key: 'turnaround_hours', label: t('tests.turnaround') },
     { key: 'label_copies', label: t('tests.labelCopies'), render: (r) => r.label_copies ?? 1 },
@@ -231,7 +241,11 @@ export default function Tests() {
           </div>
           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="input-field w-auto">
             <option value="">{t('tests.allCategories')}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{catLabel(c)}</option>)}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {getCategoryEmoji(c)} {catLabel(c)}
+              </option>
+            ))}
           </select>
           {canManage && (
             <button onClick={openCreate} className="btn-primary flex items-center gap-2">
@@ -257,6 +271,7 @@ export default function Tests() {
             onClick={() => setCategoryFilter(String(cat.id))}
             className={`card p-4 text-center transition border-2 ${categoryFilter === String(cat.id) ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:border-primary-300'}`}
           >
+            <span className="text-2xl mb-1 leading-none" aria-hidden="true">{getCategoryEmoji(cat)}</span>
             <p className="font-semibold text-sm">{catLabel(cat)}</p>
             <p className="text-xs text-gray-500">{cat.department}</p>
           </button>
@@ -303,7 +318,11 @@ export default function Tests() {
             <label className="block text-sm font-medium mb-1">{t('tests.category')}</label>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field" required>
               <option value="">—</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{catLabel(c)}</option>)}
+              {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {getCategoryEmoji(c)} {catLabel(c)}
+              </option>
+            ))}
             </select>
           </div>
           <div>
@@ -341,7 +360,10 @@ export default function Tests() {
           <div className="space-y-6">
             <div className="flex flex-wrap justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold">{displayName(detail)}</h3>
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <span className="text-xl leading-none" aria-hidden="true">{getCategoryEmoji(detail)}</span>
+                  {displayName(detail)}
+                </h3>
                 <p className="text-sm text-gray-500">{detail.code} · {detail.category_name}</p>
               </div>
               {canManage && (

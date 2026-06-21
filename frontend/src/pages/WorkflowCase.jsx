@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus } from 'lucide-react';
@@ -15,6 +15,7 @@ import {
   customersAPI, animalsAPI, testsAPI, billingAPI, samplesAPI,
 } from '../services/api';
 import { WORKFLOW_STEPS } from '../utils/workflow';
+import { getCategoryEmoji } from '../utils/testCategoryIcons';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -69,6 +70,11 @@ export default function WorkflowCase() {
 
   const animalLabel = (a) => (a ? `${a.animal_code} — ${a.name_tag} (${t(`animals.types.${a.animal_type}`)})` : '');
   const testLabel = (test) => (i18n.language === 'ar' && test.name_ar ? test.name_ar : test.name);
+  const categoryGroupLabel = (group) => {
+    const { category } = group;
+    if (i18n.language === 'ar' && category?.name_ar) return category.name_ar;
+    return category?.name || category?.code || t('tests.allCategories');
+  };
 
   const filteredTests = tests.filter((test) => {
     if (!testSearch.trim()) return true;
@@ -77,6 +83,27 @@ export default function WorkflowCase() {
       || test.name?.toLowerCase().includes(q)
       || test.name_ar?.includes(testSearch);
   });
+
+  const testsByCategory = useMemo(() => {
+    const groups = new Map();
+    for (const test of filteredTests) {
+      const key = test.category_code || test.category_name || 'other';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          category: {
+            code: test.category_code,
+            name: test.category_name,
+            name_ar: test.category_name_ar,
+            department: test.category_department,
+          },
+          tests: [],
+        });
+      }
+      groups.get(key).tests.push(test);
+    }
+    return [...groups.values()];
+  }, [filteredTests]);
 
   const toggleAnimal = (id) => {
     setSelectedAnimalIds((prev) => {
@@ -405,25 +432,35 @@ export default function WorkflowCase() {
                     return (
                       <div key={animalId} className="border rounded-lg p-3 bg-primary-50/30">
                         <p className="font-semibold text-sm mb-2 text-primary-800">{animalLabel(animal)}</p>
-                        <div className="space-y-1">
-                          {filteredTests.map((test) => (
-                            <label key={test.id} className="flex items-center gap-3 text-sm p-1.5 rounded hover:bg-white cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={(animalTests[animalId] || []).includes(test.id)}
-                                onChange={(e) => toggleAnimalTest(animalId, test.id, e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <span className="flex-1">
-                                {testLabel(test)}
-                                {(test.label_copies ?? 1) > 1 && (
-                                  <span className="text-xs text-gray-500 ms-1">
-                                    ({t('tests.labelCopiesShort', { count: test.label_copies })})
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-primary-600 font-medium">{Number(test.price).toFixed(0)}</span>
-                            </label>
+                        <div className="space-y-2">
+                          {testsByCategory.map((group) => (
+                            <div key={group.key}>
+                              <p className="flex items-center gap-1.5 text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1 px-1">
+                                <span className="text-sm leading-none" aria-hidden="true">{getCategoryEmoji(group.category)}</span>
+                                {categoryGroupLabel(group)}
+                              </p>
+                              <div className="space-y-1">
+                                {group.tests.map((test) => (
+                                  <label key={test.id} className="flex items-center gap-3 text-sm p-1.5 rounded hover:bg-white cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={(animalTests[animalId] || []).includes(test.id)}
+                                      onChange={(e) => toggleAnimalTest(animalId, test.id, e.target.checked)}
+                                      className="w-4 h-4"
+                                    />
+                                    <span className="flex-1">
+                                      {testLabel(test)}
+                                      {(test.label_copies ?? 1) > 1 && (
+                                        <span className="text-xs text-gray-500 ms-1">
+                                          ({t('tests.labelCopiesShort', { count: test.label_copies })})
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="text-primary-600 font-medium">{Number(test.price).toFixed(0)}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
