@@ -1,33 +1,29 @@
 import toast from 'react-hot-toast';
 import i18n from '../i18n';
-import { openLabelPrintWindow } from './labelPrintHtml';
+import { printLabelViaIframe, printLabelFromPreview, openLabelPrintWindow } from './labelPrintHtml';
 import { printToZebra, isBrowserPrintMissing } from './zebraPrint';
 
-/** Browser print fallback — label only, never the modal/page. */
-export function printThermalLabel(sample, { isArabic = i18n.language === 'ar' } = {}) {
-  if (sample && openLabelPrintWindow(sample, { isArabic })) return true;
+/** Browser print fallback — iframe first (no popups), then optional new window. */
+export async function printThermalLabel(sample, { isArabic = i18n.language === 'ar' } = {}) {
+  if (document.querySelector('.label-preview')) {
+    try {
+      const ok = await printLabelFromPreview();
+      if (ok) return true;
+    } catch {
+      /* fall through */
+    }
+  }
 
-  const el = document.querySelector('.label-preview.label-50x25') || document.querySelector('.label-preview');
-  if (!el) return false;
+  if (sample) {
+    try {
+      const ok = await printLabelViaIframe(sample, { isArabic });
+      if (ok) return true;
+    } catch {
+      /* fall through */
+    }
+  }
 
-  const styles = `
-    @page { size: 50mm 25mm; margin: 0; }
-    html, body { margin: 0; padding: 0; width: 50mm; height: 25mm; overflow: hidden; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    svg { max-width: 100%; height: auto; }
-  `;
-
-  const win = window.open('', '_blank', 'noopener,noreferrer,width=320,height=200');
-  if (!win) return false;
-
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Label</title><style>${styles}</style></head><body>${el.outerHTML}</body></html>`);
-  win.document.close();
-  win.onload = () => {
-    win.focus();
-    win.print();
-    win.onafterprint = () => win.close();
-  };
-  return true;
+  return openLabelPrintWindow(sample, { isArabic });
 }
 
 /** Auto-print after registration (ZPL only). Returns count printed. */
@@ -38,14 +34,9 @@ export async function autoPrintSampleLabels(samples) {
   for (let i = 0; i < samples.length; i += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      await printToZebra(samples[i], { isArabic, labelElement: null });
+      await printToZebra(samples[i], { isArabic });
       printed += 1;
-    } catch (error) {
-      if (printed === 0 && isBrowserPrintMissing(error)) {
-        toast.error(i18n.t('samples.zebraPrintMissing'));
-      } else if (printed === 0) {
-        toast.error(i18n.t('samples.zebraPrintFailed'));
-      }
+    } catch {
       break;
     }
   }
@@ -53,29 +44,32 @@ export async function autoPrintSampleLabels(samples) {
   return printed;
 }
 
-/** Print sample label: Zebra ZPL (silent) → clean label window (not modal). */
+/** Print sample label: Zebra ZPL (silent) → iframe/browser print fallback. */
 export async function printSampleLabel(sample) {
   if (!sample) return 'browser';
 
   const isArabic = i18n.language === 'ar';
 
   try {
-    const result = await printToZebra(sample, { isArabic, labelElement: null });
+    const result = await printToZebra(sample, { isArabic });
     toast.success(
-      result.method === 'image'
-        ? i18n.t('samples.zebraPrintImageOk')
-        : i18n.t('samples.zebraPrintOk', { printer: result.device || 'Zebra' })
+      i18n.t('samples.zebraPrintOk', { printer: result.device || 'Zebra' })
     );
     return 'zebra';
   } catch (error) {
+    const fallbackOk = await printThermalLabel(sample, { isArabic });
+    if (fallbackOk) {
+      if (isBrowserPrintMissing(error)) {
+        toast(i18n.t('samples.zebraBrowserPrintHint'), { icon: 'ℹ️', duration: 6000 });
+      }
+      toast.success(i18n.t('samples.zebraBrowserFallbackOk'));
+      return 'browser';
+    }
+
     if (isBrowserPrintMissing(error)) {
       toast.error(i18n.t('samples.zebraPrintMissing'));
     } else {
       toast.error(i18n.t('samples.zebraPrintFailed'));
-    }
-    const opened = printThermalLabel(sample, { isArabic });
-    if (!opened) {
-      toast.error(i18n.t('samples.zebraPrintPopupBlocked'));
     }
     return 'browser';
   }

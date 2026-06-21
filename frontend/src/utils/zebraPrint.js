@@ -12,38 +12,51 @@ export const isBrowserPrintMissing = (error) => (
   error instanceof ZebraPrintError && error.code === SERVICE_UNAVAILABLE
 );
 
-const browserPrintBase = () => {
+const BROWSER_PRINT_BASES = () => {
   const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  return secure ? 'https://127.0.0.1:9101' : 'http://127.0.0.1:9100';
+  return secure
+    ? ['https://127.0.0.1:9101', 'https://localhost:9101', 'http://127.0.0.1:9100', 'http://localhost:9100']
+    : ['http://127.0.0.1:9100', 'http://localhost:9100', 'https://127.0.0.1:9101', 'https://localhost:9101'];
 };
 
 async function browserPrintFetch(path, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 3000);
-  try {
-    const res = await fetch(`${browserPrintBase()}${path}`, {
-      ...options,
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      throw new ZebraPrintError(`Browser Print HTTP ${res.status}`, SERVICE_UNAVAILABLE);
-    }
-    const text = await res.text();
-    if (!text) return null;
+  const bases = BROWSER_PRINT_BASES();
+  let lastError = null;
+
+  for (let i = 0; i < bases.length; i += 1) {
+    const base = bases[i];
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 3000);
     try {
-      return JSON.parse(text);
-    } catch {
-      return text;
+      // eslint-disable-next-line no-await-in-loop
+      const res = await fetch(`${base}${path}`, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        lastError = new ZebraPrintError(`Browser Print HTTP ${res.status}`, SERVICE_UNAVAILABLE);
+        continue;
+      }
+      const text = await res.text();
+      if (!text) return { data: null, base };
+      try {
+        return { data: JSON.parse(text), base };
+      } catch {
+        return { data: text, base };
+      }
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error instanceof ZebraPrintError
+        ? error
+        : new ZebraPrintError(
+          error?.name === 'AbortError' ? 'Browser Print timeout' : 'Browser Print not running',
+          SERVICE_UNAVAILABLE
+        );
     }
-  } catch (error) {
-    if (error instanceof ZebraPrintError) throw error;
-    throw new ZebraPrintError(
-      error?.name === 'AbortError' ? 'Browser Print timeout' : 'Browser Print not running',
-      SERVICE_UNAVAILABLE
-    );
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw lastError || new ZebraPrintError('Browser Print not running', SERVICE_UNAVAILABLE);
 }
 
 const normalizeDevice = (payload) => {
@@ -52,6 +65,8 @@ const normalizeDevice = (payload) => {
   if (payload.uid) return payload;
   if (Array.isArray(payload.deviceList) && payload.deviceList[0]) return payload.deviceList[0];
   if (Array.isArray(payload) && payload[0]) return payload[0];
+  if (payload.printer?.[0]) return payload.printer[0];
+  if (payload.printer) return payload.printer;
   return null;
 };
 
@@ -94,8 +109,17 @@ export async function getDefaultPrinter() {
   try {
     return await getDefaultDeviceSdk();
   } catch {
-    const data = await browserPrintFetch('/default?type=printer', { timeoutMs: 2500 });
-    return normalizeDevice(data);
+    const { data } = await browserPrintFetch('/default?type=printer', { timeoutMs: 2500 });
+    let device = normalizeDevice(data);
+    if (device) return device;
+
+    const available = await browserPrintFetch('/available', { timeoutMs: 2500 });
+    device = normalizeDevice(available.data);
+    if (device) return device;
+
+    const list = available.data?.printer || available.data?.deviceList || available.data;
+    if (Array.isArray(list) && list[0]) return list[0];
+    return null;
   }
 }
 
@@ -174,17 +198,16 @@ export async function printToZebra(sample, { isArabic = false } = {}) {
     await sendZplSdk(device, zpl);
     return { method: 'zpl', device: device.name || device.uid };
   } catch (sdkError) {
-    if (isBrowserPrintMissing(sdkError)) {
-      try {
-        const device = await getDefaultPrinter();
-        if (!device) throw sdkError;
-        await sendZplHttp(device, zpl);
-        return { method: 'zpl', device: device.name || device.uid };
-      } catch {
-        throw sdkError;
-      }
+    try {
+      const device = await getDefaultPrinter();
+      if (!device) throw sdkError;
+      await sendZplHttp(device, zpl);
+      return { method: 'zpl', device: device.name || device.uid };
+    } catch {
+      throw isBrowserPrintMissing(sdkError)
+        ? sdkError
+        : new ZebraPrintError(sdkError.message || 'Zebra print failed', SERVICE_UNAVAILABLE);
     }
-    throw sdkError;
   }
 }
 
