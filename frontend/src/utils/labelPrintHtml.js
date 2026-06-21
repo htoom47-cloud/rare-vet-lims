@@ -62,8 +62,8 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
         var code = ${barcodeJson};
         if (code && document.getElementById('sample-barcode')) {
           JsBarcode('#sample-barcode', code, {
-            format: 'CODE128', width: 1.1, height: 28, displayValue: true,
-            fontSize: 8, margin: 0, background: '#ffffff', lineColor: '#000000'
+            format: 'CODE128', width: 1.05, height: 24, displayValue: true,
+            fontSize: 7, margin: 0, background: '#ffffff', lineColor: '#000000'
           });
         }
       };
