@@ -39,8 +39,8 @@ const generateInterpretation = (results, language = 'ar', animalType = 'camel') 
     const unit = r.unit ? ` ${r.unit}` : '';
     const label = r.nameAr || r.name || r.nameEn;
     return isArabic
-      ? `- ${label}: القيمة ${r.value}${unit} (${status}) | المرجع: ${r.reference}`
-      : `- ${r.nameEn || label}: value ${r.value}${unit} (${status}) | reference: ${r.reference}`;
+      ? `• ${label}: ${r.value}${unit} (${status}) — المرجع: ${r.reference}`
+      : `- ${r.nameEn || label}: ${r.value}${unit} (${status}) | reference: ${r.reference}`;
   });
 
   const intro = isArabic

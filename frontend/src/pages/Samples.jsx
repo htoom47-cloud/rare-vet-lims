@@ -15,6 +15,7 @@ import Modal from '../components/ui/Modal';
 import BarcodeScanner from '../components/barcode/BarcodeScanner';
 
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
+import { printSampleLabel } from '../utils/printLabel';
 
 import WorkflowStepper from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
@@ -113,6 +114,21 @@ export default function Samples() {
 
     }
 
+  };
+
+
+
+  const openPrintLabel = async (row) => {
+    try {
+      if (row.tests?.length) {
+        setPrintSample(row);
+        return;
+      }
+      const { data } = await samplesAPI.get(row.id);
+      setPrintSample(data.data);
+    } catch {
+      setPrintSample(row);
+    }
   };
 
 
@@ -277,7 +293,7 @@ export default function Samples() {
 
         {r.status === 'received' && <button onClick={(e) => { e.stopPropagation(); updateStatus(r.id, 'running'); }} className="text-purple-600 text-xs">{t('samples.statuses.running')}</button>}
 
-        <button onClick={(e) => { e.stopPropagation(); setPrintSample(r); }} className="text-gray-600 text-xs flex items-center gap-1"><Printer size={12} /> {t('common.print')}</button>
+        <button onClick={(e) => { e.stopPropagation(); openPrintLabel(r); }} className="text-gray-600 text-xs flex items-center gap-1"><Printer size={12} /> {t('common.print')}</button>
 
       </div>
 
@@ -495,7 +511,7 @@ export default function Samples() {
 
               )}
 
-              <button onClick={() => setPrintSample(detailSample)} className="btn-secondary text-sm">{t('samples.printLabel')}</button>
+              <button onClick={() => openPrintLabel(detailSample)} className="btn-secondary text-sm">{t('samples.printLabel')}</button>
 
               {detailSample.status === 'pending' && (
 
@@ -543,7 +559,7 @@ export default function Samples() {
 
           <BarcodeLabel sample={printSample} />
 
-          <button onClick={() => window.print()} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+          <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
 
         </Modal>
 

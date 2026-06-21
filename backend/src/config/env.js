@@ -48,9 +48,17 @@ const env = {
     vatNumber: process.env.VAT_NUMBER || '300000000000003',
   },
   notifications: {
+    provider: process.env.NOTIFICATION_PROVIDER || 'twilio',
+    defaultChannel: process.env.NOTIFICATION_DEFAULT_CHANNEL || 'sms',
     whatsapp: process.env.WHATSAPP_ENABLED === 'true',
     sms: process.env.SMS_ENABLED === 'true',
     email: process.env.EMAIL_ENABLED === 'true',
+    twilio: {
+      accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+      authToken: process.env.TWILIO_AUTH_TOKEN || '',
+      smsFrom: process.env.TWILIO_SMS_FROM || '',
+      whatsappFrom: process.env.TWILIO_WHATSAPP_FROM || '',
+    },
   },
 };
 

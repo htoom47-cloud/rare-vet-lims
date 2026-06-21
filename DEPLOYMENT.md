@@ -264,8 +264,25 @@ Use a load balancer in front of multiple API instances. All instances share the 
 
 ## Future Integrations
 
-### WhatsApp Notifications
-Set `WHATSAPP_ENABLED=true` and configure provider API keys in settings.
+### SMS & WhatsApp Notifications (Twilio)
+
+1. Create a [Twilio](https://www.twilio.com) account and buy an SMS-capable number (Saudi +966 or international).
+2. In Render → **Environment**, add:
+
+| Variable | Example |
+|----------|---------|
+| `SMS_ENABLED` | `true` |
+| `WHATSAPP_ENABLED` | `false` (or `true` after WhatsApp Business setup) |
+| `NOTIFICATION_DEFAULT_CHANNEL` | `sms` |
+| `TWILIO_ACCOUNT_SID` | From Twilio console |
+| `TWILIO_AUTH_TOKEN` | From Twilio console |
+| `TWILIO_SMS_FROM` | `+9665XXXXXXXX` |
+| `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` (sandbox) or your approved sender |
+
+3. Redeploy. The **Send SMS** / **Send WhatsApp** buttons appear on Reports and Sample detail when the channel is enabled.
+4. Messages include sample code, report number, verification code, and lab phone.
+
+**WhatsApp:** Use Twilio WhatsApp Sandbox for testing, or complete Meta Business verification for production.
 
 ### Lab Device Integration
 Configure devices via `/api/devices` endpoint. Supported protocols:

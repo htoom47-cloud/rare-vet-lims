@@ -7,6 +7,7 @@ import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/Wo
 import CustomerSearch from '../components/customers/CustomerSearch';
 import Modal from '../components/ui/Modal';
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
+import { printSampleLabel, autoPrintSampleLabels } from '../utils/printLabel';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
 import {
@@ -205,9 +206,14 @@ export default function WorkflowCase() {
       }
       setSamples(created);
       setPrintSample(created[0]);
-      setPrintOpen(true);
       setStep(4);
       toast.success(t('workflow.samplesCreated', { count: created.length }));
+      const printed = await autoPrintSampleLabels(created);
+      if (printed > 0) {
+        toast.success(t('samples.autoPrintOk', { count: printed }));
+      } else if (created.length) {
+        setPrintOpen(true);
+      }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
     } finally {
@@ -231,6 +237,22 @@ export default function WorkflowCase() {
       toast.success(t('workflow.allSamplesReceived'));
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const openPrintLabel = async (row) => {
+    try {
+      if (row.tests?.length) {
+        setPrintSample(row);
+        setPrintOpen(true);
+        return;
+      }
+      const { data } = await samplesAPI.get(row.id);
+      setPrintSample(data.data);
+      setPrintOpen(true);
+    } catch {
+      setPrintSample(row);
+      setPrintOpen(true);
     }
   };
 
@@ -427,7 +449,7 @@ export default function WorkflowCase() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => { setPrintSample(s); setPrintOpen(true); }}
+                        onClick={() => openPrintLabel(s)}
                         className="btn-secondary text-xs py-1 px-2"
                       >
                         {t('samples.printLabel')}
@@ -546,7 +568,7 @@ export default function WorkflowCase() {
 
       <Modal isOpen={printOpen} onClose={() => setPrintOpen(false)} title={t('samples.printLabel')}>
         {printSample && <BarcodeLabel sample={printSample} />}
-        <button onClick={() => window.print()} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+        <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
       </Modal>
     </div>
   );

@@ -1,3 +1,5 @@
+const { parseReferenceRange } = require('./reference-range');
+
 function parseAstm(raw) {
   const lines = raw.replace(/\r\n/g, '\r').replace(/\n/g, '\r').split('\r').filter(Boolean);
   let sampleId = null;
@@ -15,8 +17,18 @@ function parseAstm(raw) {
       const code = (fields[2] || '').split('^')[0]?.trim();
       const value = (fields[3] ?? '').trim();
       const unit = (fields[4] || '').trim();
+      const refRaw = (fields[5] || '').trim();
+      const ref = parseReferenceRange(refRaw);
       if (code && value !== '') {
-        results.push({ code, value, unit });
+        results.push({
+          code,
+          value,
+          unit,
+          reference: refRaw || null,
+          referenceMin: ref?.min ?? null,
+          referenceMax: ref?.max ?? null,
+          flag: (fields[6] || '').trim() || null,
+        });
       }
     }
   }

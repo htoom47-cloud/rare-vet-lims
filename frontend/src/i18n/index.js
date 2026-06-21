@@ -190,6 +190,11 @@ const resources = {
       samples: {
         title: 'Sample Management', register: 'Register Sample', barcode: 'Barcode',
         scan: 'Scan Barcode', printLabel: 'Print Label', selectTests: 'Select Tests',
+        zebraPrintOk: 'Label sent to {{printer}}',
+        zebraPrintImageOk: 'Label sent to Zebra (image mode)',
+        zebraPrintMissing: 'Install Zebra Browser Print on this PC — using print dialog instead',
+        zebraPrintFailed: 'Zebra print failed — using print dialog',
+        autoPrintOk: '{{count}} label(s) printed on Zebra',
         statuses: { pending: 'Pending', received: 'Received', running: 'Running', completed: 'Completed', rejected: 'Rejected', archived: 'Archived' },
       },
       tests: {
@@ -491,6 +496,11 @@ const resources = {
       samples: {
         title: 'إدارة العينات', register: 'تسجيل عينة', barcode: 'الباركود',
         scan: 'مسح الباركود', printLabel: 'طباعة الملصق', selectTests: 'اختر الفحوصات',
+        zebraPrintOk: 'تم إرسال الملصق إلى {{printer}}',
+        zebraPrintImageOk: 'تم إرسال الملصق إلى Zebra',
+        zebraPrintMissing: 'ثبّت Zebra Browser Print على هذا الجهاز — سيتم فتح نافذة الطباعة',
+        zebraPrintFailed: 'فشلت الطباعة على Zebra — سيتم فتح نافذة الطباعة',
+        autoPrintOk: 'تمت طباعة {{count}} ملصق على Zebra',
         statuses: { pending: 'معلق', received: 'مستلم', running: 'قيد التشغيل', completed: 'مكتمل', rejected: 'مرفوض', archived: 'مؤرشف' },
       },
       tests: {

@@ -2,6 +2,7 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const env = require('../config/env');
+const { uuidv4 } = require('../utils/uuid');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -81,19 +82,20 @@ const createInvoice = async (data, userId) => {
     const taxAmount = taxable * (taxRate / 100);
     const total = taxable + taxAmount;
 
+    const invoiceId = uuidv4();
     const invoiceResult = await client.query(
-      `INSERT INTO invoices (invoice_number, customer_id, sample_id, subtotal, discount_amount, tax_rate, tax_amount, total, status, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'issued',$9,$10) RETURNING *`,
-      [invoiceNumber, data.customer_id, data.sample_id, subtotal, discount, taxRate, taxAmount, total, data.notes, userId]
+      `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, tax_rate, tax_amount, total, status, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'issued',$10,$11) RETURNING *`,
+      [invoiceId, invoiceNumber, data.customer_id, data.sample_id, subtotal, discount, taxRate, taxAmount, total, data.notes, userId]
     );
 
     const invoice = invoiceResult.rows[0];
 
     for (const item of data.items) {
       await client.query(
-        `INSERT INTO invoice_items (invoice_id, test_id, package_id, animal_id, description, quantity, unit_price, total_price)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [invoice.id, item.test_id, item.package_id, item.animal_id || null, item.description, item.quantity, item.unit_price, item.unit_price * item.quantity]
+        `INSERT INTO invoice_items (id, invoice_id, test_id, package_id, animal_id, description, quantity, unit_price, total_price)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [uuidv4(), invoice.id, item.test_id, item.package_id, item.animal_id || null, item.description, item.quantity, item.unit_price, item.unit_price * item.quantity]
       );
     }
 
@@ -120,9 +122,9 @@ const recordPayment = async (data, userId) => {
     if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
 
     const paymentResult = await client.query(
-      `INSERT INTO payments (invoice_id, customer_id, amount, method, reference_number, notes, received_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [data.invoice_id, invoice.customer_id, data.amount, data.method, data.reference_number, data.notes, userId]
+      `INSERT INTO payments (id, invoice_id, customer_id, amount, method, reference_number, notes, received_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [uuidv4(), data.invoice_id, invoice.customer_id, data.amount, data.method, data.reference_number, data.notes, userId]
     );
 
     const paidResult = await client.query(
@@ -164,8 +166,8 @@ const listPackages = async () => {
 
 const processRefund = async (data, userId) => {
   const result = await query(
-    `INSERT INTO refunds (payment_id, invoice_id, amount, reason, processed_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [data.payment_id, data.invoice_id, data.amount, data.reason, userId]
+    `INSERT INTO refunds (id, payment_id, invoice_id, amount, reason, processed_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [uuidv4(), data.payment_id, data.invoice_id, data.amount, data.reason, userId]
   );
   await query('UPDATE invoices SET status = $1 WHERE id = $2', ['refunded', data.invoice_id]);
   return result.rows[0];

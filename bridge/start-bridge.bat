@@ -1,11 +1,12 @@
 @echo off
+chcp 65001 >nul
 title Rare Vet - Norma Bridge
 cd /d "%~dp0"
 
 if not exist bridge.env (
   echo.
-  echo [خطأ] ملف bridge.env غير موجود
-  echo انسخ bridge.env.example الى bridge.env وعدّل القيم
+  echo [ERROR] bridge.env not found
+  echo Copy bridge.env.example to bridge.env and set DEVICE_ID / DEVICE_API_KEY
   echo.
   pause
   exit /b 1

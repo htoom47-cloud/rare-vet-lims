@@ -1,15 +1,18 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const resultsService = require('./results.service');
+const referenceRangesService = require('./reference-ranges.service');
 const { mapNormaCode, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
 
 const findSampleByBarcode = async (barcode) => {
   const id = String(barcode || '').trim();
   if (!id) return null;
   const result = await query(
-    `SELECT id, sample_code, barcode, status FROM samples
-     WHERE barcode = $1 OR sample_code = $1 OR barcode ILIKE $2 OR sample_code ILIKE $2
-     ORDER BY created_at DESC LIMIT 1`,
+    `SELECT s.id, s.sample_code, s.barcode, s.status, a.animal_type
+     FROM samples s
+     LEFT JOIN animals a ON s.animal_id = a.id
+     WHERE s.barcode = $1 OR s.sample_code = $1 OR s.barcode ILIKE $2 OR s.sample_code ILIKE $2
+     ORDER BY s.created_at DESC LIMIT 1`,
     [id, id]
   );
   return result.rows[0] || null;
@@ -40,11 +43,17 @@ const resolveParameter = async (testCode, deviceCode) => {
   return result.rows[0] || null;
 };
 
-const importCbcResults = async ({ sampleId, results, testCode = DEFAULT_CBC_TEST_CODE, deviceName }) => {
+const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFAULT_CBC_TEST_CODE, deviceName }) => {
   const sampleTest = await findSampleTest(sampleId, testCode);
   if (!sampleTest) {
     throw new AppError(`No ${testCode} test on this sample — add CBC to the invoice first`, 404, 'NO_CBC_TEST');
   }
+
+  const refSync = await referenceRangesService.syncFromParsedResults({
+    results,
+    testCode,
+    animalType: animalType || 'camel',
+  });
 
   const values = [];
   const skipped = [];
@@ -79,6 +88,7 @@ const importCbcResults = async ({ sampleId, results, testCode = DEFAULT_CBC_TEST
     test_code: testCode,
     imported: values.length,
     skipped,
+    reference_ranges_synced: refSync.updated,
     result: saved,
   };
 };
@@ -93,6 +103,7 @@ const importFromParsed = async (parsed, device) => {
 
   const importResult = await importCbcResults({
     sampleId: sample.id,
+    animalType: sample.animal_type,
     results: parsed.results,
     testCode,
     deviceName: device?.name,

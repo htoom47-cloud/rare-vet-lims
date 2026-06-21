@@ -1,6 +1,7 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
+const { uuidv4 } = require('../utils/uuid');
 
 const list = async ({ search, mobile, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -70,9 +71,9 @@ const getProfile = async (id) => {
 
 const create = async (data, userId) => {
   const result = await query(
-    `INSERT INTO customers (full_name, full_name_ar, mobile, city, farm_company, notes, credit_limit, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit || 0, userId]
+    `INSERT INTO customers (id, full_name, full_name_ar, mobile, city, farm_company, notes, credit_limit, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [uuidv4(), data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit || 0, userId]
   );
   return result.rows[0];
 };

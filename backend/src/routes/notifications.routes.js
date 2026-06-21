@@ -6,6 +6,13 @@ const { PERMISSIONS } = require('../utils/permissions');
 const router = express.Router();
 router.use(authenticate);
 
+router.get('/channels', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
+  try {
+    const data = service.getEnabledChannels();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(PERMISSIONS.SETTINGS_VIEW), async (req, res, next) => {
   try {
     const data = await service.list(req.query);

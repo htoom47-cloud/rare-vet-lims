@@ -1,3 +1,5 @@
+const { parseReferenceRange } = require('./reference-range');
+
 function splitSegments(raw) {
   return raw
     .replace(/\x0b/g, '')
@@ -104,10 +106,20 @@ function parseHl7(raw) {
 
       const rawValue = (fields[5] ?? fields[4] ?? '').trim().replace(',', '.');
       const numeric = parseFloat(rawValue);
-      const unit = (fields[6] || fields[7] || '').trim();
+      const unit = (fields[6] || '').trim();
+      const refRaw = (fields[7] || '').trim();
+      const ref = parseReferenceRange(refRaw);
 
       if (code && rawValue !== '' && !Number.isNaN(numeric)) {
-        results.push({ code, value: String(numeric), unit });
+        results.push({
+          code,
+          value: String(numeric),
+          unit,
+          reference: refRaw || null,
+          referenceMin: ref?.min ?? null,
+          referenceMax: ref?.max ?? null,
+          flag: (fields[8] || '').trim() || null,
+        });
       }
     }
   }
