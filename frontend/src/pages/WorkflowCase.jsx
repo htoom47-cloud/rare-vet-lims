@@ -7,7 +7,7 @@ import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/Wo
 import CustomerSearch from '../components/customers/CustomerSearch';
 import Modal from '../components/ui/Modal';
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
-import { printSampleLabel, autoPrintSampleLabels } from '../utils/printLabel';
+import { printSampleLabel, autoPrintSampleLabels, printThermalLabel } from '../utils/printLabel';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
 import {
@@ -212,7 +212,9 @@ export default function WorkflowCase() {
       if (printed > 0) {
         toast.success(t('samples.autoPrintOk', { count: printed }));
       } else if (created.length) {
+        setPrintSample(created[0]);
         setPrintOpen(true);
+        printThermalLabel(created[0]);
       }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');

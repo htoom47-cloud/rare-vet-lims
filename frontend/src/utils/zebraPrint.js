@@ -51,12 +51,52 @@ const normalizeDevice = (payload) => {
   if (payload.device) return payload.device;
   if (payload.uid) return payload;
   if (Array.isArray(payload.deviceList) && payload.deviceList[0]) return payload.deviceList[0];
+  if (Array.isArray(payload) && payload[0]) return payload[0];
   return null;
 };
 
+let browserPrintLoader;
+
+export const loadBrowserPrintSdk = () => {
+  if (typeof window !== 'undefined' && window.BrowserPrint) {
+    return Promise.resolve(window.BrowserPrint);
+  }
+  if (!browserPrintLoader) {
+    browserPrintLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js';
+      script.async = true;
+      script.onload = () => {
+        if (window.BrowserPrint) resolve(window.BrowserPrint);
+        else reject(new ZebraPrintError('BrowserPrint SDK missing', SERVICE_UNAVAILABLE));
+      };
+      script.onerror = () => reject(new ZebraPrintError('BrowserPrint SDK failed to load', SERVICE_UNAVAILABLE));
+      document.head.appendChild(script);
+    });
+  }
+  return browserPrintLoader;
+};
+
+const getDefaultDeviceSdk = () => new Promise((resolve, reject) => {
+  loadBrowserPrintSdk()
+    .then((BrowserPrint) => {
+      BrowserPrint.getDefaultDevice('printer', (device) => {
+        if (device) resolve(device);
+        else reject(new ZebraPrintError('No default Zebra printer', SERVICE_UNAVAILABLE));
+      }, (err) => {
+        reject(new ZebraPrintError(typeof err === 'string' ? err : 'BrowserPrint device lookup failed', SERVICE_UNAVAILABLE));
+      });
+    })
+    .catch(reject);
+});
+
 export async function getDefaultPrinter() {
-  const data = await browserPrintFetch('/default?type=printer', { timeoutMs: 2500 });
-  return normalizeDevice(data);
+  try {
+    return await getDefaultDeviceSdk();
+  } catch {
+    const data = await browserPrintFetch('/default?type=printer', { timeoutMs: 2500 });
+    return normalizeDevice(data);
+  }
 }
 
 const LABEL_WIDTH = 400;
@@ -95,62 +135,29 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   ];
 
   if (barcode) {
-    lines.push(`^FO20,6^BY1,2,22^BCN,22,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(`^FO30,4^BY2,2,32^BCN,32,Y,N,N^FD${zplEscape(barcode)}^FS`);
   }
 
-  let y = 72;
+  let y = 78;
   if (animalLine) {
-    lines.push(`^FO12,${y}^A0N,13,11^FD${zplEscape(animalLine)}^FS`);
-    y += 16;
+    lines.push(`^FO10,${y}^A0N,14,12^FD${zplEscape(animalLine)}^FS`);
+    y += 18;
   }
   if (testLine) {
-    lines.push(`^FO12,${y}^A0N,13,11^FD${zplEscape(testLine)}^FS`);
+    lines.push(`^FO10,${y}^A0N,14,12^FD${zplEscape(testLine)}^FS`);
   }
 
   lines.push('^XZ');
   return lines.join('\n');
 };
 
-let browserPrintLoader;
-
-export const loadBrowserPrintSdk = () => {
-  if (typeof window !== 'undefined' && window.BrowserPrint) {
-    return Promise.resolve(window.BrowserPrint);
-  }
-  if (!browserPrintLoader) {
-    browserPrintLoader = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js';
-      script.async = true;
-      script.onload = () => resolve(window.BrowserPrint);
-      script.onerror = () => reject(new ZebraPrintError('BrowserPrint SDK failed to load', SERVICE_UNAVAILABLE));
-      document.head.appendChild(script);
-    });
-  }
-  return browserPrintLoader;
-};
-
-const printLabelImage = (labelElement) => new Promise((resolve, reject) => {
-  loadBrowserPrintSdk()
-    .then((BrowserPrint) => {
-      BrowserPrint.getDefaultDevice('printer', (device) => {
-        if (!device) {
-          reject(new ZebraPrintError('No default Zebra printer', SERVICE_UNAVAILABLE));
-          return;
-        }
-        if (typeof device.convertAndSendFile !== 'function') {
-          reject(new Error('convertAndSendFile not supported'));
-          return;
-        }
-        device.convertAndSendFile(labelElement, () => resolve({ method: 'image' }), (err) => {
-          reject(new Error(typeof err === 'string' ? err : 'Image print failed'));
-        });
-      }, (err) => reject(new Error(typeof err === 'string' ? err : 'BrowserPrint device lookup failed')));
-    })
-    .catch(reject);
+const sendZplSdk = (device, zpl) => new Promise((resolve, reject) => {
+  device.send(zpl, () => resolve(), (err) => {
+    reject(new Error(typeof err === 'string' ? err : 'ZPL send failed'));
+  });
 });
 
-async function sendZpl(device, zpl) {
+async function sendZplHttp(device, zpl) {
   await browserPrintFetch('/write', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -159,23 +166,25 @@ async function sendZpl(device, zpl) {
   });
 }
 
-export async function printToZebra(sample, { isArabic = false, labelElement = null } = {}) {
+export async function printToZebra(sample, { isArabic = false } = {}) {
   const zpl = buildCbcLabelZpl(sample, { isArabic });
 
   try {
-    const device = await getDefaultPrinter();
-    if (!device) throw new ZebraPrintError('No default printer', SERVICE_UNAVAILABLE);
-    await sendZpl(device, zpl);
+    const device = await getDefaultDeviceSdk();
+    await sendZplSdk(device, zpl);
     return { method: 'zpl', device: device.name || device.uid };
-  } catch (error) {
-    if (isBrowserPrintMissing(error)) throw error;
-    const hasArabic = /[\u0600-\u06FF]/.test(
-      `${sample.animal_name || ''}${testLabelFor(sample, true)}`
-    );
-    if (labelElement && hasArabic) {
-      return printLabelImage(labelElement);
+  } catch (sdkError) {
+    if (isBrowserPrintMissing(sdkError)) {
+      try {
+        const device = await getDefaultPrinter();
+        if (!device) throw sdkError;
+        await sendZplHttp(device, zpl);
+        return { method: 'zpl', device: device.name || device.uid };
+      } catch {
+        throw sdkError;
+      }
     }
-    throw error;
+    throw sdkError;
   }
 }
 

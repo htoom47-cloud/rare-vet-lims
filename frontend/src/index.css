@@ -162,6 +162,28 @@
     margin: 0;
   }
 
+  body * {
+    visibility: hidden !important;
+  }
+
+  .label-preview,
+  .label-preview * {
+    visibility: visible !important;
+  }
+
+  .label-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+
+  .no-print,
+  .no-print-root,
+  .no-print-root *:not(.label-preview):not(.label-preview *) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   html, body {
     margin: 0 !important;
     padding: 0 !important;
@@ -169,7 +191,6 @@
     height: 25mm;
   }
 
-  .no-print { display: none !important; }
   .print-only,
   .label-preview { display: block !important; }
 
