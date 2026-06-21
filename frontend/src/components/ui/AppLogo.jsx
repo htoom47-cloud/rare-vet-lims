@@ -1,15 +1,30 @@
+import { useState } from 'react';
+
 export default function AppLogo({ size = 'md', className = '' }) {
   const sizes = {
     sm: 'w-10 h-10',
     md: 'w-16 h-16',
     lg: 'w-24 h-24',
   };
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div
+        className={`${sizes[size] || sizes.md} rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-lg shadow-sm ${className}`}
+        aria-hidden
+      >
+        RV
+      </div>
+    );
+  }
 
   return (
     <img
       src="/logo.png"
-      alt="مركز رعاية النوادر البيطري"
+      alt="Rare Vet LIMS"
       className={`${sizes[size] || sizes.md} object-contain ${className}`}
+      onError={() => setFailed(true)}
     />
   );
 }

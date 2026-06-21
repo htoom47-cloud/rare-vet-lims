@@ -36,7 +36,7 @@ export default function ReceptionHome() {
 
       <button
         onClick={() => navigate('/workflow')}
-        className="w-full card p-6 mb-6 flex items-center gap-4 hover:border-primary-400 border-2 border-primary-300 transition-colors text-start"
+        className="w-full card-interactive p-6 mb-6 flex items-center gap-4 text-start border-2 border-primary-200 dark:border-primary-600"
       >
         <div className="w-14 h-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shrink-0">
           <Plus size={28} />

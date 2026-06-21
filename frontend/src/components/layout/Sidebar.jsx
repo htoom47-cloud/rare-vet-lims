@@ -57,27 +57,30 @@ const navSections = [
 export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobile }) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
+  const roleKey = user?.role ? `permissions.roles.${user.role}` : '';
+  const roleLabel = roleKey ? t(roleKey, { defaultValue: user?.role }) : '';
 
   return (
     <aside
-      className={`fixed top-0 start-0 z-40 h-screen bg-white dark:bg-primary-900 border-e border-primary-200 dark:border-primary-700 transition-transform duration-300
+      className={`fixed top-0 start-0 z-40 h-screen bg-white dark:bg-primary-900 border-e border-primary-200/80 dark:border-primary-700 transition-transform duration-300 shadow-lg lg:shadow-none
         ${collapsed ? 'w-[4.5rem]' : 'w-72'}
         ${mobileOpen ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full'}
         lg:translate-x-0`}
     >
-      <div className={`flex items-center border-b border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-900 ${collapsed ? 'justify-center p-3' : 'gap-3 p-4'}`}>
+      <div className={`flex items-center border-b border-primary-200/80 dark:border-primary-700 bg-gradient-to-b from-primary-50 to-white dark:from-primary-900 dark:to-primary-900 ${collapsed ? 'justify-center p-3' : 'gap-3 p-4'}`}>
         <AppLogo size="sm" className="shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden flex-1 min-w-0">
             <h1 className="font-bold text-sm truncate text-primary-800 dark:text-primary-100">{t('app.name')}</h1>
-            <p className="text-xs text-primary-400 truncate">{t('app.subtitle')}</p>
+            <p className="text-[11px] text-primary-400 truncate leading-tight mt-0.5">{t('app.subtitle')}</p>
           </div>
         )}
         {!collapsed && (
           <button
+            type="button"
             onClick={onCollapse}
-            className="hidden lg:flex p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-800 text-primary-500"
-            title="طي القائمة"
+            className="hidden lg:flex icon-btn text-primary-400"
+            title={t('nav.collapseSidebar')}
           >
             <PanelLeftClose size={18} />
           </button>
@@ -86,15 +89,16 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
 
       {collapsed && (
         <button
+          type="button"
           onClick={onCollapse}
-          className="hidden lg:flex w-full justify-center py-2 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800"
-          title="توسيع القائمة"
+          className="hidden lg:flex w-full justify-center py-2.5 text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+          title={t('nav.expandSidebar')}
         >
           <PanelLeft size={18} />
         </button>
       )}
 
-      <nav className="p-2 space-y-4 overflow-y-auto" style={{ height: 'calc(100vh - 80px)' }}>
+      <nav className="p-2 space-y-4 overflow-y-auto" style={{ height: collapsed ? 'calc(100vh - 120px)' : 'calc(100vh - 140px)' }}>
         {(isReception(user) ? receptionNavSections : navSections).map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (item.adminOnly && userRole(user) !== 'admin') return false;
@@ -105,7 +109,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
           return (
             <div key={group.section}>
               {!collapsed && (
-                <p className="px-3 mb-1.5 text-[11px] font-semibold text-primary-400 dark:text-primary-500">
+                <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-primary-400/90">
                   {t(group.section)}
                 </p>
               )}
@@ -118,12 +122,12 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
                     title={collapsed ? t(item.label) : undefined}
                     onClick={onCloseMobile}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
+                      `flex items-center gap-3 rounded-xl text-sm font-medium transition-all ${
                         collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
                       } ${
                         isActive
-                          ? 'bg-primary-100 dark:bg-primary-800 text-primary-800 dark:text-primary-300 border-s-2 border-primary-400'
-                          : 'text-primary-700 dark:text-primary-300 hover:bg-primary-100/60 dark:hover:bg-primary-800/60'
+                          ? 'bg-primary-600 text-white shadow-sm'
+                          : 'text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70'
                       }`
                     }
                   >
@@ -138,6 +142,20 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
           );
         })}
       </nav>
+
+      {!collapsed && user && (
+        <div className="absolute bottom-0 start-0 end-0 p-3 border-t border-primary-200/80 dark:border-primary-700 bg-primary-50/80 dark:bg-primary-900/80 backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 px-2">
+            <div className="w-8 h-8 rounded-full bg-primary-200 dark:bg-primary-700 flex items-center justify-center text-xs font-bold text-primary-700 dark:text-primary-200">
+              {user.full_name?.charAt(0)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold truncate text-primary-800 dark:text-primary-100">{user.full_name}</p>
+              <p className="text-[10px] text-primary-400 truncate">{roleLabel}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

@@ -29,6 +29,14 @@ export default {
         sans: ['Tajawal', 'Inter', 'Segoe UI', 'Tahoma', 'sans-serif'],
         arabic: ['Tajawal', 'Segoe UI', 'Tahoma', 'Arial', 'sans-serif'],
       },
+      boxShadow: {
+        card: '0 1px 3px rgba(74, 55, 40, 0.06), 0 4px 16px rgba(74, 55, 40, 0.04)',
+        'card-hover': '0 4px 12px rgba(74, 55, 40, 0.1), 0 8px 24px rgba(74, 55, 40, 0.06)',
+        header: '0 1px 0 rgba(74, 55, 40, 0.06)',
+      },
+      backgroundImage: {
+        'app-mesh': 'radial-gradient(ellipse 80% 60% at 100% 0%, rgba(197, 160, 89, 0.12), transparent), radial-gradient(ellipse 60% 50% at 0% 100%, rgba(74, 55, 40, 0.06), transparent)',
+      },
     },
   },
   plugins: [],

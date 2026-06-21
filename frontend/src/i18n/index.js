@@ -4,9 +4,11 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   en: {
     translation: {
-      app: { name: 'Al-Nawadir Veterinary Care Center', subtitle: 'Veterinary Medical & Research Laboratory' },
+      app: { name: 'Al-Nawadir Veterinary Care Center', subtitle: 'Veterinary Medical & Research Laboratory', tagline: 'Secure laboratory information management' },
       nav: {
         sections: { main: 'Main', lab: 'Laboratory', admin: 'Administration', reception: 'Reception' },
+        collapseSidebar: 'Collapse sidebar',
+        expandSidebar: 'Expand sidebar',
         dashboard: 'Dashboard',
         customers: 'Customer Management',
         animals: 'Animal Management',
@@ -155,7 +157,7 @@ const resources = {
       auth: {
         login: 'Sign In', username: 'Username', email: 'Email', password: 'Password', forgotPassword: 'Forgot Password?',
         usernamePlaceholder: 'e.g. DM or admin',
-        welcome: 'Welcome back', signIn: 'Sign in to your account',
+        welcome: 'Welcome back', signIn: 'Sign in to your account', loginSuccess: 'Welcome back!',
         showPassword: 'Show password',
         hidePassword: 'Hide password',
         loginFailed: 'Login failed — check username and password',
@@ -172,6 +174,10 @@ const resources = {
       dashboard: {
         dailySamples: 'Daily Samples', revenue: 'Revenue', topTests: 'Top Tests',
         rejected: 'Rejected Samples', queue: 'Queue', running: 'Running', critical: 'Critical Alerts',
+        activeTests: 'Active Tests', sampleStatus: 'Sample Status', techPerformance: 'Technician Performance (7 days)',
+        adminOverview: 'Overview of laboratory operations and performance',
+        labOverview: 'Your lab queue and alerts at a glance',
+        today: 'Today',
       },
       customers: {
         title: 'Customer Management', fullName: 'Full Name', mobile: 'Mobile', city: 'City',
@@ -314,9 +320,11 @@ const resources = {
   },
   ar: {
     translation: {
-      app: { name: 'مركز رعاية النوادر البيطري', subtitle: 'للتحاليل الطبية والبحثية البيطرية' },
+      app: { name: 'مركز رعاية النوادر البيطري', subtitle: 'للتحاليل الطبية والبحثية البيطرية', tagline: 'نظام إدارة معلومات المختبر الآمن' },
       nav: {
         sections: { main: 'القائمة الرئيسية', lab: 'قسم المختبر', admin: 'الإدارة والنظام', reception: 'الاستقبال' },
+        collapseSidebar: 'طي القائمة',
+        expandSidebar: 'توسيع القائمة',
         dashboard: 'لوحة التحكم',
         customers: 'إدارة العملاء',
         animals: 'إدارة الحيوانات',
@@ -465,7 +473,7 @@ const resources = {
       auth: {
         login: 'تسجيل الدخول', username: 'اسم المستخدم', email: 'البريد الإلكتروني', password: 'كلمة المرور', forgotPassword: 'نسيت كلمة المرور؟',
         usernamePlaceholder: 'مثال: DM أو admin',
-        welcome: 'مرحباً بعودتك', signIn: 'سجل الدخول إلى حسابك',
+        welcome: 'مرحباً بعودتك', signIn: 'سجل الدخول إلى حسابك', loginSuccess: 'مرحباً بعودتك!',
         showPassword: 'إظهار كلمة المرور',
         hidePassword: 'إخفاء كلمة المرور',
         loginFailed: 'فشل تسجيل الدخول — تحقق من اسم المستخدم وكلمة المرور',
@@ -482,6 +490,10 @@ const resources = {
       dashboard: {
         dailySamples: 'عينات اليوم', revenue: 'الإيرادات', topTests: 'أكثر الفحوصات',
         rejected: 'العينات المرفوضة', queue: 'قائمة الانتظار', running: 'قيد التشغيل', critical: 'تنبيهات حرجة',
+        activeTests: 'الفحوصات النشطة', sampleStatus: 'حالة العينات', techPerformance: 'أداء الفنيين (7 أيام)',
+        adminOverview: 'نظرة عامة على عمليات المختبر والأداء',
+        labOverview: 'قائمة الانتظار والتنبيهات',
+        today: 'اليوم',
       },
       customers: {
         title: 'إدارة العملاء', fullName: 'الاسم الكامل', mobile: 'الجوال', city: 'المدينة',

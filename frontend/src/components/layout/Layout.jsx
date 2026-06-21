@@ -8,7 +8,7 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-primary-50 dark:bg-primary-900">
+    <div className="min-h-screen bg-primary-50 dark:bg-primary-900 bg-app-mesh">
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-30 lg:hidden"

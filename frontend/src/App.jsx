@@ -27,7 +27,22 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Toaster position="top-center" />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#302419',
+                color: '#FDFAF3',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                boxShadow: '0 4px 16px rgba(74, 55, 40, 0.2)',
+              },
+              success: { iconTheme: { primary: '#C5A059', secondary: '#302419' } },
+              error: { iconTheme: { primary: '#ef4444', secondary: '#FDFAF3' } },
+            }}
+          />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
