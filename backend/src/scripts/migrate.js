@@ -61,7 +61,11 @@ async function backfillUsernames(client) {
 async function disableUpdatedAtTriggers(client) {
   const tables = ['users', 'customers', 'animals', 'samples', 'tests', 'invoices', 'inventory_items'];
   for (const table of tables) {
-    await client.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+    try {
+      await client.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+    } catch (err) {
+      logger.warn(`Could not disable triggers on ${table}`, { error: err.message });
+    }
   }
 }
 
@@ -92,10 +96,10 @@ async function applyPatches() {
     await client.query(
       'ALTER TABLE tests ADD COLUMN IF NOT EXISTS label_copies INTEGER NOT NULL DEFAULT 1'
     );
-    await ensureAdmin();
   } finally {
     client.release();
   }
+  await ensureAdmin();
 }
 
 async function migrate() {

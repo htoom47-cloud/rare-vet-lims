@@ -12,9 +12,8 @@ const getS3Client = () => {
   if (s3Client) return s3Client;
   const { S3Client } = require('@aws-sdk/client-s3');
   const { s3 } = env.storage;
-  const config = {
-    region: s3.region || 'us-east-1',
-  };
+  const region = !s3.region || s3.region === 'auto' ? 'auto' : s3.region;
+  const config = { region };
   if (s3.accessKey && s3.secretKey) {
     config.credentials = {
       accessKeyId: s3.accessKey,

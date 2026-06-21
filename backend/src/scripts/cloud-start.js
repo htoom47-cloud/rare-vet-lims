@@ -7,6 +7,7 @@ const logger = require('../config/logger');
 const backendRoot = path.join(__dirname, '../..');
 
 function run(script) {
+  logger.info(`Running ${script}`);
   execSync(`node ${script}`, { cwd: backendRoot, stdio: 'inherit' });
 }
 
@@ -23,9 +24,13 @@ try {
     run('src/scripts/seed.js');
   }
 
-  // Run last so admin username/password always win over seed defaults.
   run('src/scripts/ensure-admin.js');
-  run('src/scripts/purge-demo-users.js');
+
+  try {
+    run('src/scripts/purge-demo-users.js');
+  } catch (purgeErr) {
+    logger.warn('purge-demo-users skipped', { error: purgeErr.message });
+  }
 
   const distPath = path.join(backendRoot, '../frontend/dist');
   if (!fs.existsSync(distPath)) {
