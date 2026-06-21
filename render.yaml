@@ -36,6 +36,17 @@ services:
         value: local
       - key: STORAGE_PATH
         value: ./uploads
+      # Uncomment after creating S3/R2 bucket (production PDF storage):
+      # - key: STORAGE_TYPE
+      #   value: s3
+      # - key: S3_BUCKET
+      #   sync: false
+      # - key: S3_REGION
+      #   value: me-south-1
+      # - key: S3_ACCESS_KEY
+      #   sync: false
+      # - key: S3_SECRET_KEY
+      #   sync: false
       - key: LAB_NAME
         value: Rare Animals Veterinary Care Center
       - key: LAB_NAME_AR

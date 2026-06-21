@@ -8,6 +8,7 @@ bridge/bridge.env
 .DS_Store
 uploads/*
 !uploads/.gitkeep
+backups/
 coverage/
 .vscode/
 *.swp

@@ -1,11 +1,10 @@
-const fs = require('fs');
 const path = require('path');
 const { uuidv4 } = require('../utils/uuid');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
-const { ensureUploadDir } = require('../config/storage');
+const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, serveUploads } = require('../config/storage');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
 const LAB_APPROVER_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
@@ -207,18 +206,15 @@ const regeneratePdf = async (reportRow) => {
   const filename = extractFilename(reportRow.pdf_url);
   if (!filename) throw new AppError('Report file not found', 404, 'NOT_FOUND');
 
-  const filePath = path.join(ensureUploadDir(), 'reports', filename);
-  if (fs.existsSync(filePath)) {
-    await fs.promises.unlink(filePath);
+  if (reportRow.pdf_url) {
+    await deleteFile(reportRow.pdf_url);
   }
 
   const reportData = await buildPdfPayload(reportRow);
-  await generateReportPDF(
-    reportData,
-    path.join(ensureUploadDir(), 'reports'),
-    { filename }
-  );
-  return filePath;
+  const localDir = path.join(ensureUploadDir(), 'reports');
+  const pdf = await generateReportPDF(reportData, localDir, { filename });
+  await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
+  return reportRow.pdf_url;
 };
 
 const ensurePdfFile = async (reportRow) => regeneratePdf(reportRow);
@@ -266,6 +262,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
 
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);
+  await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
 
   const result = await query(
     `INSERT INTO reports (
@@ -328,12 +325,13 @@ const servePdf = async (filename, res) => {
   const report = await query(`${REPORT_SELECT} WHERE r.pdf_url LIKE $1`, [`%${filename}`]);
   if (!report.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
 
-  const filePath = await ensurePdfFile(report.rows[0]);
+  await ensurePdfFile(report.rows[0]);
+  const pdfUrl = report.rows[0].pdf_url;
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
 
+  const stream = await createReadStream(pdfUrl);
   await new Promise((resolve, reject) => {
-    const stream = fs.createReadStream(filePath);
     stream.on('error', reject);
     stream.on('end', resolve);
     stream.pipe(res);

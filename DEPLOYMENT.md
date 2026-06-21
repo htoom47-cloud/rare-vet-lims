@@ -201,7 +201,35 @@ S3_SECRET_KEY=<secret>
 
 ## Database Backups
 
-### Automated backup script
+### Render (recommended)
+
+1. [Render Dashboard](https://dashboard.render.com) → **rare-vet-db** → **Backups**
+2. Enable automatic daily backups on paid database plans
+
+### Manual backup from your PC
+
+Use the Render **External Database URL** (not the internal one):
+
+```powershell
+cd backend
+$env:DATABASE_URL="postgresql://..."
+npm run backup
+```
+
+Saves to `backend/backups/rare-vet-lims-YYYY-MM-DD.sql.gz`.  
+If `STORAGE_TYPE=s3` and S3 credentials are set, the backup is also uploaded to `s3://bucket/backups/db/`.
+
+Optional env: `BACKUP_DIR`, `BACKUP_RETENTION_DAYS=30`, `BACKUP_S3_PREFIX=backups/db`
+
+Requires **pg_dump** (PostgreSQL client tools).
+
+### Restore
+
+```bash
+gunzip -c backend/backups/rare-vet-lims-2026-06-15.sql.gz | psql "$DATABASE_URL"
+```
+
+### Docker (self-hosted)
 
 ```bash
 #!/bin/bash
@@ -216,11 +244,24 @@ Add to crontab:
 0 2 * * * /opt/scripts/backup-lims.sh
 ```
 
-### Restore
+### Restore (Docker)
 
 ```bash
 gunzip -c /backups/lims_20260101_020000.sql.gz | docker exec -i rare-vet-lims-db psql -U lims_user rare_vet_lims
 ```
+
+---
+
+## Persistent file storage (S3)
+
+On Render, local `./uploads` is **ephemeral** — PDF reports may be lost on redeploy.
+
+1. Create an S3 bucket (AWS `me-south-1` or Cloudflare R2)
+2. In Render → **Environment** set:
+   - `STORAGE_TYPE=s3`
+   - `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+   - `S3_ENDPOINT` only for R2/MinIO
+3. Redeploy — new PDFs are stored in S3; existing DB records can regenerate PDFs on open
 
 ---
 
