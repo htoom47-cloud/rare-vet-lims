@@ -19,8 +19,8 @@ const LABEL_PRINT_STYLES = `
   }
   .label-50x25 {
     width: 50mm; height: 25mm; box-sizing: border-box;
-    padding: 0.5mm 1.2mm 0.4mm;
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding: 2mm 1.5mm 1.5mm;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
     font-family: Arial, Helvetica, sans-serif; color: #000;
   }
   .label-50x25 svg { max-width: 100%; height: auto; display: block; }
@@ -89,8 +89,8 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
       var code = ${barcodeJson};
       if (code && document.getElementById('sample-barcode')) {
         JsBarcode('#sample-barcode', code, {
-          format: 'CODE128', width: 1.1, height: 28, displayValue: true,
-          fontSize: 8, margin: 0, background: '#ffffff', lineColor: '#000000'
+          format: 'CODE128', width: 1.05, height: 24, displayValue: true,
+          fontSize: 7, margin: 0, background: '#ffffff', lineColor: '#000000'
         });
       }
       ${autoPrintScript}

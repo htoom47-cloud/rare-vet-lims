@@ -48,8 +48,8 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
               value={barcodeText}
               format="CODE128"
               width={1.05}
-              height={26}
-              fontSize={6}
+              height={24}
+              fontSize={7}
               margin={0}
               displayValue
               background="#ffffff"

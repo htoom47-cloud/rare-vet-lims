@@ -156,19 +156,21 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
     `^PW${LABEL_WIDTH}`,
     `^LL${LABEL_HEIGHT}`,
     '^LH0,0',
+    '^LT22',
+    '^LS0',
   ];
 
   if (barcode) {
-    lines.push(`^FO30,4^BY2,2,32^BCN,32,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(`^FO35,18^BY1.7,2,24^BCN,24,Y,N,N^FD${zplEscape(barcode)}^FS`);
   }
 
-  let y = 78;
+  let y = 66;
   if (animalLine) {
-    lines.push(`^FO10,${y}^A0N,14,12^FD${zplEscape(animalLine)}^FS`);
-    y += 18;
+    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(animalLine)}^FS`);
+    y += 14;
   }
   if (testLine) {
-    lines.push(`^FO10,${y}^A0N,14,12^FD${zplEscape(testLine)}^FS`);
+    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(testLine)}^FS`);
   }
 
   lines.push('^XZ');
