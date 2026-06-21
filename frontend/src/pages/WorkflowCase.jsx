@@ -7,7 +7,8 @@ import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/Wo
 import CustomerSearch from '../components/customers/CustomerSearch';
 import Modal from '../components/ui/Modal';
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
-import { printSampleLabel, autoPrintSampleLabels, printThermalLabel } from '../utils/printLabel';
+import { printSampleLabel, autoPrintSampleLabels, printAllThermalLabels } from '../utils/printLabel';
+import { totalLabelCountForSample } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
 import {
@@ -214,7 +215,10 @@ export default function WorkflowCase() {
       } else if (created.length) {
         setPrintSample(created[0]);
         setPrintOpen(true);
-        printThermalLabel(created[0]);
+        for (const sample of created) {
+          // eslint-disable-next-line no-await-in-loop
+          await printAllThermalLabels(sample);
+        }
       }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -410,7 +414,14 @@ export default function WorkflowCase() {
                                 onChange={(e) => toggleAnimalTest(animalId, test.id, e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="flex-1">{testLabel(test)}</span>
+                              <span className="flex-1">
+                                {testLabel(test)}
+                                {(test.label_copies ?? 1) > 1 && (
+                                  <span className="text-xs text-gray-500 ms-1">
+                                    ({t('tests.labelCopiesShort', { count: test.label_copies })})
+                                  </span>
+                                )}
+                              </span>
                               <span className="text-primary-600 font-medium">{Number(test.price).toFixed(0)}</span>
                             </label>
                           ))}
@@ -569,7 +580,16 @@ export default function WorkflowCase() {
       </div>
 
       <Modal isOpen={printOpen} onClose={() => setPrintOpen(false)} title={t('samples.printLabel')}>
-        {printSample && <BarcodeLabel sample={printSample} />}
+        {printSample && (
+          <>
+            {totalLabelCountForSample(printSample) > 1 && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                {t('samples.labelCopiesHint', { count: totalLabelCountForSample(printSample) })}
+              </p>
+            )}
+            <BarcodeLabel sample={printSample} />
+          </>
+        )}
         <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
       </Modal>
     </div>

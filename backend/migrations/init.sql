@@ -128,6 +128,7 @@ CREATE TABLE tests (
     turnaround_hours INTEGER DEFAULT 24,
     unit VARCHAR(50),
     method VARCHAR(100),
+    label_copies INTEGER NOT NULL DEFAULT 1,
     is_active BOOLEAN DEFAULT true,
     requires_specimen VARCHAR(100),
     created_at TIMESTAMPTZ DEFAULT NOW(),

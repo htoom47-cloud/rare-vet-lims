@@ -57,6 +57,7 @@ const testSchema = Joi.object({
   turnaround_hours: Joi.number().integer().min(1).default(24),
   unit: Joi.string().allow('', null),
   method: Joi.string().allow('', null),
+  label_copies: Joi.number().integer().min(1).max(20).default(1),
 });
 
 const resultEntrySchema = Joi.object({

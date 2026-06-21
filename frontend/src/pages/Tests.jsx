@@ -11,7 +11,7 @@ const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
 const emptyTestForm = () => ({
   code: '', name: '', name_ar: '', category_id: '', description: '', price: 0,
-  turnaround_hours: 24, unit: '', method: '',
+  turnaround_hours: 24, unit: '', method: '', label_copies: 1,
 });
 
 const emptyParamForm = () => ({
@@ -100,6 +100,7 @@ export default function Tests() {
       turnaround_hours: test.turnaround_hours ?? 24,
       unit: test.unit || '',
       method: test.method || '',
+      label_copies: test.label_copies ?? 1,
     });
     setFormOpen(true);
   };
@@ -117,6 +118,7 @@ export default function Tests() {
       category_id: Number(form.category_id),
       price: Number(form.price),
       turnaround_hours: Number(form.turnaround_hours),
+      label_copies: Number(form.label_copies) || 1,
     };
     try {
       if (editingId) {
@@ -190,6 +192,7 @@ export default function Tests() {
     { key: 'category_name', label: t('tests.category') },
     { key: 'price', label: t('tests.price'), render: (r) => `${Number(r.price).toFixed(2)} SAR` },
     { key: 'turnaround_hours', label: t('tests.turnaround') },
+    { key: 'label_copies', label: t('tests.labelCopies'), render: (r) => r.label_copies ?? 1 },
     { key: 'unit', label: t('tests.unit'), render: (r) => r.unit || '—' },
     {
       key: 'actions',
@@ -311,6 +314,18 @@ export default function Tests() {
             <label className="block text-sm font-medium mb-1">{t('tests.turnaround')}</label>
             <input type="number" min="1" value={form.turnaround_hours} onChange={(e) => setForm({ ...form, turnaround_hours: e.target.value })} className="input-field" />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('tests.labelCopies')}</label>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              value={form.label_copies}
+              onChange={(e) => setForm({ ...form, label_copies: e.target.value })}
+              className="input-field"
+            />
+            <p className="text-xs text-gray-500 mt-1">{t('tests.labelCopiesHint')}</p>
+          </div>
           <div className="md:col-span-2 flex gap-2 justify-end">
             <button type="button" onClick={() => setFormOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
             <button type="submit" className="btn-primary">{t('common.save')}</button>
@@ -340,6 +355,7 @@ export default function Tests() {
               {[
                 { label: t('tests.price'), value: `${Number(detail.price).toFixed(2)} SAR` },
                 { label: t('tests.turnaround'), value: `${detail.turnaround_hours}h` },
+                { label: t('tests.labelCopies'), value: detail.label_copies ?? 1 },
                 { label: t('tests.unit'), value: detail.unit || '—' },
                 { label: t('tests.method'), value: detail.method || '—' },
               ].map((item) => (

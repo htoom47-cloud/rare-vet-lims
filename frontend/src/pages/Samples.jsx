@@ -16,6 +16,7 @@ import BarcodeScanner from '../components/barcode/BarcodeScanner';
 
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
 import { printSampleLabel } from '../utils/printLabel';
+import { totalLabelCountForSample } from '../utils/labelCopies';
 
 import WorkflowStepper from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
@@ -557,6 +558,11 @@ export default function Samples() {
 
         <Modal isOpen={!!printSample} onClose={() => setPrintSample(null)} title={t('samples.printLabel')}>
 
+          {totalLabelCountForSample(printSample) > 1 && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              {t('samples.labelCopiesHint', { count: totalLabelCountForSample(printSample) })}
+            </p>
+          )}
           <BarcodeLabel sample={printSample} />
 
           <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>

@@ -58,9 +58,9 @@ const getById = async (id) => {
 
 const create = async (data) => {
   const result = await query(
-    `INSERT INTO tests (code, name, name_ar, category_id, description, price, turnaround_hours, unit, method)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [data.code, data.name, data.name_ar, data.category_id, data.description, data.price, data.turnaround_hours, data.unit, data.method]
+    `INSERT INTO tests (code, name, name_ar, category_id, description, price, turnaround_hours, unit, method, label_copies)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    [data.code, data.name, data.name_ar, data.category_id, data.description, data.price, data.turnaround_hours, data.unit, data.method, data.label_copies ?? 1]
   );
   return result.rows[0];
 };
@@ -69,8 +69,8 @@ const update = async (id, data) => {
   await getById(id);
   const result = await query(
     `UPDATE tests SET code=$1, name=$2, name_ar=$3, category_id=$4, description=$5, price=$6,
-     turnaround_hours=$7, unit=$8, method=$9, updated_at=NOW() WHERE id=$10 RETURNING *`,
-    [data.code, data.name, data.name_ar, data.category_id, data.description, data.price, data.turnaround_hours, data.unit, data.method, id]
+     turnaround_hours=$7, unit=$8, method=$9, label_copies=$10, updated_at=NOW() WHERE id=$11 RETURNING *`,
+    [data.code, data.name, data.name_ar, data.category_id, data.description, data.price, data.turnaround_hours, data.unit, data.method, data.label_copies ?? 1, id]
   );
   return result.rows[0];
 };

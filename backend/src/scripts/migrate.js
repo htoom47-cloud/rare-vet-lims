@@ -89,6 +89,9 @@ async function applyPatches() {
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_by UUID REFERENCES users(id)');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_at TIMESTAMPTZ');
     await ensureLabSpecialistRole(client);
+    await client.query(
+      'ALTER TABLE tests ADD COLUMN IF NOT EXISTS label_copies INTEGER NOT NULL DEFAULT 1'
+    );
     await ensureAdmin();
   } finally {
     client.release();

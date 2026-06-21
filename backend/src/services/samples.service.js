@@ -72,6 +72,7 @@ const getById = async (id) => {
 
   const tests = await query(
     `SELECT st.*, t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.price,
+            t.label_copies,
             EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id) as has_results,
             EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id AND r.is_validated = true) as is_validated
      FROM sample_tests st JOIN tests t ON st.test_id = t.id WHERE st.sample_id = $1`,

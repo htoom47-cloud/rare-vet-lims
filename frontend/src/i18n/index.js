@@ -205,6 +205,9 @@ const resources = {
         zebraBrowserPrintHint: 'For silent printing: allow rare-vet-lims.onrender.com in Zebra Browser Print settings',
         zebraBrowserFallbackOk: 'Print dialog opened — choose ZDesigner ZD421 (not ZPL) and scale 100%',
         autoPrintOk: '{{count}} label(s) printed on Zebra',
+        labelCopiesHint: '{{count}} barcode labels will be printed (one per test tube)',
+        zebraPrintMultipleOk: '{{count}} labels sent to {{printer}}',
+        zebraPrintPartial: '{{printed}} of {{total}} labels sent to {{printer}}',
         statuses: { pending: 'Pending', received: 'Received', running: 'Running', completed: 'Completed', rejected: 'Rejected', archived: 'Archived' },
       },
       tests: {
@@ -217,6 +220,8 @@ const resources = {
         animalType: 'Animal Type', noParameters: 'No parameters defined yet', paramCount: 'Parameters',
         searchPlaceholder: 'Search by name or code...', created: 'Test added', updated: 'Test updated',
         paramAdded: 'Parameter added', rangeAdded: 'Reference range added',
+        labelCopies: 'Barcode copies', labelCopiesHint: 'Number of barcode labels to print when this test is ordered',
+        labelCopiesShort: '×{{count}} labels',
       },
       reports: {
         title: 'Reports', subtitle: 'Professional laboratory reports',
@@ -521,6 +526,9 @@ const resources = {
         zebraBrowserPrintHint: 'للطباعة المباشرة: اسمح لـ rare-vet-lims.onrender.com في إعدادات Zebra Browser Print',
         zebraBrowserFallbackOk: 'تم فتح الطباعة — اختر ZDesigner ZD421 (بدون ZPL) والمقياس 100%',
         autoPrintOk: 'تمت طباعة {{count}} ملصق على Zebra',
+        labelCopiesHint: 'سيتم طباعة {{count}} ملصق باركود (ملصق لكل أنبوبة/فحص)',
+        zebraPrintMultipleOk: 'تم إرسال {{count}} ملصق إلى {{printer}}',
+        zebraPrintPartial: 'تم إرسال {{printed}} من {{total}} ملصق إلى {{printer}}',
         statuses: { pending: 'معلق', received: 'مستلم', running: 'قيد التشغيل', completed: 'مكتمل', rejected: 'مرفوض', archived: 'مؤرشف' },
       },
       tests: {
@@ -533,6 +541,8 @@ const resources = {
         animalType: 'نوع الحيوان', noParameters: 'لا توجد معاملات بعد', paramCount: 'المعامل',
         searchPlaceholder: 'بحث بالاسم أو الكود...', created: 'تم إضافة الفحص', updated: 'تم تحديث الفحص',
         paramAdded: 'تم إضافة المعامل', rangeAdded: 'تم إضافة المدى المرجعي',
+        labelCopies: 'نسخ الباركود', labelCopiesHint: 'عدد ملصقات الباركود المطلوبة عند طلب هذا الفحص',
+        labelCopiesShort: '×{{count}} ملصق',
       },
       reports: {
         title: 'التقارير المخبرية', subtitle: 'تقارير مخبرية احترافية',
