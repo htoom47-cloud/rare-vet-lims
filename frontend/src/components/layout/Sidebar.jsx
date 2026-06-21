@@ -62,7 +62,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
 
   return (
     <aside
-      className={`fixed top-0 start-0 z-40 h-screen bg-white dark:bg-primary-900 border-e border-primary-200/80 dark:border-primary-700 transition-transform duration-300 shadow-lg lg:shadow-none
+      className={`fixed top-0 start-0 z-40 h-screen bg-card border-e border-border/80 transition-transform duration-300 shadow-lg lg:shadow-none
         ${collapsed ? 'w-[4.5rem]' : 'w-72'}
         ${mobileOpen ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full'}
         lg:translate-x-0`}

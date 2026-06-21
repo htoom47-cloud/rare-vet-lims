@@ -1,16 +1,18 @@
 import { useTranslation } from 'react-i18next';
+import { Skeleton } from './skeleton';
+import { Card } from './card';
 
 function TableSkeleton({ cols = 4 }) {
   return (
-    <div className="card space-y-3">
+    <Card className="space-y-3">
       {[1, 2, 3, 4, 5].map((row) => (
         <div key={row} className="flex gap-4">
           {Array.from({ length: cols }).map((_, i) => (
-            <div key={i} className="skeleton h-4 flex-1" />
+            <Skeleton key={i} className="h-4 flex-1" />
           ))}
         </div>
       ))}
-    </div>
+    </Card>
   );
 }
 
@@ -23,14 +25,14 @@ export default function DataTable({ columns, data, loading, onRowClick }) {
 
   if (!data?.length) {
     return (
-      <div className="card text-center py-14">
-        <p className="text-primary-400 text-sm">{t('common.noData')}</p>
-      </div>
+      <Card className="text-center py-14">
+        <p className="text-muted-foreground text-sm">{t('common.noData')}</p>
+      </Card>
     );
   }
 
   return (
-    <div className="table-container bg-white dark:bg-primary-800 rounded-2xl shadow-card border border-primary-200/50 dark:border-primary-700 overflow-hidden">
+    <div className="table-container bg-card rounded-2xl shadow-card border border-border/60 overflow-hidden">
       <table className="data-table">
         <thead>
           <tr>
@@ -39,12 +41,12 @@ export default function DataTable({ columns, data, loading, onRowClick }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-primary-100 dark:divide-primary-700 bg-white dark:bg-primary-800">
+        <tbody className="divide-y divide-border/60 bg-card">
           {data.map((row, idx) => (
             <tr
               key={row.id || idx}
               onClick={() => onRowClick?.(row)}
-              className={onRowClick ? 'cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-700/30' : ''}
+              className={onRowClick ? 'cursor-pointer hover:bg-accent/50 transition-colors duration-150' : ''}
             >
               {columns.map((col) => (
                 <td key={col.key} className={col.className}>

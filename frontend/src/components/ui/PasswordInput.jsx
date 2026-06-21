@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff } from 'lucide-react';
+import { Input } from './input';
+import { cn } from '../../lib/utils';
 
 export default function PasswordInput({
+  id,
   value,
   onChange,
-  className = 'input-field pe-11',
+  className,
   required = false,
   autoComplete = 'current-password',
   placeholder,
@@ -16,11 +19,12 @@ export default function PasswordInput({
 
   return (
     <div className="relative">
-      <input
+      <Input
+        id={id}
         type={show ? 'text' : 'password'}
         value={value}
         onChange={onChange}
-        className={className}
+        className={cn('pe-11', className)}
         required={required}
         autoComplete={autoComplete}
         placeholder={placeholder}
@@ -29,7 +33,7 @@ export default function PasswordInput({
       <button
         type="button"
         onClick={() => setShow((v) => !v)}
-        className="absolute inset-y-0 end-0 flex items-center px-3 text-primary-500 hover:text-primary-700 dark:hover:text-primary-300"
+        className="absolute inset-y-0 end-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
         aria-label={show ? t('auth.hidePassword') : t('auth.showPassword')}
         tabIndex={-1}
       >
