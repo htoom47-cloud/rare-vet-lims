@@ -267,3 +267,76 @@
     page-break-inside: avoid;
   }
 }
+
+/* ── Laboratory Report (A4 screen + print) ── */
+.lab-report-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 0;
+}
+
+.lab-results-table {
+  border-collapse: collapse;
+}
+
+.avoid-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+@media print {
+  @page lab-a4 {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  body.printing-lab-report {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body.printing-lab-report aside,
+  body.printing-lab-report header,
+  body.printing-lab-report .no-print,
+  body.printing-lab-report .bg-app-mesh {
+    display: none !important;
+  }
+
+  body.printing-lab-report main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  body.printing-lab-report > div > div[class*="lg:ms-"] {
+    margin-inline-start: 0 !important;
+  }
+
+  body.printing-lab-report .lab-report-document {
+    page: lab-a4;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  body.printing-lab-report .lab-results-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-lab-report .lab-report-watermark {
+    display: flex !important;
+    opacity: 1;
+  }
+
+  body.printing-lab-report .lab-report-page-number::after {
+    content: counter(page);
+  }
+
+  body.printing-lab-report {
+    counter-reset: page;
+  }
+}

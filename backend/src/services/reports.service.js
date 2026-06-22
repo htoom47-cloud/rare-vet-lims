@@ -2,10 +2,33 @@ const path = require('path');
 const { uuidv4 } = require('../utils/uuid');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const env = require('../config/env');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
-const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, serveUploads } = require('../config/storage');
+const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists } = require('../config/storage');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
+
+const INSTRUMENT_BY_CATEGORY = {
+  CBC: 'Norma Icon',
+  HEM: 'Norma Icon',
+  CHEM: 'Diasys Respons 910',
+  BIOCHEM: 'Diasys Respons 910',
+  IMMUNO: 'Mini VIDAS',
+  ELISA: 'Mini VIDAS',
+  PCR: 'PCR',
+  MICRO: 'Microscope',
+  PARAS: 'Microscope',
+  URINE: 'Microscope',
+};
+
+const resolveInstrument = (categoryCode, testCode) => {
+  const code = String(categoryCode || testCode || '').toUpperCase();
+  for (const [key, device] of Object.entries(INSTRUMENT_BY_CATEGORY)) {
+    if (code.includes(key)) return device;
+  }
+  if (/CBC|WBC|RBC|HGB/i.test(String(testCode || ''))) return 'Norma Icon';
+  return 'Laboratory Analyzer';
+};
 
 const LAB_APPROVER_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_APPROVER_ROLES = new Set(['veterinarian', 'manager', 'admin']);
@@ -104,11 +127,13 @@ const buildReportData = async (sampleId, opts) => {
 
   const resultsData = await query(
     `SELECT tp.id as parameter_id, tp.code as parameter_code, tp.sort_order,
-            t.name as test_name, t.name_ar as test_name_ar, t.code as test_code,
+            t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.method as test_method,
+            tc.code as category_code,
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
             rv.value, rv.numeric_value, tp.unit, tr.min_value, tr.max_value, rv.flag, rv.is_critical, res.doctor_notes
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
+     LEFT JOIN test_categories tc ON t.category_id = tc.id
      JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
      JOIN result_values rv ON rv.result_id = res.id
      JOIN test_parameters tp ON rv.parameter_id = tp.id
@@ -147,7 +172,8 @@ const buildReportData = async (sampleId, opts) => {
   const isArabic = language === 'ar';
   const results = uniqueByParameter.map((r) => ({
     code: r.parameter_code,
-    nameAr: r.parameter_name_ar || r.parameter_name || r.test_name,
+    testCode: r.test_code,
+    nameAr: r.parameter_name_ar || r.parameter_name || r.test_name_ar || r.test_name,
     nameEn: r.parameter_name || r.test_name,
     testNameAr: r.test_name_ar || r.test_name,
     testNameEn: r.test_name,
@@ -161,6 +187,8 @@ const buildReportData = async (sampleId, opts) => {
       : '-',
     flag: r.flag,
     isCritical: r.is_critical,
+    method: r.test_method || '-',
+    instrument: resolveInstrument(r.category_code, r.test_code),
   }));
 
   return {
@@ -203,21 +231,28 @@ const buildPdfPayload = async (reportRow) => {
 };
 
 const regeneratePdf = async (reportRow) => {
-  const filename = extractFilename(reportRow.pdf_url);
-  if (!filename) throw new AppError('Report file not found', 404, 'NOT_FOUND');
+  const existingName = extractFilename(reportRow.pdf_url);
+  const reportData = await buildPdfPayload(reportRow);
+  const localDir = path.join(ensureUploadDir(), 'reports');
+  const pdf = await generateReportPDF(reportData, localDir, existingName ? { filename: existingName } : {});
 
   if (reportRow.pdf_url) {
     await deleteFile(reportRow.pdf_url);
   }
 
-  const reportData = await buildPdfPayload(reportRow);
-  const localDir = path.join(ensureUploadDir(), 'reports');
-  const pdf = await generateReportPDF(reportData, localDir, { filename });
-  await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
-  return reportRow.pdf_url;
+  const saved = await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
+  if (saved.url !== reportRow.pdf_url) {
+    await query('UPDATE reports SET pdf_url = $1 WHERE id = $2', [saved.url, reportRow.id]);
+  }
+  return saved.url;
 };
 
-const ensurePdfFile = async (reportRow) => regeneratePdf(reportRow);
+const ensurePdfFile = async (reportRow) => {
+  if (reportRow.pdf_url && await fileExists(reportRow.pdf_url)) {
+    return reportRow.pdf_url;
+  }
+  return regeneratePdf(reportRow);
+};
 
 const generate = async (sampleId, userId, userRole, language = 'ar', options = {}) => {
   const sampleResult = await query(
@@ -325,8 +360,7 @@ const servePdf = async (filename, res) => {
   const report = await query(`${REPORT_SELECT} WHERE r.pdf_url LIKE $1`, [`%${filename}`]);
   if (!report.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
 
-  await ensurePdfFile(report.rows[0]);
-  const pdfUrl = report.rows[0].pdf_url;
+  const pdfUrl = await ensurePdfFile(report.rows[0]);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
 
@@ -336,6 +370,87 @@ const servePdf = async (filename, res) => {
     stream.on('end', resolve);
     stream.pipe(res);
   });
+};
+
+const getPreview = async (id) => {
+  const reportRow = await getById(id);
+  const base = await buildPdfPayload(reportRow);
+
+  const metaResult = await query(
+    `SELECT s.barcode, s.collection_date, s.received_date, s.department, s.notes as sample_notes,
+            s.completed_date, s.status as sample_status,
+            a.age, a.color, a.weight,
+            inv.invoice_number as order_number,
+            cb.full_name as collected_by_name, cb.full_name_ar as collected_by_name_ar
+     FROM samples s
+     JOIN animals a ON s.animal_id = a.id
+     LEFT JOIN invoices inv ON inv.sample_id = s.id
+     LEFT JOIN users cb ON s.created_by = cb.id
+     WHERE s.id = $1`,
+    [reportRow.sample_id]
+  );
+  const meta = metaResult.rows[0] || {};
+
+  const isArabic = reportRow.language === 'ar';
+  const verifyUrl = `${env.appUrl}/verify/${reportRow.qr_verification_code}`;
+
+  return {
+    id: reportRow.id,
+    sampleId: reportRow.sample_id,
+    pdfUrl: reportRow.pdf_url,
+    reportNumber: base.reportNumber,
+    orderNumber: meta.order_number || base.sampleCode,
+    sampleCode: base.sampleCode,
+    barcode: meta.barcode,
+    status: reportRow.is_final ? 'final' : 'preliminary',
+    language: reportRow.language,
+    issuedAt: reportRow.created_at,
+    requestedAt: meta.collection_date || reportRow.created_at,
+    verificationCode: reportRow.qr_verification_code,
+    verifyUrl,
+    lab: {
+      name: env.lab.name,
+      nameAr: env.lab.nameAr,
+      subtitle: env.lab.subtitle,
+      subtitleAr: env.lab.subtitleAr,
+      address: env.lab.address,
+      phone: env.lab.phone,
+      email: env.lab.email,
+    },
+    customer: {
+      name: base.customerName,
+      mobile: base.customerMobile,
+    },
+    animal: {
+      code: base.animalCode,
+      type: base.animalType,
+      name: base.animalName,
+      gender: base.animalGender,
+      chip: base.animalChip,
+      age: meta.age,
+      color: meta.color,
+      weight: meta.weight,
+    },
+    sample: {
+      id: base.sampleCode,
+      type: meta.department || 'Blood',
+      collectionDate: meta.collection_date,
+      receivedDate: meta.received_date,
+      condition: meta.sample_notes ? meta.sample_notes : (meta.sample_status === 'completed' ? 'Acceptable' : 'Pending'),
+      collectedBy: isArabic
+        ? (meta.collected_by_name_ar || meta.collected_by_name || '-')
+        : (meta.collected_by_name || '-'),
+    },
+    results: base.results,
+    interpretation: base.aiInterpretation,
+    recommendations: base.treatmentRecommendations,
+    doctorNotes: base.doctorNotes,
+    approvals: {
+      lab: base.labApproval,
+      vet: base.vetApproval,
+    },
+    generatedBy: reportRow.generated_by_name,
+  };
 };
 
 const verify = async (code) => {
@@ -358,4 +473,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, generate, approve, verify, servePdf };
+module.exports = { list, getPreview, generate, approve, verify, servePdf };

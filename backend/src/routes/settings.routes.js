@@ -12,6 +12,9 @@ router.get('/public', (_req, res) => {
     data: {
       lab_name: env.lab.name,
       lab_name_ar: env.lab.nameAr,
+      lab_subtitle: env.lab.subtitle,
+      lab_subtitle_ar: env.lab.subtitleAr,
+      address: env.lab.address,
       phone: env.lab.phone,
       email: env.lab.email,
     },

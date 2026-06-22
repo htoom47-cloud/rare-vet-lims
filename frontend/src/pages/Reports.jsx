@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Download, FileText, FilePlus, Stethoscope } from 'lucide-react';
+import { CheckCircle2, Download, Eye, FileText, FilePlus, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -59,6 +59,7 @@ function ApprovalLine({ label, approved, approverName, approvedAt, canApprove, o
 
 export default function Reports() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [reports, setReports] = useState([]);
@@ -121,11 +122,18 @@ export default function Reports() {
     }
   };
 
-  const openPdf = async (pdfUrl) => {
+  const openPdf = async (report) => {
+    const pdfUrl = typeof report === 'string' ? report : report.pdf_url;
+    const reportId = typeof report === 'object' ? report.id : null;
     try {
       await reportsAPI.openPdf(pdfUrl);
     } catch {
-      toast.error(t('reports.openFailed'));
+      if (reportId) {
+        navigate(`/reports/${reportId}/view`);
+        toast(t('labReport.openingView'));
+      } else {
+        toast.error(t('reports.openFailed'));
+      }
     }
   };
 
@@ -223,8 +231,15 @@ export default function Reports() {
       label: t('common.actions'),
       render: (r) => (
         <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => navigate(`/reports/${r.id}/view`)}
+            className="text-primary-600 flex items-center gap-1 text-sm"
+          >
+            <Eye size={14} /> {t('labReport.title')}
+          </button>
           {r.pdf_url && (
-            <button type="button" onClick={() => openPdf(r.pdf_url)} className="text-primary-600 flex items-center gap-1 text-sm">
+            <button type="button" onClick={() => openPdf(r)} className="text-primary-600 flex items-center gap-1 text-sm">
               <Download size={14} /> {t('common.print')}
             </button>
           )}

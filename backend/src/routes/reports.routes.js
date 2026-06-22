@@ -1,5 +1,6 @@
 const express = require('express');
 const service = require('../services/reports.service');
+const env = require('../config/env');
 const { authenticate, authorize } = require('../middleware/auth');
 const { PERMISSIONS } = require('../utils/permissions');
 
@@ -11,6 +12,16 @@ router.get('/verify/:code', async (req, res, next) => {
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
+
+/** Local dev only — preview real reports without login */
+if (env.nodeEnv !== 'production') {
+  router.get('/:id/preview-dev', async (req, res, next) => {
+    try {
+      const data = await service.getPreview(req.params.id);
+      res.json({ success: true, data });
+    } catch (err) { next(err); }
+  });
+}
 
 router.use(authenticate);
 
@@ -48,6 +59,13 @@ router.post('/:id/approve', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res
 router.get('/download/:filename', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
   try {
     await service.servePdf(req.params.filename, res);
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/preview', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.getPreview(req.params.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

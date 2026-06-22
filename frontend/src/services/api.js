@@ -109,18 +109,49 @@ export const openReportPdf = async (pdfUrl) => {
 
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
-  window.open(objectUrl, '_blank');
+  const opened = window.open(objectUrl, '_blank');
+  if (!opened) {
+    await downloadReportPdf(pdfUrl, filename);
+  }
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+};
+
+export const downloadReportPdf = async (pdfUrl, saveAs) => {
+  const filename = pdfUrl?.split('/').pop();
+  if (!filename) throw new Error('Missing report file');
+
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${API_URL}/reports/download/${encodeURIComponent(filename)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!response.ok) {
+    const err = new Error('Report PDF not found');
+    err.response = { status: response.status };
+    throw err;
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = saveAs || filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
 
 export const reportsAPI = {
   list: (params) => api.get('/reports', { params }),
+  getPreview: (id) => api.get(`/reports/${id}/preview`),
   interpret: (sampleId, language = 'ar') => api.post(`/reports/interpret/${sampleId}`, { language }),
   generate: (sampleId, { language = 'ar', treatment_recommendations = '', approve_lab = false, approve_vet = false } = {}) =>
     api.post(`/reports/generate/${sampleId}`, { language, treatment_recommendations, approve_lab, approve_vet }),
   approve: (reportId, type) => api.post(`/reports/${reportId}/approve`, { type }),
   verify: (code) => api.get(`/reports/verify/${code}`),
   openPdf: openReportPdf,
+  downloadPdf: downloadReportPdf,
 };
 
 export const notificationsAPI = {

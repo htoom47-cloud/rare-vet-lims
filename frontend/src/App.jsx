@@ -11,6 +11,10 @@ import Animals from './pages/Animals';
 import Samples from './pages/Samples';
 import Tests from './pages/Tests';
 import Reports from './pages/Reports';
+import LaboratoryReport from './pages/LaboratoryReport';
+import VerifyReport from './pages/VerifyReport';
+import ReportDemo from './pages/ReportDemo';
+import ReportLive from './pages/ReportLive';
 import Billing from './pages/Billing';
 import Inventory from './pages/Inventory';
 import Quality from './pages/Quality';
@@ -45,6 +49,9 @@ export default function App() {
           />
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/report-demo" element={<ReportDemo />} />
+            <Route path="/report-live/:id" element={<ReportLive />} />
+            <Route path="/verify/:code" element={<VerifyReport />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<RoleHome />} />
               <Route path="customers" element={<ProtectedRoute permission="customers.view"><Customers /></ProtectedRoute>} />
@@ -55,6 +62,7 @@ export default function App() {
               <Route path="vet-review" element={<ProtectedRoute permission="results.validate"><VetReview /></ProtectedRoute>} />
               <Route path="tests" element={<ProtectedRoute permission="tests.view"><Tests /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute permission="reports.view"><Reports /></ProtectedRoute>} />
+              <Route path="reports/:id/view" element={<ProtectedRoute permission="reports.view"><LaboratoryReport /></ProtectedRoute>} />
               <Route path="billing" element={<ProtectedRoute permission="billing.view"><Billing /></ProtectedRoute>} />
               <Route path="inventory" element={<ProtectedRoute permission="inventory.view"><Inventory /></ProtectedRoute>} />
               <Route path="quality" element={<ProtectedRoute permission="quality.view"><Quality /></ProtectedRoute>} />
