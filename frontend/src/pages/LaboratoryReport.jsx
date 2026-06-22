@@ -161,6 +161,33 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     document.body.classList.toggle('printing-lab-report', on);
   };
 
+  const preparePdfExport = () => {
+    const root = reportRef.current;
+    if (!root) return () => {};
+    const pageEl = root.closest('.lab-report-page');
+    const prev = {
+      pageDir: pageEl?.getAttribute('dir') ?? null,
+      htmlDir: document.documentElement.getAttribute('dir'),
+      bodyDir: document.body.getAttribute('dir'),
+    };
+    root.classList.add('lab-pdf-export');
+    if (isAr) root.classList.add('lab-pdf-export-ar');
+    if (pageEl) pageEl.setAttribute('dir', 'ltr');
+    document.documentElement.setAttribute('dir', 'ltr');
+    document.body.setAttribute('dir', 'ltr');
+    return () => {
+      root.classList.remove('lab-pdf-export', 'lab-pdf-export-ar');
+      if (pageEl) {
+        if (prev.pageDir) pageEl.setAttribute('dir', prev.pageDir);
+        else pageEl.removeAttribute('dir');
+      }
+      if (prev.htmlDir) document.documentElement.setAttribute('dir', prev.htmlDir);
+      else document.documentElement.removeAttribute('dir');
+      if (prev.bodyDir) document.body.setAttribute('dir', prev.bodyDir);
+      else document.body.removeAttribute('dir');
+    };
+  };
+
   const handlePrint = () => {
     setPrintMode(true);
     window.print();
@@ -171,13 +198,33 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     if (!reportRef.current) return;
     setExportingPdf(true);
     setPrintMode(true);
+    const restorePdfLayout = preparePdfExport();
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
     try {
       const html2pdf = (await import('html2pdf.js')).default;
       await html2pdf().set({
         margin: [5, 6, 5, 6],
         filename: `${report.reportNumber}.pdf`,
         image: { type: 'jpeg', quality: 0.92 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          onclone: (clonedDoc, clonedElement) => {
+            clonedDoc.documentElement.setAttribute('dir', 'ltr');
+            clonedDoc.body.setAttribute('dir', 'ltr');
+            let node = clonedElement;
+            while (node) {
+              node.setAttribute?.('dir', 'ltr');
+              node = node.parentElement;
+            }
+            clonedElement.classList.add('lab-pdf-export');
+            if (isAr) clonedElement.classList.add('lab-pdf-export-ar');
+          },
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: {
           mode: ['css', 'legacy'],
@@ -189,6 +236,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
       toast.error(t('labReport.downloadFailed'));
       handlePrint();
     } finally {
+      restorePdfLayout();
       setPrintMode(false);
       setExportingPdf(false);
     }

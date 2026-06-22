@@ -656,6 +656,49 @@
   border-collapse: collapse;
 }
 
+/* html2canvas mirrors RTL documents — force LTR shell during PDF export */
+.lab-pdf-export {
+  direction: ltr !important;
+  letter-spacing: normal;
+  word-wrap: normal;
+}
+
+.lab-pdf-export-ar .lab-rpt-header {
+  flex-direction: row-reverse;
+}
+
+.lab-pdf-export-ar .lab-rpt-header-meta {
+  flex-direction: row-reverse;
+}
+
+.lab-pdf-export-ar .lab-rpt-meta-grid {
+  text-align: start;
+}
+
+.lab-pdf-export-ar .lab-rpt-table {
+  direction: rtl;
+}
+
+.lab-pdf-export-ar .lab-rpt-patient-bar,
+.lab-pdf-export-ar .lab-rpt-footer,
+.lab-pdf-export-ar .lab-rpt-notes,
+.lab-pdf-export-ar .lab-rpt-images-title {
+  direction: rtl;
+}
+
+.lab-pdf-export-ar .lab-rpt-table .col-test,
+.lab-pdf-export-ar .lab-rpt-panel-row td {
+  text-align: right;
+}
+
+.lab-pdf-export-ar .lab-pdf-export,
+.lab-pdf-export-ar .test-name-ar,
+.lab-pdf-export-ar .lab-rpt-lab-name,
+.lab-pdf-export-ar .lab-patient-value {
+  letter-spacing: normal;
+  word-wrap: normal;
+}
+
 @media print {
   @page {
     size: A4 portrait;
