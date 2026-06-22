@@ -96,6 +96,21 @@ async function applyPatches() {
     await client.query(
       'ALTER TABLE tests ADD COLUMN IF NOT EXISTS label_copies INTEGER NOT NULL DEFAULT 1'
     );
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS result_attachments (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        result_id UUID NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+        parameter_id UUID REFERENCES test_parameters(id) ON DELETE SET NULL,
+        file_url TEXT NOT NULL,
+        caption TEXT,
+        sort_order INTEGER DEFAULT 0,
+        uploaded_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_result_attachments_result ON result_attachments(result_id)'
+    );
   } finally {
     client.release();
   }

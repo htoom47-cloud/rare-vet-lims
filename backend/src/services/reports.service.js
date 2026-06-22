@@ -170,6 +170,12 @@ const buildReportData = async (sampleId, opts) => {
   }
 
   const isArabic = language === 'ar';
+  const qualLabel = (value, flag) => {
+    if (flag === 'POS') return isArabic ? 'إيجابي' : 'Positive';
+    if (flag === 'NEG') return isArabic ? 'سلبي' : 'Negative';
+    return value;
+  };
+
   const results = uniqueByParameter.map((r) => ({
     code: r.parameter_code,
     testCode: r.test_code,
@@ -177,7 +183,10 @@ const buildReportData = async (sampleId, opts) => {
     nameEn: r.parameter_name || r.test_name,
     testNameAr: r.test_name_ar || r.test_name,
     testNameEn: r.test_name,
-    value: formatNumber(r.numeric_value ?? r.value) ?? '-',
+    value: qualLabel(
+      formatNumber(r.numeric_value ?? r.value) ?? '-',
+      r.flag
+    ),
     numericValue: r.numeric_value != null ? Number(r.numeric_value) : null,
     unit: r.unit,
     minValue: r.min_value != null ? Number(r.min_value) : null,
@@ -190,6 +199,17 @@ const buildReportData = async (sampleId, opts) => {
     method: r.test_method || '-',
     instrument: resolveInstrument(r.category_code, r.test_code),
   }));
+
+  const attachmentsResult = await query(
+    `SELECT ra.file_url, ra.caption, t.name as test_name, t.name_ar as test_name_ar
+     FROM result_attachments ra
+     JOIN results res ON ra.result_id = res.id
+     JOIN sample_tests st ON res.sample_test_id = st.id
+     JOIN tests t ON st.test_id = t.id
+     WHERE st.sample_id = $1 AND res.is_validated = true
+     ORDER BY ra.sort_order, ra.created_at`,
+    [sampleId]
+  );
 
   return {
     reportNumber,
@@ -213,6 +233,7 @@ const buildReportData = async (sampleId, opts) => {
     labApproval: labApproval ?? { approved: false },
     vetApproval: vetApproval ?? { approved: false },
     results,
+    attachments: attachmentsResult.rows,
   };
 };
 

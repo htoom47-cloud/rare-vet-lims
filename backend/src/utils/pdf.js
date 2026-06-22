@@ -4,6 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('../config/env');
 const { generateQR } = require('./barcode');
+const { resolveImagePath } = require('../config/storage');
 
 const ARABIC_FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
@@ -25,10 +26,11 @@ const BRAND = {
 const PANEL_COLORS = ['#3182CE', '#38A169', '#DD6B20', '#805AD5', '#C5A059'];
 const FLAG_COLORS = {
   HIGH: '#dc2626', CRIT_HIGH: '#991b1b', NORMAL: '#16a34a', LOW: '#2563eb', CRIT_LOW: '#1d4ed8',
+  POS: '#dc2626', NEG: '#16a34a',
 };
 const FLAG = {
-  en: { NORMAL: 'Normal', HIGH: 'High', LOW: 'Low', CRIT_HIGH: 'Crit.H', CRIT_LOW: 'Crit.L' },
-  ar: { NORMAL: 'معتدل', HIGH: 'مرتفع', LOW: 'منخفض', CRIT_HIGH: 'حرج', CRIT_LOW: 'حرج' },
+  en: { NORMAL: 'Normal', HIGH: 'High', LOW: 'Low', CRIT_HIGH: 'Crit.H', CRIT_LOW: 'Crit.L', POS: 'Positive', NEG: 'Negative' },
+  ar: { NORMAL: 'معتدل', HIGH: 'مرتفع', LOW: 'منخفض', CRIT_HIGH: 'حرج', CRIT_LOW: 'حرج', POS: 'إيجابي', NEG: 'سلبي' },
 };
 
 const PATIENT_FIELDS = [
@@ -314,6 +316,47 @@ const drawResultsTable = (doc, results) => {
   doc.y = y + 4;
 };
 
+const drawMicroscopeImages = (doc, attachments) => {
+  if (!attachments?.length) return;
+
+  const images = attachments
+    .map((a) => ({ ...a, path: resolveImagePath(a.file_url) }))
+    .filter((a) => a.path);
+
+  if (!images.length) return;
+
+  ensureSpace(doc, 80);
+  let y = doc.y;
+  bilingualBar(doc, TX, y, TW, 14, 'Microscope Images', 'صور المجهر', BRAND.gold, { size: 7 });
+  y += 18;
+
+  const imgW = (TW - 8) / 2;
+  const imgH = 110;
+  let col = 0;
+
+  images.forEach((img) => {
+    ensureSpace(doc, imgH + 20);
+    if (doc.y > y) y = doc.y;
+    const x = TX + col * (imgW + 8);
+    try {
+      doc.image(img.path, x, y, { width: imgW, height: imgH, fit: [imgW, imgH] });
+      if (img.caption) {
+        cellLatin(doc, img.caption, x, y + imgH + 2, imgW, 12, { size: 6, color: BRAND.muted, align: 'center' });
+      }
+    } catch {
+      /* skip unreadable image */
+    }
+    col += 1;
+    if (col >= 2) {
+      col = 0;
+      y += imgH + 18;
+    }
+  });
+
+  if (col > 0) y += imgH + 18;
+  doc.y = y + 4;
+};
+
 const drawNotes = (doc, treatment) => {
   const treat = (treatment || '').trim();
   if (!treat) return;
@@ -435,6 +478,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       });
 
       drawResultsTable(doc, reportData.results);
+      drawMicroscopeImages(doc, reportData.attachments);
       drawNotes(doc, reportData.treatmentRecommendations);
       drawApprovals(doc, reportData);
       await drawFooter(doc, reportData);

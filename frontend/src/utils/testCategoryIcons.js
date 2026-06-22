@@ -10,6 +10,7 @@ const CODE_ICONS = {
   SERO: '🛡️',
   PAR: '🪱',
   PARA: '🪱',
+  PARAS: '🪱',
 };
 
 const KEYWORD_ICONS = [

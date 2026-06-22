@@ -9,6 +9,7 @@ export const routeTitleKey = (pathname, isReception) => {
     '/billing': isReception ? 'reception.billing' : 'nav.billing',
     '/reports': 'nav.reports',
     '/workbench': 'nav.workbench',
+    '/parasitology': 'nav.parasitology',
     '/vet-review': 'nav.vetReview',
     '/tests': 'nav.tests',
     '/inventory': 'nav.inventory',

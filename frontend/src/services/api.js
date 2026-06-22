@@ -70,6 +70,7 @@ export const samplesAPI = {
   create: (data) => api.post('/samples', data),
   updateStatus: (id, data) => api.patch(`/samples/${id}/status`, data),
   getQueue: () => api.get('/samples/queue'),
+  parasitologyQueue: () => api.get('/samples/queue/parasitology'),
   scan: (barcode) => api.get(`/samples/scan/${barcode}`),
   getBarcode: (id, format) => api.get(`/samples/${id}/barcode`, { params: { format } }),
 };
@@ -81,6 +82,8 @@ export const testsAPI = {
   create: (data) => api.post('/tests', data),
   update: (id, data) => api.put(`/tests/${id}`, data),
   addParameter: (testId, data) => api.post(`/tests/${testId}/parameters`, data),
+  updateParameter: (parameterId, data) => api.put(`/tests/parameters/${parameterId}`, data),
+  deleteParameter: (parameterId) => api.delete(`/tests/parameters/${parameterId}`),
   addReferenceRange: (parameterId, data) => api.post(`/tests/parameters/${parameterId}/ranges`, data),
 };
 
@@ -90,6 +93,15 @@ export const resultsAPI = {
   validate: (sampleTestId, doctorNotes) => api.post(`/results/validate/${sampleTestId}`, { doctor_notes: doctorNotes }),
   critical: () => api.get('/results/critical'),
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
+  uploadAttachment: (sampleTestId, file, caption) => {
+    const form = new FormData();
+    form.append('image', file);
+    if (caption) form.append('caption', caption);
+    return api.post(`/results/sample-test/${sampleTestId}/attachments`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteAttachment: (id) => api.delete(`/results/attachments/${id}`),
 };
 
 export const openReportPdf = async (pdfUrl) => {

@@ -50,6 +50,20 @@ router.post('/:id/parameters', authorize(PERMISSIONS.TESTS_MANAGE), async (req, 
   } catch (err) { next(err); }
 });
 
+router.put('/parameters/:parameterId', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.updateParameter(req.params.parameterId, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/parameters/:parameterId', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.deleteParameter(req.params.parameterId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.post('/parameters/:parameterId/ranges', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
   try {
     const data = await service.addReferenceRange(req.params.parameterId, req.body);

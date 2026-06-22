@@ -46,7 +46,7 @@ const getById = async (id) => {
   if (!result.rows[0]) throw new AppError('Test not found', 404, 'NOT_FOUND');
 
   const [parameters, ranges] = await Promise.all([
-    query('SELECT * FROM test_parameters WHERE test_id = $1 ORDER BY sort_order', [id]),
+    query('SELECT * FROM test_parameters WHERE test_id = $1 AND is_active = true ORDER BY sort_order', [id]),
     query(
       `SELECT tr.*, tp.name as parameter_name, tp.code as parameter_code
        FROM test_reference_ranges tr JOIN test_parameters tp ON tr.parameter_id = tp.id
@@ -87,6 +87,43 @@ const addParameter = async (testId, param) => {
   return result.rows[0];
 };
 
+const getParameterById = async (parameterId) => {
+  const result = await query('SELECT * FROM test_parameters WHERE id = $1', [parameterId]);
+  if (!result.rows[0]) throw new AppError('Parameter not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
+const updateParameter = async (parameterId, param) => {
+  const existing = await getParameterById(parameterId);
+  const result = await query(
+    `UPDATE test_parameters
+     SET code = $1, name = $2, name_ar = $3, unit = $4, sort_order = $5,
+         is_calculated = $6, formula = $7, decimal_places = $8
+     WHERE id = $9 RETURNING *`,
+    [
+      param.code ?? existing.code,
+      param.name ?? existing.name,
+      param.name_ar ?? existing.name_ar,
+      param.unit ?? existing.unit,
+      param.sort_order ?? existing.sort_order,
+      param.is_calculated ?? existing.is_calculated,
+      param.formula ?? existing.formula,
+      param.decimal_places ?? existing.decimal_places,
+      parameterId,
+    ]
+  );
+  return result.rows[0];
+};
+
+const deleteParameter = async (parameterId) => {
+  const existing = await getParameterById(parameterId);
+  if (existing.code === 'NOTES') {
+    throw new AppError('Cannot delete the notes field', 400, 'PROTECTED_PARAMETER');
+  }
+  await query('UPDATE test_parameters SET is_active = false WHERE id = $1', [parameterId]);
+  return { deleted: true };
+};
+
 const addReferenceRange = async (parameterId, range) => {
   const result = await query(
     `INSERT INTO test_reference_ranges (parameter_id, animal_type, min_value, max_value, critical_low, critical_high, unit, notes)
@@ -96,4 +133,7 @@ const addReferenceRange = async (parameterId, range) => {
   return result.rows[0];
 };
 
-module.exports = { listCategories, list, getById, create, update, addParameter, addReferenceRange };
+module.exports = {
+  listCategories, list, getById, create, update,
+  addParameter, updateParameter, deleteParameter, addReferenceRange,
+};

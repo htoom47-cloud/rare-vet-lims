@@ -150,16 +150,34 @@ export default function TechnicianWorkbench() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {fields.map((param, idx) => (
                     <div key={param.parameter_id}>
-                      <label className="text-sm font-medium">{param.name} {param.unit && `(${param.unit})`}</label>
-                      <input
-                        value={param.value}
-                        onChange={(e) => {
-                          const updated = [...resultForm[test.id]];
-                          updated[idx] = { ...param, value: e.target.value };
-                          setResultForm({ ...resultForm, [test.id]: updated });
-                        }}
-                        className="input-field mt-1"
-                      />
+                      <label className="text-sm font-medium">
+                        {param.name} {param.unit && param.unit !== 'qual' && `(${param.unit})`}
+                      </label>
+                      {param.unit === 'qual' ? (
+                        <select
+                          value={param.value}
+                          onChange={(e) => {
+                            const updated = [...resultForm[test.id]];
+                            updated[idx] = { ...param, value: e.target.value };
+                            setResultForm({ ...resultForm, [test.id]: updated });
+                          }}
+                          className="input-field mt-1"
+                        >
+                          <option value="">—</option>
+                          <option value="Negative">{t('parasitology.negative', { defaultValue: 'Negative' })}</option>
+                          <option value="Positive">{t('parasitology.positive', { defaultValue: 'Positive' })}</option>
+                        </select>
+                      ) : (
+                        <input
+                          value={param.value}
+                          onChange={(e) => {
+                            const updated = [...resultForm[test.id]];
+                            updated[idx] = { ...param, value: e.target.value };
+                            setResultForm({ ...resultForm, [test.id]: updated });
+                          }}
+                          className="input-field mt-1"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

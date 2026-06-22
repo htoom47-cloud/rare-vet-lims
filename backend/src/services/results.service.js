@@ -3,6 +3,29 @@ const { AppError } = require('../middleware/errorHandler');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
+const { saveFile, deleteFile } = require('../config/storage');
+
+const isPositiveQual = (raw) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(raw);
+const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(raw);
+
+const formatQualValue = (value, unit) => {
+  if (unit !== 'qual' || !value) return value;
+  if (isPositiveQual(value)) return 'Positive';
+  if (isNegativeQual(value)) return 'Negative';
+  return value;
+};
+
+const getAttachments = async (resultId) => {
+  const result = await query(
+    `SELECT ra.*, u.full_name as uploaded_by_name
+     FROM result_attachments ra
+     LEFT JOIN users u ON ra.uploaded_by = u.id
+     WHERE ra.result_id = $1
+     ORDER BY ra.sort_order, ra.created_at`,
+    [resultId]
+  );
+  return result.rows;
+};
 
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
@@ -58,6 +81,7 @@ const getBySampleTest = async (sampleTestId) => {
     technician_notes: head.technician_notes,
     has_critical: head.has_critical,
     values: values.sort(compareByNormaOrder),
+    attachments: await getAttachments(head.result_id),
   };
 };
 
@@ -105,7 +129,17 @@ const enterResults = async (data, userId) => {
       let flag = '';
       let isCritical = false;
 
-      if (isNumeric) {
+      const paramMeta = await client.query(
+        'SELECT unit FROM test_parameters WHERE id = $1',
+        [val.parameter_id]
+      );
+      const unit = paramMeta.rows[0]?.unit;
+
+      if (unit === 'qual') {
+        const normalized = formatQualValue(raw, unit);
+        if (isPositiveQual(normalized)) flag = 'POS';
+        else if (isNegativeQual(normalized)) flag = 'NEG';
+      } else if (isNumeric) {
         const rangeResult = await client.query(
           `SELECT * FROM test_reference_ranges
            WHERE parameter_id = $1 AND (animal_type = $2 OR animal_type IS NULL)
@@ -125,7 +159,15 @@ const enterResults = async (data, userId) => {
       await client.query(
         `INSERT INTO result_values (id, result_id, parameter_id, value, numeric_value, flag, is_critical)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [uuidv4(), resultId, val.parameter_id, raw, isNumeric ? numericValue : null, flag, isCritical]
+        [
+          uuidv4(),
+          resultId,
+          val.parameter_id,
+          unit === 'qual' ? formatQualValue(raw, unit) : raw,
+          isNumeric ? numericValue : null,
+          flag,
+          isCritical,
+        ]
       );
     }
 
@@ -213,4 +255,68 @@ const getCriticalAlerts = async () => {
   return result.rows;
 };
 
-module.exports = { getBySampleTest, enterResults, validateResults, getPreviousResults, getCriticalAlerts };
+const ensureResultId = async (client, sampleTestId, userId) => {
+  const existing = await client.query('SELECT id FROM results WHERE sample_test_id = $1', [sampleTestId]);
+  if (existing.rows[0]) return existing.rows[0].id;
+
+  const resultId = uuidv4();
+  await client.query(
+    `INSERT INTO results (id, sample_test_id, entered_by) VALUES ($1, $2, $3)`,
+    [resultId, sampleTestId, userId]
+  );
+  return resultId;
+};
+
+const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id } = {}) => {
+  const client = await getClient();
+  let committed = false;
+  try {
+    await client.query('BEGIN');
+    const st = await client.query('SELECT id FROM sample_tests WHERE id = $1', [sampleTestId]);
+    if (!st.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
+
+    const resultId = await ensureResultId(client, sampleTestId, userId);
+    const saved = await saveFile(file.buffer, 'microscope', file.originalname);
+
+    const attachmentId = uuidv4();
+    await client.query(
+      `INSERT INTO result_attachments (id, result_id, parameter_id, file_url, caption, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [attachmentId, resultId, parameter_id || null, saved.url, caption || null, userId]
+    );
+
+    await client.query(
+      `UPDATE sample_tests SET status = 'running', technician_id = $1, started_at = COALESCE(started_at, NOW()) WHERE id = $2`,
+      [userId, sampleTestId]
+    );
+
+    await client.query('COMMIT');
+    committed = true;
+    return getBySampleTest(sampleTestId);
+  } catch (err) {
+    if (!committed) await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+const removeAttachment = async (attachmentId) => {
+  const existing = await query('SELECT file_url FROM result_attachments WHERE id = $1', [attachmentId]);
+  if (!existing.rows[0]) throw new AppError('Attachment not found', 404, 'NOT_FOUND');
+
+  await deleteFile(existing.rows[0].file_url);
+  await query('DELETE FROM result_attachments WHERE id = $1', [attachmentId]);
+  return { deleted: true };
+};
+
+module.exports = {
+  getBySampleTest,
+  enterResults,
+  validateResults,
+  getPreviousResults,
+  getCriticalAlerts,
+  addAttachment,
+  removeAttachment,
+  getAttachments,
+};

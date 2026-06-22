@@ -63,7 +63,7 @@ const ensureUploadDir = () => {
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
   }
-  ['reports', 'animals', 'signatures', 'temp'].forEach((subdir) => {
+  ['reports', 'animals', 'signatures', 'temp', 'microscope'].forEach((subdir) => {
     const dir = path.join(uploadPath, subdir);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });
@@ -74,6 +74,11 @@ const localPathForUrl = (url) => {
   const parsed = parseUploadUrl(url);
   if (!parsed) return null;
   return path.join(ensureUploadDir(), parsed.subdir, parsed.filename);
+};
+
+const resolveImagePath = (url) => {
+  const local = localPathForUrl(url);
+  return local && fs.existsSync(local) ? local : null;
 };
 
 const s3Put = async (key, body, contentType) => {
@@ -231,4 +236,5 @@ module.exports = {
   createReadStream,
   serveUploads,
   parseUploadUrl,
+  resolveImagePath,
 };

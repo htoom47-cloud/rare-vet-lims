@@ -1,10 +1,12 @@
 const express = require('express');
+const multer = require('multer');
 const service = require('../services/results.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { resultEntrySchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = express.Router();
 router.use(authenticate);
 
@@ -39,6 +41,31 @@ router.post('/enter', authorize(PERMISSIONS.RESULTS_ENTER), validate(resultEntry
 router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
   try {
     const data = await service.validateResults(req.params.sampleTestId, req.user.id, req.body.doctor_notes);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post(
+  '/sample-test/:id/attachments',
+  authorize(PERMISSIONS.RESULTS_ENTER),
+  upload.single('image'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: { message: 'No image provided' } });
+      }
+      const data = await service.addAttachment(req.params.id, req.file, req.user.id, {
+        caption: req.body.caption,
+        parameter_id: req.body.parameter_id || null,
+      });
+      res.json({ success: true, data });
+    } catch (err) { next(err); }
+  }
+);
+
+router.delete('/attachments/:id', authorize(PERMISSIONS.RESULTS_ENTER), async (req, res, next) => {
+  try {
+    const data = await service.removeAttachment(req.params.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

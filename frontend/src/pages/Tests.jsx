@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3 } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -43,6 +43,7 @@ export default function Tests() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [paramOpen, setParamOpen] = useState(false);
+  const [editingParamId, setEditingParamId] = useState(null);
   const [paramForm, setParamForm] = useState(emptyParamForm());
 
   const [rangeOpen, setRangeOpen] = useState(false);
@@ -141,15 +142,48 @@ export default function Tests() {
     e.preventDefault();
     if (!detail?.id) return;
     try {
-      await testsAPI.addParameter(detail.id, {
+      const payload = {
         ...paramForm,
         sort_order: Number(paramForm.sort_order),
         decimal_places: Number(paramForm.decimal_places),
         formula: paramForm.is_calculated ? paramForm.formula : null,
-      });
-      toast.success(t('tests.paramAdded'));
+      };
+      if (editingParamId) {
+        await testsAPI.updateParameter(editingParamId, payload);
+        toast.success(t('tests.paramUpdated'));
+      } else {
+        await testsAPI.addParameter(detail.id, payload);
+        toast.success(t('tests.paramAdded'));
+      }
       setParamOpen(false);
+      setEditingParamId(null);
       setParamForm(emptyParamForm());
+      await loadDetail(detail.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const openEditParameter = (param) => {
+    setEditingParamId(param.id);
+    setParamForm({
+      code: param.code || '',
+      name: param.name || '',
+      name_ar: param.name_ar || '',
+      unit: param.unit || '',
+      sort_order: param.sort_order ?? 0,
+      is_calculated: !!param.is_calculated,
+      formula: param.formula || '',
+      decimal_places: param.decimal_places ?? 2,
+    });
+    setParamOpen(true);
+  };
+
+  const handleDeleteParameter = async (param) => {
+    if (!window.confirm(t('tests.confirmDeleteParam'))) return;
+    try {
+      await testsAPI.deleteParameter(param.id);
+      toast.success(t('tests.paramDeleted'));
       await loadDetail(detail.id);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -398,7 +432,7 @@ export default function Tests() {
                   <BarChart3 size={18} /> {t('tests.parameters')} ({detail.parameters?.length || 0})
                 </h4>
                 {canManage && (
-                  <button onClick={() => { setParamForm(emptyParamForm()); setParamOpen(true); }} className="btn-primary text-sm flex items-center gap-1">
+                  <button onClick={() => { setEditingParamId(null); setParamForm(emptyParamForm()); setParamOpen(true); }} className="btn-primary text-sm flex items-center gap-1">
                     <ListPlus size={16} /> {t('tests.addParameter')}
                   </button>
                 )}
@@ -413,19 +447,38 @@ export default function Tests() {
                       <div className="flex flex-wrap justify-between gap-2 mb-3">
                         <div>
                           <p className="font-medium">{i18n.language === 'ar' && param.name_ar ? param.name_ar : param.name}</p>
-                          <p className="text-xs text-gray-500">{param.code} · {param.unit || '—'}</p>
+                          <p className="text-xs text-gray-500">{param.code} · {param.unit === 'qual' ? t('tests.unitQual') : (param.unit || '—')}</p>
                         </div>
                         {canManage && (
-                          <button
-                            onClick={() => {
-                              setRangeParam(param);
-                              setRangeForm({ ...emptyRangeForm(), unit: param.unit || '' });
-                              setRangeOpen(true);
-                            }}
-                            className="text-primary-600 text-sm"
-                          >
-                            + {t('tests.addRange')}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditParameter(param)}
+                              className="text-primary-600 text-sm flex items-center gap-1"
+                            >
+                              <Pencil size={14} /> {t('common.edit')}
+                            </button>
+                            {param.code !== 'NOTES' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteParameter(param)}
+                                className="text-red-600 text-sm flex items-center gap-1"
+                              >
+                                <Trash2 size={14} /> {t('common.delete')}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRangeParam(param);
+                                setRangeForm({ ...emptyRangeForm(), unit: param.unit || '' });
+                                setRangeOpen(true);
+                              }}
+                              className="text-primary-600 text-sm"
+                            >
+                              + {t('tests.addRange')}
+                            </button>
+                          </div>
                         )}
                       </div>
                       {rangesForParam(param.id).length > 0 ? (
@@ -468,13 +521,12 @@ export default function Tests() {
       </Modal>
 
       {/* إضافة معامل */}
-      <Modal isOpen={paramOpen} onClose={() => setParamOpen(false)} title={t('tests.addParameter')} size="md">
+      <Modal isOpen={paramOpen} onClose={() => { setParamOpen(false); setEditingParamId(null); }} title={editingParamId ? t('tests.editParameter') : t('tests.addParameter')} size="md">
         <form onSubmit={handleAddParameter} className="space-y-4">
           {[
-            { key: 'code', label: t('tests.paramCode'), required: true },
+            { key: 'code', label: t('tests.paramCode'), required: true, disabled: !!editingParamId },
             { key: 'name', label: t('tests.nameEn'), required: true },
             { key: 'name_ar', label: t('tests.nameAr') },
-            { key: 'unit', label: t('tests.unit') },
           ].map((f) => (
             <div key={f.key}>
               <label className="block text-sm font-medium mb-1">{f.label}</label>
@@ -483,9 +535,26 @@ export default function Tests() {
                 onChange={(e) => setParamForm({ ...paramForm, [f.key]: e.target.value })}
                 className="input-field"
                 required={f.required}
+                disabled={f.disabled}
               />
             </div>
           ))}
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('tests.unit')}</label>
+            <select
+              value={paramForm.unit}
+              onChange={(e) => setParamForm({ ...paramForm, unit: e.target.value })}
+              className="input-field"
+            >
+              <option value="">—</option>
+              <option value="qual">{t('tests.unitQual')}</option>
+              <option value="mg/dL">mg/dL</option>
+              <option value="g/dL">g/dL</option>
+              <option value="U/L">U/L</option>
+              <option value="%">%</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{t('tests.unitQualHint')}</p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">ترتيب العرض</label>
@@ -507,7 +576,7 @@ export default function Tests() {
             </div>
           )}
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setParamOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="button" onClick={() => { setParamOpen(false); setEditingParamId(null); }} className="btn-secondary">{t('common.cancel')}</button>
             <button type="submit" className="btn-primary">{t('common.save')}</button>
           </div>
         </form>

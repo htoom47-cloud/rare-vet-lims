@@ -24,6 +24,7 @@ const CATEGORIES = [
   { code: 'CULT', name: 'Culture', name_ar: 'المزرعة', department: 'Microbiology', sort_order: 6 },
   { code: 'SERO', name: 'Serology', name_ar: 'المصلية', department: 'Immunology', sort_order: 7 },
   { code: 'MICRO', name: 'Microscopy', name_ar: 'المجهر', department: 'Microscopy', sort_order: 8 },
+  { code: 'PARAS', name: 'Parasitology', name_ar: 'الطفيليات', department: 'Parasitology', sort_order: 9 },
 ];
 
 const TESTS = [
@@ -35,6 +36,8 @@ const TESTS = [
   { code: 'CULT-BACT', name: 'Bacterial Culture', name_ar: 'مزرعة بكتيرية', category: 'CULT', price: 300 },
   { code: 'SERO-BRU', name: 'Brucella Serology', name_ar: 'مصلية البروسيلا', category: 'SERO', price: 200 },
   { code: 'MICRO-FECAL', name: 'Fecal Microscopy', name_ar: 'فحص البراز المجهري', category: 'MICRO', price: 100 },
+  { code: 'PARAS-BLOOD', name: 'Blood Parasites', name_ar: 'طفيليات الدم', category: 'PARAS', price: 120, method: 'Microscope' },
+  { code: 'PARAS-STOOL', name: 'Stool Parasites', name_ar: 'طفيليات البراز', category: 'PARAS', price: 120, method: 'Microscope' },
 ];
 
 const CBC_PARAMS = [
@@ -97,6 +100,35 @@ const TEST_PARAMS = {
   'CULT-BACT': { params: [{ code: 'GROWTH', name: 'Culture Result', name_ar: 'نتيجة المزرعة', unit: '' }] },
   'SERO-BRU': { params: [{ code: 'TITER', name: 'Antibody Titer', name_ar: 'العيار المصلي', unit: '' }] },
   'MICRO-FECAL': { params: [{ code: 'FINDINGS', name: 'Microscopic Findings', name_ar: 'الموجودات المجهرية', unit: '' }] },
+  'PARAS-BLOOD': {
+    params: [
+      { code: 'BABESIA', name: 'Babesia', name_ar: 'بابيسيا', unit: 'qual' },
+      { code: 'THEILERIA', name: 'Theileria', name_ar: 'ثيليريا', unit: 'qual' },
+      { code: 'TRYPANO', name: 'Trypanosoma', name_ar: 'تريبانوسوما (إيفانسى)', unit: 'qual' },
+      { code: 'ANAPLASMA', name: 'Anaplasma', name_ar: 'أنابلازما', unit: 'qual' },
+      { code: 'EHRLICHIA', name: 'Ehrlichia', name_ar: 'إيرليكيا', unit: 'qual' },
+      { code: 'HAEMOPROTEUS', name: 'Haemoproteus', name_ar: 'هيموبروتيوس (طيور)', unit: 'qual' },
+      { code: 'PLASMODIUM', name: 'Plasmodium', name_ar: 'بلازموديوم (طيور)', unit: 'qual' },
+      { code: 'NOTES', name: 'Comments', name_ar: 'ملاحظات', unit: '' },
+    ],
+  },
+  'PARAS-STOOL': {
+    params: [
+      { code: 'STRONGYLES', name: 'Strongyles', name_ar: 'ديدان معوية قوية', unit: 'qual' },
+      { code: 'HAEMONCHUS', name: 'Haemonchus', name_ar: 'هيمونكوس', unit: 'qual' },
+      { code: 'TRICHOSTRONG', name: 'Trichostrongylus', name_ar: 'تريكوسترونجيلوس', unit: 'qual' },
+      { code: 'ASCARIS', name: 'Ascaris / Toxocara', name_ar: 'الصفار (أسكاريس)', unit: 'qual' },
+      { code: 'COCCIDIA', name: 'Coccidia (Eimeria)', name_ar: 'كوكسيديا', unit: 'qual' },
+      { code: 'GIARDIA', name: 'Giardia', name_ar: 'جيارديا', unit: 'qual' },
+      { code: 'CRYPTOSPOR', name: 'Cryptosporidium', name_ar: 'كريبتوسبوريديوم', unit: 'qual' },
+      { code: 'FASCIOLA', name: 'Fasciola', name_ar: 'دودة الكبد (فاشولا)', unit: 'qual' },
+      { code: 'MONIEZIA', name: 'Moniezia', name_ar: 'مونيزيا', unit: 'qual' },
+      { code: 'TAPEWORM', name: 'Tapeworm Eggs', name_ar: 'بيض الديدان الشريطية', unit: 'qual' },
+      { code: 'NEMATODE', name: 'Nematode Eggs', name_ar: 'بيض الديدان المستديرة', unit: 'qual' },
+      { code: 'BALANTIDIUM', name: 'Balantidium', name_ar: 'بالانتيديوم', unit: 'qual' },
+      { code: 'NOTES', name: 'Comments', name_ar: 'ملاحظات', unit: '' },
+    ],
+  },
 };
 
 async function seedTestParameters(testId, config) {

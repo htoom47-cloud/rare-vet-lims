@@ -72,10 +72,13 @@ const getById = async (id) => {
 
   const tests = await query(
     `SELECT st.*, t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.price,
-            t.label_copies,
+            t.label_copies, tc.code as category_code,
             EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id) as has_results,
             EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id AND r.is_validated = true) as is_validated
-     FROM sample_tests st JOIN tests t ON st.test_id = t.id WHERE st.sample_id = $1`,
+     FROM sample_tests st
+     JOIN tests t ON st.test_id = t.id
+     LEFT JOIN test_categories tc ON t.category_id = tc.id
+     WHERE st.sample_id = $1`,
     [id]
   );
 
@@ -210,6 +213,28 @@ const getQueue = async (technicianId) => {
   return result.rows;
 };
 
+const getParasitologyQueue = async () => {
+  const result = await query(
+    `SELECT s.*, c.full_name as customer_name, a.animal_code, a.animal_type,
+            (SELECT COUNT(*) FROM sample_tests st
+             JOIN tests t ON st.test_id = t.id
+             JOIN test_categories tc ON t.category_id = tc.id
+             WHERE st.sample_id = s.id AND tc.code = 'PARAS' AND st.status != 'completed') as pending_tests
+     FROM samples s
+     LEFT JOIN customers c ON s.customer_id = c.id
+     LEFT JOIN animals a ON s.animal_id = a.id
+     WHERE s.status IN ('received', 'running')
+       AND EXISTS (
+         SELECT 1 FROM sample_tests st
+         JOIN tests t ON st.test_id = t.id
+         JOIN test_categories tc ON t.category_id = tc.id
+         WHERE st.sample_id = s.id AND tc.code = 'PARAS'
+       )
+     ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`
+  );
+  return result.rows;
+};
+
 const getBarcode = async (id, format = 'code128') => {
   const sample = await getById(id);
   const barcodeImage = await generateSampleBarcode({
@@ -222,4 +247,4 @@ const getBarcode = async (id, format = 'code128') => {
   return { barcode: sample.barcode, sample_code: sample.sample_code, image: barcodeImage };
 };
 
-module.exports = { list, getById, getByBarcode, create, updateStatus, getQueue, getBarcode };
+module.exports = { list, getById, getByBarcode, create, updateStatus, getQueue, getParasitologyQueue, getBarcode };

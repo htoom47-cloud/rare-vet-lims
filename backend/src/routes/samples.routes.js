@@ -16,6 +16,13 @@ router.get('/', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/queue/parasitology', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.getParasitologyQueue();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/queue', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
   try {
     const data = await service.getQueue(req.user.role_name === 'lab_technician' ? req.user.id : null);
