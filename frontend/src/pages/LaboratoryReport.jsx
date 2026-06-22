@@ -144,11 +144,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   const resultGroups = useMemo(() => groupResults(report?.results), [report]);
 
-  const abnormalResults = useMemo(
-    () => (report?.results || []).filter((r) => isAbnormal(r.flag)),
-    [report]
-  );
-
   const instruments = useMemo(() => {
     const set = new Set((report?.results || []).map((r) => r.instrument).filter(Boolean));
     return [...set].join(' · ');
@@ -191,7 +186,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: {
           mode: ['css', 'legacy'],
-          avoid: ['.lab-rpt-header', '.lab-rpt-patient-bar', '.lab-rpt-footer', '.lab-rpt-abnormal-box'],
+          avoid: ['.lab-rpt-header', '.lab-rpt-patient-bar', '.lab-rpt-footer'],
         },
       }).from(reportRef.current).save();
       toast.success(t('labReport.downloadDone'));
@@ -345,20 +340,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             </tbody>
           </table>
         </div>
-
-        {abnormalResults.length > 0 && (
-          <div className="lab-rpt-abnormal-box">
-            <span className="lab-rpt-abnormal-title">{t('labReport.abnormalSummary')}:</span>
-            <span className="lab-rpt-abnormal-list">
-              {abnormalResults.map((r, i) => (
-                <span key={i} className="lab-rpt-abnormal-item">
-                  {isAr ? r.nameAr : r.nameEn} <b>{r.value}</b> {formatUnit(r.unit)}
-                  {i < abnormalResults.length - 1 ? ' · ' : ''}
-                </span>
-              ))}
-            </span>
-          </div>
-        )}
 
         {attachments.length > 0 && (
           <section className="lab-rpt-images">

@@ -732,7 +732,6 @@
     page-break-inside: avoid;
   }
 
-  body.printing-lab-report .lab-rpt-abnormal-box,
   body.printing-lab-report .lab-rpt-notes {
     break-inside: avoid;
     page-break-inside: avoid;
