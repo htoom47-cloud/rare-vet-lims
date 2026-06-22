@@ -123,18 +123,7 @@ export default function Reports() {
   };
 
   const openPdf = async (report) => {
-    const pdfUrl = typeof report === 'string' ? report : report.pdf_url;
-    const reportId = typeof report === 'object' ? report.id : null;
-    try {
-      await reportsAPI.openPdf(pdfUrl);
-    } catch {
-      if (reportId) {
-        navigate(`/reports/${reportId}/view`);
-        toast(t('labReport.openingView'));
-      } else {
-        toast.error(t('reports.openFailed'));
-      }
-    }
+    navigate(`/reports/${report.id}/view`);
   };
 
   const openGenerateForSample = (sample) => {
@@ -173,7 +162,7 @@ export default function Reports() {
       setGenerateOpen(false);
       setSelectedSample(null);
       load();
-      if (data.data.pdf_url) await reportsAPI.openPdf(data.data.pdf_url);
+      navigate(`/reports/${data.data.id}/view`);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('reports.generateFailed'));
     } finally {

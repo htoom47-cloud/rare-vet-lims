@@ -253,6 +253,7 @@ const resources = {
         loadFailed: 'Could not load report',
         downloadPdf: 'Download PDF',
         downloadFailed: 'Could not download PDF',
+        downloadDone: 'PDF downloaded',
         printFallback: 'Use browser print to save as PDF',
         email: 'Send Email',
         sent: 'Report sent',
@@ -301,6 +302,7 @@ const resources = {
         stampNote: 'Official laboratory stamp applied upon final approval',
         phone: 'Phone',
         legal: 'This report is confidential and intended for the requesting veterinarian only. Results must be interpreted in clinical context.',
+        downloadDone: 'PDF downloaded',
         openingView: 'PDF unavailable — opening report view',
       },
       billing: {
@@ -631,6 +633,7 @@ const resources = {
         downloadPdf: 'تحميل PDF',
         downloadFailed: 'تعذّر تحميل PDF',
         printFallback: 'استخدم طباعة المتصفح للحفظ كـ PDF',
+        downloadDone: 'تم تحميل PDF',
         email: 'إرسال بالبريد',
         sent: 'تم إرسال التقرير',
         sendFailed: 'تعذّر إرسال التقرير',

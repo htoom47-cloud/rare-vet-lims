@@ -128,6 +128,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const [report, setReport] = useState(initialReport || (demoMode ? DEMO_REPORT : null));
   const [loading, setLoading] = useState(!demoMode && !initialReport);
   const [sending, setSending] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const isAr = report?.language === 'ar' || i18n.language === 'ar';
   const dir = isAr ? 'rtl' : 'ltr';
@@ -185,22 +186,46 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     return isAr ? entry.ar : entry.en;
   };
 
+  const setPrintMode = (on) => {
+    document.documentElement.classList.toggle('printing-lab-report', on);
+    document.body.classList.toggle('printing-lab-report', on);
+  };
+
   const handlePrint = () => {
-    document.body.classList.add('printing-lab-report');
+    setPrintMode(true);
     window.print();
-    window.onafterprint = () => document.body.classList.remove('printing-lab-report');
+    window.onafterprint = () => setPrintMode(false);
   };
 
   const handleDownloadPdf = async () => {
-    if (!report?.pdfUrl) {
-      handlePrint();
-      toast(t('labReport.printFallback'));
-      return;
-    }
+    if (!reportRef.current) return;
+    setExportingPdf(true);
+    setPrintMode(true);
     try {
-      await reportsAPI.downloadPdf(report.pdfUrl, `${report.reportNumber}.pdf`);
+      const html2pdf = (await import('html2pdf.js')).default;
+      await html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename: `${report.reportNumber}.pdf`,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'], avoid: '.avoid-break' },
+        })
+        .from(reportRef.current)
+        .save();
+      toast.success(t('labReport.downloadDone'));
     } catch {
       toast.error(t('labReport.downloadFailed'));
+      handlePrint();
+    } finally {
+      setPrintMode(false);
+      setExportingPdf(false);
     }
   };
 
@@ -261,9 +286,9 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             <Printer size={16} />
             {t('common.print')}
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} className="gap-2">
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-2">
             <Download size={16} />
-            {t('labReport.downloadPdf')}
+            {exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}
           </Button>
           <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-2 text-green-700">
             <MessageCircle size={16} />
