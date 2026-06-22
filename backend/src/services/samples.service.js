@@ -192,28 +192,38 @@ const updateStatus = async (id, status, extra = {}) => {
   return result.rows[0];
 };
 
+const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL'];
+
 const getQueue = async (technicianId) => {
-  const params = [];
+  const params = [PARAS_TEST_CODES];
   let where = `WHERE s.status IN ('received', 'running')`;
 
   if (technicianId) {
     params.push(technicianId);
-    where += ` AND (s.assigned_technician = $1 OR s.assigned_technician IS NULL)`;
+    where += ` AND (s.assigned_technician = $2 OR s.assigned_technician IS NULL)`;
   }
 
   const result = await query(
     `SELECT s.*, c.full_name as customer_name, a.animal_code,
-            (SELECT COUNT(*) FROM sample_tests st WHERE st.sample_id = s.id AND st.status != 'completed') as pending_tests
+            (SELECT COUNT(*) FROM sample_tests st
+             JOIN tests t ON st.test_id = t.id
+             WHERE st.sample_id = s.id AND st.status != 'completed'
+               AND NOT (t.code = ANY($1::text[]))) as pending_tests
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     ${where} ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`,
+     ${where}
+       AND EXISTS (
+         SELECT 1 FROM sample_tests st
+         JOIN tests t ON st.test_id = t.id
+         WHERE st.sample_id = s.id AND st.status != 'completed'
+           AND NOT (t.code = ANY($1::text[]))
+       )
+     ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`,
     params
   );
   return result.rows;
 };
-
-const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL'];
 
 const getParasitologyQueue = async () => {
   const result = await query(

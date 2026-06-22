@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { WORKFLOW_STEPS } from '../utils/workflow';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
+import { getResultsEntryTargets } from '../utils/parasitologyTests';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -549,14 +550,22 @@ export default function WorkflowCase() {
               <button onClick={resetCase} className="btn-primary py-3 px-6">{t('reception.anotherCase')}</button>
               <button onClick={() => navigate('/samples')} className="btn-secondary py-3 px-6">{t('reception.viewSamples')}</button>
             </div>
-            {!receptionMode && samples[0] && (
+            {!receptionMode && samples[0] && (() => {
+              const entry = getResultsEntryTargets(samples[0].id, samples[0].tests);
+              return (
               <div className="flex flex-wrap justify-center gap-2 mt-4 pt-4 border-t">
                 <p className="w-full text-sm text-primary-500 mb-1">{t('workflow.labStepsNote')}</p>
-                <button onClick={() => navigate(`/workbench?sample=${samples[0].id}`)} className="btn-secondary text-sm">{t('workflow.goEnterResults')}</button>
+                {entry.workbench && (
+                  <button onClick={() => navigate(entry.workbench)} className="btn-secondary text-sm">{t('workflow.goEnterResults')}</button>
+                )}
+                {entry.parasitology && (
+                  <button onClick={() => navigate(entry.parasitology)} className="btn-secondary text-sm">{t('nav.parasitology')}</button>
+                )}
                 <button onClick={() => navigate(`/vet-review?sample=${samples[0].id}`)} className="btn-secondary text-sm">{t('workflow.goApprove')}</button>
                 <button onClick={() => navigate('/reports')} className="btn-secondary text-sm">{t('workflow.goExtract')}</button>
               </div>
-            )}
+              );
+            })()}
           </div>
         );
     }

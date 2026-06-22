@@ -39,6 +39,7 @@ const resources = {
         noParameters: 'This test has no parameters defined',
         noParametersHint: 'No parameters are defined for this test. Add parameters from Test Management first.',
         goToTests: 'Go to Test Management',
+        parasOnlyHint: 'Parasitology results are entered from the Parasitology page.',
       },
       parasitology: {
         title: 'Parasitology',
@@ -461,6 +462,7 @@ const resources = {
         noParameters: 'لا توجد معاملات لهذا الفحص',
         noParametersHint: 'لم يُعرّف معاملات لهذا الفحص. أضف المعاملات من دليل الفحوصات أولاً.',
         goToTests: 'الذهاب لدليل الفحوصات',
+        parasOnlyHint: 'نتائج الطفيليات تُدخل من صفحة الطفيليات فقط.',
       },
       parasitology: {
         title: 'قسم الطفيليات',

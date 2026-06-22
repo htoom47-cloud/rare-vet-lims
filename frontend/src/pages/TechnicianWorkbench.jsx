@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
+import { filterNonParasTests } from '../utils/parasitologyTests';
 
 export default function TechnicianWorkbench() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [queue, setQueue] = useState([]);
   const [critical, setCritical] = useState([]);
@@ -41,9 +43,15 @@ export default function TechnicianWorkbench() {
 
   const openResultEntry = async (sample) => {
     const { data } = await samplesAPI.get(sample.id);
-    setSelectedSample(data.data);
+    const labTests = filterNonParasTests(data.data.tests || []);
+    if (!labTests.length) {
+      toast(t('workbench.parasOnlyHint'), { icon: '🪱' });
+      navigate(`/parasitology?sample=${sample.id}`);
+      return;
+    }
+    setSelectedSample({ ...data.data, tests: labTests });
     const form = {};
-    for (const test of data.data.tests || []) {
+    for (const test of labTests) {
       const testDetail = await testsAPI.get(test.test_id);
       let existing = null;
       try {

@@ -22,6 +22,7 @@ import WorkflowStepper from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
 
 import { samplesAPI, animalsAPI, testsAPI, billingAPI, notificationsAPI } from '../services/api';
+import { getResultsEntryTargets } from '../utils/parasitologyTests';
 
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -520,11 +521,19 @@ export default function Samples() {
 
               )}
 
-              {['received', 'running'].includes(detailSample.status) && !detailSample.workflow?.all_validated && (
-
-                <button onClick={() => { setDetailSample(null); navigate(`/workbench?sample=${detailSample.id}`); }} className="btn-secondary text-sm">{t('workflow.goEnterResults')}</button>
-
-              )}
+              {['received', 'running'].includes(detailSample.status) && !detailSample.workflow?.all_validated && (() => {
+                const entry = getResultsEntryTargets(detailSample.id, detailSample.tests);
+                return (
+                  <>
+                    {entry.workbench && (
+                      <button onClick={() => { setDetailSample(null); navigate(entry.workbench); }} className="btn-secondary text-sm">{t('workflow.goEnterResults')}</button>
+                    )}
+                    {entry.parasitology && (
+                      <button onClick={() => { setDetailSample(null); navigate(entry.parasitology); }} className="btn-secondary text-sm">{t('nav.parasitology')}</button>
+                    )}
+                  </>
+                );
+              })()}
 
               {detailSample.workflow?.has_results && !detailSample.workflow?.all_validated && (
 

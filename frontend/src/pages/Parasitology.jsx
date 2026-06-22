@@ -1,15 +1,16 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { isParasitologyTest } from '../utils/parasitologyTests';
 
 const PARAS_BLOOD = 'PARAS-BLOOD';
 const PARAS_STOOL = 'PARAS-STOOL';
-const PARAS_TEST_CODES = new Set([PARAS_BLOOD, PARAS_STOOL]);
 
 const emptyParasiteForm = () => ({
   code: '', name: '', name_ar: '', unit: 'qual', sort_order: 0,
@@ -299,6 +300,7 @@ function buildFindingsFromExisting(testDetail, existing) {
 
 export default function Parasitology() {
   const { t, i18n } = useTranslation();
+  const [searchParams] = useSearchParams();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('tests.manage');
 
@@ -358,9 +360,7 @@ export default function Parasitology() {
 
   useEffect(() => { loadParasTypes(); }, [loadParasTypes]);
 
-  const parasTests = (sample) => (sample?.tests || []).filter(
-    (tst) => PARAS_TEST_CODES.has(tst.test_code)
-  );
+  const parasTests = (sample) => (sample?.tests || []).filter(isParasitologyTest);
 
   const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);
   const stoolTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_STOOL);
@@ -405,6 +405,17 @@ export default function Parasitology() {
       setStoolNotesParamId(null);
     }
   };
+
+  useEffect(() => {
+    const sampleId = searchParams.get('sample');
+    if (!sampleId || loading) return;
+    const match = queue.find((s) => s.id === sampleId);
+    if (match) {
+      openSample(match);
+      return;
+    }
+    samplesAPI.get(sampleId).then(({ data }) => openSample(data.data)).catch(() => {});
+  }, [searchParams, queue, loading]);
 
   const buildValues = (findings, notesParamId, notes) => {
     const values = findings
