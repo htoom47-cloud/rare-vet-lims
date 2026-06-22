@@ -99,7 +99,6 @@ function FindingPanel({
   onNotesChange,
   labels,
   displayName,
-  emptyHint,
   onUploadImage,
   onDeleteImage,
   uploadingId,
@@ -107,14 +106,7 @@ function FindingPanel({
   const { t } = useTranslation();
   const fileRefs = useRef({});
 
-  if (!test) {
-    return (
-      <div className="card p-6 text-center text-gray-500">
-        <Icon className="mx-auto mb-2 opacity-40" size={32} />
-        <p className="text-sm">{emptyHint}</p>
-      </div>
-    );
-  }
+  if (!test) return null;
 
   const qualOptions = (testMeta?.parameters || []).filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
   const usedParamIds = new Set(findings.map((f) => f.parameter_id).filter(Boolean));
@@ -318,6 +310,7 @@ export default function Parasitology() {
   const [stoolNotesParamId, setStoolNotesParamId] = useState(null);
 
   const [typesOpen, setTypesOpen] = useState(false);
+  const [typesTab, setTypesTab] = useState('blood');
   const [bloodMeta, setBloodMeta] = useState(null);
   const [stoolMeta, setStoolMeta] = useState(null);
   const [paramFormOpen, setParamFormOpen] = useState(false);
@@ -364,6 +357,12 @@ export default function Parasitology() {
 
   const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);
   const stoolTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_STOOL);
+  const hasBloodPanel = !!bloodTest;
+  const hasStoolPanel = !!stoolTest;
+
+  const sectionLabel = (testMeta) => (
+    testMeta?.code === PARAS_BLOOD ? t('parasitology.bloodSection') : t('parasitology.stoolSection')
+  );
 
   const openSample = async (sample) => {
     const { data } = await samplesAPI.get(sample.id);
@@ -426,6 +425,10 @@ export default function Parasitology() {
     }
     return values;
   };
+
+  const bloodValuesCount = buildValues(bloodFindings, bloodNotesParamId, bloodNotes).length;
+  const stoolValuesCount = buildValues(stoolFindings, stoolNotesParamId, stoolNotes).length;
+  const canSave = (hasBloodPanel && bloodValuesCount > 0) || (hasStoolPanel && stoolValuesCount > 0);
 
   const uploadPendingImages = async (testId, findings, setFindings) => {
     for (const finding of findings) {
@@ -641,9 +644,19 @@ export default function Parasitology() {
                 <p className="text-sm text-gray-500">
                   {selectedSample.customer_name} · {selectedSample.animal_code}
                 </p>
+                <p className="text-xs text-primary-700 dark:text-primary-300 mt-2">
+                  {hasBloodPanel && hasStoolPanel
+                    ? t('parasitology.orderedBoth')
+                    : hasBloodPanel
+                      ? t('parasitology.orderedBloodOnly')
+                      : hasStoolPanel
+                        ? t('parasitology.orderedStoolOnly')
+                        : t('parasitology.noParasTests')}
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className={`grid gap-4 ${hasBloodPanel && hasStoolPanel ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                {hasBloodPanel && (
                 <FindingPanel
                   title={t('parasitology.bloodSection')}
                   icon={Droplets}
@@ -655,11 +668,12 @@ export default function Parasitology() {
                   onNotesChange={setBloodNotes}
                   labels={labels}
                   displayName={displayName}
-                  emptyHint={t('parasitology.noBloodTest')}
                   onUploadImage={(testId, finding, file) => handleUploadImage(testId, finding, file, setBloodFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBloodFindings)}
                   uploadingId={uploadingId}
                 />
+                )}
+                {hasStoolPanel && (
                 <FindingPanel
                   title={t('parasitology.stoolSection')}
                   icon={Bug}
@@ -671,18 +685,20 @@ export default function Parasitology() {
                   onNotesChange={setStoolNotes}
                   labels={labels}
                   displayName={displayName}
-                  emptyHint={t('parasitology.noStoolTest')}
                   onUploadImage={(testId, finding, file) => handleUploadImage(testId, finding, file, setStoolFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setStoolFindings)}
                   uploadingId={uploadingId}
                 />
+                )}
               </div>
+
+              <p className="text-xs text-gray-500 text-center">{t('parasitology.saveHint')}</p>
 
               <button
                 type="button"
                 onClick={submitResults}
-                disabled={saving}
-                className="btn-primary w-full py-3"
+                disabled={saving || !canSave}
+                className="btn-primary w-full py-3 disabled:opacity-50"
               >
                 {saving ? t('common.loading') : t('parasitology.save')}
               </button>
@@ -691,8 +707,26 @@ export default function Parasitology() {
         </div>
       </div>
 
-      <Modal isOpen={typesOpen} onClose={() => setTypesOpen(false)} title={t('parasitology.editTypes')} size="xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Modal isOpen={typesOpen} onClose={() => setTypesOpen(false)} title={t('parasitology.editTypes')} size="lg">
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setTypesTab('blood')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === 'blood' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+          >
+            <Droplets size={16} />
+            {t('parasitology.bloodSection')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTypesTab('stool')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === 'stool' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+          >
+            <Bug size={16} />
+            {t('parasitology.stoolSection')}
+          </button>
+        </div>
+        {typesTab === 'blood' ? (
           <ParasiteTypeList
             title={t('parasitology.bloodSection')}
             icon={Droplets}
@@ -705,6 +739,7 @@ export default function Parasitology() {
             displayName={displayName}
             addLabel={t('parasitology.addParasite')}
           />
+        ) : (
           <ParasiteTypeList
             title={t('parasitology.stoolSection')}
             icon={Bug}
@@ -717,13 +752,17 @@ export default function Parasitology() {
             displayName={displayName}
             addLabel={t('parasitology.addParasite')}
           />
-        </div>
+        )}
       </Modal>
 
       <Modal
         isOpen={paramFormOpen}
         onClose={() => setParamFormOpen(false)}
-        title={editingParam ? t('parasitology.editParasite') : t('parasitology.addParasite')}
+        title={
+          editingParam
+            ? `${t('parasitology.editParasite')} — ${sectionLabel(paramTargetTest)}`
+            : `${t('parasitology.addParasite')} — ${sectionLabel(paramTargetTest)}`
+        }
         size="md"
       >
         <form onSubmit={handleSaveParasite} className="space-y-4">

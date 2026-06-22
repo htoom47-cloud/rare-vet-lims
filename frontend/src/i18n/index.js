@@ -43,7 +43,7 @@ const resources = {
       },
       parasitology: {
         title: 'Parasitology',
-        subtitle: 'Blood and stool parasite examination with microscope images',
+        subtitle: 'Blood and/or stool parasites — according to what was ordered for the sample',
         bloodSection: 'Blood Parasites',
         stoolSection: 'Stool Parasites',
         positive: 'Positive',
@@ -79,6 +79,11 @@ const resources = {
         selectParasiteFirst: 'Select parasite type first',
         imagePerFinding: 'Microscope image',
         result: 'Result',
+        orderedBloodOnly: 'Ordered: blood parasites only',
+        orderedStoolOnly: 'Ordered: stool parasites only',
+        orderedBoth: 'Ordered: blood and stool parasites',
+        noParasTests: 'No parasitology tests on this sample',
+        saveHint: 'You can save blood or stool results independently — only the ordered section(s) are shown',
       },
       workflow: {
         title: 'Workflow Progress',
@@ -468,7 +473,7 @@ const resources = {
       },
       parasitology: {
         title: 'قسم الطفيليات',
-        subtitle: 'فحص طفيليات الدم والبراز مع إرفاق صور المجهر',
+        subtitle: 'طفيليات الدم و/أو البراز — حسب ما طُلب في العينة',
         bloodSection: 'طفيليات الدم',
         stoolSection: 'طفيليات البراز',
         positive: 'إيجابي',
@@ -504,6 +509,11 @@ const resources = {
         selectParasiteFirst: 'اختر نوع الطفيل أولاً',
         imagePerFinding: 'صورة المجهر',
         result: 'النتيجة',
+        orderedBloodOnly: 'المطلوب: طفيليات الدم فقط',
+        orderedStoolOnly: 'المطلوب: طفيليات البراز فقط',
+        orderedBoth: 'المطلوب: طفيليات الدم والبراز',
+        noParasTests: 'لا توجد فحوصات طفيليات لهذه العينة',
+        saveHint: 'يمكن حفظ نتائج الدم أو البراز بشكل مستقل — يظهر فقط القسم المطلوب في العينة',
       },
       workflow: {
         title: 'تقدم سير العمل',
