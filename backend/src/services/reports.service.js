@@ -198,6 +198,7 @@ const buildReportData = async (sampleId, opts) => {
     isCritical: r.is_critical,
     method: r.test_method || '-',
     instrument: resolveInstrument(r.category_code, r.test_code),
+    categoryCode: r.category_code || null,
   }));
 
   const attachmentsResult = await query(
@@ -463,6 +464,12 @@ const getPreview = async (id) => {
         : (meta.collected_by_name || '-'),
     },
     results: base.results,
+    attachments: (base.attachments || []).map((a) => ({
+      fileUrl: a.file_url,
+      caption: a.caption,
+      testNameAr: a.test_name_ar,
+      testNameEn: a.test_name,
+    })),
     interpretation: base.aiInterpretation,
     recommendations: base.treatmentRecommendations,
     doctorNotes: base.doctorNotes,

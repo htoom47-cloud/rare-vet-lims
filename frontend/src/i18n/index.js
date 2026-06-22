@@ -344,7 +344,8 @@ const resources = {
         stampNote: 'Official laboratory stamp applied upon final approval',
         phone: 'Phone',
         legal: 'This report is confidential and intended for the requesting veterinarian only. Results must be interpreted in clinical context.',
-        downloadDone: 'PDF downloaded',
+        microscopeImages: 'Microscopy Images',
+        bloodSmear: 'Blood Smear',
         openingView: 'PDF unavailable — opening report view',
       },
       billing: {
@@ -765,6 +766,8 @@ const resources = {
         stampNote: 'يُطبَع ختم المختبر الرسمي عند الاعتماد النهائي',
         phone: 'الهاتف',
         legal: 'هذا التقرير سري وموجه للطبيب البيطري المعالج فقط. يجب تفسير النتائج في السياق السريري.',
+        microscopeImages: 'صور المجهر',
+        bloodSmear: 'مسحة الدم',
         openingView: 'تعذّر فتح PDF — جاري فتح عرض التقرير',
       },
       billing: {
