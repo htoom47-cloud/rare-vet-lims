@@ -84,6 +84,9 @@ const resources = {
         orderedBoth: 'Ordered: blood and stool parasites',
         noParasTests: 'No parasitology tests on this sample',
         saveHint: 'You can save blood or stool results independently — only the ordered section(s) are shown',
+        selectResultFirst: 'Select positive or negative before attaching an image',
+        imageQueued: 'Image will upload when you save results',
+        savedPartial: 'Section saved — complete remaining parasitology tests if any',
       },
       workflow: {
         title: 'Workflow Progress',
@@ -514,6 +517,9 @@ const resources = {
         orderedBoth: 'المطلوب: طفيليات الدم والبراز',
         noParasTests: 'لا توجد فحوصات طفيليات لهذه العينة',
         saveHint: 'يمكن حفظ نتائج الدم أو البراز بشكل مستقل — يظهر فقط القسم المطلوب في العينة',
+        selectResultFirst: 'حدد إيجابي أو سلبي قبل إرفاق الصورة',
+        imageQueued: 'ستُرفع الصورة عند حفظ النتائج',
+        savedPartial: 'تم حفظ القسم — أكمل فحوصات الطفيليات المتبقية إن وُجدت',
       },
       workflow: {
         title: 'تقدم سير العمل',

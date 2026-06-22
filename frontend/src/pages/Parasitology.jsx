@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -11,6 +11,13 @@ import { isParasitologyTest } from '../utils/parasitologyTests';
 
 const PARAS_BLOOD = 'PARAS-BLOOD';
 const PARAS_STOOL = 'PARAS-STOOL';
+const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
+
+const mediaUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('blob:')) return url;
+  return `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
+};
 
 const emptyParasiteForm = () => ({
   code: '', name: '', name_ar: '', unit: 'qual', sort_order: 0,
@@ -99,9 +106,8 @@ function FindingPanel({
   onNotesChange,
   labels,
   displayName,
-  onUploadImage,
+  onQueueImage,
   onDeleteImage,
-  uploadingId,
 }) {
   const { t } = useTranslation();
   const fileRefs = useRef({});
@@ -194,13 +200,13 @@ function FindingPanel({
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) onUploadImage(test.id, finding, file);
+                      if (file) onQueueImage(finding, file);
                       e.target.value = '';
                     }}
                   />
                   <button
                     type="button"
-                    disabled={!finding.parameter_id || uploadingId === finding.clientId}
+                    disabled={!finding.parameter_id}
                     onClick={() => {
                       if (!finding.parameter_id) {
                         toast.error(t('parasitology.selectParasiteFirst'));
@@ -211,7 +217,7 @@ function FindingPanel({
                     className="btn-secondary text-xs flex items-center gap-1.5 py-2"
                   >
                     <Camera size={14} />
-                    {uploadingId === finding.clientId ? t('common.loading') : t('parasitology.uploadImage')}
+                    {t('parasitology.uploadImage')}
                   </button>
                 </div>
 
@@ -220,7 +226,8 @@ function FindingPanel({
                     <img
                       src={
                         finding.attachment?.file_url
-                          || (finding.pendingFile ? URL.createObjectURL(finding.pendingFile) : '')
+                          ? mediaUrl(finding.attachment.file_url)
+                          : (finding.pendingFile ? URL.createObjectURL(finding.pendingFile) : '')
                       }
                       alt={paramLabel(finding.parameter_id)}
                       className="w-20 h-20 object-cover rounded-lg border border-primary-200"
@@ -229,6 +236,15 @@ function FindingPanel({
                       <button
                         type="button"
                         onClick={() => onDeleteImage(finding.attachment.id, finding.clientId)}
+                        className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                    {finding.pendingFile && !finding.attachment?.id && (
+                      <button
+                        type="button"
+                        onClick={() => onQueueImage(finding, null)}
                         className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white"
                       >
                         <Trash2 size={12} />
@@ -270,19 +286,19 @@ function buildFindingsFromExisting(testDetail, existing) {
   const notesParam = params.find((p) => p.code === 'NOTES');
   const attachmentsByParam = {};
   (existing?.attachments || []).forEach((a) => {
-    if (a.parameter_id) attachmentsByParam[a.parameter_id] = a;
+    if (a.parameter_id) attachmentsByParam[String(a.parameter_id)] = a;
   });
 
   const findings = qualParams
-    .filter((p) => existing?.values?.some((v) => v.parameter_id === p.id && v.value))
+    .filter((p) => existing?.values?.some((v) => String(v.parameter_id) === String(p.id) && v.value))
     .map((p) => {
-      const val = existing.values.find((v) => v.parameter_id === p.id);
+      const val = existing.values.find((v) => String(v.parameter_id) === String(p.id));
       return {
         clientId: `${p.id}-loaded`,
         parameter_id: p.id,
         value: val?.value || '',
         pendingFile: null,
-        attachment: attachmentsByParam[p.id] || null,
+        attachment: attachmentsByParam[String(p.id)] || null,
       };
     });
 
@@ -293,6 +309,7 @@ function buildFindingsFromExisting(testDetail, existing) {
 export default function Parasitology() {
   const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('tests.manage');
 
@@ -300,7 +317,6 @@ export default function Parasitology() {
   const [loading, setLoading] = useState(true);
   const [selectedSample, setSelectedSample] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [uploadingId, setUploadingId] = useState(null);
 
   const [bloodFindings, setBloodFindings] = useState([]);
   const [stoolFindings, setStoolFindings] = useState([]);
@@ -417,8 +433,14 @@ export default function Parasitology() {
   }, [searchParams, queue, loading]);
 
   const buildValues = (findings, notesParamId, notes) => {
+    const seen = new Set();
     const values = findings
       .filter((f) => f.parameter_id && f.value)
+      .filter((f) => {
+        if (seen.has(f.parameter_id)) return false;
+        seen.add(f.parameter_id);
+        return true;
+      })
       .map((f) => ({ parameter_id: f.parameter_id, value: f.value }));
     if (notesParamId && String(notes).trim()) {
       values.push({ parameter_id: notesParamId, value: notes.trim() });
@@ -431,46 +453,45 @@ export default function Parasitology() {
   const canSave = (hasBloodPanel && bloodValuesCount > 0) || (hasStoolPanel && stoolValuesCount > 0);
 
   const uploadPendingImages = async (testId, findings, setFindings) => {
+    const failures = [];
     for (const finding of findings) {
       if (!finding.pendingFile || !finding.parameter_id) continue;
-      const { data } = await resultsAPI.uploadAttachment(testId, finding.pendingFile, {
-        parameter_id: finding.parameter_id,
-      });
-      const att = (data.data?.attachments || []).find((a) => a.parameter_id === finding.parameter_id);
-      setFindings((prev) => prev.map((f) => (
-        f.clientId === finding.clientId
-          ? { ...f, pendingFile: null, attachment: att || f.attachment }
-          : f
-      )));
+      try {
+        const { data } = await resultsAPI.uploadAttachment(testId, finding.pendingFile, {
+          parameter_id: finding.parameter_id,
+        });
+        const att = (data.data?.attachments || []).find(
+          (a) => String(a.parameter_id) === String(finding.parameter_id)
+        );
+        setFindings((prev) => prev.map((f) => (
+          f.clientId === finding.clientId
+            ? { ...f, pendingFile: null, attachment: att || f.attachment }
+            : f
+        )));
+      } catch (err) {
+        failures.push(err.response?.data?.error?.message || err.message || 'upload');
+      }
+    }
+    if (failures.length) {
+      throw new Error(failures[0]);
     }
   };
 
-  const handleUploadImage = async (testId, finding, file, setFindings) => {
-    if (!finding.parameter_id) {
+  const queueImageForFinding = (finding, file, setFindings) => {
+    if (file && !finding.parameter_id) {
       toast.error(t('parasitology.selectParasiteFirst'));
       return;
     }
-
-    setUploadingId(finding.clientId);
-    try {
-      const { data } = await resultsAPI.uploadAttachment(testId, file, {
-        parameter_id: finding.parameter_id,
-      });
-      const att = (data.data?.attachments || []).find((a) => a.parameter_id === finding.parameter_id);
-      setFindings((prev) => prev.map((f) => (
-        f.clientId === finding.clientId
-          ? { ...f, pendingFile: null, attachment: att || data.data?.attachments?.at(-1) || null }
-          : f
-      )));
-      toast.success(t('parasitology.imageUploaded'));
-    } catch (err) {
-      const msg = err.response?.data?.error?.message;
-      toast.error(msg && msg !== 'An unexpected error occurred'
-        ? msg
-        : t('parasitology.imageUploadFailed'));
-    } finally {
-      setUploadingId(null);
+    if (file && !finding.value) {
+      toast.error(t('parasitology.selectResultFirst'));
+      return;
     }
+    setFindings((prev) => prev.map((f) => (
+      f.clientId === finding.clientId
+        ? { ...f, pendingFile: file, attachment: file ? null : f.attachment }
+        : f
+    )));
+    if (file) toast.success(t('parasitology.imageQueued'));
   };
 
   const handleDeleteImage = async (attachmentId, clientId, setFindings) => {
@@ -502,21 +523,34 @@ export default function Parasitology() {
 
     setSaving(true);
     try {
+      const sampleId = selectedSample.id;
       for (const job of jobs) {
         await resultsAPI.enter({ sample_test_id: job.test.id, values: job.values });
         await uploadPendingImages(job.test.id, job.findings, job.setFindings);
       }
-      const { data: queueData } = await samplesAPI.parasitologyQueue();
-      const stillInQueue = (queueData.data || []).some((s) => s.id === selectedSample.id);
-      toast.success(stillInQueue ? t('parasitology.saved') : t('parasitology.savedGoValidate'));
+
+      const [{ data: queueData }, { data: validationData }] = await Promise.all([
+        samplesAPI.parasitologyQueue(),
+        samplesAPI.list({ awaiting_validation: true, limit: 100 }),
+      ]);
+      const stillInQueue = (queueData.data || []).some((s) => s.id === sampleId);
+      const canValidate = (validationData.data || []).some((s) => s.id === sampleId);
+
       loadQueue();
-      if (stillInQueue) {
-        await openSample(selectedSample);
+      if (canValidate) {
+        toast.success(t('parasitology.savedGoValidate'));
+        setSelectedSample(null);
+        navigate(`/vet-review?sample=${sampleId}`);
+      } else if (stillInQueue) {
+        toast.success(t('parasitology.savedPartial'));
+        await openSample({ id: sampleId });
       } else {
+        toast.success(t('parasitology.saved'));
         setSelectedSample(null);
       }
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
+      const msg = err.response?.data?.error?.message || err.message;
+      toast.error(msg || 'Error');
     } finally {
       setSaving(false);
     }
@@ -668,9 +702,8 @@ export default function Parasitology() {
                   onNotesChange={setBloodNotes}
                   labels={labels}
                   displayName={displayName}
-                  onUploadImage={(testId, finding, file) => handleUploadImage(testId, finding, file, setBloodFindings)}
+                  onQueueImage={(finding, file) => queueImageForFinding(finding, file, setBloodFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBloodFindings)}
-                  uploadingId={uploadingId}
                 />
                 )}
                 {hasStoolPanel && (
@@ -685,9 +718,8 @@ export default function Parasitology() {
                   onNotesChange={setStoolNotes}
                   labels={labels}
                   displayName={displayName}
-                  onUploadImage={(testId, finding, file) => handleUploadImage(testId, finding, file, setStoolFindings)}
+                  onQueueImage={(finding, file) => queueImageForFinding(finding, file, setStoolFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setStoolFindings)}
-                  uploadingId={uploadingId}
                 />
                 )}
               </div>

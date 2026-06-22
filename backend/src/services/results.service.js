@@ -1,3 +1,4 @@
+const path = require('path');
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
@@ -275,9 +276,24 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
     const st = await client.query('SELECT id FROM sample_tests WHERE id = $1', [sampleTestId]);
     if (!st.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
 
+    if (!file?.buffer?.length) {
+      throw new AppError('Empty or unreadable image file', 400, 'VALIDATION_ERROR');
+    }
+
     const resultId = await ensureResultId(client, sampleTestId, userId);
-    const safeName = file.originalname || file.mimetype?.replace('/', '.') || 'image.jpg';
-    const saved = await saveFile(file.buffer, 'microscope', safeName);
+    let safeName = file.originalname || file.mimetype?.replace('/', '.') || 'microscope.jpg';
+    if (!path.extname(safeName)) safeName = `${safeName}.jpg`;
+
+    let saved;
+    try {
+      saved = await saveFile(file.buffer, 'microscope', safeName);
+    } catch (storageErr) {
+      throw new AppError(
+        `Could not store microscope image: ${storageErr.message}`,
+        500,
+        'STORAGE_ERROR'
+      );
+    }
 
     const paramId = parameter_id && String(parameter_id).trim() ? String(parameter_id).trim() : null;
 
@@ -306,7 +322,11 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
     if (err.code === '22P02') {
       throw new AppError('Invalid parasite parameter for this image', 400, 'VALIDATION_ERROR');
     }
-    throw err;
+    if (err.code === '23503') {
+      throw new AppError('Invalid parasite parameter for this image', 400, 'VALIDATION_ERROR');
+    }
+    if (err.isOperational) throw err;
+    throw new AppError('Could not attach microscope image', 500, 'UPLOAD_FAILED');
   } finally {
     client.release();
   }

@@ -119,22 +119,32 @@ const s3Delete = async (key) => {
   }));
 };
 
+const saveFileLocal = async (buffer, subdir, filename) => {
+  const uploadPath = ensureUploadDir();
+  const filePath = path.join(uploadPath, subdir, filename);
+  await fs.promises.writeFile(filePath, buffer);
+  const url = uploadUrl(subdir, filename);
+  logger.info('File saved locally', { url, subdir });
+  return { url, path: filePath, filename };
+};
+
 const saveFile = async (buffer, subdir, originalName) => {
   const ext = path.extname(originalName || '') || '.jpg';
   const filename = `${uuidv4()}${ext}`;
   const url = uploadUrl(subdir, filename);
 
   if (isS3Storage()) {
-    await s3Put(`${subdir}/${filename}`, buffer, guessMime(filename));
-    logger.info('File saved to S3', { url, subdir });
-    return { url, filename, path: null };
+    try {
+      await s3Put(`${subdir}/${filename}`, buffer, guessMime(filename));
+      logger.info('File saved to S3', { url, subdir });
+      return { url, filename, path: null };
+    } catch (err) {
+      logger.warn('S3 upload failed — falling back to local disk', { error: err.message, subdir });
+      return saveFileLocal(buffer, subdir, filename);
+    }
   }
 
-  const uploadPath = ensureUploadDir();
-  const filePath = path.join(uploadPath, subdir, filename);
-  await fs.promises.writeFile(filePath, buffer);
-  logger.info('File saved locally', { url, subdir });
-  return { url, path: filePath, filename };
+  return saveFileLocal(buffer, subdir, filename);
 };
 
 /** Persist a file written to disk (e.g. PDF) — uploads to S3 when configured. */

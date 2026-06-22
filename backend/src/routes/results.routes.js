@@ -25,9 +25,18 @@ const upload = multer({
   },
 });
 
+const pickUploadFile = (req) => {
+  if (req.file) return req.file;
+  const files = req.files || [];
+  return files.find((f) => f.fieldname === 'image' || f.fieldname === 'file') || files[0] || null;
+};
+
 const handleUpload = (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
-    if (!err) return next();
+  upload.fields([{ name: 'image', maxCount: 1 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
+    if (!err) {
+      req.file = pickUploadFile(req);
+      return next();
+    }
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
     }
