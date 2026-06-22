@@ -236,13 +236,13 @@ const regeneratePdf = async (reportRow) => {
   const localDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, localDir, existingName ? { filename: existingName } : {});
 
-  if (reportRow.pdf_url) {
-    await deleteFile(reportRow.pdf_url);
-  }
-
   const saved = await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
   if (saved.url !== reportRow.pdf_url) {
     await query('UPDATE reports SET pdf_url = $1 WHERE id = $2', [saved.url, reportRow.id]);
+  }
+
+  if (reportRow.pdf_url && reportRow.pdf_url !== saved.url) {
+    await deleteFile(reportRow.pdf_url);
   }
   return saved.url;
 };
