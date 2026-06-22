@@ -144,11 +144,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   const resultGroups = useMemo(() => groupResults(report?.results), [report]);
 
-  const instruments = useMemo(() => {
-    const set = new Set((report?.results || []).map((r) => r.instrument).filter(Boolean));
-    return [...set].join(' · ');
-  }, [report]);
-
   const attachments = useMemo(() => report?.attachments || [], [report]);
 
   const speciesLabel = (type) => {
@@ -395,9 +390,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             </div>
           </div>
           <div className="lab-rpt-footer-info">
-            {instruments && (
-              <p className="lab-rpt-instruments"><b>{t('labReport.instrumentsUsed')}:</b> {instruments}</p>
-            )}
             <p className="lab-rpt-contact">{labName} · {report.lab.phone} · {report.lab.email}</p>
             <p className="lab-rpt-legal">{t('labReport.legal')}</p>
           </div>
