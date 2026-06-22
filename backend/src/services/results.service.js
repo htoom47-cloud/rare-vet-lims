@@ -276,13 +276,16 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
     if (!st.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
 
     const resultId = await ensureResultId(client, sampleTestId, userId);
-    const saved = await saveFile(file.buffer, 'microscope', file.originalname);
+    const safeName = file.originalname || file.mimetype?.replace('/', '.') || 'image.jpg';
+    const saved = await saveFile(file.buffer, 'microscope', safeName);
+
+    const paramId = parameter_id && String(parameter_id).trim() ? String(parameter_id).trim() : null;
 
     const attachmentId = uuidv4();
     await client.query(
       `INSERT INTO result_attachments (id, result_id, parameter_id, file_url, caption, uploaded_by)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [attachmentId, resultId, parameter_id || null, saved.url, caption || null, userId]
+      [attachmentId, resultId, paramId, saved.url, caption || null, userId]
     );
 
     await client.query(

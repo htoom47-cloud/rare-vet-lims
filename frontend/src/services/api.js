@@ -10,6 +10,10 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Let the browser set multipart boundary — manual Content-Type breaks uploads.
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
@@ -60,7 +64,7 @@ export const animalsAPI = {
   uploadImage: (id, file) => {
     const form = new FormData();
     form.append('image', file);
-    return api.post(`/animals/${id}/image`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.post(`/animals/${id}/image`, form);
   },
 };
 
@@ -98,9 +102,7 @@ export const resultsAPI = {
     form.append('image', file);
     if (opts.caption) form.append('caption', opts.caption);
     if (opts.parameter_id) form.append('parameter_id', opts.parameter_id);
-    return api.post(`/results/sample-test/${sampleTestId}/attachments`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post(`/results/sample-test/${sampleTestId}/attachments`, form);
   },
   deleteAttachment: (id) => api.delete(`/results/attachments/${id}`),
 };

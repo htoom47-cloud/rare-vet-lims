@@ -52,6 +52,8 @@ const guessMime = (filename) => {
     '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
     '.webp': 'image/webp',
+    '.heic': 'image/heic',
+    '.heif': 'image/heif',
   };
   return map[ext] || 'application/octet-stream';
 };
@@ -118,7 +120,7 @@ const s3Delete = async (key) => {
 };
 
 const saveFile = async (buffer, subdir, originalName) => {
-  const ext = path.extname(originalName) || '.bin';
+  const ext = path.extname(originalName || '') || '.jpg';
   const filename = `${uuidv4()}${ext}`;
   const url = uploadUrl(subdir, filename);
 

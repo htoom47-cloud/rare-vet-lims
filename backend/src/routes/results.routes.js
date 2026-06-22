@@ -6,7 +6,29 @@ const { validate } = require('../middleware/validate');
 const { resultEntrySchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype?.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  },
+});
+
+const handleUpload = (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
+    }
+    return res.status(400).json({
+      success: false,
+      error: { message: err.message || 'Invalid image upload' },
+    });
+  });
+};
 const router = express.Router();
 router.use(authenticate);
 
@@ -48,7 +70,7 @@ router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), 
 router.post(
   '/sample-test/:id/attachments',
   authorize(PERMISSIONS.RESULTS_ENTER),
-  upload.single('image'),
+  handleUpload,
   async (req, res, next) => {
     try {
       if (!req.file) {
