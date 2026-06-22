@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -309,7 +309,6 @@ function buildFindingsFromExisting(testDetail, existing) {
 export default function Parasitology() {
   const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('tests.manage');
 
@@ -512,11 +511,27 @@ export default function Parasitology() {
     const jobs = [];
     if (bloodTest) {
       const values = buildValues(bloodFindings, bloodNotesParamId, bloodNotes);
-      if (values.length) jobs.push({ test: bloodTest, values, findings: bloodFindings, setFindings: setBloodFindings });
+      if (values.length) {
+        jobs.push({
+          test: bloodTest,
+          values,
+          findings: bloodFindings,
+          setFindings: setBloodFindings,
+          notes: bloodNotes,
+        });
+      }
     }
     if (stoolTest) {
       const values = buildValues(stoolFindings, stoolNotesParamId, stoolNotes);
-      if (values.length) jobs.push({ test: stoolTest, values, findings: stoolFindings, setFindings: setStoolFindings });
+      if (values.length) {
+        jobs.push({
+          test: stoolTest,
+          values,
+          findings: stoolFindings,
+          setFindings: setStoolFindings,
+          notes: stoolNotes,
+        });
+      }
     }
 
     if (!jobs.length) return toast.error(t('parasitology.enterOneValue'));
@@ -527,25 +542,23 @@ export default function Parasitology() {
       for (const job of jobs) {
         await resultsAPI.enter({ sample_test_id: job.test.id, values: job.values });
         await uploadPendingImages(job.test.id, job.findings, job.setFindings);
+        await resultsAPI.validate(job.test.id, job.notes?.trim() || '');
       }
 
-      const [{ data: queueData }, { data: validationData }] = await Promise.all([
-        samplesAPI.parasitologyQueue(),
-        samplesAPI.list({ awaiting_validation: true, limit: 100 }),
-      ]);
+      const { data: queueData } = await samplesAPI.parasitologyQueue();
       const stillInQueue = (queueData.data || []).some((s) => s.id === sampleId);
-      const canValidate = (validationData.data || []).some((s) => s.id === sampleId);
+      const allParasOnSample = parasTests(selectedSample);
+      const approvedAll = jobs.length === allParasOnSample.length && !stillInQueue;
 
       loadQueue();
-      if (canValidate) {
-        toast.success(t('parasitology.savedGoValidate'));
+      if (approvedAll) {
+        toast.success(t('parasitology.approved'));
         setSelectedSample(null);
-        navigate(`/vet-review?sample=${sampleId}`);
       } else if (stillInQueue) {
-        toast.success(t('parasitology.savedPartial'));
+        toast.success(t('parasitology.approvedPartial'));
         await openSample({ id: sampleId });
       } else {
-        toast.success(t('parasitology.saved'));
+        toast.success(t('parasitology.approved'));
         setSelectedSample(null);
       }
     } catch (err) {
@@ -724,7 +737,7 @@ export default function Parasitology() {
                 )}
               </div>
 
-              <p className="text-xs text-gray-500 text-center">{t('parasitology.saveHint')}</p>
+              <p className="text-xs text-gray-500 text-center">{t('parasitology.approveHint')}</p>
 
               <button
                 type="button"
@@ -732,7 +745,7 @@ export default function Parasitology() {
                 disabled={saving || !canSave}
                 className="btn-primary w-full py-3 disabled:opacity-50"
               >
-                {saving ? t('common.loading') : t('parasitology.save')}
+                {saving ? t('common.loading') : t('parasitology.approve')}
               </button>
             </div>
           )}
