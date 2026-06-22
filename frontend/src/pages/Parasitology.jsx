@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,20 +15,28 @@ const emptyParasiteForm = () => ({
   code: '', name: '', name_ar: '', unit: 'qual', sort_order: 0,
 });
 
+const createFinding = () => ({
+  clientId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  parameter_id: '',
+  value: '',
+  pendingFile: null,
+  attachment: null,
+});
+
 function QualToggle({ value, onChange, labels }) {
   return (
-    <div className="flex gap-1 mt-1">
+    <div className="flex gap-1">
       {[
-        { v: '', label: labels.notSet, cls: 'bg-gray-100 dark:bg-gray-800 text-gray-500' },
-        { v: 'Negative', label: labels.negative, cls: 'data-[on=true]:bg-green-600 data-[on=true]:text-white' },
-        { v: 'Positive', label: labels.positive, cls: 'data-[on=true]:bg-red-600 data-[on=true]:text-white' },
+        { v: 'Negative', label: labels.negative, active: 'bg-green-600 text-white' },
+        { v: 'Positive', label: labels.positive, active: 'bg-red-600 text-white' },
       ].map((opt) => (
         <button
-          key={opt.v || 'empty'}
+          key={opt.v}
           type="button"
-          data-on={value === opt.v}
           onClick={() => onChange(opt.v)}
-          className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium border border-primary-200 dark:border-primary-700 transition ${opt.cls} ${value === opt.v ? (opt.v === 'Negative' ? 'bg-green-600 text-white' : opt.v === 'Positive' ? 'bg-red-600 text-white' : opt.cls) : 'hover:bg-primary-50 dark:hover:bg-primary-900/30'}`}
+          className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium border border-primary-200 dark:border-primary-700 transition ${
+            value === opt.v ? opt.active : 'hover:bg-primary-50 dark:hover:bg-primary-900/30'
+          }`}
         >
           {opt.label}
         </button>
@@ -79,7 +87,25 @@ function ParasiteTypeList({ title, icon: Icon, testMeta, params, canManage, onAd
   );
 }
 
-function ParasiteSection({ title, icon: Icon, test, fields, onChange, labels, emptyHint }) {
+function FindingPanel({
+  title,
+  icon: Icon,
+  test,
+  testMeta,
+  findings,
+  notes,
+  onFindingsChange,
+  onNotesChange,
+  labels,
+  displayName,
+  emptyHint,
+  onUploadImage,
+  onDeleteImage,
+  uploadingId,
+}) {
+  const { t } = useTranslation();
+  const fileRefs = useRef({});
+
   if (!test) {
     return (
       <div className="card p-6 text-center text-gray-500">
@@ -89,51 +115,205 @@ function ParasiteSection({ title, icon: Icon, test, fields, onChange, labels, em
     );
   }
 
+  const qualOptions = (testMeta?.parameters || []).filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
+  const usedParamIds = new Set(findings.map((f) => f.parameter_id).filter(Boolean));
+
+  const updateFinding = (clientId, patch) => {
+    onFindingsChange(findings.map((f) => (f.clientId === clientId ? { ...f, ...patch } : f)));
+  };
+
+  const removeFinding = async (finding) => {
+    if (finding.attachment?.id) {
+      await onDeleteImage(finding.attachment.id, finding.clientId);
+    }
+    onFindingsChange(findings.filter((f) => f.clientId !== finding.clientId));
+  };
+
+  const addFinding = () => {
+    onFindingsChange([...findings, createFinding()]);
+  };
+
+  const paramLabel = (parameterId) => {
+    const p = qualOptions.find((o) => o.id === parameterId);
+    return p ? displayName(p) : '';
+  };
+
   return (
     <div className="card">
       <h3 className="font-semibold flex items-center gap-2 mb-4 pb-3 border-b border-primary-200 dark:border-primary-700">
         <Icon size={20} className="text-primary-600" />
         {title}
       </h3>
-      <div className="space-y-3">
-        {fields.map((param, idx) => (
-          <div key={param.parameter_id} className="p-3 rounded-lg bg-primary-50/50 dark:bg-primary-900/20">
-            <label className="text-sm font-medium block">
-              {param.displayName}
-            </label>
-            {param.unit === 'qual' ? (
-              <QualToggle
-                value={param.value}
-                onChange={(v) => onChange(test.id, idx, v)}
-                labels={labels}
-              />
-            ) : (
-              <textarea
-                value={param.value}
-                onChange={(e) => onChange(test.id, idx, e.target.value)}
-                className="input-field mt-1 min-h-[60px]"
-                placeholder={labels.notes}
-              />
-            )}
-          </div>
-        ))}
+
+      {findings.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-4">{t('parasitology.noFindings')}</p>
+      ) : (
+        <div className="space-y-4">
+          {findings.map((finding) => (
+            <div
+              key={finding.clientId}
+              className="p-3 rounded-xl border border-primary-200/80 dark:border-primary-700 bg-primary-50/40 dark:bg-primary-900/20 space-y-3"
+            >
+              <div className="flex flex-wrap gap-2 items-start">
+                <div className="flex-1 min-w-[160px]">
+                  <label className="text-xs text-gray-500 block mb-1">{t('parasitology.selectParasite')}</label>
+                  <select
+                    value={finding.parameter_id}
+                    onChange={(e) => updateFinding(finding.clientId, { parameter_id: e.target.value })}
+                    className="input-field text-sm"
+                  >
+                    <option value="">{t('parasitology.selectParasite')}</option>
+                    {qualOptions
+                      .filter((p) => p.id === finding.parameter_id || !usedParamIds.has(p.id))
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>{displayName(p)}</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="flex-1 min-w-[140px]">
+                  <label className="text-xs text-gray-500 block mb-1">{t('parasitology.result')}</label>
+                  <QualToggle
+                    value={finding.value}
+                    onChange={(v) => updateFinding(finding.clientId, { value: v })}
+                    labels={labels}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => removeFinding(finding)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg mt-5"
+                  title={t('common.delete')}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-primary-200/60 dark:border-primary-700/60">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">{t('parasitology.imagePerFinding')}</label>
+                  <input
+                    ref={(el) => { fileRefs.current[finding.clientId] = el; }}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onUploadImage(test.id, finding, file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!finding.parameter_id || uploadingId === finding.clientId}
+                    onClick={() => {
+                      if (!finding.parameter_id) {
+                        toast.error(t('parasitology.selectParasiteFirst'));
+                        return;
+                      }
+                      fileRefs.current[finding.clientId]?.click();
+                    }}
+                    className="btn-secondary text-xs flex items-center gap-1.5 py-2"
+                  >
+                    <Camera size={14} />
+                    {uploadingId === finding.clientId ? t('common.loading') : t('parasitology.uploadImage')}
+                  </button>
+                </div>
+
+                {(finding.attachment?.file_url || finding.pendingFile) && (
+                  <div className="relative group">
+                    <img
+                      src={
+                        finding.attachment?.file_url
+                          || (finding.pendingFile ? URL.createObjectURL(finding.pendingFile) : '')
+                      }
+                      alt={paramLabel(finding.parameter_id)}
+                      className="w-20 h-20 object-cover rounded-lg border border-primary-200"
+                    />
+                    {finding.attachment?.id && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteImage(finding.attachment.id, finding.clientId)}
+                        className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={addFinding}
+        className="mt-4 w-full btn-secondary text-sm flex items-center justify-center gap-2 py-2.5"
+      >
+        <Plus size={16} />
+        {t('parasitology.addFinding')}
+      </button>
+
+      <div className="mt-4 pt-4 border-t border-primary-200 dark:border-primary-700">
+        <label className="text-sm font-medium block mb-1">{labels.notes}</label>
+        <textarea
+          value={notes}
+          onChange={(e) => onNotesChange(e.target.value)}
+          className="input-field min-h-[60px] text-sm"
+          placeholder={labels.notes}
+        />
       </div>
     </div>
   );
+}
+
+function buildFindingsFromExisting(testDetail, existing) {
+  const params = testDetail?.parameters || [];
+  const qualParams = params.filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
+  const notesParam = params.find((p) => p.code === 'NOTES');
+  const attachmentsByParam = {};
+  (existing?.attachments || []).forEach((a) => {
+    if (a.parameter_id) attachmentsByParam[a.parameter_id] = a;
+  });
+
+  const findings = qualParams
+    .filter((p) => existing?.values?.some((v) => v.parameter_id === p.id && v.value))
+    .map((p) => {
+      const val = existing.values.find((v) => v.parameter_id === p.id);
+      return {
+        clientId: `${p.id}-loaded`,
+        parameter_id: p.id,
+        value: val?.value || '',
+        pendingFile: null,
+        attachment: attachmentsByParam[p.id] || null,
+      };
+    });
+
+  const notes = existing?.values?.find((v) => v.parameter_id === notesParam?.id)?.value || '';
+  return { findings, notes, notesParamId: notesParam?.id };
 }
 
 export default function Parasitology() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('tests.manage');
-  const fileRef = useRef(null);
+
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSample, setSelectedSample] = useState(null);
-  const [resultForm, setResultForm] = useState({});
-  const [attachments, setAttachments] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingId, setUploadingId] = useState(null);
+
+  const [bloodFindings, setBloodFindings] = useState([]);
+  const [stoolFindings, setStoolFindings] = useState([]);
+  const [bloodNotes, setBloodNotes] = useState('');
+  const [stoolNotes, setStoolNotes] = useState('');
+  const [bloodNotesParamId, setBloodNotesParamId] = useState(null);
+  const [stoolNotesParamId, setStoolNotesParamId] = useState(null);
 
   const [typesOpen, setTypesOpen] = useState(false);
   const [bloodMeta, setBloodMeta] = useState(null);
@@ -148,7 +328,6 @@ export default function Parasitology() {
   const labels = {
     positive: t('parasitology.positive'),
     negative: t('parasitology.negative'),
-    notSet: t('parasitology.notSet'),
     notes: t('parasitology.notes'),
   };
 
@@ -179,31 +358,145 @@ export default function Parasitology() {
 
   useEffect(() => { loadParasTypes(); }, [loadParasTypes]);
 
-  const reloadSampleForm = async (sample) => {
-    if (!sample) return;
+  const parasTests = (sample) => (sample?.tests || []).filter(
+    (tst) => PARAS_TEST_CODES.has(tst.test_code)
+  );
+
+  const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);
+  const stoolTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_STOOL);
+
+  const openSample = async (sample) => {
     const { data } = await samplesAPI.get(sample.id);
-    const form = {};
-    for (const test of parasTests(data.data)) {
-      const testDetail = await testsAPI.get(test.test_id);
+    setSelectedSample(data.data);
+
+    const tests = parasTests(data.data);
+    const bt = tests.find((tst) => tst.test_code === PARAS_BLOOD);
+    const st = tests.find((tst) => tst.test_code === PARAS_STOOL);
+
+    if (bt) {
+      const testDetail = (await testsAPI.get(bt.test_id)).data.data;
       let existing = null;
       try {
-        const res = await resultsAPI.get(test.id);
-        existing = res.data.data;
-      } catch { /* no results */ }
-      form[test.id] = (testDetail.data.data.parameters || []).map((p) => {
-        const val = existing?.values?.find((v) => v.parameter_id === p.id);
-        const prev = (resultForm[test.id] || []).find((f) => f.parameter_id === p.id);
-        return {
-          parameter_id: p.id,
-          name: p.name,
-          name_ar: p.name_ar,
-          unit: p.unit,
-          value: val?.value || prev?.value || '',
-          displayName: i18n.language === 'ar' && p.name_ar ? p.name_ar : p.name,
-        };
-      });
+        existing = (await resultsAPI.get(bt.id)).data.data;
+      } catch { /* none */ }
+      const loaded = buildFindingsFromExisting(testDetail, existing);
+      setBloodFindings(loaded.findings);
+      setBloodNotes(loaded.notes);
+      setBloodNotesParamId(loaded.notesParamId);
+    } else {
+      setBloodFindings([]);
+      setBloodNotes('');
+      setBloodNotesParamId(null);
     }
-    setResultForm(form);
+
+    if (st) {
+      const testDetail = (await testsAPI.get(st.test_id)).data.data;
+      let existing = null;
+      try {
+        existing = (await resultsAPI.get(st.id)).data.data;
+      } catch { /* none */ }
+      const loaded = buildFindingsFromExisting(testDetail, existing);
+      setStoolFindings(loaded.findings);
+      setStoolNotes(loaded.notes);
+      setStoolNotesParamId(loaded.notesParamId);
+    } else {
+      setStoolFindings([]);
+      setStoolNotes('');
+      setStoolNotesParamId(null);
+    }
+  };
+
+  const buildValues = (findings, notesParamId, notes) => {
+    const values = findings
+      .filter((f) => f.parameter_id && f.value)
+      .map((f) => ({ parameter_id: f.parameter_id, value: f.value }));
+    if (notesParamId && String(notes).trim()) {
+      values.push({ parameter_id: notesParamId, value: notes.trim() });
+    }
+    return values;
+  };
+
+  const uploadPendingImages = async (testId, findings, setFindings) => {
+    for (const finding of findings) {
+      if (!finding.pendingFile || !finding.parameter_id) continue;
+      const { data } = await resultsAPI.uploadAttachment(testId, finding.pendingFile, {
+        parameter_id: finding.parameter_id,
+      });
+      const att = (data.data?.attachments || []).find((a) => a.parameter_id === finding.parameter_id);
+      setFindings((prev) => prev.map((f) => (
+        f.clientId === finding.clientId
+          ? { ...f, pendingFile: null, attachment: att || f.attachment }
+          : f
+      )));
+    }
+  };
+
+  const handleUploadImage = async (testId, finding, file, setFindings) => {
+    if (!finding.parameter_id) {
+      toast.error(t('parasitology.selectParasiteFirst'));
+      return;
+    }
+
+    setUploadingId(finding.clientId);
+    try {
+      const { data } = await resultsAPI.uploadAttachment(testId, file, {
+        parameter_id: finding.parameter_id,
+      });
+      const att = (data.data?.attachments || []).find((a) => a.parameter_id === finding.parameter_id);
+      setFindings((prev) => prev.map((f) => (
+        f.clientId === finding.clientId
+          ? { ...f, pendingFile: null, attachment: att || data.data?.attachments?.at(-1) || null }
+          : f
+      )));
+      toast.success(t('parasitology.imageUploaded'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Error');
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  const handleDeleteImage = async (attachmentId, clientId, setFindings) => {
+    try {
+      await resultsAPI.deleteAttachment(attachmentId);
+      setFindings((prev) => prev.map((f) => (
+        f.clientId === clientId ? { ...f, attachment: null, pendingFile: null } : f
+      )));
+      toast.success(t('parasitology.imageDeleted'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Error');
+    }
+  };
+
+  const submitResults = async () => {
+    if (!selectedSample) return;
+
+    const jobs = [];
+    if (bloodTest) {
+      const values = buildValues(bloodFindings, bloodNotesParamId, bloodNotes);
+      if (values.length) jobs.push({ test: bloodTest, values, findings: bloodFindings, setFindings: setBloodFindings });
+    }
+    if (stoolTest) {
+      const values = buildValues(stoolFindings, stoolNotesParamId, stoolNotes);
+      if (values.length) jobs.push({ test: stoolTest, values, findings: stoolFindings, setFindings: setStoolFindings });
+    }
+
+    if (!jobs.length) return toast.error(t('parasitology.enterOneValue'));
+
+    setSaving(true);
+    try {
+      for (const job of jobs) {
+        await resultsAPI.enter({ sample_test_id: job.test.id, values: job.values });
+        await uploadPendingImages(job.test.id, job.findings, job.setFindings);
+      }
+      toast.success(t('parasitology.saved'));
+      loadQueue();
+      await openSample(selectedSample);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openAddParasite = (testMeta) => {
@@ -248,7 +541,7 @@ export default function Parasitology() {
       }
       setParamFormOpen(false);
       await loadParasTypes();
-      if (selectedSample) await reloadSampleForm(selectedSample);
+      if (selectedSample) await openSample(selectedSample);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'Error');
     }
@@ -260,7 +553,7 @@ export default function Parasitology() {
       await testsAPI.deleteParameter(param.id);
       toast.success(t('parasitology.paramDeleted'));
       await loadParasTypes();
-      if (selectedSample) await reloadSampleForm(selectedSample);
+      if (selectedSample) await openSample(selectedSample);
     } catch (err) {
       const msg = err.response?.data?.error?.code === 'PROTECTED_PARAMETER'
         ? t('parasitology.protectedParam')
@@ -268,126 +561,6 @@ export default function Parasitology() {
       toast.error(msg);
     }
   };
-
-  const parasTests = (sample) => (sample?.tests || []).filter(
-    (tst) => PARAS_TEST_CODES.has(tst.test_code)
-  );
-
-  const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);
-  const stoolTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_STOOL);
-  const primaryTest = bloodTest || stoolTest || parasTests(selectedSample)[0];
-
-  const openSample = async (sample) => {
-    const { data } = await samplesAPI.get(sample.id);
-    setSelectedSample(data.data);
-
-    const form = {};
-    const allAttachments = [];
-
-    for (const test of parasTests(data.data)) {
-      const testDetail = await testsAPI.get(test.test_id);
-      let existing = null;
-      try {
-        const res = await resultsAPI.get(test.id);
-        existing = res.data.data;
-      } catch { /* no results */ }
-
-      if (existing?.attachments?.length) {
-        allAttachments.push(...existing.attachments.map((a) => ({ ...a, sample_test_id: test.id })));
-      }
-
-      form[test.id] = (testDetail.data.data.parameters || []).map((p) => {
-        const val = existing?.values?.find((v) => v.parameter_id === p.id);
-        return {
-          parameter_id: p.id,
-          name: p.name,
-          name_ar: p.name_ar,
-          unit: p.unit,
-          value: val?.value || '',
-          displayName: i18n.language === 'ar' && p.name_ar ? p.name_ar : p.name,
-        };
-      });
-    }
-
-    setResultForm(form);
-    setAttachments(allAttachments);
-  };
-
-  const updateField = (testId, idx, value) => {
-    const updated = [...(resultForm[testId] || [])];
-    updated[idx] = { ...updated[idx], value };
-    setResultForm({ ...resultForm, [testId]: updated });
-  };
-
-  const submitResults = async () => {
-    if (!selectedSample) return;
-
-    const payloads = parasTests(selectedSample)
-      .map((test) => {
-        const fields = resultForm[test.id] || [];
-        const values = fields.filter((v) => String(v.value ?? '').trim() !== '');
-        if (!values.length) return null;
-        return {
-          sample_test_id: test.id,
-          values: values.map((v) => ({ parameter_id: v.parameter_id, value: v.value })),
-        };
-      })
-      .filter(Boolean);
-
-    if (!payloads.length) return toast.error(t('parasitology.enterOneValue'));
-
-    setSaving(true);
-    try {
-      for (const payload of payloads) {
-        await resultsAPI.enter(payload);
-      }
-      toast.success(t('parasitology.saved'));
-      if (primaryTest) {
-        const res = await resultsAPI.get(primaryTest.id);
-        const att = (res.data.data?.attachments || []).map((a) => ({
-          ...a,
-          sample_test_id: primaryTest.id,
-        }));
-        setAttachments(att);
-      }
-      loadQueue();
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const uploadImage = async (file) => {
-    if (!file || !primaryTest) return;
-    setUploading(true);
-    try {
-      const { data } = await resultsAPI.uploadAttachment(primaryTest.id, file);
-      const att = (data.data?.attachments || []).map((a) => ({
-        ...a,
-        sample_test_id: primaryTest.id,
-      }));
-      setAttachments(att);
-      toast.success(t('parasitology.imageUploaded'));
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  const deleteImage = async (id) => {
-    try {
-      await resultsAPI.deleteAttachment(id);
-      setAttachments((prev) => prev.filter((a) => a.id !== id));
-      toast.success(t('parasitology.imageDeleted'));
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
-    }
-  };
-
-  const imageUrl = (url) => url;
 
   if (loading) return <div className="text-center py-20">{t('common.loading')}</div>;
 
@@ -402,11 +575,7 @@ export default function Parasitology() {
           <p className="text-sm text-gray-500 mt-1">{t('parasitology.subtitle')}</p>
         </div>
         {canManage && (
-          <button
-            type="button"
-            onClick={() => setTypesOpen(true)}
-            className="btn-secondary text-sm flex items-center gap-2"
-          >
+          <button type="button" onClick={() => setTypesOpen(true)} className="btn-secondary text-sm flex items-center gap-2">
             <Settings2 size={16} />
             {t('parasitology.editTypes')}
           </button>
@@ -455,77 +624,38 @@ export default function Parasitology() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ParasiteSection
+                <FindingPanel
                   title={t('parasitology.bloodSection')}
                   icon={Droplets}
                   test={bloodTest}
-                  fields={bloodTest ? resultForm[bloodTest.id] || [] : []}
-                  onChange={updateField}
+                  testMeta={bloodMeta}
+                  findings={bloodFindings}
+                  notes={bloodNotes}
+                  onFindingsChange={setBloodFindings}
+                  onNotesChange={setBloodNotes}
                   labels={labels}
+                  displayName={displayName}
                   emptyHint={t('parasitology.noBloodTest')}
+                  onUploadImage={(testId, finding, file) => handleUploadImage(testId, finding, file, setBloodFindings)}
+                  onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBloodFindings)}
+                  uploadingId={uploadingId}
                 />
-                <ParasiteSection
+                <FindingPanel
                   title={t('parasitology.stoolSection')}
                   icon={Bug}
                   test={stoolTest}
-                  fields={stoolTest ? resultForm[stoolTest.id] || [] : []}
-                  onChange={updateField}
+                  testMeta={stoolMeta}
+                  findings={stoolFindings}
+                  notes={stoolNotes}
+                  onFindingsChange={setStoolFindings}
+                  onNotesChange={setStoolNotes}
                   labels={labels}
+                  displayName={displayName}
                   emptyHint={t('parasitology.noStoolTest')}
+                  onUploadImage={(testId, finding, file) => handleUploadImage(testId, finding, file, setStoolFindings)}
+                  onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setStoolFindings)}
+                  uploadingId={uploadingId}
                 />
-              </div>
-
-              <div className="card">
-                <h3 className="font-semibold flex items-center gap-2 mb-4">
-                  <Camera size={20} className="text-primary-600" />
-                  {t('parasitology.microscopeImages')}
-                </h3>
-                <p className="text-xs text-gray-500 mb-3">{t('parasitology.addImage')}</p>
-
-                {primaryTest ? (
-                  <>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => uploadImage(e.target.files?.[0])}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileRef.current?.click()}
-                      disabled={uploading}
-                      className="btn-secondary flex items-center gap-2 text-sm mb-4"
-                    >
-                      <Camera size={16} />
-                      {uploading ? t('common.loading') : t('parasitology.uploadImage')}
-                    </button>
-
-                    {attachments.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {attachments.map((att) => (
-                          <div key={att.id} className="relative group rounded-lg overflow-hidden border border-primary-200 dark:border-primary-700">
-                            <img
-                              src={imageUrl(att.file_url)}
-                              alt={att.caption || 'microscope'}
-                              className="w-full h-28 object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => deleteImage(att.id)}
-                              className="absolute top-1 end-1 p-1.5 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 transition"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-500">{t('parasitology.selectSample')}</p>
-                )}
               </div>
 
               <button

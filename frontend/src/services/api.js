@@ -93,10 +93,11 @@ export const resultsAPI = {
   validate: (sampleTestId, doctorNotes) => api.post(`/results/validate/${sampleTestId}`, { doctor_notes: doctorNotes }),
   critical: () => api.get('/results/critical'),
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
-  uploadAttachment: (sampleTestId, file, caption) => {
+  uploadAttachment: (sampleTestId, file, opts = {}) => {
     const form = new FormData();
     form.append('image', file);
-    if (caption) form.append('caption', caption);
+    if (opts.caption) form.append('caption', opts.caption);
+    if (opts.parameter_id) form.append('parameter_id', opts.parameter_id);
     return api.post(`/results/sample-test/${sampleTestId}/attachments`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
