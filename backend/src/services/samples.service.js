@@ -213,13 +213,14 @@ const getQueue = async (technicianId) => {
   return result.rows;
 };
 
+const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL'];
+
 const getParasitologyQueue = async () => {
   const result = await query(
     `SELECT s.*, c.full_name as customer_name, a.animal_code, a.animal_type,
             (SELECT COUNT(*) FROM sample_tests st
              JOIN tests t ON st.test_id = t.id
-             JOIN test_categories tc ON t.category_id = tc.id
-             WHERE st.sample_id = s.id AND tc.code = 'PARAS' AND st.status != 'completed') as pending_tests
+             WHERE st.sample_id = s.id AND t.code = ANY($1::text[]) AND st.status != 'completed') as pending_tests
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
@@ -227,10 +228,10 @@ const getParasitologyQueue = async () => {
        AND EXISTS (
          SELECT 1 FROM sample_tests st
          JOIN tests t ON st.test_id = t.id
-         JOIN test_categories tc ON t.category_id = tc.id
-         WHERE st.sample_id = s.id AND tc.code = 'PARAS'
+         WHERE st.sample_id = s.id AND t.code = ANY($1::text[])
        )
-     ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`
+     ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`,
+    [PARAS_TEST_CODES]
   );
   return result.rows;
 };

@@ -24,7 +24,6 @@ const CATEGORIES = [
   { code: 'CULT', name: 'Culture', name_ar: 'المزرعة', department: 'Microbiology', sort_order: 6 },
   { code: 'SERO', name: 'Serology', name_ar: 'المصلية', department: 'Immunology', sort_order: 7 },
   { code: 'MICRO', name: 'Microscopy', name_ar: 'المجهر', department: 'Microscopy', sort_order: 8 },
-  { code: 'PARAS', name: 'Parasitology', name_ar: 'الطفيليات', department: 'Parasitology', sort_order: 9 },
 ];
 
 const TESTS = [
@@ -36,8 +35,8 @@ const TESTS = [
   { code: 'CULT-BACT', name: 'Bacterial Culture', name_ar: 'مزرعة بكتيرية', category: 'CULT', price: 300 },
   { code: 'SERO-BRU', name: 'Brucella Serology', name_ar: 'مصلية البروسيلا', category: 'SERO', price: 200 },
   { code: 'MICRO-FECAL', name: 'Fecal Microscopy', name_ar: 'فحص البراز المجهري', category: 'MICRO', price: 100 },
-  { code: 'PARAS-BLOOD', name: 'Blood Parasites', name_ar: 'طفيليات الدم', category: 'PARAS', price: 120, method: 'Microscope' },
-  { code: 'PARAS-STOOL', name: 'Stool Parasites', name_ar: 'طفيليات البراز', category: 'PARAS', price: 120, method: 'Microscope' },
+  { code: 'PARAS-BLOOD', name: 'Blood Parasites', name_ar: 'طفيليات الدم', category: 'MICRO', price: 120, method: 'Microscope' },
+  { code: 'PARAS-STOOL', name: 'Stool Parasites', name_ar: 'طفيليات البراز', category: 'MICRO', price: 120, method: 'Microscope' },
 ];
 
 const CBC_PARAMS = [

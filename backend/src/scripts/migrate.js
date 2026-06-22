@@ -111,6 +111,12 @@ async function applyPatches() {
     await client.query(
       'CREATE INDEX IF NOT EXISTS idx_result_attachments_result ON result_attachments(result_id)'
     );
+    await client.query(
+      `UPDATE tests SET category_id = (SELECT id FROM test_categories WHERE code = 'MICRO')
+       WHERE code IN ('PARAS-BLOOD', 'PARAS-STOOL')
+         AND EXISTS (SELECT 1 FROM test_categories WHERE code = 'MICRO')`
+    );
+    await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
   } finally {
     client.release();
   }

@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 
 const PARAS_BLOOD = 'PARAS-BLOOD';
 const PARAS_STOOL = 'PARAS-STOOL';
+const PARAS_TEST_CODES = new Set([PARAS_BLOOD, PARAS_STOOL]);
 
 const emptyParasiteForm = () => ({
   code: '', name: '', name_ar: '', unit: 'qual', sort_order: 0,
@@ -269,7 +270,7 @@ export default function Parasitology() {
   };
 
   const parasTests = (sample) => (sample?.tests || []).filter(
-    (tst) => tst.category_code === 'PARAS' || tst.test_code?.startsWith('PARAS-')
+    (tst) => PARAS_TEST_CODES.has(tst.test_code)
   );
 
   const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);

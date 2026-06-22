@@ -2,10 +2,6 @@ require('dotenv').config();
 const { query, pool } = require('../config/database');
 const logger = require('../config/logger');
 
-const PARAS_CATEGORY = {
-  code: 'PARAS', name: 'Parasitology', name_ar: 'الطفيليات', department: 'Parasitology', sort_order: 9,
-};
-
 const PARAS_TESTS = [
   { code: 'PARAS-BLOOD', name: 'Blood Parasites', name_ar: 'طفيليات الدم', price: 120, method: 'Microscope' },
   { code: 'PARAS-STOOL', name: 'Stool Parasites', name_ar: 'طفيليات البراز', price: 120, method: 'Microscope' },
@@ -71,14 +67,14 @@ async function seedTestParameters(testId, config) {
 }
 
 async function ensureParasitologyCatalog() {
-  const cat = await query(
-    `INSERT INTO test_categories (code, name, name_ar, department, sort_order)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (code) DO UPDATE SET name = $2, name_ar = $3, department = $4, sort_order = $5
-     RETURNING id`,
-    [PARAS_CATEGORY.code, PARAS_CATEGORY.name, PARAS_CATEGORY.name_ar, PARAS_CATEGORY.department, PARAS_CATEGORY.sort_order]
+  const micro = await query(
+    `SELECT id FROM test_categories WHERE code = 'MICRO'`
   );
-  const categoryId = cat.rows[0].id;
+  if (!micro.rows[0]) {
+    logger.warn('MICRO category not found — skipping parasitology catalog');
+    return;
+  }
+  const categoryId = micro.rows[0].id;
 
   const testIdMap = {};
   for (const test of PARAS_TESTS) {
@@ -96,7 +92,9 @@ async function ensureParasitologyCatalog() {
     await seedTestParameters(testIdMap[code], config);
   }
 
-  logger.info('Parasitology catalog ensured');
+  await query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
+
+  logger.info('Parasitology tests ensured under MICRO category');
 }
 
 if (require.main === module) {
