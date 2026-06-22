@@ -190,8 +190,12 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   const handlePrint = () => {
     setPrintMode(true);
-    window.print();
-    window.onafterprint = () => setPrintMode(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+        window.onafterprint = () => setPrintMode(false);
+      });
+    });
   };
 
   const handleDownloadPdf = async () => {
@@ -203,34 +207,48 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
       requestAnimationFrame(() => requestAnimationFrame(resolve));
     });
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set({
-        margin: [5, 6, 5, 6],
-        filename: `${report.reportNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.92 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          onclone: (clonedDoc, clonedElement) => {
-            clonedDoc.documentElement.setAttribute('dir', 'ltr');
-            clonedDoc.body.setAttribute('dir', 'ltr');
-            let node = clonedElement;
-            while (node) {
-              node.setAttribute?.('dir', 'ltr');
-              node = node.parentElement;
-            }
-            clonedElement.classList.add('lab-pdf-export');
-            if (isAr) clonedElement.classList.add('lab-pdf-export-ar');
-          },
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const root = reportRef.current;
+      const canvas = await html2canvas(root, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: root.scrollWidth,
+        onclone: (clonedDoc, clonedElement) => {
+          clonedDoc.documentElement.setAttribute('dir', 'ltr');
+          clonedDoc.body.setAttribute('dir', 'ltr');
+          clonedElement.setAttribute('dir', 'ltr');
+          clonedElement.classList.add('lab-pdf-export');
+          if (isAr) clonedElement.classList.add('lab-pdf-export-ar');
         },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: {
-          mode: ['css', 'legacy'],
-          avoid: ['.lab-rpt-header', '.lab-rpt-patient-bar', '.lab-rpt-footer'],
-        },
-      }).from(reportRef.current).save();
+      });
+
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const margin = 6;
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const contentW = pageW - margin * 2;
+      const contentH = pageH - margin * 2;
+      const imgH = (canvas.height * contentW) / canvas.width;
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+      let position = margin;
+      let heightLeft = imgH;
+      pdf.addImage(imgData, 'JPEG', margin, position, contentW, imgH);
+      heightLeft -= contentH;
+
+      while (heightLeft > 0) {
+        position = margin - (imgH - heightLeft);
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', margin, position, contentW, imgH);
+        heightLeft -= contentH;
+      }
+
+      pdf.save(`${report.reportNumber}.pdf`);
       toast.success(t('labReport.downloadDone'));
     } catch {
       toast.error(t('labReport.downloadFailed'));
