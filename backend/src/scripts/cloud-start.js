@@ -19,6 +19,7 @@ try {
   }
 
   run('src/scripts/migrate.js');
+  run('src/scripts/ensure-result-attachments.js');
   run('src/scripts/ensure-parasitology.js');
 
   if (process.env.RUN_SEED === 'true') {

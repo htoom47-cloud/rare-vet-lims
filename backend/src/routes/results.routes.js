@@ -6,14 +6,22 @@ const { validate } = require('../middleware/validate');
 const { resultEntrySchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i;
+
+const isImageUpload = (file) => {
+  const mime = String(file.mimetype || '').toLowerCase();
+  if (!mime || mime === 'application/octet-stream') {
+    return IMAGE_EXT.test(file.originalname || '');
+  }
+  return mime.startsWith('image/');
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype?.startsWith('image/')) {
-      return cb(new Error('Only image files are allowed'));
-    }
-    cb(null, true);
+    if (isImageUpload(file)) return cb(null, true);
+    cb(new Error('Only image files are allowed (JPEG, PNG, WEBP, HEIC)'));
   },
 });
 

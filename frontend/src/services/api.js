@@ -61,10 +61,22 @@ export const animalsAPI = {
   get: (id, history) => api.get(`/animals/${id}`, { params: { history } }),
   create: (data) => api.post('/animals', data),
   update: (id, data) => api.put(`/animals/${id}`, data),
-  uploadImage: (id, file) => {
+  uploadImage: async (id, file) => {
     const form = new FormData();
-    form.append('image', file);
-    return api.post(`/animals/${id}/image`, form);
+    form.append('image', file, file?.name || 'photo.jpg');
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${API_URL}/animals/${id}/image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data?.error?.message || 'Upload failed');
+      error.response = { status: response.status, data };
+      throw error;
+    }
+    return { data };
   },
 };
 
@@ -97,12 +109,34 @@ export const resultsAPI = {
   validate: (sampleTestId, doctorNotes) => api.post(`/results/validate/${sampleTestId}`, { doctor_notes: doctorNotes }),
   critical: () => api.get('/results/critical'),
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
-  uploadAttachment: (sampleTestId, file, opts = {}) => {
+  uploadAttachment: async (sampleTestId, file, opts = {}) => {
     const form = new FormData();
-    form.append('image', file);
+    const name = file?.name || file?.filename || 'microscope.jpg';
+    form.append('image', file, name);
     if (opts.caption) form.append('caption', opts.caption);
     if (opts.parameter_id) form.append('parameter_id', opts.parameter_id);
-    return api.post(`/results/sample-test/${sampleTestId}/attachments`, form);
+
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${API_URL}/results/sample-test/${sampleTestId}/attachments`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      const error = new Error(data?.error?.message || `Upload failed (${response.status})`);
+      error.response = { status: response.status, data };
+      throw error;
+    }
+
+    return { data };
   },
   deleteAttachment: (id) => api.delete(`/results/attachments/${id}`),
 };

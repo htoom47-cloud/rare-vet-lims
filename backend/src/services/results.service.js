@@ -297,7 +297,15 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
     committed = true;
     return getBySampleTest(sampleTestId);
   } catch (err) {
-    if (!committed) await client.query('ROLLBACK');
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    }
+    if (err.code === '42P01') {
+      throw new AppError('Image attachments table is missing — contact admin to run migration', 503, 'SCHEMA_MISSING');
+    }
+    if (err.code === '22P02') {
+      throw new AppError('Invalid parasite parameter for this image', 400, 'VALIDATION_ERROR');
+    }
     throw err;
   } finally {
     client.release();

@@ -461,7 +461,10 @@ export default function Parasitology() {
       )));
       toast.success(t('parasitology.imageUploaded'));
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
+      const msg = err.response?.data?.error?.message;
+      toast.error(msg && msg !== 'An unexpected error occurred'
+        ? msg
+        : t('parasitology.imageUploadFailed'));
     } finally {
       setUploadingId(null);
     }
