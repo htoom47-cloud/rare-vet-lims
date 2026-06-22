@@ -53,10 +53,10 @@ const GENDERS = {
   male: { en: 'Male', ar: 'ذكر' }, female: { en: 'Female', ar: 'أنثى' }, unknown: { en: 'Unknown', ar: 'غير محدد' },
 };
 
-const ARABIC_RUN = /[\u0600-\u06FF\u0750-\u077F]+/g;
-const arabicReshaper = require('arabic-reshaper');
+const { drawArBox, registerPdfFonts } = require('./pdf-arabic');
 
 const registerFonts = (doc) => {
+  registerPdfFonts(doc);
   if (HAS_ARABIC_FONT) doc.registerFont('Arabic', ARABIC_FONT_PATH);
   doc.registerFont('Latin', 'Helvetica');
   doc.registerFont('Latin-Bold', 'Helvetica-Bold');
@@ -68,30 +68,7 @@ const clean = (t) => String(t ?? '')
 
 const hasAr = (t) => /[\u0600-\u06FF]/.test(String(t || ''));
 
-/** PDFKit draws RTL text LTR — reverse word order before shaping so phrases read correctly. */
-const reverseArWords = (text) => {
-  const words = String(text).trim().split(/\s+/);
-  return words.length > 1 ? words.reverse().join(' ') : String(text).trim();
-};
-
-const shapeAr = (text) => arabicReshaper.convertArabic(reverseArWords(text));
-
-/** Shape Arabic for PDFKit LTR engine. */
-const arLine = (text) => {
-  const line = clean(text).trim();
-  if (!line || !hasAr(line)) return line;
-  try {
-    if (/[0-9A-Za-z]/.test(line)) {
-      return line.replace(ARABIC_RUN, (m) => shapeAr(m));
-    }
-    return shapeAr(line);
-  } catch {
-    return line;
-  }
-};
-
 const setLatin = (doc, bold = false) => doc.font(bold ? 'Latin-Bold' : 'Latin');
-const setArabic = (doc) => { if (HAS_ARABIC_FONT) doc.font('Arabic'); else doc.font('Latin'); };
 
 const ensureSpace = (doc, h) => {
   if (doc.y + h > PAGE_BOTTOM) { doc.addPage(); doc.y = MARGIN; }
@@ -106,15 +83,7 @@ const cellLatin = (doc, text, x, y, w, h, opts = {}) => {
 
 const cellArabic = (doc, text, x, y, w, h, opts = {}) => {
   const { size = 6.5, color = BRAND.brown, bold = false, align = 'right' } = opts;
-  setArabic(doc);
-  doc.fontSize(size).fillColor(color);
-  const shaped = arLine(text);
-  if (!shaped) return;
-  const tw = doc.widthOfString(shaped);
-  let tx = x;
-  if (align === 'right') tx = x + Math.max(0, w - tw);
-  else if (align === 'center') tx = x + Math.max(0, (w - tw) / 2);
-  doc.text(shaped, tx, y, { lineBreak: false });
+  drawArBox(doc, clean(text), x, y, w, { size, color, bold, align, fromTop: true });
 };
 
 const strokeCell = (doc, x, y, w, h, fill) => {
@@ -141,16 +110,14 @@ const flowLatin = (doc, text, width, opts = {}) => {
 
 const flowArabic = (doc, text, width, opts = {}) => {
   if (!text) return;
-  setArabic(doc);
   const size = opts.size || 6.5;
-  doc.fontSize(size).fillColor(opts.color || BRAND.brown);
   const lines = String(text).split('\n');
   for (const line of lines) {
     if (!line.trim()) { doc.y += size * 0.5; continue; }
-    const shaped = arLine(line);
-    const tw = doc.widthOfString(shaped);
-    doc.text(shaped, TX + 4 + width - tw, doc.y, { lineBreak: false });
-    doc.y += size + 2;
+    drawArBox(doc, clean(line), TX + 4, doc.y, width, {
+      size, color: opts.color || BRAND.brown, align: 'right', fromTop: true,
+    });
+    doc.y += size + 4;
   }
 };
 

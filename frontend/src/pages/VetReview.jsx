@@ -19,7 +19,7 @@ export default function VetReview() {
 
   const load = () => {
     setLoading(true);
-    samplesAPI.list({ awaiting_validation: true })
+    samplesAPI.list({ awaiting_validation: true, limit: 100 })
       .then(({ data }) => setSamples(data.data))
       .finally(() => setLoading(false));
   };
@@ -109,7 +109,10 @@ export default function VetReview() {
               <li>{t('resultValidation.emptyStep2')}</li>
               <li>{t('resultValidation.emptyStep3')}</li>
             </ol>
-            <Link to="/workbench" className="btn-primary inline-block">{t('nav.workbench')}</Link>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link to="/workbench" className="btn-primary">{t('nav.workbench')}</Link>
+              <Link to="/parasitology" className="btn-secondary">{t('nav.parasitology')}</Link>
+            </div>
           </div>
         )}
       </div>

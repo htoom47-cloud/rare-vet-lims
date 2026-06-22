@@ -500,9 +500,15 @@ export default function Parasitology() {
         await resultsAPI.enter({ sample_test_id: job.test.id, values: job.values });
         await uploadPendingImages(job.test.id, job.findings, job.setFindings);
       }
-      toast.success(t('parasitology.saved'));
+      const { data: queueData } = await samplesAPI.parasitologyQueue();
+      const stillInQueue = (queueData.data || []).some((s) => s.id === selectedSample.id);
+      toast.success(stillInQueue ? t('parasitology.saved') : t('parasitology.savedGoValidate'));
       loadQueue();
-      await openSample(selectedSample);
+      if (stillInQueue) {
+        await openSample(selectedSample);
+      } else {
+        setSelectedSample(null);
+      }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'Error');
     } finally {
