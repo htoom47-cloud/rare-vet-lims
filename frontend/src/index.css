@@ -766,51 +766,86 @@
   border-collapse: collapse;
 }
 
-/* html2canvas mirrors RTL documents — force LTR shell during PDF export */
-.lab-pdf-export {
+/* html2canvas — isolated LTR capture (no RTL mirror) */
+.lab-pdf-export,
+.lab-pdf-capture-host {
   direction: ltr !important;
   letter-spacing: normal;
   word-wrap: normal;
 }
 
 .lab-pdf-export-ar .lab-rpt-header {
-  flex-direction: row-reverse;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.lab-pdf-export-ar .lab-rpt-header-brand {
+  text-align: right;
 }
 
 .lab-pdf-export-ar .lab-rpt-header-meta {
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
 .lab-pdf-export-ar .lab-rpt-meta-grid {
   text-align: end;
+  align-items: flex-end;
+}
+
+.lab-pdf-export .lab-rpt-patient-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px 8px;
+  direction: ltr;
+}
+
+.lab-pdf-export-ar .lab-patient-label,
+.lab-pdf-export-ar .lab-patient-value {
+  text-align: right;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .lab-pdf-export-ar .lab-rpt-table {
   direction: ltr;
 }
 
-.lab-pdf-export-ar .lab-rpt-patient-bar,
-.lab-pdf-export-ar .lab-rpt-footer,
-.lab-pdf-export-ar .lab-rpt-notes,
-.lab-pdf-export-ar .lab-rpt-images-title {
-  direction: ltr;
-  text-align: right;
-}
-
 .lab-pdf-export-ar .lab-rpt-table .col-test,
 .lab-pdf-export-ar .lab-rpt-panel-row td,
 .lab-pdf-export-ar .test-name-ar,
 .lab-pdf-export-ar .lab-rpt-lab-name,
-.lab-pdf-export-ar .lab-patient-value,
+.lab-pdf-export-ar .lab-rpt-notes,
+.lab-pdf-export-ar .lab-rpt-footer-info,
 .lab-pdf-export-ar .lab-rpt-sig-name {
   text-align: right;
+  direction: rtl;
   unicode-bidi: plaintext;
 }
 
-.lab-pdf-export-ar .lab-pdf-export,
-.lab-pdf-export-ar .test-name-ar,
-.lab-pdf-export-ar .lab-rpt-lab-name,
-.lab-pdf-export-ar .lab-patient-value {
-  letter-spacing: normal;
-  word-wrap: normal;
+.lab-pdf-export-ar .test-name-en {
+  text-align: right;
+  direction: ltr;
+}
+
+.lab-pdf-export .lab-rpt-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  padding: 6px;
+  font-size: 7pt;
+  color: #5B3A29;
+  text-align: center;
+  background: #f3f0eb;
+}
+
+body.printing-lab-report [data-rht-toaster],
+body.printing-lab-report #_rht_toaster,
+body.lab-pdf-capture-active [data-rht-toaster],
+body.lab-pdf-capture-active #_rht_toaster {
+  display: none !important;
+  visibility: hidden !important;
 }

@@ -159,33 +159,84 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const setPrintMode = (on) => {
     document.documentElement.classList.toggle('printing-lab-report', on);
     document.body.classList.toggle('printing-lab-report', on);
+    if (on) toast.dismiss();
   };
 
-  const preparePdfExport = () => {
+  const waitForImages = (container) => Promise.all(
+    [...container.querySelectorAll('img')].map(
+      (img) => new Promise((resolve) => {
+        if (img.complete && img.naturalWidth > 0) {
+          resolve();
+          return;
+        }
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+        setTimeout(done, 2000);
+      })
+    )
+  );
+
+  const buildPdfCaptureNode = () => {
     const root = reportRef.current;
-    if (!root) return () => {};
-    const pageEl = root.closest('.lab-report-page');
-    const prev = {
-      pageDir: pageEl?.getAttribute('dir') ?? null,
-      htmlDir: document.documentElement.getAttribute('dir'),
-      bodyDir: document.body.getAttribute('dir'),
-    };
-    root.classList.add('lab-pdf-export');
-    if (isAr) root.classList.add('lab-pdf-export-ar');
-    if (pageEl) pageEl.setAttribute('dir', 'ltr');
-    document.documentElement.setAttribute('dir', 'ltr');
-    document.body.setAttribute('dir', 'ltr');
-    return () => {
-      root.classList.remove('lab-pdf-export', 'lab-pdf-export-ar');
-      if (pageEl) {
-        if (prev.pageDir) pageEl.setAttribute('dir', prev.pageDir);
-        else pageEl.removeAttribute('dir');
+    if (!root) return null;
+
+    const host = document.createElement('div');
+    host.className = cn('lab-pdf-capture-host', isAr && 'lab-pdf-export-ar');
+    host.setAttribute('dir', 'ltr');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;';
+
+    const clone = root.cloneNode(true);
+    clone.classList.add('lab-pdf-export');
+    if (isAr) clone.classList.add('lab-pdf-export-ar');
+    clone.setAttribute('dir', 'ltr');
+    clone.style.boxShadow = 'none';
+    clone.style.margin = '0';
+
+    host.appendChild(clone);
+    document.body.appendChild(host);
+
+    clone.querySelectorAll('img').forEach((img) => {
+      if (!img.getAttribute('src') && img.src) return;
+      const src = img.getAttribute('src') || img.src;
+      img.setAttribute('src', src);
+      if (src.startsWith('data:image/svg')) {
+        img.style.display = 'none';
+        const card = img.closest('.lab-rpt-image-card');
+        if (card) {
+          card.style.background = '#f3f0eb';
+          card.style.minHeight = '72px';
+        }
       }
-      if (prev.htmlDir) document.documentElement.setAttribute('dir', prev.htmlDir);
-      else document.documentElement.removeAttribute('dir');
-      if (prev.bodyDir) document.body.setAttribute('dir', prev.bodyDir);
-      else document.body.removeAttribute('dir');
-    };
+    });
+
+    return { host, clone };
+  };
+
+  const addCanvasToPdf = (pdf, canvas, margin) => {
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const contentW = pageW - margin * 2;
+    const contentH = pageH - margin * 2;
+    const imgH = (canvas.height * contentW) / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+    if (imgH <= contentH + 2) {
+      pdf.addImage(imgData, 'JPEG', margin, margin, contentW, imgH);
+      return;
+    }
+
+    let offset = margin;
+    let heightLeft = imgH;
+    pdf.addImage(imgData, 'JPEG', margin, offset, contentW, imgH);
+    heightLeft -= contentH;
+
+    while (heightLeft > 4) {
+      offset = margin - (imgH - heightLeft);
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', margin, offset, contentW, imgH);
+      heightLeft -= contentH;
+    }
   };
 
   const handlePrint = () => {
@@ -201,63 +252,61 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return;
     setExportingPdf(true);
+    toast.dismiss();
     setPrintMode(true);
-    const restorePdfLayout = preparePdfExport();
+    document.body.classList.add('lab-pdf-capture-active');
+
+    let capture = null;
     await new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(resolve));
     });
+
     try {
+      capture = buildPdfCaptureNode();
+      if (!capture) throw new Error('no report');
+
+      const { host, clone } = capture;
+      await waitForImages(clone);
+
+      clone.querySelectorAll('.lab-rpt-image-card').forEach((card) => {
+        const img = card.querySelector('img');
+        if (!img || img.naturalWidth === 0 || img.style.display === 'none') {
+          const cap = card.querySelector('.lab-rpt-image-caption')?.textContent?.trim();
+          card.innerHTML = cap
+            ? `<div class="lab-rpt-image-fallback">${cap}</div>`
+            : '';
+        }
+      });
+
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
-      const root = reportRef.current;
-      const canvas = await html2canvas(root, {
+
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        windowWidth: root.scrollWidth,
-        onclone: (clonedDoc, clonedElement) => {
-          clonedDoc.documentElement.setAttribute('dir', 'ltr');
-          clonedDoc.body.setAttribute('dir', 'ltr');
-          clonedElement.setAttribute('dir', 'ltr');
-          clonedElement.classList.add('lab-pdf-export');
-          if (isAr) clonedElement.classList.add('lab-pdf-export-ar');
-        },
+        width: clone.scrollWidth,
+        height: clone.scrollHeight,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
       });
 
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      const margin = 6;
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const contentW = pageW - margin * 2;
-      const contentH = pageH - margin * 2;
-      const imgH = (canvas.height * contentW) / canvas.width;
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
-
-      let position = margin;
-      let heightLeft = imgH;
-      pdf.addImage(imgData, 'JPEG', margin, position, contentW, imgH);
-      heightLeft -= contentH;
-
-      while (heightLeft > 0) {
-        position = margin - (imgH - heightLeft);
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', margin, position, contentW, imgH);
-        heightLeft -= contentH;
-      }
-
+      addCanvasToPdf(pdf, canvas, 6);
       pdf.save(`${report.reportNumber}.pdf`);
-      toast.success(t('labReport.downloadDone'));
     } catch {
       toast.error(t('labReport.downloadFailed'));
       handlePrint();
+      return;
     } finally {
-      restorePdfLayout();
+      capture?.host?.remove();
+      document.body.classList.remove('lab-pdf-capture-active');
       setPrintMode(false);
       setExportingPdf(false);
     }
+
+    setTimeout(() => toast.success(t('labReport.downloadDone')), 300);
   };
 
   const handleWhatsApp = () => {
