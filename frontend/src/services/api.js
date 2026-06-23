@@ -144,7 +144,10 @@ export const resultsAPI = {
     }
 
     if (!response.ok) {
-      const error = new Error(data?.error?.message || `Upload failed (${response.status})`);
+      const fallback = response.status === 502 || response.status === 503
+        ? 'Server busy — wait a few seconds and try again'
+        : `Upload failed (${response.status})`;
+      const error = new Error(data?.error?.message || fallback);
       error.response = { status: response.status, data };
       throw error;
     }

@@ -31,23 +31,34 @@ const upload = multer({
 
 const pickUploadFile = (req) => {
   if (req.file) return req.file;
-  const files = req.files || [];
-  return files.find((f) => f.fieldname === 'image' || f.fieldname === 'file') || files[0] || null;
+  const files = req.files;
+  if (!files) return null;
+  if (Array.isArray(files)) {
+    return files.find((f) => f.fieldname === 'image' || f.fieldname === 'file') || files[0] || null;
+  }
+  return files.image?.[0] || files.file?.[0] || Object.values(files).flat()[0] || null;
 };
 
 const handleUpload = (req, res, next) => {
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
-    if (!err) {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
+      }
+      return res.status(400).json({
+        success: false,
+        error: { message: err.message || 'Invalid image upload' },
+      });
+    }
+    try {
       req.file = pickUploadFile(req);
       return next();
+    } catch (pickErr) {
+      return res.status(400).json({
+        success: false,
+        error: { message: pickErr.message || 'Invalid image upload' },
+      });
     }
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
-    }
-    return res.status(400).json({
-      success: false,
-      error: { message: err.message || 'Invalid image upload' },
-    });
   });
 };
 const router = express.Router();
