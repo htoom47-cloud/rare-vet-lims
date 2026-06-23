@@ -1,0 +1,17 @@
+{
+  "name": "rare-vet-parasitology-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watch MIIImageView export folder and upload microscope images to Rare Vet LIMS",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "setup": "node setup.js"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "apiUrl": "https://rare-vet-lims.onrender.com/api",
+  "username": "admin",
+  "password": "YOUR_PASSWORD",
+  "watchDir": "C:\\Users\\YOUR_USER\\Documents\\MIIImageView",
+  "panel": "blood",
+  "localPort": 3920,
+  "deleteAfterUpload": false,
+  "moveAfterUpload": true,
+  "uploadedDir": "uploaded"
+}

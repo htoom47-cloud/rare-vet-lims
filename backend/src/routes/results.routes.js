@@ -6,7 +6,7 @@ const { validate } = require('../middleware/validate');
 const { resultEntrySchema, resultApproveBatchSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i;
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
 
 const isImageUpload = (file) => {
   const mime = String(file.mimetype || '').toLowerCase();
@@ -22,7 +22,7 @@ const isImageUpload = (file) => {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (isImageUpload(file)) return cb(null, true);
     cb(new Error('Only image files are allowed (JPEG, PNG, WEBP, HEIC)'));
