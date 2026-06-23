@@ -358,12 +358,16 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             <div className="lab-rpt-image-grid">
               {attachments.map((att, i) => (
                 <figure key={i} className="lab-rpt-image-card">
-                  <img
-                    src={resolveImageUrl(att.fileUrl)}
-                    alt={att.caption || (isAr ? att.testNameAr : att.testNameEn) || t('labReport.microscopeImages')}
-                    className="lab-rpt-image"
-                    crossOrigin="anonymous"
-                  />
+                  {att.missing ? (
+                    <div className="lab-rpt-image lab-rpt-image-missing">{t('labReport.imageUnavailable')}</div>
+                  ) : (
+                    <img
+                      src={resolveImageUrl(att.fileUrl)}
+                      alt={att.caption || (isAr ? att.testNameAr : att.testNameEn) || t('labReport.microscopeImages')}
+                      className="lab-rpt-image"
+                      crossOrigin="anonymous"
+                    />
+                  )}
                   <figcaption className="lab-rpt-image-caption">
                     {att.caption || (isAr ? att.testNameAr : att.testNameEn) || '—'}
                   </figcaption>

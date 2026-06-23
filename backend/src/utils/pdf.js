@@ -4,7 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('../config/env');
 const { generateQR } = require('./barcode');
-const { resolveImagePath, readImageBuffer } = require('../config/storage');
+const { readImageBuffer } = require('../config/storage');
 
 const ARABIC_FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
@@ -293,13 +293,10 @@ const drawMicroscopeImages = async (doc, attachments) => {
 
   const images = [];
   for (const a of attachments) {
-    const pathLocal = resolveImagePath(a.file_url);
-    if (pathLocal) {
-      images.push({ ...a, source: pathLocal, isPath: true });
-      continue;
-    }
     const buffer = await readImageBuffer(a.file_url);
-    if (buffer) images.push({ ...a, source: buffer, isPath: false });
+    if (buffer?.length) {
+      images.push({ ...a, source: buffer, isPath: false });
+    }
   }
 
   if (!images.length) return;

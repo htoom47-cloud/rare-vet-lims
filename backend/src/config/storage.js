@@ -196,20 +196,24 @@ const saveFileLocal = async (buffer, subdir, filename) => {
 const saveFile = async (buffer, subdir, originalName) => {
   const ext = path.extname(originalName || '') || '.jpg';
   const filename = `${uuidv4()}${ext}`;
-  const url = uploadUrl(subdir, filename);
+  const contentType = guessMime(filename);
+
+  // Always keep a local copy (serving + PDF generation on this instance).
+  const local = await saveFileLocal(buffer, subdir, filename);
 
   if (isS3Storage()) {
     try {
-      await s3Put(`${subdir}/${filename}`, buffer, guessMime(filename));
-      logger.info('File saved to S3', { url, subdir });
-      return { url, filename, path: null };
+      await s3Put(`${subdir}/${filename}`, buffer, contentType);
+      logger.info('File mirrored to S3', { url: local.url, subdir });
     } catch (err) {
-      logger.warn('S3 upload failed — falling back to local disk', { error: err.message, subdir });
-      return saveFileLocal(buffer, subdir, filename);
+      logger.warn('S3 mirror failed — local copy only (lost on server restart without S3)', {
+        error: err.message,
+        url: local.url,
+      });
     }
   }
 
-  return saveFileLocal(buffer, subdir, filename);
+  return local;
 };
 
 /** Persist a file written to disk (e.g. PDF) — uploads to S3 when configured. */

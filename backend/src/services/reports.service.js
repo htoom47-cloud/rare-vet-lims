@@ -6,7 +6,7 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
-const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists } = require('../config/storage');
+const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
 const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 
 const INSTRUMENT_BY_CATEGORY = {
@@ -42,6 +42,19 @@ const canApproveAsVet = (role) => VET_APPROVER_ROLES.has(role);
 const displayName = (user, isArabic) => {
   if (!user) return null;
   return isArabic ? (user.full_name_ar || user.full_name) : user.full_name;
+};
+
+const mapAttachmentForPreview = async (a) => {
+  const buffer = await readImageBuffer(a.file_url);
+  return {
+    fileUrl: buffer?.length
+      ? `data:image/jpeg;base64,${buffer.toString('base64')}`
+      : a.file_url,
+    missing: !buffer?.length,
+    caption: a.caption,
+    testNameAr: a.test_name_ar,
+    testNameEn: a.test_name,
+  };
 };
 
 const buildApprovalFields = (reportRow, isArabic) => ({
@@ -485,12 +498,7 @@ const getPreview = async (id) => {
         : (meta.collected_by_name || '-'),
     },
     results: base.results,
-    attachments: (base.attachments || []).map((a) => ({
-      fileUrl: a.file_url,
-      caption: a.caption,
-      testNameAr: a.test_name_ar,
-      testNameEn: a.test_name,
-    })),
+    attachments: await Promise.all((base.attachments || []).map(mapAttachmentForPreview)),
     interpretation: base.aiInterpretation,
     recommendations: base.treatmentRecommendations,
     doctorNotes: base.doctorNotes,

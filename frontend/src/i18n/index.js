@@ -376,6 +376,7 @@ const resources = {
         phone: 'Phone',
         legal: 'This report is confidential and intended for the requesting veterinarian only. Results must be interpreted in clinical context.',
         microscopeImages: 'Microscopy Images',
+        imageUnavailable: 'Image unavailable — please re-upload from Parasitology',
         bloodSmear: 'Blood Smear',
         openingView: 'PDF unavailable — opening report view',
       },
@@ -829,7 +830,7 @@ const resources = {
         phone: 'الهاتف',
         legal: 'هذا التقرير سري وموجه للطبيب البيطري المعالج فقط. يجب تفسير النتائج في السياق السريري.',
         microscopeImages: 'صور المجهر',
-        bloodSmear: 'مسحة الدم',
+        imageUnavailable: 'الصورة غير متوفرة — يرجى إعادة رفعها من صفحة الطفيليات',
         openingView: 'تعذّر فتح PDF — جاري فتح عرض التقرير',
       },
       billing: {
