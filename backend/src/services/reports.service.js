@@ -269,7 +269,7 @@ const buildPdfPayload = async (reportRow) => {
     treatmentRecommendations: reportRow.treatment_recommendations,
     ...buildApprovalFields(reportRow, isArabic),
   });
-  return base;
+  return { ...base, isFinal: reportRow.is_final !== false };
 };
 
 const regeneratePdf = async (reportRow) => {
@@ -337,6 +337,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
     labApproval,
     vetApproval,
   });
+  reportData.isFinal = true;
 
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);

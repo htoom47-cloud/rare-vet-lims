@@ -114,7 +114,7 @@ function PatientField({ label, value }) {
   );
 }
 
-export default function LaboratoryReport({ demoMode = false, initialReport = null }) {
+export default function LaboratoryReport({ demoMode = false, initialReport = null, backPath = null, hideShareActions = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
@@ -251,14 +251,18 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
         animate={{ opacity: 1, y: 0 }}
         className="no-print flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between mb-4"
       >
-        <Button variant="ghost" size="sm" onClick={() => navigate(demoMode ? '/login' : '/reports')} className="gap-2 h-8">
+        <Button variant="ghost" size="sm" onClick={() => navigate(backPath || (demoMode ? '/login' : '/reports'))} className="gap-2 h-8">
           <ArrowLeft size={14} /> {t('labReport.back')}
         </Button>
         <div className="flex flex-wrap gap-1.5">
           <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>
           <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-1.5 h-8 text-xs"><Download size={14} />{exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}</Button>
-          <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
-          <Button variant="secondary" size="sm" onClick={handleEmail} disabled={sending === 'email'} className="gap-1.5 h-8 text-xs"><Mail size={14} />{t('labReport.email')}</Button>
+          {!hideShareActions && (
+            <>
+              <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
+              <Button variant="secondary" size="sm" onClick={handleEmail} disabled={sending === 'email'} className="gap-1.5 h-8 text-xs"><Mail size={14} />{t('labReport.email')}</Button>
+            </>
+          )}
         </div>
       </motion.div>
 
@@ -279,7 +283,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
               <span><b>{t('labReport.reportNo')}</b> {report.reportNumber}</span>
               <span><b>{t('labReport.sampleId')}</b> {report.sampleCode || report.sample?.id}</span>
               <span><b>{t('labReport.issued')}</b> {fmtDate(report.issuedAt, locale, true)}</span>
-              <span className={cn('lab-rpt-status', report.status === 'final' ? 'is-final' : 'is-prelim')}>{statusLabel}</span>
             </div>
             <div className="lab-rpt-header-codes">
               {report.barcode && (
@@ -291,6 +294,14 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             </div>
           </div>
         </header>
+
+        <div className="lab-rpt-title-banner">
+          <span className="lab-rpt-title-en">Laboratory Results Report</span>
+          <span className="lab-rpt-title-ar">تقرير نتائج المختبر</span>
+          <span className={cn('lab-rpt-title-badge', report.status === 'final' ? 'is-final' : 'is-prelim')}>
+            {statusLabel}
+          </span>
+        </div>
 
         <div className="lab-rpt-patient-bar">
           <PatientField label={t('customers.fullName')} value={report.customer.name} />
@@ -387,6 +398,12 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             )}
           </div>
         )}
+
+        <div className="lab-rpt-flag-legend">
+          <span><span className="lab-flag lab-flag-high">↑</span> {t('labReport.high')}</span>
+          <span><span className="lab-flag lab-flag-low">↓</span> {t('labReport.low')}</span>
+          <span><span className="lab-flag lab-flag-crit">+</span> {t('labReport.positive')}</span>
+        </div>
 
         <footer className="lab-rpt-footer">
           <div className="lab-rpt-signatures">

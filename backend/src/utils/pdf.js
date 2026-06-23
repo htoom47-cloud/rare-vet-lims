@@ -11,37 +11,47 @@ const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 const HAS_ARABIC_FONT = fs.existsSync(ARABIC_FONT_PATH);
 const HAS_LOGO = fs.existsSync(LOGO_PATH);
 
-const MARGIN = 28;
+const MARGIN = 22;
 const PAGE_W = 595;
 const PAGE_H = 842;
 const TX = MARGIN;
 const TW = PAGE_W - MARGIN * 2;
-const PAGE_BOTTOM = PAGE_H - 36;
+const FOOTER_H = 20;
+const PAGE_BOTTOM = PAGE_H - FOOTER_H - 6;
 
 const BRAND = {
-  brown: '#4A3728', gold: '#C5A059', goldLight: '#E8D5B5', goldPale: '#F5EDE0',
-  cream: '#FDFAF3', border: '#D4C4A8', muted: '#6b7280', white: '#ffffff',
+  brown: '#4A3728', brownMid: '#5B3A29', gold: '#C5A059', goldLight: '#E8D5B5', goldPale: '#F5EDE0',
+  cream: '#FDFAF3', border: '#D4C4A8', muted: '#6b7280', white: '#ffffff', headerBg: '#F7F5F2',
 };
 
-const PANEL_COLORS = ['#3182CE', '#38A169', '#DD6B20', '#805AD5', '#C5A059'];
+/** Unified panel palette — brand tones only */
+const PANEL_COLORS = ['#5B3A29', '#6B4423', '#5B3A29', '#6B4423', '#5B3A29'];
 const FLAG_COLORS = {
   HIGH: '#dc2626', CRIT_HIGH: '#991b1b', NORMAL: '#16a34a', LOW: '#2563eb', CRIT_LOW: '#1d4ed8',
   POS: '#dc2626', NEG: '#16a34a',
 };
-const FLAG = {
-  en: { NORMAL: 'Normal', HIGH: 'High', LOW: 'Low', CRIT_HIGH: 'Crit.H', CRIT_LOW: 'Crit.L', POS: 'Positive', NEG: 'Negative' },
-  ar: { NORMAL: 'معتدل', HIGH: 'مرتفع', LOW: 'منخفض', CRIT_HIGH: 'حرج', CRIT_LOW: 'حرج', POS: 'إيجابي', NEG: 'سلبي' },
+const FLAG_SYMBOL = {
+  NORMAL: '', HIGH: '\u2191', LOW: '\u2193', CRIT_HIGH: '\u2191\u2191', CRIT_LOW: '\u2193\u2193',
+  POS: '+', NEG: '\u2212',
 };
 
-const PATIENT_FIELDS = [
-  { en: 'Report No', ar: 'رقم التقرير', key: 'reportNumber' },
-  { en: 'Sample ID', ar: 'رقم العينة', key: 'sampleCode' },
-  { en: 'Date', ar: 'التاريخ', key: 'dateStr' },
-  { en: 'Client', ar: 'العميل', key: 'customerName' },
-  { en: 'Animal ID', ar: 'رقم الحيوان', key: 'animalCode' },
-  { en: 'Species', ar: 'النوع', key: 'species' },
-  { en: 'Name', ar: 'الاسم', key: 'animalName' },
-  { en: 'Gender', ar: 'الجنس', key: 'gender' },
+const PATIENT_PAIRS = [
+  [
+    { en: 'Report No', ar: 'رقم التقرير', key: 'reportNumber' },
+    { en: 'Sample ID', ar: 'رقم العينة', key: 'sampleCode' },
+  ],
+  [
+    { en: 'Date', ar: 'التاريخ', key: 'dateStr' },
+    { en: 'Client', ar: 'العميل', key: 'customerName' },
+  ],
+  [
+    { en: 'Animal ID', ar: 'رقم الحيوان', key: 'animalCode' },
+    { en: 'Species', ar: 'النوع', key: 'species' },
+  ],
+  [
+    { en: 'Name', ar: 'الاسم', key: 'animalName' },
+    { en: 'Gender', ar: 'الجنس', key: 'gender' },
+  ],
 ];
 
 const ANIMAL_TYPES = {
@@ -70,20 +80,33 @@ const hasAr = (t) => /[\u0600-\u06FF]/.test(String(t || ''));
 
 const setLatin = (doc, bold = false) => doc.font(bold ? 'Latin-Bold' : 'Latin');
 
+const pinDocY = (doc, y) => { doc.y = y; };
+
+/** Paginate by content Y — avoids spurious breaks when raster Arabic advances doc.y */
+const ensureSpaceY = (doc, y, needH, onNewPage) => {
+  if (y + needH <= PAGE_BOTTOM) return y;
+  doc.addPage();
+  return onNewPage ? onNewPage() : MARGIN + 4;
+};
+
 const ensureSpace = (doc, h) => {
-  if (doc.y + h > PAGE_BOTTOM) { doc.addPage(); doc.y = MARGIN; }
+  if (doc.y + h > PAGE_BOTTOM) { doc.addPage(); doc.y = MARGIN + 4; }
 };
 
 const cellLatin = (doc, text, x, y, w, h, opts = {}) => {
   const { size = 6.5, color = BRAND.brown, bold = false, align = 'left' } = opts;
+  const savedY = doc.y;
   setLatin(doc, bold);
   doc.fontSize(size).fillColor(color);
   doc.text(clean(text), x, y, { width: w, height: h, align, lineBreak: false, ellipsis: true });
+  doc.y = savedY;
 };
 
 const cellArabic = (doc, text, x, y, w, h, opts = {}) => {
   const { size = 6.5, color = BRAND.brown, bold = false, align = 'right' } = opts;
+  const savedY = doc.y;
   drawArBox(doc, clean(text), x, y, w, { size, color, bold, align, fromTop: true });
+  doc.y = savedY;
 };
 
 const strokeCell = (doc, x, y, w, h, fill) => {
@@ -121,38 +144,60 @@ const flowArabic = (doc, text, width, opts = {}) => {
   }
 };
 
-const drawHeader = (doc) => {
-  const top = 10;
-  const headerH = 72;
-  doc.rect(0, 0, PAGE_W, 2).fill(BRAND.gold);
-  doc.rect(0, 2, PAGE_W, headerH).fill(BRAND.cream);
-  if (HAS_LOGO) doc.image(LOGO_PATH, TX, top + 4, { width: 40, height: 40 });
+const drawHeader = (doc, reportData) => {
+  const top = 6;
+  const headerH = 58;
+  doc.rect(0, 0, PAGE_W, 3).fill(BRAND.gold);
+  doc.rect(0, 3, PAGE_W, headerH).fill(BRAND.headerBg);
+  if (HAS_LOGO) doc.image(LOGO_PATH, TX, top + 4, { width: 36, height: 36 });
 
-  const textX = TX + 48;
-  const textW = PAGE_W - textX - MARGIN;
+  const textX = TX + 42;
+  const textW = PAGE_W - textX - MARGIN - 40;
   const half = textW / 2;
   const labAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
   const labEn = env.lab.name || 'Rare Animals Veterinary Care Center';
 
-  // السطر 1: إنجليزي يسار | عربي يمين — بدون تداخل
-  cellLatin(doc, labEn, textX, top + 4, half - 6, 16, { size: 10, bold: true, align: 'left' });
-  cellArabic(doc, labAr, textX + half, top + 4, half - 4, 16, { size: 10, bold: true, align: 'right' });
+  cellLatin(doc, labEn, textX, top + 4, half - 6, 14, { size: 9.5, bold: true, align: 'left' });
+  cellArabic(doc, labAr, textX + half, top + 4, half - 4, 14, { size: 9.5, bold: true, align: 'right' });
 
-  // السطر 2: وصف المختبر
-  cellLatin(doc, env.lab.subtitle, textX, top + 22, textW, 9, { size: 6.5, color: BRAND.muted, align: 'center' });
-  cellArabic(doc, env.lab.subtitleAr, textX, top + 32, textW, 9, { size: 6.5, color: BRAND.gold, align: 'center' });
+  cellLatin(doc, env.lab.subtitle, textX, top + 20, textW, 8, { size: 6, color: BRAND.muted, align: 'center' });
+  cellArabic(doc, env.lab.subtitleAr, textX, top + 28, textW, 8, { size: 6, color: BRAND.gold, align: 'center' });
 
-  // السطر 3: التواصل
-  cellLatin(doc, `${env.lab.phone}  |  ${env.lab.email}`, textX, top + 44, textW, 9, { size: 6, color: BRAND.muted, align: 'center' });
+  cellLatin(doc, `${env.lab.phone}  |  ${env.lab.email}`, textX, top + 40, textW, 8, { size: 5.5, color: BRAND.muted, align: 'center' });
 
-  doc.rect(0, headerH + 2, PAGE_W, 1).fill(BRAND.goldLight);
-  doc.y = headerH + 10;
+  if (reportData?.reportNumber) {
+    cellLatin(doc, reportData.reportNumber, PAGE_W - MARGIN - 38, top + 6, 36, 10, {
+      size: 6, bold: true, color: BRAND.brownMid, align: 'right',
+    });
+  }
+
+  doc.rect(0, headerH + 3, PAGE_W, 1).fill(BRAND.goldLight);
+  doc.y = headerH + 8;
 };
 
-const drawTitleBanner = (doc) => {
+const drawTitleBanner = (doc, reportData = {}) => {
   const y = doc.y;
-  bilingualBar(doc, TX, y, TW, 18, 'Laboratory Results Report', 'تقرير نتائج المختبر', BRAND.brown, { size: 9 });
-  doc.y = y + 22;
+  bilingualBar(doc, TX, y, TW, 14, 'Laboratory Results Report', 'تقرير نتائج المختبر', BRAND.brownMid, { size: 8 });
+  const badge = reportData.isFinal !== false ? 'FINAL' : 'PRELIM';
+  const badgeAr = reportData.isFinal !== false ? 'نهائي' : 'مبدئي';
+  const badgeW = 52;
+  const badgeX = TX + TW - badgeW - 4;
+  doc.rect(badgeX, y + 2, badgeW, 10).fill(reportData.isFinal !== false ? '#16a34a' : '#d97706');
+  cellLatin(doc, badge, badgeX + 2, y + 3, badgeW / 2 - 2, 8, { size: 5.5, color: '#fff', bold: true, align: 'center' });
+  cellArabic(doc, badgeAr, badgeX + badgeW / 2, y + 3, badgeW / 2 - 2, 8, { size: 5.5, color: '#fff', bold: true, align: 'center' });
+  doc.y = y + 16;
+};
+
+const drawContinuationHeader = (doc, reportData) => {
+  const y = MARGIN;
+  doc.rect(TX, y, TW, 13).fill(BRAND.headerBg).stroke(BRAND.border);
+  cellLatin(doc, env.lab.name || 'Rare Animals Veterinary Care Center', TX + 4, y + 2, TW / 2 - 8, 10, {
+    size: 6.5, bold: true, color: BRAND.brownMid,
+  });
+  cellLatin(doc, reportData.reportNumber || '', TX + TW / 2, y + 2, TW / 2 - 4, 10, {
+    size: 6.5, color: BRAND.muted, align: 'right',
+  });
+  return y + 15;
 };
 
 const drawPatientValue = (doc, x, y, w, h, val, bg) => {
@@ -172,69 +217,89 @@ const drawPatientValue = (doc, x, y, w, h, val, bg) => {
 };
 
 const drawPatientTable = (doc, data) => {
-  const labelW = 108;
-  const valueW = TW - labelW * 2;
-  const rowH = 15;
+  const rowH = 12;
+  const bannerH = 12;
+  const halfW = TW / 2;
+  const labelW = 52;
+  const arLabelW = 52;
+  const valueW = halfW - labelW - arLabelW;
   const y0 = doc.y;
 
-  bilingualBar(doc, TX, y0, TW, 16, 'Patient Information', 'بيانات التقرير والحالة', BRAND.goldPale, {
-    enColor: BRAND.brown, arColor: BRAND.brown, size: 7.5,
+  bilingualBar(doc, TX, y0, TW, bannerH, 'Patient Information', 'بيانات التقرير والحالة', BRAND.goldPale, {
+    enColor: BRAND.brown, arColor: BRAND.brown, size: 6.5,
   });
 
-  let y = y0 + 16;
-  PATIENT_FIELDS.forEach((f, i) => {
+  let y = y0 + bannerH;
+  PATIENT_PAIRS.forEach((pair, ri) => {
     ensureSpace(doc, rowH);
     if (doc.y > y) y = doc.y;
-    const bg = i % 2 === 0 ? BRAND.cream : BRAND.white;
-    const val = data[f.key];
+    const bg = ri % 2 === 0 ? BRAND.cream : BRAND.white;
 
-    strokeCell(doc, TX, y, labelW, rowH, bg);
-    cellLatin(doc, f.en, TX + 3, y + 4, labelW - 6, rowH - 5, { size: 6.5, color: BRAND.muted, bold: true });
+    pair.forEach((f, col) => {
+      const x0 = TX + col * halfW;
+      const val = data[f.key];
 
-    drawPatientValue(doc, TX + labelW, y, valueW, rowH, val, bg);
+      strokeCell(doc, x0, y, labelW, rowH, bg);
+      cellLatin(doc, f.en, x0 + 2, y + 2, labelW - 4, rowH - 3, { size: 5.5, color: BRAND.muted, bold: true });
 
-    strokeCell(doc, TX + labelW + valueW, y, labelW, rowH, BRAND.goldPale);
-    cellArabic(doc, f.ar, TX + labelW + valueW + 3, y + 4, labelW - 6, rowH - 5, { size: 6.5, color: BRAND.muted, bold: true });
+      drawPatientValue(doc, x0 + labelW, y, valueW, rowH, val, bg);
 
+      strokeCell(doc, x0 + labelW + valueW, y, arLabelW, rowH, BRAND.goldPale);
+      cellArabic(doc, f.ar, x0 + labelW + valueW + 2, y + 2, arLabelW - 4, rowH - 3, { size: 5.5, color: BRAND.muted, bold: true });
+    });
     y += rowH;
   });
-  doc.y = y + 4;
+  doc.y = y + 2;
 };
 
-// Layout: EN (left) | RESULT + REF + UNITS + STATUS (center) | AR test name (right)
-const COLS = [135, 58, 98, 58, 55, 135];
+// Layout: EN (left) | RESULT + REF + UNITS + FLAG (center) | AR test name (right)
+const COLS = [132, 56, 96, 54, 38, 138];
 const COL = { TEST_EN: 0, RESULT: 1, REF: 2, UNIT: 3, STATUS_EN: 4, TEST_AR: 5 };
 const colXs = () => { const xs = []; let x = TX; COLS.forEach((w) => { xs.push(x); x += w; }); return xs; };
 
-const drawResultsTable = (doc, results) => {
+const drawResultsTableHeader = (doc, y) => {
   const xs = colXs();
-  const rowH = 14;
-  const headH = 18;
-  let y = doc.y;
+  const headH = 14;
 
-  ensureSpace(doc, headH + 20);
-
-  // Header row
-  strokeCell(doc, xs[COL.TEST_EN], y, COLS[COL.TEST_EN], headH, BRAND.brown);
-  cellLatin(doc, 'TEST', xs[COL.TEST_EN] + 3, y + 5, COLS[COL.TEST_EN] - 6, 10, { size: 6.5, color: BRAND.goldPale, bold: true, align: 'left' });
+  strokeCell(doc, xs[COL.TEST_EN], y, COLS[COL.TEST_EN], headH, BRAND.brownMid);
+  cellLatin(doc, 'TEST', xs[COL.TEST_EN] + 3, y + 3, COLS[COL.TEST_EN] - 6, headH, { size: 6, color: BRAND.goldPale, bold: true, align: 'left' });
 
   [
     { i: COL.RESULT, en: 'RESULT', ar: 'النتيجة' },
-    { i: COL.REF, en: 'REF RANGE', ar: 'المرجع' },
-    { i: COL.UNIT, en: 'UNITS', ar: 'الوحدة' },
+    { i: COL.REF, en: 'REFERENCE', ar: 'المرجع' },
+    { i: COL.UNIT, en: 'UNIT', ar: 'الوحدة' },
   ].forEach(({ i, en, ar }) => {
-    strokeCell(doc, xs[i], y, COLS[i], headH, BRAND.brown);
-    cellLatin(doc, en, xs[i] + 1, y + 2, COLS[i] - 2, 8, { size: 5.5, color: BRAND.goldPale, bold: true, align: 'center' });
-    cellArabic(doc, ar, xs[i] + 1, y + 10, COLS[i] - 2, 8, { size: 5.5, color: BRAND.goldPale, bold: true, align: 'center' });
+    strokeCell(doc, xs[i], y, COLS[i], headH, BRAND.brownMid);
+    cellLatin(doc, en, xs[i] + 1, y + 2, COLS[i] - 2, 7, { size: 5, color: BRAND.goldPale, bold: true, align: 'center' });
+    cellArabic(doc, ar, xs[i] + 1, y + 7, COLS[i] - 2, 7, { size: 4.5, color: BRAND.goldLight, bold: true, align: 'center' });
   });
 
-  strokeCell(doc, xs[COL.STATUS_EN], y, COLS[COL.STATUS_EN], headH, BRAND.brown);
-  cellLatin(doc, 'STATUS', xs[COL.STATUS_EN] + 1, y + 5, COLS[COL.STATUS_EN] - 2, 10, { size: 6, color: BRAND.goldPale, bold: true, align: 'center' });
+  strokeCell(doc, xs[COL.STATUS_EN], y, COLS[COL.STATUS_EN], headH, BRAND.brownMid);
+  cellLatin(doc, 'FLG', xs[COL.STATUS_EN] + 1, y + 4, COLS[COL.STATUS_EN] - 2, headH, { size: 5, color: BRAND.goldPale, bold: true, align: 'center' });
 
-  strokeCell(doc, xs[COL.TEST_AR], y, COLS[COL.TEST_AR], headH, BRAND.brown);
-  cellArabic(doc, 'الفحص', xs[COL.TEST_AR] + 3, y + 5, COLS[COL.TEST_AR] - 6, 10, { size: 6.5, color: BRAND.goldPale, bold: true, align: 'right' });
+  strokeCell(doc, xs[COL.TEST_AR], y, COLS[COL.TEST_AR], headH, BRAND.brownMid);
+  cellArabic(doc, 'الفحص', xs[COL.TEST_AR] + 3, y + 3, COLS[COL.TEST_AR] - 6, headH, { size: 6, color: BRAND.goldPale, bold: true, align: 'right' });
 
-  y += headH;
+  return y + headH;
+};
+
+const drawResultsTable = (doc, results, reportData = {}) => {
+  const xs = colXs();
+  const rowH = 11;
+  const headH = 14;
+  let y = doc.y;
+  let pageBefore = doc.bufferedPageRange().count;
+
+  const onResultsNewPage = () => {
+    let ny = drawContinuationHeader(doc, reportData);
+    ny = drawResultsTableHeader(doc, ny);
+    pinDocY(doc, ny);
+    return ny;
+  };
+
+  y = ensureSpaceY(doc, y, headH + 8, onResultsNewPage);
+  y = drawResultsTableHeader(doc, y);
+  pinDocY(doc, y);
 
   const groups = [];
   const map = new Map();
@@ -248,41 +313,50 @@ const drawResultsTable = (doc, results) => {
   });
 
   groups.forEach((group, gi) => {
-    ensureSpace(doc, rowH + 2);
-    if (doc.y > y) y = doc.y;
-    bilingualBar(doc, TX, y, TW, rowH, group.nameEn, group.nameAr, PANEL_COLORS[gi % PANEL_COLORS.length], { size: 6.5 });
+    y = ensureSpaceY(doc, y, rowH + 2, onResultsNewPage);
+    if (doc.bufferedPageRange().count > pageBefore) {
+      pageBefore = doc.bufferedPageRange().count;
+    }
+    bilingualBar(doc, TX, y, TW, rowH, group.nameEn, group.nameAr, PANEL_COLORS[gi % PANEL_COLORS.length], { size: 6 });
     y += rowH;
+    pinDocY(doc, y);
 
     group.items.forEach((row, ri) => {
-      ensureSpace(doc, rowH);
-      if (doc.y > y) y = doc.y;
+      y = ensureSpaceY(doc, y, rowH, onResultsNewPage);
+      if (doc.bufferedPageRange().count > pageBefore) {
+        pageBefore = doc.bufferedPageRange().count;
+      }
       const bg = ri % 2 === 0 ? BRAND.cream : BRAND.white;
       const fc = FLAG_COLORS[row.flag] || BRAND.brown;
+      const flagSym = FLAG_SYMBOL[row.flag] || '';
 
       strokeCell(doc, xs[COL.TEST_EN], y, COLS[COL.TEST_EN], rowH, bg);
-      cellLatin(doc, row.nameEn || '-', xs[COL.TEST_EN] + 3, y + 3, COLS[COL.TEST_EN] - 6, rowH - 4, { size: 6, align: 'left' });
+      cellLatin(doc, row.nameEn || '-', xs[COL.TEST_EN] + 3, y + 2, COLS[COL.TEST_EN] - 6, rowH - 3, { size: 5.5, align: 'left' });
 
       strokeCell(doc, xs[COL.RESULT], y, COLS[COL.RESULT], rowH, bg);
       const resultStr = String(row.value ?? '-');
       if (hasAr(resultStr)) {
-        cellArabic(doc, resultStr, xs[COL.RESULT] + 1, y + 3, COLS[COL.RESULT] - 2, rowH - 4, { size: 6.5, color: fc, bold: true, align: 'center' });
+        cellArabic(doc, resultStr, xs[COL.RESULT] + 1, y + 2, COLS[COL.RESULT] - 2, rowH - 3, { size: 6, color: fc, bold: true, align: 'center' });
       } else {
-        cellLatin(doc, resultStr, xs[COL.RESULT] + 1, y + 3, COLS[COL.RESULT] - 2, rowH - 4, { size: 6.5, color: fc, bold: true, align: 'center' });
+        cellLatin(doc, resultStr, xs[COL.RESULT] + 1, y + 2, COLS[COL.RESULT] - 2, rowH - 3, { size: 6, color: fc, bold: true, align: 'center' });
       }
 
       strokeCell(doc, xs[COL.REF], y, COLS[COL.REF], rowH, bg);
-      cellLatin(doc, row.reference, xs[COL.REF] + 1, y + 3, COLS[COL.REF] - 2, rowH - 4, { size: 6, color: BRAND.muted, align: 'center' });
+      cellLatin(doc, row.reference, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5.5, color: BRAND.muted, align: 'center' });
 
       strokeCell(doc, xs[COL.UNIT], y, COLS[COL.UNIT], rowH, bg);
-      cellLatin(doc, row.unit || '-', xs[COL.UNIT] + 1, y + 3, COLS[COL.UNIT] - 2, rowH - 4, { size: 5.5, color: BRAND.muted, align: 'center' });
+      cellLatin(doc, row.unit || '-', xs[COL.UNIT] + 1, y + 2, COLS[COL.UNIT] - 2, rowH - 3, { size: 5, color: BRAND.muted, align: 'center' });
 
       strokeCell(doc, xs[COL.STATUS_EN], y, COLS[COL.STATUS_EN], rowH, bg);
-      cellLatin(doc, FLAG.en[row.flag] || '-', xs[COL.STATUS_EN] + 1, y + 3, COLS[COL.STATUS_EN] - 2, rowH - 4, { size: 6, color: fc, bold: true, align: 'center' });
+      if (flagSym) {
+        cellLatin(doc, flagSym, xs[COL.STATUS_EN] + 1, y + 2, COLS[COL.STATUS_EN] - 2, rowH - 3, { size: 7, color: fc, bold: true, align: 'center' });
+      }
 
       strokeCell(doc, xs[COL.TEST_AR], y, COLS[COL.TEST_AR], rowH, bg);
-      cellArabic(doc, row.nameAr || '-', xs[COL.TEST_AR] + 3, y + 3, COLS[COL.TEST_AR] - 6, rowH - 4, { size: 6, align: 'right' });
+      cellArabic(doc, row.nameAr || '-', xs[COL.TEST_AR] + 3, y + 2, COLS[COL.TEST_AR] - 6, rowH - 3, { size: 5.5, align: 'right' });
 
       y += rowH;
+      pinDocY(doc, y);
     });
   });
   doc.y = y + 4;
@@ -301,13 +375,19 @@ const drawMicroscopeImages = async (doc, attachments) => {
 
   if (!images.length) return;
 
-  ensureSpace(doc, 80);
+  ensureSpace(doc, 60);
   let y = doc.y;
-  bilingualBar(doc, TX, y, TW, 14, 'Microscope Images', 'صور المجهر', BRAND.gold, { size: 7 });
-  y += 18;
+  bilingualBar(doc, TX, y, TW, 11, 'Microscope Images', 'صور المجهر', BRAND.gold, { size: 6.5 });
+  y += 13;
 
-  const maxW = TW;
-  const maxH = 280;
+  const IMG_GAP = 6;
+  const perRow = 2;
+  const cellW = (TW - (perRow - 1) * IMG_GAP) / perRow;
+  const maxH = 120;
+
+  let col = 0;
+  let rowY = y;
+  let rowMaxH = 0;
 
   for (const img of images) {
     let meta;
@@ -317,29 +397,42 @@ const drawMicroscopeImages = async (doc, attachments) => {
       continue;
     }
 
-    let drawW = maxW;
+    let drawW = cellW;
     let drawH = drawW * (meta.height / meta.width);
     if (drawH > maxH) {
       drawH = maxH;
       drawW = drawH * (meta.width / meta.height);
     }
 
-    ensureSpace(doc, drawH + 24);
-    y = Math.max(y, doc.y);
-    const x = TX + (TW - drawW) / 2;
-
-    doc.image(img.source, x, y, { width: drawW, height: drawH });
-
     const caption = img.caption || img.test_name_ar || img.test_name || '';
+    const blockH = drawH + (caption ? 12 : 4);
+
+    if (col === 0) {
+      ensureSpace(doc, blockH + 8);
+      rowY = Math.max(rowY, doc.y);
+    }
+
+    const x = TX + col * (cellW + IMG_GAP) + (cellW - drawW) / 2;
+    doc.rect(x - 1, rowY - 1, drawW + 2, drawH + 2).lineWidth(0.5).strokeColor(BRAND.border).stroke();
+    const savedY = doc.y;
+    doc.image(img.source, x, rowY, { width: drawW, height: drawH });
+    doc.y = savedY;
+
     if (caption) {
-      cellLatin(doc, caption, TX, y + drawH + 2, TW, 12, { size: 6, color: BRAND.muted, align: 'center' });
-      y += drawH + 16;
-    } else {
-      y += drawH + 8;
+      cellLatin(doc, caption, TX + col * (cellW + IMG_GAP), rowY + drawH + 1, cellW, 10, { size: 5.5, color: BRAND.muted, align: 'center' });
+    }
+
+    rowMaxH = Math.max(rowMaxH, blockH);
+    col += 1;
+    if (col >= perRow) {
+      col = 0;
+      rowY += rowMaxH + 4;
+      rowMaxH = 0;
     }
   }
 
-  doc.y = y + 4;
+  if (col > 0) rowY += rowMaxH;
+  doc.y = rowY + 2;
 };
 
 const drawNotes = (doc, treatment) => {
@@ -362,7 +455,7 @@ const drawCheck = (doc, x, y, size = 10) => {
 };
 
 const drawApprovalCell = (doc, x, y, w, h, titleEn, titleAr, approval) => {
-  const headerH = 14;
+  const headerH = 11;
   strokeCell(doc, x, y, w, h, BRAND.cream);
   bilingualBar(doc, x, y, w, headerH, titleEn, titleAr, BRAND.brown, { size: 5.5 });
 
@@ -383,10 +476,10 @@ const drawApprovalCell = (doc, x, y, w, h, titleEn, titleAr, approval) => {
 };
 
 const drawApprovals = (doc, reportData) => {
-  ensureSpace(doc, 48);
+  ensureSpace(doc, 36);
   const y = doc.y;
   const half = TW / 2;
-  const rowH = 42;
+  const rowH = 32;
 
   drawApprovalCell(doc, TX, y, half, rowH, 'Lab Specialist Approval', 'موافقة أخصائي المختبر', reportData.labApproval);
   drawApprovalCell(doc, TX + half, y, half, rowH, 'Veterinarian Approval', 'موافقة الطبيب البيطري', reportData.vetApproval);
@@ -394,7 +487,7 @@ const drawApprovals = (doc, reportData) => {
 };
 
 const drawFooter = async (doc, reportData) => {
-  ensureSpace(doc, 44);
+  ensureSpace(doc, 40);
   const y = doc.y;
 
   const qrData = await generateQR({
@@ -404,18 +497,39 @@ const drawFooter = async (doc, reportData) => {
   });
   const qrBuffer = Buffer.from(qrData.replace(/^data:image\/png;base64,/, ''), 'base64');
 
-  doc.moveTo(TX, y).lineTo(TX + TW, y).strokeColor(BRAND.border).stroke();
-  doc.image(qrBuffer, TX, y + 4, { width: 38 });
-  cellLatin(doc, 'Scan to verify', TX + 44, y + 6, 95, 8, { size: 5.5, color: BRAND.muted });
-  cellArabic(doc, 'امسح للتحقق', TX + 44, y + 14, 95, 8, { size: 5.5, color: BRAND.muted, align: 'right' });
-  cellLatin(doc, reportData.verificationCode, TX + 44, y + 22, 95, 8, { size: 5.5, color: '#9ca3af' });
+  doc.moveTo(TX, y).lineTo(TX + TW, y).lineWidth(0.6).strokeColor(BRAND.gold).stroke();
+
+  const savedY = doc.y;
+  doc.image(qrBuffer, TX, y + 4, { width: 34 });
+  doc.y = savedY;
+
+  cellLatin(doc, 'Scan QR to verify authenticity', TX + 40, y + 5, 100, 7, { size: 5, color: BRAND.muted });
+  cellArabic(doc, 'امسح للتحقق من صحة التقرير', TX + 40, y + 12, 100, 7, { size: 5, color: BRAND.muted, align: 'right' });
+  cellLatin(doc, reportData.verificationCode, TX + 40, y + 19, 100, 7, { size: 5, color: '#9ca3af' });
 
   const labEn = env.lab.name || 'Rare Animals Veterinary Care Center';
   const labAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
-  const issuedY = y + 32;
-  cellLatin(doc, `Issued by ${labEn}`, TX, issuedY, TW / 2 - 4, 8, { size: 5.5, color: '#9ca3af', align: 'center' });
-  cellArabic(doc, `صادر من ${labAr}`, TX + TW / 2 + 4, issuedY, TW / 2 - 4, 8, { size: 5.5, color: '#9ca3af', align: 'center' });
-  doc.y = y + 44;
+  cellLatin(doc, `Issued by ${labEn}`, TX + TW / 2 + 4, y + 8, TW / 2 - 8, 7, { size: 5, color: '#9ca3af', align: 'left' });
+  cellArabic(doc, `صادر من ${labAr}`, TX + TW / 2 + 4, y + 16, TW / 2 - 8, 7, { size: 5, color: '#9ca3af', align: 'left' });
+  cellLatin(doc, 'Confidential — For veterinary use only', TX + TW / 2 + 4, y + 24, TW / 2 - 8, 7, { size: 4.5, color: '#b8a088', align: 'left' });
+
+  doc.y = y + 38;
+};
+
+const stampPageFooters = (doc, reportData) => {
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i += 1) {
+    doc.switchToPage(range.start + i);
+    const fy = PAGE_H - FOOTER_H + 2;
+    doc.moveTo(TX, fy).lineTo(TX + TW, fy).lineWidth(0.35).strokeColor(BRAND.border).stroke();
+    cellLatin(doc, reportData.reportNumber || '', TX, fy + 3, TW / 3, 8, { size: 5, color: BRAND.muted });
+    cellLatin(doc, `Page ${i + 1} / ${range.count}`, TX + TW / 3, fy + 3, TW / 3, 8, {
+      size: 5, color: BRAND.muted, align: 'center',
+    });
+    cellArabic(doc, `${i + 1} / ${range.count}`, TX + (TW * 2) / 3, fy + 3, TW / 3, 8, {
+      size: 5, color: BRAND.muted, align: 'right',
+    });
+  }
 };
 
 const formatShortDate = (date) => {
@@ -438,14 +552,14 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
 
   return new Promise(async (resolve, reject) => {
     try {
-      const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: true });
+      const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: true, bufferPages: true });
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
       registerFonts(doc);
       doc.y = MARGIN;
 
-      drawHeader(doc);
-      drawTitleBanner(doc);
+      drawHeader(doc, reportData);
+      drawTitleBanner(doc, reportData);
       drawPatientTable(doc, {
         reportNumber: reportData.reportNumber,
         sampleCode: reportData.sampleCode,
@@ -463,11 +577,12 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
         },
       });
 
-      drawResultsTable(doc, reportData.results);
+      drawResultsTable(doc, reportData.results, reportData);
       await drawMicroscopeImages(doc, reportData.attachments);
       drawNotes(doc, reportData.treatmentRecommendations);
       drawApprovals(doc, reportData);
       await drawFooter(doc, reportData);
+      stampPageFooters(doc, reportData);
 
       doc.end();
       stream.on('finish', () => resolve({ filePath, filename, url: `/uploads/reports/${filename}` }));

@@ -372,17 +372,45 @@
 
   body.printing-lab-report .lab-rpt-image {
     height: auto;
-    max-height: 280px;
+    max-height: 120px;
     object-fit: contain;
   }
 
+  body.printing-lab-report .lab-rpt-image-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+
   body.printing-lab-report .lab-rpt-table {
-    font-size: 7.5pt;
+    font-size: 7pt;
   }
 
   body.printing-lab-report .lab-rpt-table td,
   body.printing-lab-report .lab-rpt-table th {
-    padding: 1px 3px;
+    padding: 0 2px;
+    line-height: 1.15;
+  }
+
+  body.printing-lab-report .lab-rpt-header {
+    padding: 4px 6px 3px;
+  }
+
+  body.printing-lab-report .lab-rpt-lab-name {
+    font-size: 10pt;
+  }
+
+  body.printing-lab-report .lab-rpt-patient-bar {
+    padding: 3px 6px;
+    gap: 1px 4px;
+  }
+
+  body.printing-lab-report .lab-rpt-panel-row td {
+    padding: 2px 4px !important;
+  }
+
+  body.printing-lab-report .lab-rpt-footer {
+    padding: 3px 6px 4px;
+    margin-top: 2px;
   }
 }
 
@@ -391,6 +419,67 @@
   max-width: 210mm;
   font-size: 8.5pt;
   line-height: 1.25;
+}
+
+.lab-rpt-title-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 8px;
+  background: #5B3A29;
+  color: #F7F5F2;
+  position: relative;
+}
+
+.lab-rpt-title-en {
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lab-rpt-title-ar {
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.lab-rpt-title-badge {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 6.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.lab-rpt-title-badge.is-final {
+  background: #16a34a;
+  color: #fff;
+}
+
+.lab-rpt-title-badge.is-prelim {
+  background: #d97706;
+  color: #fff;
+}
+
+.lab-rpt-flag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 2px 8px 4px;
+  padding: 2px 4px;
+  font-size: 6.5pt;
+  color: #8b7355;
+}
+
+.lab-rpt-flag-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .lab-rpt-header {
@@ -634,9 +723,10 @@
 
 .lab-rpt-panel-row td {
   padding: 3px 6px !important;
-  background: #5B3A29;
+  background: linear-gradient(90deg, #5B3A29 0%, #6B4423 100%);
   color: #F7F5F2;
   border-bottom: none;
+  border-inline-start: 3px solid #C9A86A;
 }
 
 .lab-rpt-panel-name {
@@ -667,8 +757,8 @@
 
 .lab-rpt-image-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
 }
 
 .lab-rpt-image-card {
@@ -683,7 +773,7 @@
   display: block;
   width: 100%;
   height: auto;
-  max-height: 320px;
+  max-height: 140px;
   object-fit: contain;
   background: #f3f0eb;
 }
