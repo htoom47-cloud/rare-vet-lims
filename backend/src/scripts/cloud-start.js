@@ -23,9 +23,13 @@ if (!hasDb) {
 }
 
 const distPath = path.join(backendRoot, '../frontend/dist');
+const portalDistPath = path.join(backendRoot, '../frontend-portal/dist');
 if (!fs.existsSync(distPath)) {
   logger.error('frontend/dist not found — check Build Command includes vite build');
   process.exit(1);
+}
+if (!fs.existsSync(path.join(portalDistPath, 'index.html'))) {
+  logger.warn('frontend-portal/dist not found — portal host routing disabled until portal build is included');
 }
 
 // Start HTTP immediately so Render health checks pass during background boot tasks.

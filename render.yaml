@@ -1,5 +1,5 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
-# Deploy: connect GitHub repo → New Blueprint → select this file
+# One web service serves staff + portal (by custom domain / host header).
 
 databases:
   - name: rare-vet-db
@@ -12,9 +12,14 @@ services:
     runtime: node
     plan: starter
     region: frankfurt
+    repo: https://github.com/htoom47-cloud/rare-vet-lims
+    branch: main
     buildCommand: npm run build:cloud
     startCommand: npm run start:cloud
     healthCheckPath: /api/health
+    domains:
+      - lims.rarevetcare.com
+      - portal.rarevetcare.com
     envVars:
       - key: NODE_ENV
         value: production
@@ -36,17 +41,6 @@ services:
         value: local
       - key: STORAGE_PATH
         value: ./uploads
-      # Uncomment after creating S3/R2 bucket (production PDF storage):
-      # - key: STORAGE_TYPE
-      #   value: s3
-      # - key: S3_BUCKET
-      #   sync: false
-      # - key: S3_REGION
-      #   value: me-south-1
-      # - key: S3_ACCESS_KEY
-      #   sync: false
-      # - key: S3_SECRET_KEY
-      #   sync: false
       - key: LAB_NAME
         value: Rare Animals Veterinary Care Center
       - key: LAB_NAME_AR
@@ -63,22 +57,15 @@ services:
         fromDatabase:
           name: rare-vet-db
           property: connectionString
-      # Official URLs — update after attaching custom domains in Render:
+      - key: APP_URL
+        value: https://lims.rarevetcare.com
       - key: STAFF_APP_URL
         value: https://lims.rarevetcare.com
       - key: PORTAL_APP_URL
         value: https://portal.rarevetcare.com
+      - key: PORTAL_HOSTS
+        value: portal.rarevetcare.com
       - key: CORS_ORIGINS
-        value: https://lims.rarevetcare.com,https://portal.rarevetcare.com,https://rare-vet-lims.onrender.com,https://rare-vet-portal.onrender.com
+        value: https://lims.rarevetcare.com,https://portal.rarevetcare.com,https://rare-vet-lims.onrender.com
       - key: PORTAL_JWT_EXPIRES_IN
         value: 48h
-
-  - type: web
-    name: rare-vet-portal
-    runtime: static
-    buildCommand: cd frontend-portal && npm ci --include=dev && VITE_API_URL=https://rare-vet-lims.onrender.com/api npm run build
-    staticPublishPath: frontend-portal/dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

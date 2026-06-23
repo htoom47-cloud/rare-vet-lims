@@ -27,6 +27,13 @@ const env = {
   corsOrigin: staffAppUrl,
   corsOrigins,
   serveFrontend: process.env.SERVE_FRONTEND === 'true',
+  portalHosts: [...new Set([
+    ...parseOrigins(process.env.PORTAL_HOSTS),
+    (() => {
+      try { return new URL(portalAppUrl).hostname; } catch { return null; }
+    })(),
+    'portal.rarevetcare.com',
+  ].filter(Boolean))],
   runSeed: process.env.RUN_SEED === 'true',
   databaseUrl: process.env.DATABASE_URL || null,
   db: {

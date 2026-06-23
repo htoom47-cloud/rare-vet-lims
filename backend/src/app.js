@@ -1,3 +1,4 @@
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -89,11 +90,39 @@ app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use('/api', routes);
 
-if (env.serveFrontend) {
-  const distPath = path.join(__dirname, '../../frontend/dist');
-  app.use(express.static(distPath, { index: false, maxAge: '1d' }));
-  app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+const staffDistPath = path.join(__dirname, '../../frontend/dist');
+const portalDistPath = path.join(__dirname, '../../frontend-portal/dist');
+const portalDistReady = fs.existsSync(path.join(portalDistPath, 'index.html'));
+const staffDistReady = fs.existsSync(path.join(staffDistPath, 'index.html'));
+
+const portalHostSet = new Set(env.portalHosts.map((h) => h.toLowerCase()));
+const isPortalRequest = (req) => portalDistReady && portalHostSet.has((req.hostname || '').toLowerCase());
+
+const serveSpa = (distPath) => {
+  const staticMw = express.static(distPath, { index: false, maxAge: '1d' });
+  return (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    staticMw(req, res, (err) => {
+      if (err) return next(err);
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      res.sendFile(path.join(distPath, 'index.html'), (sendErr) => {
+        if (sendErr) next(sendErr);
+      });
+    });
+  };
+};
+
+if (env.serveFrontend && staffDistReady) {
+  app.use((req, res, next) => {
+    if (isPortalRequest(req)) return next();
+    return serveSpa(staffDistPath)(req, res, next);
+  });
+}
+
+if (portalDistReady) {
+  app.use((req, res, next) => {
+    if (!isPortalRequest(req)) return next();
+    return serveSpa(portalDistPath)(req, res, next);
   });
 }
 
