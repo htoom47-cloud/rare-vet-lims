@@ -59,6 +59,7 @@ const LAB_REPORT_PRINT_STYLES = `
     width: 14px; height: 14px; border-radius: 50%; font-size: 7pt; font-weight: 700;
   }
   .lab-flag-normal { background: #dcfce7; color: #15803d; }
+  .lab-flag-empty { background: transparent; color: transparent; }
   .lab-flag-high { background: #fee2e2; color: #b91c1c; }
   .lab-flag-low { background: #ffedd5; color: #c2410c; }
   .lab-flag-crit { background: #7f1d1d; color: #fff; }

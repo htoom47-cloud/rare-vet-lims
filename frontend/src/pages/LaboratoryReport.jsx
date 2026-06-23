@@ -89,13 +89,19 @@ function groupResults(results) {
   return groups;
 }
 
-function CompactFlag({ flag, isCriticalFlag, isAr }) {
+function CompactFlag({ flag, isCriticalFlag }) {
   if (!flag || flag === 'PENDING') return <span className="lab-flag lab-flag-pending">—</span>;
-  if (flag === 'NORMAL' || flag === 'NEG') return <span className="lab-flag lab-flag-normal">{isAr ? 'ط' : 'N'}</span>;
+  if (flag === 'NORMAL' || flag === 'NEG') return <span className="lab-flag lab-flag-empty" />;
   if (flag === 'POS') return <span className="lab-flag lab-flag-crit">+</span>;
+  if (flag === 'HIGH' || flag === 'CRIT_HIGH') {
+    const crit = flag === 'CRIT_HIGH' || (flag === 'HIGH' && isCriticalFlag);
+    return <span className={cn('lab-flag lab-flag-high', crit && 'lab-flag-crit')}>↑</span>;
+  }
+  if (flag === 'LOW' || flag === 'CRIT_LOW') {
+    const crit = flag === 'CRIT_LOW' || (flag === 'LOW' && isCriticalFlag);
+    return <span className={cn('lab-flag lab-flag-low', crit && 'lab-flag-crit')}>↓</span>;
+  }
   if (isCritical(flag, isCriticalFlag)) return <span className="lab-flag lab-flag-crit">!</span>;
-  if (flag === 'HIGH' || flag === 'CRIT_HIGH') return <span className="lab-flag lab-flag-high">↑</span>;
-  if (flag === 'LOW' || flag === 'CRIT_LOW') return <span className="lab-flag lab-flag-low">↓</span>;
   return <span className="lab-flag">{flag}</span>;
 }
 
@@ -335,7 +341,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
                         <td className="col-unit">{formatUnit(row.unit)}</td>
                         <td className="col-ref">{row.reference}</td>
                         <td className="col-flag">
-                          <CompactFlag flag={row.flag} isCriticalFlag={row.isCritical} isAr={isAr} />
+                          <CompactFlag flag={row.flag} isCriticalFlag={row.isCritical} />
                         </td>
                       </tr>
                     );
