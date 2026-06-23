@@ -119,9 +119,20 @@ const inventorySchema = Joi.object({
   cost_per_unit: Joi.number().min(0).allow(null),
 });
 
+const portalOtpRequestSchema = Joi.object({
+  mobile: Joi.string().min(9).max(20).required(),
+});
+
+const portalOtpVerifySchema = Joi.object({
+  mobile: Joi.string().min(9).max(20).required(),
+  otp: Joi.string().length(6).pattern(/^\d+$/).required(),
+});
+
 module.exports = {
   loginSchema,
   registerSchema,
+  portalOtpRequestSchema,
+  portalOtpVerifySchema,
   customerSchema,
   animalSchema,
   sampleSchema,

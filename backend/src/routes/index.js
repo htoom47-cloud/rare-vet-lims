@@ -15,6 +15,7 @@ const auditRoutes = require('./audit.routes');
 const notificationsRoutes = require('./notifications.routes');
 const devicesRoutes = require('./devices.routes');
 const settingsRoutes = require('./settings.routes');
+const portalRoutes = require('./portal.routes');
 
 const router = express.Router();
 
@@ -34,6 +35,7 @@ router.use('/audit', auditRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/devices', devicesRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/portal', portalRoutes);
 
 router.get('/health', (_req, res) => {
   res.json({ success: true, status: 'healthy', timestamp: new Date().toISOString() });

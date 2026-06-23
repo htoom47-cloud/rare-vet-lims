@@ -42,6 +42,9 @@ services:
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_PATH: /app/uploads
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      STAFF_APP_URL: ${STAFF_APP_URL:-http://localhost:5173}
+      PORTAL_APP_URL: ${PORTAL_APP_URL:-http://localhost:5174}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
     ports:
       - "${API_PORT:-5000}:5000"
     volumes:
@@ -59,6 +62,19 @@ services:
       - backend
     ports:
       - "${WEB_PORT:-5173}:80"
+
+  portal:
+    build:
+      context: ./frontend-portal
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: rare-vet-portal-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${PORTAL_PORT:-5174}:80"
 
 volumes:
   postgres_data:

@@ -131,6 +131,20 @@ async function applyPatches() {
     await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
     await syncPermissionsCatalog(client);
     await syncAllRolePermissions(client);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_otp_codes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        otp_hash VARCHAR(64) NOT NULL,
+        attempts INTEGER DEFAULT 0,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_customer_otp_customer ON customer_otp_codes(customer_id, created_at DESC)'
+    );
   } finally {
     client.release();
   }

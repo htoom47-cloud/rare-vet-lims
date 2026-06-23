@@ -63,3 +63,22 @@ services:
         fromDatabase:
           name: rare-vet-db
           property: connectionString
+      # Official URLs — update after attaching custom domains in Render:
+      - key: STAFF_APP_URL
+        value: https://lims.rarevetcare.com
+      - key: PORTAL_APP_URL
+        value: https://portal.rarevetcare.com
+      - key: CORS_ORIGINS
+        value: https://lims.rarevetcare.com,https://portal.rarevetcare.com,https://rare-vet-lims.onrender.com,https://rare-vet-portal.onrender.com
+      - key: PORTAL_JWT_EXPIRES_IN
+        value: 48h
+
+  - type: web
+    name: rare-vet-portal
+    runtime: static
+    buildCommand: cd frontend-portal && npm ci --include=dev && VITE_API_URL=https://rare-vet-lims.onrender.com/api npm run build
+    staticPublishPath: frontend-portal/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

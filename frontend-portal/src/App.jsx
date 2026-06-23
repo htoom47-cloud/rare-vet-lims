@@ -1,0 +1,43 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { PortalProvider } from './context/PortalContext';
+import { ThemeProvider } from './context/ThemeContext';
+import ProtectedPortalRoute from './components/portal/ProtectedPortalRoute';
+import PortalLogin from './pages/PortalLogin';
+import PortalReports from './pages/PortalReports';
+import PortalReportView from './pages/PortalReportView';
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ThemeProvider>
+        <PortalProvider>
+          <Toaster
+            position="top-center"
+            containerClassName="no-print"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#302419',
+                color: '#FDFAF3',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                boxShadow: '0 4px 16px rgba(74, 55, 40, 0.2)',
+              },
+              success: { iconTheme: { primary: '#C5A059', secondary: '#302419' } },
+              error: { iconTheme: { primary: '#ef4444', secondary: '#FDFAF3' } },
+            }}
+          />
+          <Routes>
+            <Route path="/login" element={<PortalLogin />} />
+            <Route path="/reports" element={<ProtectedPortalRoute><PortalReports /></ProtectedPortalRoute>} />
+            <Route path="/reports/:id" element={<ProtectedPortalRoute><PortalReportView /></ProtectedPortalRoute>} />
+            <Route path="/" element={<Navigate to="/reports" replace />} />
+            <Route path="*" element={<Navigate to="/reports" replace />} />
+          </Routes>
+        </PortalProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  );
+}

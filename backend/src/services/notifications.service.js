@@ -21,18 +21,20 @@ const assertChannelEnabled = (channel) => {
 const buildReportMessage = ({ sampleCode, reportNumber, verificationCode, customerName }) => {
   const verifyLine = verificationCode ? `\nرمز التحقق: ${verificationCode}` : '';
   const verifyLineEn = verificationCode ? `\nVerify code: ${verificationCode}` : '';
+  const portalLine = env.portalAppUrl ? `\nبوابة العميل: ${env.portalAppUrl}` : '';
+  const portalLineEn = env.portalAppUrl ? `\nClient portal: ${env.portalAppUrl}` : '';
 
   return [
     `${env.lab.nameAr}`,
     `عزيزي ${customerName || 'العميل'}، تقريركم جاهز.`,
     `العينة: ${sampleCode}`,
-    `رقم التقرير: ${reportNumber}${verifyLine}`,
+    `رقم التقرير: ${reportNumber}${verifyLine}${portalLine}`,
     `للاستفسار: ${env.lab.phone}`,
     '',
     `${env.lab.name}`,
     `Dear ${customerName || 'customer'}, your lab report is ready.`,
     `Sample: ${sampleCode}`,
-    `Report: ${reportNumber}${verifyLineEn}`,
+    `Report: ${reportNumber}${verifyLineEn}${portalLineEn}`,
     `Contact: ${env.lab.phone}`,
   ].join('\n');
 };

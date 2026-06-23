@@ -8,18 +8,14 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   Download,
-  Mail,
-  MessageCircle,
   Printer,
 } from 'lucide-react';
 import AppLogo from '../components/ui/AppLogo';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
-import { notificationsAPI, reportsAPI } from '../services/api';
-import { DEMO_REPORT } from '../data/demoReport';
+import { portalReportsAPI } from '../services/portalApi';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
-import { isSinglePageLayout, isAbnormalFlag, flattenResults } from '../utils/reportLayout';
 
 const ANIMAL_TYPES = {
   camel: { en: 'Camel', ar: 'إبل' },
@@ -115,15 +111,13 @@ function PatientField({ label, value }) {
   );
 }
 
-/** Active layout: report design #1 — see .cursor/rules/report-design-1.mdc */
-export default function LaboratoryReport({ demoMode = false, initialReport = null, backPath = null, hideShareActions = false }) {
+export default function LaboratoryReport({ initialReport = null, backPath = '/reports' }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const reportRef = useRef(null);
-  const [report, setReport] = useState(initialReport || (demoMode ? DEMO_REPORT : null));
-  const [loading, setLoading] = useState(!demoMode && !initialReport);
-  const [sending, setSending] = useState(null);
+  const [report, setReport] = useState(initialReport);
+  const [loading, setLoading] = useState(!initialReport);
   const [exportingPdf, setExportingPdf] = useState(false);
 
   const isAr = report?.language === 'ar' || i18n.language === 'ar';
@@ -132,22 +126,18 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   const load = useCallback(async () => {
     if (initialReport) { setReport(initialReport); setLoading(false); return; }
-    if (demoMode || id === 'demo') {
-      setReport({ ...DEMO_REPORT, verifyUrl: `${window.location.origin}/verify/${DEMO_REPORT.verificationCode}` });
-      setLoading(false);
-      return;
-    }
+    if (!id) return;
     setLoading(true);
     try {
-      const { data } = await reportsAPI.getPreview(id);
+      const { data } = await portalReportsAPI.getPreview(id);
       setReport(data.data);
     } catch {
       toast.error(t('labReport.loadFailed'));
-      navigate('/reports');
+      navigate(backPath);
     } finally {
       setLoading(false);
     }
-  }, [id, demoMode, initialReport, navigate, t]);
+  }, [id, initialReport, navigate, backPath, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -171,12 +161,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   }, []);
 
   const resultGroups = useMemo(() => groupResults(report?.results), [report]);
-  const singlePage = useMemo(() => isSinglePageLayout(report), [report]);
-  const flatResults = useMemo(() => flattenResults(resultGroups), [resultGroups]);
-  const abnormalResults = useMemo(
-    () => (report?.results || []).filter((r) => isAbnormalFlag(r.flag)),
-    [report]
-  );
 
   const attachments = useMemo(() => report?.attachments || [], [report]);
 
@@ -194,7 +178,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     toast.dismiss();
     if (!reportRef.current) return;
     try {
-      await printLabReport(reportRef.current, { isAr, dir });
+      await printLabReport(reportRef.current, { isAr });
     } catch {
       toast.error(t('labReport.downloadFailed'));
     }
@@ -207,7 +191,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     try {
       await downloadLabReportPdf(reportRef.current, {
         isAr,
-        dir,
         filename: `${report.reportNumber}.pdf`,
       });
       setTimeout(() => toast.success(t('labReport.downloadDone')), 300);
@@ -216,26 +199,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
       await handlePrint();
     } finally {
       setExportingPdf(false);
-    }
-  };
-
-  const handleWhatsApp = () => {
-    const text = encodeURIComponent(`${isAr ? 'تقرير' : 'Report'}: ${report.reportNumber}\n${report.verifyUrl}`);
-    window.open(`https://wa.me/${(report.customer.mobile || '').replace(/\D/g, '')}?text=${text}`, '_blank');
-  };
-
-  const handleEmail = async () => {
-    if (!report?.sampleId) return;
-    const recipient = report.customer.mobile || report.lab?.email;
-    if (!recipient) { toast.error(t('labReport.noRecipient')); return; }
-    setSending('email');
-    try {
-      await notificationsAPI.sendReport(report.sampleId, 'email', recipient);
-      toast.success(t('labReport.sent'));
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || t('labReport.sendFailed'));
-    } finally {
-      setSending(null);
     }
   };
 
@@ -260,40 +223,25 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
         animate={{ opacity: 1, y: 0 }}
         className="no-print flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between mb-4"
       >
-        <Button variant="ghost" size="sm" onClick={() => navigate(backPath || (demoMode ? '/login' : '/reports'))} className="gap-2 h-8">
+        <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="gap-2 h-8">
           <ArrowLeft size={14} /> {t('labReport.back')}
         </Button>
         <div className="flex flex-wrap gap-1.5">
           <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>
           <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-1.5 h-8 text-xs"><Download size={14} />{exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}</Button>
-          {!hideShareActions && (
-            <>
-              <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
-              <Button variant="secondary" size="sm" onClick={handleEmail} disabled={sending === 'email'} className="gap-1.5 h-8 text-xs"><Mail size={14} />{t('labReport.email')}</Button>
-            </>
-          )}
         </div>
       </motion.div>
 
       <div
         ref={reportRef}
-        className={cn(
-          'lab-report-document lab-report-a4 mx-auto bg-white text-[#2d2118] shadow-lg print:shadow-none',
-          singlePage && 'lab-report-single-page'
-        )}
+        className="lab-report-document lab-report-a4 mx-auto bg-white text-[#2d2118] shadow-lg print:shadow-none"
       >
         <header className="lab-rpt-header">
           <div className="lab-rpt-header-brand">
             <AppLogo size="sm" className="lab-rpt-logo shrink-0" />
             <div className="min-w-0">
               <h1 className="lab-rpt-lab-name">{labName}</h1>
-              <p className="lab-rpt-lab-sub">
-                {singlePage ? (
-                  <>Laboratory Results Report · تقرير نتائج المختبر</>
-                ) : (
-                  t('labReport.title')
-                )}
-              </p>
+              <p className="lab-rpt-lab-sub">{t('labReport.title')}</p>
             </div>
           </div>
           <div className="lab-rpt-header-meta">
@@ -301,29 +249,18 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
               <span><b>{t('labReport.reportNo')}</b> {report.reportNumber}</span>
               <span><b>{t('labReport.sampleId')}</b> {report.sampleCode || report.sample?.id}</span>
               <span><b>{t('labReport.issued')}</b> {fmtDate(report.issuedAt, locale, true)}</span>
-              {singlePage && (
-                <span className={cn('lab-rpt-status', report.status === 'final' ? 'is-final' : 'is-prelim')}>{statusLabel}</span>
-              )}
             </div>
             <div className="lab-rpt-header-codes">
               {report.barcode && (
-                <Barcode
-                  value={report.barcode}
-                  width={singlePage ? 0.75 : 0.95}
-                  height={singlePage ? 18 : 24}
-                  fontSize={singlePage ? 7 : 8}
-                  margin={0}
-                  displayValue
-                />
+                <Barcode value={report.barcode} width={0.95} height={24} fontSize={8} margin={0} displayValue />
               )}
               <div className="lab-rpt-qr-wrap">
-                <QRCode value={report.verifyUrl} size={singlePage ? 36 : 48} level="M" />
+                <QRCode value={report.verifyUrl} size={48} level="M" />
               </div>
             </div>
           </div>
         </header>
 
-        {!singlePage && (
         <div className="lab-rpt-title-banner">
           <span className="lab-rpt-title-en">Laboratory Results Report</span>
           <span className="lab-rpt-title-ar">تقرير نتائج المختبر</span>
@@ -331,29 +268,18 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
             {statusLabel}
           </span>
         </div>
-        )}
 
-        <div className={cn('lab-rpt-patient-bar', singlePage && 'lab-rpt-patient-bar-compact')}>
+        <div className="lab-rpt-patient-bar">
           <PatientField label={t('customers.fullName')} value={report.customer.name} />
           <PatientField label={t('labReport.mobile')} value={report.customer.mobile} />
           <PatientField label={t('labReport.species')} value={speciesLabel(report.animal.type)} />
           <PatientField label={t('labReport.animalName')} value={report.animal.name} />
-          {!singlePage && (
-            <>
-              <PatientField label={t('labReport.age')} value={report.animal.age} />
-              <PatientField label={t('labReport.gender')} value={genderLabel(report.animal.gender)} />
-              <PatientField label={t('labReport.chip')} value={report.animal.chip} />
-              <PatientField label={t('labReport.sampleType')} value={report.sample.type} />
-              <PatientField label={t('labReport.collectionDate')} value={fmtDate(report.sample.collectionDate, locale, true)} />
-              <PatientField label={t('labReport.receivedDate')} value={fmtDate(report.sample.receivedDate, locale, true)} />
-            </>
-          )}
-          {singlePage && (
-            <>
-              <PatientField label={t('labReport.gender')} value={genderLabel(report.animal.gender)} />
-              <PatientField label={t('labReport.sampleType')} value={report.sample.type} />
-            </>
-          )}
+          <PatientField label={t('labReport.age')} value={report.animal.age} />
+          <PatientField label={t('labReport.gender')} value={genderLabel(report.animal.gender)} />
+          <PatientField label={t('labReport.chip')} value={report.animal.chip} />
+          <PatientField label={t('labReport.sampleType')} value={report.sample.type} />
+          <PatientField label={t('labReport.collectionDate')} value={fmtDate(report.sample.collectionDate, locale, true)} />
+          <PatientField label={t('labReport.receivedDate')} value={fmtDate(report.sample.receivedDate, locale, true)} />
         </div>
 
         <div className="lab-rpt-table-wrap">
@@ -368,26 +294,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
               </tr>
             </thead>
             <tbody>
-              {singlePage ? (
-                flatResults.map((row, idx) => {
-                  const abnormal = isAbnormal(row.flag);
-                  return (
-                    <tr key={`${row.code}-${idx}`} className={cn(abnormal && 'row-abnormal')}>
-                      <td className="col-test">
-                        <span className="test-name-ar">{row.nameAr}</span>
-                        <span className="test-name-en">{row.nameEn}</span>
-                      </td>
-                      <td className={cn('col-result', abnormal && 'val-abnormal')}>{row.value}</td>
-                      <td className="col-unit">{formatUnit(row.unit)}</td>
-                      <td className="col-ref">{row.reference}</td>
-                      <td className="col-flag">
-                        <CompactFlag flag={row.flag} isCriticalFlag={row.isCritical} />
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-              resultGroups.map((group) => (
+              {resultGroups.map((group) => (
                 <Fragment key={group.testCode}>
                   <tr className="lab-rpt-panel-row">
                     <td colSpan={5}>
@@ -417,23 +324,9 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
                     );
                   })}
                 </Fragment>
-              ))
-              )}
+              ))}
             </tbody>
           </table>
-
-          {abnormalResults.length > 0 && (
-            <div className="lab-rpt-abnormal-box">
-              <span className="lab-rpt-abnormal-title">{t('labReport.abnormalSummary')}:</span>
-              {' '}
-              {abnormalResults.map((r, i) => (
-                <span key={r.code || i} className="lab-rpt-abnormal-item">
-                  {i > 0 && ' · '}
-                  <b>{isAr ? r.nameAr : r.nameEn}</b>: {r.value}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {attachments.length > 0 && (
@@ -472,13 +365,11 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           </div>
         )}
 
-        {!singlePage && (
         <div className="lab-rpt-flag-legend">
           <span><span className="lab-flag lab-flag-high">↑</span> {t('labReport.high')}</span>
           <span><span className="lab-flag lab-flag-low">↓</span> {t('labReport.low')}</span>
           <span><span className="lab-flag lab-flag-crit">+</span> {t('labReport.positive')}</span>
         </div>
-        )}
 
         <footer className="lab-rpt-footer">
           <div className="lab-rpt-signatures">

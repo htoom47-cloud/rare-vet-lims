@@ -1,15 +1,31 @@
 require('dotenv').config();
 
+const parseOrigins = (raw) => (raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+const staffAppUrl = process.env.STAFF_APP_URL || process.env.CORS_ORIGIN || 'http://localhost:5173';
+const portalAppUrl = process.env.PORTAL_APP_URL
+  || process.env.PORTAL_CORS_ORIGIN
+  || (process.env.NODE_ENV === 'production' ? 'https://portal.rarevetcare.com' : 'http://localhost:5174');
 const appUrl = process.env.APP_URL
   || process.env.RENDER_EXTERNAL_URL
   || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
-  || process.env.CORS_ORIGIN
-  || 'http://localhost:5173';
+  || staffAppUrl;
+
+const corsOrigins = [...new Set([
+  ...parseOrigins(process.env.CORS_ORIGINS),
+  staffAppUrl,
+  portalAppUrl,
+  appUrl,
+].filter(Boolean))];
 
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 5000,
   appUrl,
+  staffAppUrl,
+  portalAppUrl,
+  corsOrigin: staffAppUrl,
+  corsOrigins,
   serveFrontend: process.env.SERVE_FRONTEND === 'true',
   runSeed: process.env.RUN_SEED === 'true',
   databaseUrl: process.env.DATABASE_URL || null,
@@ -24,8 +40,8 @@ const env = {
     secret: process.env.JWT_SECRET || 'dev-secret-change-me',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    portalExpiresIn: process.env.PORTAL_JWT_EXPIRES_IN || '48h',
   },
-  corsOrigin: process.env.CORS_ORIGIN || appUrl,
   storage: {
     type: process.env.STORAGE_TYPE || 'local',
     path: process.env.STORAGE_PATH || './uploads',

@@ -17,6 +17,7 @@ router.get('/public', (_req, res) => {
       address: env.lab.address,
       phone: env.lab.phone,
       email: env.lab.email,
+      portal_url: env.portalAppUrl,
     },
   });
 });
