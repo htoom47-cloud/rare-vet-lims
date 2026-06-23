@@ -3,6 +3,7 @@ const { uuidv4 } = require('../utils/uuid');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const env = require('../config/env');
+const logger = require('../config/logger');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists } = require('../config/storage');
@@ -210,7 +211,13 @@ const buildReportData = async (sampleId, opts) => {
      WHERE st.sample_id = $1 AND res.is_validated = true
      ORDER BY ra.sort_order, ra.created_at`,
     [sampleId]
-  );
+  ).catch((err) => {
+    if (err.code === '42P01') {
+      logger.warn('result_attachments table missing — report will omit microscope images');
+      return { rows: [] };
+    }
+    throw err;
+  });
 
   return {
     reportNumber,
@@ -277,6 +284,7 @@ const ensurePdfFile = async (reportRow) => {
 };
 
 const generate = async (sampleId, userId, userRole, language = 'ar', options = {}) => {
+  try {
   const sampleResult = await query(
     'SELECT id FROM samples WHERE id = $1 AND status = $2',
     [sampleId, 'completed']
@@ -342,6 +350,19 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
   );
 
   return getById(result.rows[0].id);
+  } catch (err) {
+    if (err.isOperational) throw err;
+    logger.error('Report generation failed', {
+      sampleId,
+      message: err.message,
+      stack: err.stack,
+    });
+    throw new AppError(
+      `Could not generate report PDF: ${err.message}`,
+      500,
+      'PDF_GENERATION_FAILED'
+    );
+  }
 };
 
 const approve = async (reportId, userId, userRole, type) => {

@@ -152,19 +152,39 @@ export default function Reports() {
     if (!selectedSample) return;
     setGenerating(true);
     try {
-      const { data } = await reportsAPI.generate(selectedSample.id, {
+      const run = () => reportsAPI.generate(selectedSample.id, {
         language,
         treatment_recommendations: treatment,
         approve_lab: approveLabOnGenerate,
         approve_vet: approveVetOnGenerate,
       });
+
+      let data;
+      try {
+        ({ data } = await run());
+      } catch (err) {
+        const status = err.response?.status;
+        if (status === 502 || status === 503 || status === 504) {
+          await new Promise((r) => setTimeout(r, 3000));
+          ({ data } = await run());
+        } else {
+          throw err;
+        }
+      }
+
       toast.success(`${t('reports.created')} ${data.data.report_number}`);
       setGenerateOpen(false);
       setSelectedSample(null);
       load();
       navigate(`/reports/${data.data.id}/view`);
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || t('reports.generateFailed'));
+      const status = err.response?.status;
+      const msg = err.response?.data?.error?.message;
+      if (status === 502 || status === 503) {
+        toast.error(t('parasitology.serverWaking'));
+      } else {
+        toast.error(msg || t('reports.generateFailed'));
+      }
     } finally {
       setGenerating(false);
     }

@@ -263,7 +263,12 @@ const drawResultsTable = (doc, results) => {
       cellLatin(doc, row.nameEn || '-', xs[COL.TEST_EN] + 3, y + 3, COLS[COL.TEST_EN] - 6, rowH - 4, { size: 6, align: 'left' });
 
       strokeCell(doc, xs[COL.RESULT], y, COLS[COL.RESULT], rowH, bg);
-      cellLatin(doc, row.value, xs[COL.RESULT] + 1, y + 3, COLS[COL.RESULT] - 2, rowH - 4, { size: 6.5, color: fc, bold: true, align: 'center' });
+      const resultStr = String(row.value ?? '-');
+      if (hasAr(resultStr)) {
+        cellArabic(doc, resultStr, xs[COL.RESULT] + 1, y + 3, COLS[COL.RESULT] - 2, rowH - 4, { size: 6.5, color: fc, bold: true, align: 'center' });
+      } else {
+        cellLatin(doc, resultStr, xs[COL.RESULT] + 1, y + 3, COLS[COL.RESULT] - 2, rowH - 4, { size: 6.5, color: fc, bold: true, align: 'center' });
+      }
 
       strokeCell(doc, xs[COL.REF], y, COLS[COL.REF], rowH, bg);
       cellLatin(doc, row.reference, xs[COL.REF] + 1, y + 3, COLS[COL.REF] - 2, rowH - 4, { size: 6, color: BRAND.muted, align: 'center' });
@@ -415,6 +420,7 @@ const formatApprovalStamp = (date) => {
 
 const generateReportPDF = async (reportData, outputDir, options = {}) => {
   const filename = options.filename || `report-${reportData.reportNumber}-${uuidv4().slice(0, 8)}.pdf`;
+  fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, filename);
 
   return new Promise(async (resolve, reject) => {

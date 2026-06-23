@@ -196,8 +196,13 @@ export const reportsAPI = {
   list: (params) => api.get('/reports', { params }),
   getPreview: (id) => api.get(`/reports/${id}/preview`),
   interpret: (sampleId, language = 'ar') => api.post(`/reports/interpret/${sampleId}`, { language }),
-  generate: (sampleId, { language = 'ar', treatment_recommendations = '', approve_lab = false, approve_vet = false } = {}) =>
-    api.post(`/reports/generate/${sampleId}`, { language, treatment_recommendations, approve_lab, approve_vet }),
+  generate: (sampleId, opts = {}) =>
+    api.post(`/reports/generate/${sampleId}`, {
+      language: opts.language ?? 'ar',
+      treatment_recommendations: opts.treatment_recommendations ?? '',
+      approve_lab: opts.approve_lab ?? false,
+      approve_vet: opts.approve_vet ?? false,
+    }, { timeout: 120000 }),
   approve: (reportId, type) => api.post(`/reports/${reportId}/approve`, { type }),
   verify: (code) => api.get(`/reports/verify/${code}`),
   openPdf: openReportPdf,
