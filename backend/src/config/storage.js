@@ -3,7 +3,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('./env');
 const logger = require('./logger');
-const { sniffFormat, toBrowserJpeg } = require('../utils/image-normalize');
+const { sniffFormat, toBrowserJpeg, isMostlyBlackJpeg } = require('../utils/image-normalize');
 
 let s3Client = null;
 
@@ -90,7 +90,10 @@ const localPathForUrl = (url) => {
 
 const toDisplayJpeg = async (buffer) => {
   const format = sniffFormat(buffer);
-  if (format === 'jpeg') return buffer;
+  if (format === 'jpeg') {
+    if (await isMostlyBlackJpeg(buffer)) return null;
+    return buffer;
+  }
   return toBrowserJpeg(buffer);
 };
 
@@ -114,6 +117,17 @@ const readImageBuffer = async (url) => {
   }
 
   if (!buffer?.length) return null;
+
+  // Re-convert TIFF stored on disk (not already a valid JPEG).
+  const format = sniffFormat(buffer);
+  if (format === 'tiff' || format === 'heic' || format === 'unknown') {
+    try {
+      return await toBrowserJpeg(buffer);
+    } catch (err) {
+      logger.warn('Image normalize failed', { url, error: err.message });
+      return null;
+    }
+  }
 
   try {
     return await toDisplayJpeg(buffer);
@@ -291,6 +305,7 @@ const serveUploads = async (req, res, next) => {
         res.setHeader('Cache-Control', 'private, max-age=3600');
         return res.send(jpeg);
       }
+      return res.status(404).json({ success: false, error: { message: 'Microscope image unavailable — please re-upload' } });
     }
 
     const stream = await createReadStream(url);
