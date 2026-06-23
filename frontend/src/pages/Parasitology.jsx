@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2 } from 'lucide-react';
+import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
@@ -36,7 +36,7 @@ const mediaUrl = (url) => {
   return `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
 };
 
-const withRetry = async (fn, { retries = 2, delayMs = 2500 } = {}) => {
+const withRetry = async (fn, { retries = 2, delayMs = 1200 } = {}) => {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
@@ -62,6 +62,8 @@ const createFinding = () => ({
   value: '',
   pendingFile: null,
   attachment: null,
+  uploadingImage: false,
+  previewUrl: null,
 });
 
 function QualToggle({ value, onChange, labels }) {
@@ -239,7 +241,7 @@ function FindingPanel({
                   />
                   <button
                     type="button"
-                    disabled={!finding.parameter_id}
+                    disabled={!finding.parameter_id || !finding.value || finding.uploadingImage}
                     onClick={() => {
                       if (!finding.parameter_id) {
                         toast.error(t('parasitology.selectParasiteFirst'));
@@ -254,22 +256,28 @@ function FindingPanel({
                   </button>
                 </div>
 
-                {(finding.attachment?.file_url || finding.pendingFile) && (
+                {(finding.attachment?.file_url || finding.previewUrl || finding.pendingFile) && (
                   <div className="relative group">
-                    <img
-                      src={
-                        finding.attachment?.file_url
-                          ? mediaUrl(finding.attachment.file_url)
-                          : (finding.pendingFile ? URL.createObjectURL(finding.pendingFile) : '')
-                      }
-                      alt={paramLabel(finding.parameter_id)}
-                      className="w-20 h-20 object-cover rounded-lg border border-primary-200"
-                      onError={() => {
-                        if (finding.attachment?.file_url) {
-                          updateFinding(finding.clientId, { attachment: null });
+                    {finding.uploadingImage ? (
+                      <div className="w-20 h-20 rounded-lg border border-primary-200 bg-primary-50 flex items-center justify-center">
+                        <Loader2 size={22} className="animate-spin text-primary-600" />
+                      </div>
+                    ) : (
+                      <img
+                        src={
+                          finding.attachment?.file_url
+                            ? mediaUrl(finding.attachment.file_url)
+                            : (finding.previewUrl || (finding.pendingFile ? URL.createObjectURL(finding.pendingFile) : ''))
                         }
-                      }}
-                    />
+                        alt={paramLabel(finding.parameter_id)}
+                        className="w-20 h-20 object-cover rounded-lg border border-primary-200"
+                        onError={() => {
+                          if (finding.attachment?.file_url) {
+                            updateFinding(finding.clientId, { attachment: null });
+                          }
+                        }}
+                      />
+                    )}
                     {finding.attachment?.id && (
                       <button
                         type="button"
@@ -279,7 +287,7 @@ function FindingPanel({
                         <Trash2 size={12} />
                       </button>
                     )}
-                    {finding.pendingFile && !finding.attachment?.id && (
+                    {finding.pendingFile && !finding.attachment?.id && !finding.uploadingImage && (
                       <button
                         type="button"
                         onClick={() => onQueueImage(finding, null)}
@@ -337,6 +345,8 @@ function buildFindingsFromExisting(testDetail, existing) {
         value: val?.value || '',
         pendingFile: null,
         attachment: attachmentsByParam[String(p.id)] || null,
+        uploadingImage: false,
+        previewUrl: null,
       };
     });
 
@@ -387,6 +397,11 @@ export default function Parasitology() {
   };
 
   useEffect(() => { loadQueue(); }, []);
+
+  // Wake Render server before user uploads (reduces 502 on cold start).
+  useEffect(() => {
+    fetch(`${API_ORIGIN}/api/health`).catch(() => {});
+  }, []);
 
   const loadParasTypes = useCallback(async () => {
     try {
@@ -489,46 +504,81 @@ export default function Parasitology() {
   const stoolValuesCount = buildValues(stoolFindings, stoolNotesParamId, stoolNotes).length;
   const canSave = (hasBloodPanel && bloodValuesCount > 0) || (hasStoolPanel && stoolValuesCount > 0);
 
-  const uploadPendingImages = async (testId, findings, setFindings) => {
-    const failures = [];
-    for (const finding of findings) {
-      if (!finding.pendingFile || !finding.parameter_id) continue;
-      try {
-        const file = normalizeUploadFile(finding.pendingFile);
-        await withRetry(() => resultsAPI.uploadAttachment(testId, file, {
-          parameter_id: finding.parameter_id,
-        }), { retries: 3, delayMs: 3000 });
-        const res = await resultsAPI.get(testId);
-        const att = (res.data.data?.attachments || []).find(
-          (a) => String(a.parameter_id) === String(finding.parameter_id)
-        );
-        setFindings((prev) => prev.map((f) => (
-          f.clientId === finding.clientId
-            ? { ...f, pendingFile: null, attachment: att || f.attachment }
-            : f
-        )));
-      } catch (err) {
-        failures.push(err.response?.data?.error?.message || err.message || 'upload');
-      }
-    }
-    return failures;
+  const uploadOneImage = async (testId, finding, setFindings) => {
+    if (!finding.pendingFile || !finding.parameter_id || !testId) return null;
+    const file = normalizeUploadFile(finding.pendingFile);
+    await withRetry(() => resultsAPI.uploadAttachment(testId, file, {
+      parameter_id: finding.parameter_id,
+    }), { retries: 2, delayMs: 1200 });
+    const res = await resultsAPI.get(testId);
+    const att = (res.data.data?.attachments || []).find(
+      (a) => String(a.parameter_id) === String(finding.parameter_id)
+    );
+    setFindings((prev) => prev.map((f) => (
+      f.clientId === finding.clientId
+        ? {
+          ...f,
+          pendingFile: null,
+          uploadingImage: false,
+          previewUrl: null,
+          attachment: att || f.attachment,
+        }
+        : f
+    )));
+    return att;
   };
 
-  const queueImageForFinding = (finding, file, setFindings) => {
-    if (file && !finding.parameter_id) {
+  const uploadPendingImages = async (testId, findings, setFindings) => {
+    const pending = findings.filter((f) => f.pendingFile && f.parameter_id);
+    if (!pending.length) return [];
+    const results = await Promise.allSettled(
+      pending.map((finding) => uploadOneImage(testId, finding, setFindings))
+    );
+    return results
+      .filter((r) => r.status === 'rejected')
+      .map((r) => r.reason?.response?.data?.error?.message || r.reason?.message || 'upload');
+  };
+
+  const uploadImageForFinding = async (testId, finding, file, setFindings) => {
+    if (!file) {
+      setFindings((prev) => prev.map((f) => (
+        f.clientId === finding.clientId
+          ? { ...f, pendingFile: null, previewUrl: null, uploadingImage: false }
+          : f
+      )));
+      return;
+    }
+    if (!finding.parameter_id) {
       toast.error(t('parasitology.selectParasiteFirst'));
       return;
     }
-    if (file && !finding.value) {
+    if (!finding.value) {
       toast.error(t('parasitology.selectResultFirst'));
       return;
     }
+    if (!testId) return;
+
+    const previewUrl = URL.createObjectURL(file);
     setFindings((prev) => prev.map((f) => (
       f.clientId === finding.clientId
-        ? { ...f, pendingFile: file, attachment: file ? null : f.attachment }
+        ? { ...f, pendingFile: file, attachment: null, uploadingImage: true, previewUrl }
         : f
     )));
-    if (file) toast.success(t('parasitology.imageQueued'));
+
+    try {
+      await uploadOneImage(testId, { ...finding, pendingFile: file }, setFindings);
+      toast.success(t('parasitology.imageUploaded'));
+    } catch (err) {
+      setFindings((prev) => prev.map((f) => (
+        f.clientId === finding.clientId ? { ...f, uploadingImage: false } : f
+      )));
+      const status = err.response?.status;
+      if (status === 502 || status === 503 || status === 504) {
+        toast.error(t('parasitology.serverWaking'));
+      } else {
+        toast.error(err.response?.data?.error?.message || t('parasitology.imageUploadFailed'));
+      }
+    }
   };
 
   const handleDeleteImage = async (attachmentId, clientId, setFindings) => {
@@ -574,33 +624,28 @@ export default function Parasitology() {
 
     if (!jobs.length) return toast.error(t('parasitology.enterOneValue'));
 
+    const stillUploading = jobs.some((job) => job.findings.some((f) => f.uploadingImage));
+    if (stillUploading) return toast.error(t('parasitology.waitForUpload'));
+
     setSaving(true);
     try {
       const sampleId = selectedSample.id;
 
-      // 1) Save result values first (required before images can attach to the result row)
-      for (const job of jobs) {
-        await withRetry(() => resultsAPI.enter({
-          sample_test_id: job.test.id,
-          values: job.values,
-          technician_notes: job.notes?.trim() || '',
-        }), { retries: 3, delayMs: 3000 });
-      }
-
-      // 2) Upload microscope images while the result row exists
+      // Upload any images not yet sent (parallel)
       const uploadFailures = [];
       for (const job of jobs) {
         const failed = await uploadPendingImages(job.test.id, job.findings, job.setFindings);
         uploadFailures.push(...failed);
       }
 
-      // 3) Approve / validate
-      for (const job of jobs) {
-        await withRetry(() => resultsAPI.validate(job.test.id, job.notes?.trim() || ''), {
-          retries: 3,
-          delayMs: 3000,
-        });
-      }
+      // Approve in one request (faster than enter + validate separately)
+      await withRetry(() => resultsAPI.approveBatch(
+        jobs.map((job) => ({
+          sample_test_id: job.test.id,
+          values: job.values,
+          doctor_notes: job.notes?.trim() || '',
+        }))
+      ), { retries: 2, delayMs: 1200 });
 
       if (uploadFailures.length) {
         toast.error(uploadFailures[0] || t('parasitology.imageUploadFailed'));
@@ -781,7 +826,7 @@ export default function Parasitology() {
                   onNotesChange={setBloodNotes}
                   labels={labels}
                   displayName={displayName}
-                  onQueueImage={(finding, file) => queueImageForFinding(finding, file, setBloodFindings)}
+                  onQueueImage={(finding, file) => uploadImageForFinding(bloodTest?.id, finding, file, setBloodFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBloodFindings)}
                 />
                 )}
@@ -797,7 +842,7 @@ export default function Parasitology() {
                   onNotesChange={setStoolNotes}
                   labels={labels}
                   displayName={displayName}
-                  onQueueImage={(finding, file) => queueImageForFinding(finding, file, setStoolFindings)}
+                  onQueueImage={(finding, file) => uploadImageForFinding(stoolTest?.id, finding, file, setStoolFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setStoolFindings)}
                 />
                 )}
