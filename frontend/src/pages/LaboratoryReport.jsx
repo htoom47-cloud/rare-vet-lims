@@ -18,6 +18,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { notificationsAPI, reportsAPI } from '../services/api';
 import { DEMO_REPORT } from '../data/demoReport';
+import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
 
 const ANIMAL_TYPES = {
   camel: { en: 'Camel', ar: 'إبل' },
@@ -142,6 +143,25 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const onBeforePrint = () => {
+      document.documentElement.classList.add('printing-lab-report');
+      document.body.classList.add('printing-lab-report');
+      toast.dismiss();
+    };
+    const onAfterPrint = () => {
+      document.documentElement.classList.remove('printing-lab-report');
+      document.body.classList.remove('printing-lab-report');
+    };
+    window.addEventListener('beforeprint', onBeforePrint);
+    window.addEventListener('afterprint', onAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', onBeforePrint);
+      window.removeEventListener('afterprint', onAfterPrint);
+      onAfterPrint();
+    };
+  }, []);
+
   const resultGroups = useMemo(() => groupResults(report?.results), [report]);
 
   const attachments = useMemo(() => report?.attachments || [], [report]);
@@ -156,157 +176,32 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     return e ? (isAr ? e.ar : e.en) : '—';
   };
 
-  const setPrintMode = (on) => {
-    document.documentElement.classList.toggle('printing-lab-report', on);
-    document.body.classList.toggle('printing-lab-report', on);
-    if (on) toast.dismiss();
-  };
-
-  const waitForImages = (container) => Promise.all(
-    [...container.querySelectorAll('img')].map(
-      (img) => new Promise((resolve) => {
-        if (img.complete && img.naturalWidth > 0) {
-          resolve();
-          return;
-        }
-        const done = () => resolve();
-        img.addEventListener('load', done, { once: true });
-        img.addEventListener('error', done, { once: true });
-        setTimeout(done, 2000);
-      })
-    )
-  );
-
-  const buildPdfCaptureNode = () => {
-    const root = reportRef.current;
-    if (!root) return null;
-
-    const host = document.createElement('div');
-    host.className = cn('lab-pdf-capture-host', isAr && 'lab-pdf-export-ar');
-    host.setAttribute('dir', 'ltr');
-    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;';
-
-    const clone = root.cloneNode(true);
-    clone.classList.add('lab-pdf-export');
-    if (isAr) clone.classList.add('lab-pdf-export-ar');
-    clone.setAttribute('dir', 'ltr');
-    clone.style.boxShadow = 'none';
-    clone.style.margin = '0';
-
-    host.appendChild(clone);
-    document.body.appendChild(host);
-
-    clone.querySelectorAll('img').forEach((img) => {
-      if (!img.getAttribute('src') && img.src) return;
-      const src = img.getAttribute('src') || img.src;
-      img.setAttribute('src', src);
-      if (src.startsWith('data:image/svg')) {
-        img.style.display = 'none';
-        const card = img.closest('.lab-rpt-image-card');
-        if (card) {
-          card.style.background = '#f3f0eb';
-          card.style.minHeight = '72px';
-        }
-      }
-    });
-
-    return { host, clone };
-  };
-
-  const addCanvasToPdf = (pdf, canvas, margin) => {
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const contentW = pageW - margin * 2;
-    const contentH = pageH - margin * 2;
-    const imgH = (canvas.height * contentW) / canvas.width;
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-
-    if (imgH <= contentH + 2) {
-      pdf.addImage(imgData, 'JPEG', margin, margin, contentW, imgH);
-      return;
+  const handlePrint = async () => {
+    toast.dismiss();
+    if (!reportRef.current) return;
+    try {
+      await printLabReport(reportRef.current, { isAr });
+    } catch {
+      toast.error(t('labReport.downloadFailed'));
     }
-
-    let offset = margin;
-    let heightLeft = imgH;
-    pdf.addImage(imgData, 'JPEG', margin, offset, contentW, imgH);
-    heightLeft -= contentH;
-
-    while (heightLeft > 4) {
-      offset = margin - (imgH - heightLeft);
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', margin, offset, contentW, imgH);
-      heightLeft -= contentH;
-    }
-  };
-
-  const handlePrint = () => {
-    setPrintMode(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.print();
-        window.onafterprint = () => setPrintMode(false);
-      });
-    });
   };
 
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return;
     setExportingPdf(true);
     toast.dismiss();
-    setPrintMode(true);
-    document.body.classList.add('lab-pdf-capture-active');
-
-    let capture = null;
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
-    });
-
     try {
-      capture = buildPdfCaptureNode();
-      if (!capture) throw new Error('no report');
-
-      const { host, clone } = capture;
-      await waitForImages(clone);
-
-      clone.querySelectorAll('.lab-rpt-image-card').forEach((card) => {
-        const img = card.querySelector('img');
-        if (!img || img.naturalWidth === 0 || img.style.display === 'none') {
-          const cap = card.querySelector('.lab-rpt-image-caption')?.textContent?.trim();
-          card.innerHTML = cap
-            ? `<div class="lab-rpt-image-fallback">${cap}</div>`
-            : '';
-        }
+      await downloadLabReportPdf(reportRef.current, {
+        isAr,
+        filename: `${report.reportNumber}.pdf`,
       });
-
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        width: clone.scrollWidth,
-        height: clone.scrollHeight,
-        windowWidth: clone.scrollWidth,
-        windowHeight: clone.scrollHeight,
-      });
-
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      addCanvasToPdf(pdf, canvas, 6);
-      pdf.save(`${report.reportNumber}.pdf`);
+      setTimeout(() => toast.success(t('labReport.downloadDone')), 300);
     } catch {
       toast.error(t('labReport.downloadFailed'));
-      handlePrint();
-      return;
+      await handlePrint();
     } finally {
-      capture?.host?.remove();
-      document.body.classList.remove('lab-pdf-capture-active');
-      setPrintMode(false);
       setExportingPdf(false);
     }
-
-    setTimeout(() => toast.success(t('labReport.downloadDone')), 300);
   };
 
   const handleWhatsApp = () => {
