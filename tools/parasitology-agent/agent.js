@@ -19,6 +19,17 @@ const CONFIG_PATH = path.join(ROOT, 'config.json');
 const STATE_PATH = path.join(ROOT, 'state.json');
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
+const SMP_RE = /SMP-\d{6}-\d+/i;
+
+const extractBarcode = (filePath) => {
+  const hit = path.basename(filePath).match(SMP_RE);
+  if (hit) return hit[0].toUpperCase();
+  for (const part of filePath.split(/[\\/]/)) {
+    const m = part.match(SMP_RE);
+    if (m) return m[0].toUpperCase();
+  }
+  return null;
+};
 
 const loadJson = (file) => {
   if (!fs.existsSync(file)) return { error: 'file missing' };
@@ -112,13 +123,18 @@ const resolveSampleTestId = async (barcode, panel) => {
 };
 
 const uploadFile = async (filePath) => {
-  if (!state.sampleBarcode?.trim()) {
-    log(`تخطي (لم يُحدد رقم العينة): ${path.basename(filePath)}`);
+  let barcode = state.sampleBarcode?.trim();
+  if (!barcode) {
+    barcode = extractBarcode(filePath);
+    if (barcode) log(`رقم العينة من المجلد/الملف: ${barcode}`);
+  }
+  if (!barcode) {
+    log(`تخطي — ضع الصورة داخل مجلد اسمه رقم العينة (مثل SMP-260623-022279)`);
     return;
   }
 
   const token = await login();
-  const { sampleTestId, sampleCode } = await resolveSampleTestId(state.sampleBarcode.trim(), state.panel);
+  const { sampleTestId, sampleCode } = await resolveSampleTestId(barcode, state.panel);
 
   const buffer = fs.readFileSync(filePath);
   const name = path.basename(filePath);

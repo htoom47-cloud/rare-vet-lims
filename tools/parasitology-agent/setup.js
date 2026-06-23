@@ -19,7 +19,11 @@ const config = {
   uploadedDir: 'uploaded',
 };
 
-fs.mkdirSync(watchDir, { recursive: true });
+try {
+  fs.mkdirSync(watchDir, { recursive: true });
+} catch (err) {
+  console.warn('تنبيه: لم يُنشأ المجلد محلياً (طبيعي على جهاز آخر):', err.message);
+}
 fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
 console.log('config.json created');
 console.log('watchDir:', watchDir);

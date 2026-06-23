@@ -1,4 +1,4 @@
-# Deploy parasitology agent to remote PC via WinRM + admin share
+# Deploy parasitology agent via WinRM (no admin share needed)
 # Usage: .\deploy-remote.ps1 -Username User
 param(
   [string]$ComputerName = '192.168.1.101',
@@ -12,32 +12,44 @@ $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
 
 if (-not $Password) {
-  $sec = Read-Host "Windows password for $Username" -AsSecureString
+  $sec = Read-Host "Windows password for $Username on $ComputerName" -AsSecureString
 } else {
   $sec = ConvertTo-SecureString $Password -AsPlainText -Force
 }
-$plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-)
 $cred = New-Object PSCredential ($Username, $sec)
 
 Write-Host "Testing WinRM on $ComputerName..."
 $t = Test-NetConnection -ComputerName $ComputerName -Port 5985 -WarningAction SilentlyContinue
-if (-not $t.TcpTestSucceeded) { throw "WinRM port 5985 not reachable" }
+if (-not $t.TcpTestSucceeded) {
+  throw "WinRM not reachable on $ComputerName — enable it on parasitology PC first."
+}
 
-$share = "\\$ComputerName\C$"
-Write-Host "Mapping $share ..."
-cmd /c "net use `"$share`" /user:`"$Username`" `"$plain`"" | Out-Null
-
+Write-Host "Opening remote session..."
+$session = New-PSSession -ComputerName $ComputerName -Credential $cred
 try {
-  $dest = Join-Path $share 'RareVet\parasitology-agent'
-  New-Item -ItemType Directory -Path $dest -Force | Out-Null
-  Write-Host "Copying files..."
-  robocopy $src $dest /MIR /XD node_modules /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
-  if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
+  Write-Host "Copying files (via WinRM, not USB)..."
+  Invoke-Command -Session $session -ScriptBlock {
+    param($dir)
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  } -ArgumentList $RemoteDir
 
-  Write-Host "Remote install + start..."
-  $out = Invoke-Command -ComputerName $ComputerName -Credential $cred -ScriptBlock {
+  $files = Get-ChildItem $src -Recurse | Where-Object {
+    $_.FullName -notmatch '\\node_modules\\' -and $_.Name -ne 'node_modules'
+  }
+  foreach ($item in $files) {
+    $rel = $item.FullName.Substring($src.Length).TrimStart('\')
+    $remotePath = Join-Path $RemoteDir $rel
+    if ($item.PSIsContainer) {
+      Invoke-Command -Session $session -ScriptBlock {
+        param($p) New-Item -ItemType Directory -Path $p -Force | Out-Null
+      } -ArgumentList $remotePath
+    } else {
+      Copy-Item -Path $item.FullName -Destination $remotePath -ToSession $session -Force
+    }
+  }
+
+  Write-Host "Installing and starting agent..."
+  $out = Invoke-Command -Session $session -ScriptBlock {
     param($RemoteDir, $WatchDir)
     Set-Location $RemoteDir
     New-Item -ItemType Directory -Path $WatchDir -Force | Out-Null
@@ -45,18 +57,20 @@ try {
       & npm.cmd install --omit=dev 2>&1 | Out-String
     }
     & node setup.js $WatchDir
-    $existing = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-      Where-Object { $_.CommandLine -like '*parasitology-agent*agent.js*' }
-    foreach ($p in $existing) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
-    Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm start' -WorkingDirectory $RemoteDir -WindowStyle Normal
-    'OK'
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+      Where-Object { $_.CommandLine -like '*parasitology-agent*agent.js*' } |
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', 'npm start' -WorkingDirectory $RemoteDir
+    'OK — agent started'
   } -ArgumentList $RemoteDir, $WatchDir
 
-  Write-Host "Remote result: $out"
-  Write-Host "Open on parasitology PC: http://localhost:3920"
+  Write-Host $out
+  Write-Host "On parasitology PC open: http://localhost:3920"
+} catch {
+  Write-Host ""
+  Write-Host "فشل النشر عن بُعد: $($_.Exception.Message)"
+  Write-Host "الحل البديل: انسخ المجلد بفلاشة USB وشغّل START-AGENT.bat على كمبيوتر الطفيليات."
+  throw
 } finally {
-  cmd /c "net use `"$share`" /delete /y" 2>$null | Out-Null
-  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR(
-    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-  )
+  if ($session) { Remove-PSSession $session }
 }

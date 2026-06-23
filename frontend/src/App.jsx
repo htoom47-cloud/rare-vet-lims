@@ -26,6 +26,7 @@ import TechnicianWorkbench from './pages/TechnicianWorkbench';
 import VetReview from './pages/VetReview';
 import WorkflowCase from './pages/WorkflowCase';
 import Parasitology from './pages/Parasitology';
+import ParasitologyUpload from './pages/ParasitologyUpload';
 
 export default function App() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="workflow" element={<ProtectedRoute permission="samples.create"><WorkflowCase /></ProtectedRoute>} />
               <Route path="workbench" element={<ProtectedRoute permission="results.enter"><TechnicianWorkbench /></ProtectedRoute>} />
               <Route path="parasitology" element={<ProtectedRoute permissions={['results.enter', 'results.validate']}><Parasitology /></ProtectedRoute>} />
+              <Route path="parasitology/upload" element={<ProtectedRoute permission="results.enter"><ParasitologyUpload /></ProtectedRoute>} />
               <Route path="vet-review" element={<ProtectedRoute permission="results.validate"><VetReview /></ProtectedRoute>} />
               <Route path="tests" element={<ProtectedRoute permission="tests.view"><Tests /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute permission="reports.view"><Reports /></ProtectedRoute>} />

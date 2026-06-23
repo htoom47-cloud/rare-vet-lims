@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, PawPrint, FlaskConical, TestTube, FileText, Activity, Stethoscope,
-  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug,
+  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isReception, userRole } from '../../utils/roles';
@@ -37,6 +37,7 @@ const navSections = [
     section: 'nav.sections.lab',
     items: [
       { path: '/workbench', icon: Activity, label: 'nav.workbench', permission: 'results.enter' },
+      { path: '/parasitology/upload', icon: Camera, label: 'nav.parasitologyUpload', permission: 'results.enter' },
       { path: '/parasitology', icon: Bug, label: 'nav.parasitology', permissions: ['results.enter', 'results.validate'] },
       { path: '/vet-review', icon: Stethoscope, label: 'nav.vetReview', permission: 'results.validate' },
       { path: '/tests', icon: TestTube, label: 'nav.tests', permission: 'tests.view' },
