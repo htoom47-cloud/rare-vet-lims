@@ -20,29 +20,40 @@ const STATE_PATH = path.join(ROOT, 'state.json');
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
 
-const loadJson = (file, fallback) => {
+const loadJson = (file) => {
+  if (!fs.existsSync(file)) return { error: 'file missing' };
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return fallback;
+    const raw = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
+    return { data: JSON.parse(raw) };
+  } catch (err) {
+    return { error: err.message };
   }
 };
 
 const saveJson = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
 
-let config = loadJson(CONFIG_PATH, null);
-if (!config) {
-  console.error('Missing config.json — copy config.example.json and edit it.');
+const loaded = loadJson(CONFIG_PATH);
+if (!loaded.data) {
+  if (loaded.error === 'file missing') {
+    console.error('Missing config.json — run setup-config.bat or copy config.example.json');
+  } else {
+    console.error('config.json is invalid JSON:', loaded.error);
+    console.error('Fix: delete config.json and run setup-config.bat');
+  }
   process.exit(1);
 }
+let config = loaded.data;
 
-let state = loadJson(STATE_PATH, {
+const stateDefaults = () => ({
   sampleBarcode: '',
   panel: config.panel || 'blood',
   token: null,
   tokenAt: 0,
   log: [],
 });
+
+const stateLoaded = loadJson(STATE_PATH);
+let state = stateLoaded.data || stateDefaults();
 
 const log = (msg) => {
   const line = `[${new Date().toLocaleTimeString('ar-SA')}] ${msg}`;
