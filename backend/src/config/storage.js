@@ -3,6 +3,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('./env');
 const logger = require('./logger');
+const { sniffFormat, toBrowserJpeg } = require('../utils/image-normalize');
 
 let s3Client = null;
 
@@ -87,9 +88,50 @@ const localPathForUrl = (url) => {
   return path.join(ensureUploadDir(), parsed.subdir, parsed.filename);
 };
 
+const toDisplayJpeg = async (buffer) => {
+  const format = sniffFormat(buffer);
+  if (format === 'jpeg') return buffer;
+  return toBrowserJpeg(buffer);
+};
+
+const readImageBuffer = async (url) => {
+  const parsed = parseUploadUrl(url);
+  if (!parsed) return null;
+
+  let buffer = null;
+  const local = localPathForUrl(url);
+  if (local && fs.existsSync(local)) {
+    buffer = await fs.promises.readFile(local);
+  } else if (isS3Storage()) {
+    try {
+      const stream = await s3GetStream(parsed.key);
+      const chunks = [];
+      for await (const chunk of stream) chunks.push(chunk);
+      buffer = Buffer.concat(chunks);
+    } catch {
+      buffer = null;
+    }
+  }
+
+  if (!buffer?.length) return null;
+
+  try {
+    return await toDisplayJpeg(buffer);
+  } catch (err) {
+    logger.warn('Image normalize failed', { url, error: err.message });
+    return buffer;
+  }
+};
+
 const resolveImagePath = (url) => {
   const local = localPathForUrl(url);
-  return local && fs.existsSync(local) ? local : null;
+  if (!local || !fs.existsSync(local)) return null;
+  try {
+    const head = fs.readFileSync(local);
+    const fmt = sniffFormat(head);
+    if (fmt === 'jpeg' || fmt === 'png') return local;
+  } catch { /* ignore */ }
+  return null;
 };
 
 const s3Put = async (key, body, contentType) => {
@@ -242,6 +284,15 @@ const serveUploads = async (req, res, next) => {
 
   const url = `/uploads/${rel}`;
   try {
+    if (rel.startsWith('microscope/')) {
+      const jpeg = await readImageBuffer(url);
+      if (jpeg) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        return res.send(jpeg);
+      }
+    }
+
     const stream = await createReadStream(url);
     res.setHeader('Content-Type', guessMime(path.basename(rel)));
     res.setHeader('Cache-Control', 'private, max-age=3600');
@@ -263,4 +314,5 @@ module.exports = {
   serveUploads,
   parseUploadUrl,
   resolveImagePath,
+  readImageBuffer,
 };

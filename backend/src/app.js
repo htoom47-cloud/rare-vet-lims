@@ -9,7 +9,7 @@ const path = require('path');
 const env = require('./config/env');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
-const { ensureUploadDir, serveUploads, isS3Storage } = require('./config/storage');
+const { ensureUploadDir, serveUploads } = require('./config/storage');
 
 const app = express();
 
@@ -31,11 +31,7 @@ if (env.nodeEnv === 'production') {
   }));
 }
 
-if (isS3Storage()) {
-  app.use('/uploads', serveUploads);
-} else {
-  app.use('/uploads', express.static(path.resolve(ensureUploadDir())));
-}
+app.use('/uploads', serveUploads);
 
 const swaggerSpec = swaggerJsdoc({
   definition: {

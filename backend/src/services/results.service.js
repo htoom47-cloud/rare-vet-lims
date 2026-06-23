@@ -5,6 +5,7 @@ const { compareByNormaOrder } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
+const { normalizeMicroscopeImage } = require('../utils/image-normalize');
 
 const isPositiveQual = (raw) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(raw);
 const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(raw);
@@ -304,9 +305,16 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
       safeName = `${safeName}${ext}`;
     }
 
+    let normalized;
+    try {
+      normalized = await normalizeMicroscopeImage(file.buffer, safeName);
+    } catch (normErr) {
+      throw new AppError(normErr.message || 'Unsupported image format', 400, 'VALIDATION_ERROR');
+    }
+
     let saved;
     try {
-      saved = await saveFile(file.buffer, 'microscope', safeName);
+      saved = await saveFile(normalized.buffer, 'microscope', normalized.filename);
     } catch (storageErr) {
       throw new AppError(
         `Could not store microscope image: ${storageErr.message}`,

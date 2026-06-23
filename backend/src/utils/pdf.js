@@ -4,7 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('../config/env');
 const { generateQR } = require('./barcode');
-const { resolveImagePath } = require('../config/storage');
+const { resolveImagePath, readImageBuffer } = require('../config/storage');
 
 const ARABIC_FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
@@ -288,12 +288,19 @@ const drawResultsTable = (doc, results) => {
   doc.y = y + 4;
 };
 
-const drawMicroscopeImages = (doc, attachments) => {
+const drawMicroscopeImages = async (doc, attachments) => {
   if (!attachments?.length) return;
 
-  const images = attachments
-    .map((a) => ({ ...a, path: resolveImagePath(a.file_url) }))
-    .filter((a) => a.path);
+  const images = [];
+  for (const a of attachments) {
+    const pathLocal = resolveImagePath(a.file_url);
+    if (pathLocal) {
+      images.push({ ...a, source: pathLocal, isPath: true });
+      continue;
+    }
+    const buffer = await readImageBuffer(a.file_url);
+    if (buffer) images.push({ ...a, source: buffer, isPath: false });
+  }
 
   if (!images.length) return;
 
@@ -311,7 +318,7 @@ const drawMicroscopeImages = (doc, attachments) => {
     if (doc.y > y) y = doc.y;
     const x = TX + col * (imgW + 8);
     try {
-      doc.image(img.path, x, y, { width: imgW, height: imgH, fit: [imgW, imgH] });
+      doc.image(img.source, x, y, { width: imgW, height: imgH, fit: [imgW, imgH] });
       if (img.caption) {
         cellLatin(doc, img.caption, x, y + imgH + 2, imgW, 12, { size: 6, color: BRAND.muted, align: 'center' });
       }
@@ -451,7 +458,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       });
 
       drawResultsTable(doc, reportData.results);
-      drawMicroscopeImages(doc, reportData.attachments);
+      await drawMicroscopeImages(doc, reportData.attachments);
       drawNotes(doc, reportData.treatmentRecommendations);
       drawApprovals(doc, reportData);
       await drawFooter(doc, reportData);

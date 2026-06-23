@@ -35,8 +35,10 @@
     "pdfkit": "^0.16.0",
     "pg": "^8.13.1",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "utif2": "^4.1.0",
     "uuid": "^11.0.5",
     "winston": "^3.17.0"
   },
