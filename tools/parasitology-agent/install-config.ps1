@@ -10,18 +10,6 @@ if (-not (Test-Path $watchDir)) {
   Write-Host "Created folder: $watchDir"
 }
 
-$config = @{
-  apiUrl = 'https://rare-vet-lims.onrender.com/api'
-  username = 'admin'
-  password = 'CHANGE_ME'
-  watchDir = $watchDir
-  panel = 'blood'
-  localPort = 3920
-  deleteAfterUpload = $false
-  moveAfterUpload = $false
-  uploadedDir = 'uploaded'
-} | ConvertTo-Json
-
-Set-Content -Path $configPath -Value $config -Encoding UTF8
+& node (Join-Path $dir 'setup.js') $watchDir
 Write-Host "Saved: $configPath"
-Write-Host "Edit password in config.json if needed, then run: npm start"
+Write-Host "Run: npm start"

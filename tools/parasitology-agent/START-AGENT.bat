@@ -15,7 +15,7 @@ if not exist node_modules (
 mkdir "C:\Users\User\Desktop\صور الطفيليات" 2>nul
 
 echo Creating config.json...
-node -e "const fs=require('fs');const c={apiUrl:'https://rare-vet-lims.onrender.com/api',username:'admin',password:'Htoome449944@',watchDir:'C:\\Users\\User\\Desktop\\صور الطفيليات',panel:'blood',localPort:3920,deleteAfterUpload:false,moveAfterUpload:false,uploadedDir:'uploaded'};fs.writeFileSync('config.json',JSON.stringify(c,null,2),'utf8');console.log('config.json created OK');"
+node setup.js
 
 if errorlevel 1 goto fail
 
