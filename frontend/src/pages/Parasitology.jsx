@@ -19,6 +19,22 @@ const mediaUrl = (url) => {
   return `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
 };
 
+const withRetry = async (fn, { retries = 2, delayMs = 2500 } = {}) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const status = err.response?.status;
+      const retryable = !status || status === 502 || status === 503 || status === 504;
+      if (!retryable || attempt === retries) break;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+};
+
 const emptyParasiteForm = () => ({
   code: '', name: '', name_ar: '', unit: 'qual', sort_order: 0,
 });
@@ -231,6 +247,11 @@ function FindingPanel({
                       }
                       alt={paramLabel(finding.parameter_id)}
                       className="w-20 h-20 object-cover rounded-lg border border-primary-200"
+                      onError={() => {
+                        if (finding.attachment?.file_url) {
+                          updateFinding(finding.clientId, { attachment: null });
+                        }
+                      }}
                     />
                     {finding.attachment?.id && (
                       <button
@@ -456,10 +477,11 @@ export default function Parasitology() {
     for (const finding of findings) {
       if (!finding.pendingFile || !finding.parameter_id) continue;
       try {
-        const { data } = await resultsAPI.uploadAttachment(testId, finding.pendingFile, {
+        await withRetry(() => resultsAPI.uploadAttachment(testId, finding.pendingFile, {
           parameter_id: finding.parameter_id,
-        });
-        const att = (data.data?.attachments || []).find(
+        }));
+        const res = await resultsAPI.get(testId);
+        const att = (res.data.data?.attachments || []).find(
           (a) => String(a.parameter_id) === String(finding.parameter_id)
         );
         setFindings((prev) => prev.map((f) => (
@@ -471,9 +493,7 @@ export default function Parasitology() {
         failures.push(err.response?.data?.error?.message || err.message || 'upload');
       }
     }
-    if (failures.length) {
-      throw new Error(failures[0]);
-    }
+    return failures;
   };
 
   const queueImageForFinding = (finding, file, setFindings) => {
@@ -539,10 +559,21 @@ export default function Parasitology() {
     setSaving(true);
     try {
       const sampleId = selectedSample.id;
+      await withRetry(() => resultsAPI.approveBatch(
+        jobs.map((job) => ({
+          sample_test_id: job.test.id,
+          values: job.values,
+          doctor_notes: job.notes?.trim() || '',
+        }))
+      ));
+
+      const uploadFailures = [];
       for (const job of jobs) {
-        await resultsAPI.enter({ sample_test_id: job.test.id, values: job.values });
-        await uploadPendingImages(job.test.id, job.findings, job.setFindings);
-        await resultsAPI.validate(job.test.id, job.notes?.trim() || '');
+        const failed = await uploadPendingImages(job.test.id, job.findings, job.setFindings);
+        uploadFailures.push(...failed);
+      }
+      if (uploadFailures.length) {
+        toast.error(t('parasitology.imageUploadFailed'));
       }
 
       const { data: queueData } = await samplesAPI.parasitologyQueue();
@@ -562,8 +593,13 @@ export default function Parasitology() {
         setSelectedSample(null);
       }
     } catch (err) {
+      const status = err.response?.status;
       const msg = err.response?.data?.error?.message || err.message;
-      toast.error(msg || 'Error');
+      if (status === 502 || status === 503) {
+        toast.error(t('parasitology.serverWaking'));
+      } else {
+        toast.error(msg || 'Error');
+      }
     } finally {
       setSaving(false);
     }

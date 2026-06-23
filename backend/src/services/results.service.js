@@ -192,7 +192,9 @@ const enterResults = async (data, userId) => {
     committed = true;
     return getBySampleTest(data.sample_test_id);
   } catch (err) {
-    if (!committed) await client.query('ROLLBACK');
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    }
     throw err;
   } finally {
     client.release();
@@ -224,6 +226,15 @@ const validateResults = async (sampleTestId, userId, doctorNotes) => {
   }
 
   return getBySampleTest(sampleTestId);
+};
+
+const approveBatch = async (items, userId) => {
+  const approved = [];
+  for (const item of items) {
+    await enterResults(item, userId);
+    approved.push(await validateResults(item.sample_test_id, userId, item.doctor_notes ?? ''));
+  }
+  return approved;
 };
 
 const getPreviousResults = async (animalId, parameterId, limit = 5) => {
@@ -344,6 +355,7 @@ const removeAttachment = async (attachmentId) => {
 module.exports = {
   getBySampleTest,
   enterResults,
+  approveBatch,
   validateResults,
   getPreviousResults,
   getCriticalAlerts,

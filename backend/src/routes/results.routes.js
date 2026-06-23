@@ -3,7 +3,7 @@ const multer = require('multer');
 const service = require('../services/results.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { resultEntrySchema } = require('../validators/schemas');
+const { resultEntrySchema, resultApproveBatchSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i;
@@ -73,6 +73,13 @@ router.get('/previous/:animalId/:parameterId', authorize(PERMISSIONS.RESULTS_VIE
 router.post('/enter', authorize(PERMISSIONS.RESULTS_ENTER), validate(resultEntrySchema), async (req, res, next) => {
   try {
     const data = await service.enterResults(req.body, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/approve-batch', authorize(PERMISSIONS.RESULTS_VALIDATE), validate(resultApproveBatchSchema), async (req, res, next) => {
+  try {
+    const data = await service.approveBatch(req.body.items, req.user.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
