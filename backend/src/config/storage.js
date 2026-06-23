@@ -6,15 +6,24 @@ const logger = require('./logger');
 
 let s3Client = null;
 
-const isS3Storage = () => env.storage.type === 's3' && !!env.storage.s3.bucket;
+const isS3Storage = () => {
+  const { type, s3 } = env.storage;
+  return type === 's3' && !!s3.bucket && !!s3.accessKey && !!s3.secretKey;
+};
+
+const resolveS3Region = () => {
+  const region = env.storage.s3.region;
+  // AWS SDK requires a real region; R2/MinIO accept us-east-1 with custom endpoint.
+  if (!region || region === 'auto') return 'us-east-1';
+  return region;
+};
 
 const getS3Client = () => {
   if (s3Client) return s3Client;
   const { S3Client } = require('@aws-sdk/client-s3');
   const { s3 } = env.storage;
-  const region = !s3.region || s3.region === 'auto' ? 'auto' : s3.region;
   const config = {
-    region,
+    region: resolveS3Region(),
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   };
@@ -155,11 +164,16 @@ const persistLocalFile = async (filePath, subdir, filename) => {
   }
 
   if (isS3Storage()) {
-    const buffer = await fs.promises.readFile(filePath);
-    await s3Put(`${subdir}/${filename}`, buffer, guessMime(filename));
-    await fs.promises.unlink(filePath).catch(() => {});
-    logger.info('File persisted to S3', { url });
-    return { url, filename, path: null };
+    try {
+      const buffer = await fs.promises.readFile(filePath);
+      await s3Put(`${subdir}/${filename}`, buffer, guessMime(filename));
+      await fs.promises.unlink(filePath).catch(() => {});
+      logger.info('File persisted to S3', { url });
+      return { url, filename, path: null };
+    } catch (err) {
+      logger.warn('S3 persist failed — keeping local file', { url, error: err.message });
+      return { url, filename, path: filePath };
+    }
   }
 
   return { url, filename, path: filePath };
