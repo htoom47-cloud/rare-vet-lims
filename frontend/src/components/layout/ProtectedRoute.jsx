@@ -4,9 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { userRole } from '../../utils/roles';
 import AppLogo from '../ui/AppLogo';
 
-export default function ProtectedRoute({ children, permission, adminOnly = false }) {
+export default function ProtectedRoute({ children, permission, permissions, adminOnly = false }) {
   const { t } = useTranslation();
-  const { user, loading, hasPermission } = useAuth();
+  const { user, loading, hasPermission, hasAnyPermission } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +20,7 @@ export default function ProtectedRoute({ children, permission, adminOnly = false
 
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && userRole(user) !== 'admin') return <Navigate to="/" replace />;
+  if (permissions?.length && !hasAnyPermission(...permissions)) return <Navigate to="/" replace />;
   if (permission && !hasPermission(permission)) return <Navigate to="/" replace />;
 
   return children;

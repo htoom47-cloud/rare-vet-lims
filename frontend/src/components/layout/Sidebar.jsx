@@ -37,7 +37,7 @@ const navSections = [
     section: 'nav.sections.lab',
     items: [
       { path: '/workbench', icon: Activity, label: 'nav.workbench', permission: 'results.enter' },
-      { path: '/parasitology', icon: Bug, label: 'nav.parasitology', permission: 'results.enter' },
+      { path: '/parasitology', icon: Bug, label: 'nav.parasitology', permissions: ['results.enter', 'results.validate'] },
       { path: '/vet-review', icon: Stethoscope, label: 'nav.vetReview', permission: 'results.validate' },
       { path: '/tests', icon: TestTube, label: 'nav.tests', permission: 'tests.view' },
       { path: '/inventory', icon: Package, label: 'nav.inventory', permission: 'inventory.view' },
@@ -57,7 +57,7 @@ const navSections = [
 
 export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobile }) {
   const { t } = useTranslation();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, hasAnyPermission } = useAuth();
   const roleKey = user?.role ? `permissions.roles.${user.role}` : '';
   const roleLabel = roleKey ? t(roleKey, { defaultValue: user?.role }) : '';
 
@@ -103,6 +103,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
         {(isReception(user) ? receptionNavSections : navSections).map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (item.adminOnly && userRole(user) !== 'admin') return false;
+            if (item.permissions?.length) return hasAnyPermission(...item.permissions);
             return hasPermission(item.permission);
           });
           if (!visibleItems.length) return null;

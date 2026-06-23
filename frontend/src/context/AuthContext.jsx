@@ -43,8 +43,13 @@ export const AuthProvider = ({ children }) => {
     return user.permissions?.includes(permission);
   };
 
+  const hasAnyPermission = (...permissions) => {
+    if (!permissions.length) return true;
+    return permissions.some((p) => hasPermission(p));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasPermission, loadUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, hasPermission, hasAnyPermission, loadUser }}>
       {children}
     </AuthContext.Provider>
   );
