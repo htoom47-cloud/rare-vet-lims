@@ -412,6 +412,39 @@
     padding: 3px 6px 4px;
     margin-top: 2px;
   }
+
+  body.printing-lab-report .lab-report-single-page {
+    @page {
+      size: A4 portrait;
+      margin: 4mm 6mm;
+    }
+  }
+
+  body.printing-lab-report .lab-report-single-page .lab-rpt-title-banner {
+    display: none !important;
+  }
+
+  body.printing-lab-report .lab-report-single-page .lab-rpt-flag-legend {
+    display: none !important;
+  }
+
+  body.printing-lab-report .lab-report-single-page .lab-rpt-abnormal-box {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 1px 0 2px;
+    padding: 2px 5px;
+  }
+
+  body.printing-lab-report .lab-report-single-page .lab-rpt-table td,
+  body.printing-lab-report .lab-report-single-page .lab-rpt-table th {
+    padding: 0 2px;
+    line-height: 1.1;
+    font-size: 6.5pt;
+  }
+
+  body.printing-lab-report .lab-report-single-page .test-name-en {
+    display: none;
+  }
 }
 
 /* ── Laboratory Report — single-page A4 layout ── */
@@ -419,6 +452,85 @@
   max-width: 210mm;
   font-size: 8.5pt;
   line-height: 1.25;
+}
+
+/* ── Single A4 page mode (CBC / routine panels ≤34 rows) ── */
+.lab-report-single-page {
+  font-size: 8pt;
+  line-height: 1.15;
+}
+
+.lab-report-single-page .lab-rpt-header {
+  padding: 3px 6px 2px;
+}
+
+.lab-report-single-page .lab-rpt-logo {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.lab-report-single-page .lab-rpt-lab-name {
+  font-size: 9.5pt;
+}
+
+.lab-report-single-page .lab-rpt-lab-sub {
+  font-size: 6.5pt;
+}
+
+.lab-report-single-page .lab-rpt-meta-grid {
+  font-size: 6.5pt;
+  gap: 0;
+}
+
+.lab-report-single-page .lab-rpt-patient-bar-compact {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px 4px;
+  padding: 2px 6px;
+}
+
+.lab-report-single-page .lab-patient-label {
+  font-size: 5.5pt;
+}
+
+.lab-report-single-page .lab-patient-value {
+  font-size: 7pt;
+}
+
+.lab-report-single-page .lab-rpt-table {
+  font-size: 7pt;
+}
+
+.lab-report-single-page .lab-rpt-table th {
+  padding: 2px 3px;
+  font-size: 6.5pt;
+}
+
+.lab-report-single-page .lab-rpt-table td {
+  padding: 1px 3px;
+  line-height: 1.1;
+}
+
+.lab-report-single-page .test-name-en {
+  display: none;
+}
+
+.lab-report-single-page .lab-rpt-abnormal-box {
+  margin: 1px 0 3px;
+  padding: 2px 6px;
+  font-size: 6.5pt;
+  line-height: 1.2;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.lab-report-single-page .lab-rpt-footer {
+  padding: 2px 6px 3px;
+  margin-top: 2px;
+  font-size: 6.5pt;
+}
+
+.lab-report-single-page .lab-rpt-sig-name {
+  font-size: 7pt;
 }
 
 .lab-rpt-title-banner {
@@ -708,7 +820,7 @@
   margin: 3px 8px;
   padding: 3px 6px;
   background: #faf8f5;
-  border-left: 2px solid #C9A86A;
+  border-inline-start: 2px solid #C9A86A;
   font-size: 7.5pt;
   line-height: 1.35;
 }

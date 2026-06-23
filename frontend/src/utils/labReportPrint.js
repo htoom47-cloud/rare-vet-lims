@@ -1,4 +1,4 @@
-/** Standalone lab report print/PDF — isolated iframe, LTR shell, no page RTL bugs */
+/** Standalone lab report print/PDF — isolated iframe mirroring on-screen layout */
 import { LAB_REPORT_PRINT_STYLES } from './report-designs/design-1-print';
 
 const absolutizeUrl = (url) => {
@@ -22,17 +22,18 @@ const prepareReportHtml = (reportElement) => {
   return clone.innerHTML;
 };
 
-export const buildLabReportPrintDocument = (reportElement, { isAr = false } = {}) => {
-  const bodyClass = isAr ? 'lab-report-ar' : '';
+export const buildLabReportPrintDocument = (reportElement, { isAr = false, dir } = {}) => {
+  const resolvedDir = dir || reportElement?.closest('[dir]')?.getAttribute('dir') || (isAr ? 'rtl' : 'ltr');
+  const bodyClass = resolvedDir === 'rtl' ? 'lab-report-ar' : '';
   const html = prepareReportHtml(reportElement);
   return `<!DOCTYPE html>
-<html lang="${isAr ? 'ar' : 'en'}" dir="ltr">
+<html lang="${resolvedDir === 'rtl' ? 'ar' : 'en'}" dir="${resolvedDir}">
 <head>
   <meta charset="utf-8">
   <title>Lab Report</title>
   <style>${LAB_REPORT_PRINT_STYLES}</style>
 </head>
-<body>
+<body class="${bodyClass}">
   <div class="lab-report-document lab-report-a4 ${bodyClass}">
     ${html}
   </div>

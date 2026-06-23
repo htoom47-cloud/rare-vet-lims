@@ -545,7 +545,10 @@ const formatApprovalStamp = (date) => {
   return `${formatShortDate(d)}  ${time}`;
 };
 
-const generateReportPDF = async (reportData, outputDir, options = {}) => {
+const { shouldUseSinglePageLayout } = require('./layout-mode');
+const { generateSinglePagePDF } = require('./design-1-single-page');
+
+const generateStandardPDF = async (reportData, outputDir, options = {}) => {
   const filename = options.filename || `report-${reportData.reportNumber}-${uuidv4().slice(0, 8)}.pdf`;
   fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, filename);
@@ -591,6 +594,13 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
       reject(err);
     }
   });
+};
+
+const generateReportPDF = async (reportData, outputDir, options = {}) => {
+  if (shouldUseSinglePageLayout(reportData)) {
+    return generateSinglePagePDF(reportData, outputDir, options);
+  }
+  return generateStandardPDF(reportData, outputDir, options);
 };
 
 module.exports = {
