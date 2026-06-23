@@ -1,0 +1,37 @@
+---
+description: Restore or apply lab report design #1 when user asks for "تصميم التقرير رقم 1" or "report design 1"
+alwaysApply: false
+---
+
+# Lab Report Design #1
+
+Saved compact professional bilingual layout (Jun 2026). Reference report: `RPT-260623-812322` (~3 pages, 10 tests, 43 rows, 2 microscope images).
+
+## When user requests design 1
+
+Phrases: **تصميم التقرير رقم 1**, **report design 1**, **design #1**, **التصميم رقم 1**
+
+1. Set active PDF generator to design 1: `REPORT_DESIGN=1` (default).
+2. Restore files from the frozen snapshot if they were changed:
+   - `backend/src/utils/report-designs/design-1.js` → PDF generator (copy logic to active path or wire registry)
+   - `frontend/src/utils/report-designs/design-1-print.js` → print iframe CSS
+   - `frontend/src/pages/LaboratoryReport.jsx` → HTML structure (title banner, flag legend, patient bar, table)
+   - `frontend/src/index.css` → `.lab-rpt-*` screen + print styles
+3. Registry: `backend/src/utils/report-designs/index.js` — lists all traits and file paths.
+4. Do **not** invent a new layout; match design 1 unless user asks for design 2+.
+
+## Design 1 traits
+
+- Compact A4: patient 4×2 fields, results row 11px, 2-col microscope images (max 120px)
+- Y-based PDF pagination (pin `doc.y` after Arabic raster)
+- Page footer: report number + `Page N / Total`
+- Continuation header + repeating table header on new pages
+- Title banner: FINAL/PRELIM badge (brown bar, bilingual title)
+- Brand palette `#5B3A29` / `#C9A86A` only for panels
+- Flag symbols: ↑ ↓ + − (not long status text)
+- Bilingual table headers, QR + confidentiality footer
+
+## Active wiring
+
+- `backend/src/utils/pdf.js` → delegates to `report-designs` registry
+- Default design id: **1**

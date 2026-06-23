@@ -114,6 +114,7 @@ function PatientField({ label, value }) {
   );
 }
 
+/** Active layout: report design #1 — see .cursor/rules/report-design-1.mdc */
 export default function LaboratoryReport({ demoMode = false, initialReport = null, backPath = null, hideShareActions = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
