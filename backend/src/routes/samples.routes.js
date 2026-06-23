@@ -9,7 +9,7 @@ const { auditLog } = require('../middleware/audit');
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
+router.get('/', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
   try {
     const data = await service.list(req.query);
     res.json({ success: true, ...data });
@@ -30,14 +30,14 @@ router.get('/queue', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next)
   } catch (err) { next(err); }
 });
 
-router.get('/scan/:barcode', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
+router.get('/scan/:barcode', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
   try {
     const data = await service.getByBarcode(req.params.barcode);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
-router.get('/:id', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
+router.get('/:id', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
   try {
     const data = await service.getById(req.params.id);
     res.json({ success: true, data });

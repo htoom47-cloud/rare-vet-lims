@@ -71,7 +71,7 @@ router.get('/critical', authorize(PERMISSIONS.RESULTS_VIEW), async (req, res, ne
   } catch (err) { next(err); }
 });
 
-router.get('/sample-test/:id', authorize(PERMISSIONS.RESULTS_VIEW), async (req, res, next) => {
+router.get('/sample-test/:id', authorize(PERMISSIONS.RESULTS_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
   try {
     const data = await service.getBySampleTest(req.params.id);
     res.json({ success: true, data });
@@ -108,7 +108,7 @@ router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), 
 
 router.post(
   '/sample-test/:id/attachments',
-  authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE),
+  authorize(PERMISSIONS.RESULTS_UPLOAD_IMAGES, PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE),
   handleUpload,
   async (req, res, next) => {
     try {

@@ -4,7 +4,19 @@ const path = require('path');
 const { pool } = require('../config/database');
 const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
-const { ROLE_PERMISSIONS } = require('../utils/permissions');
+const { ROLE_PERMISSIONS, PERMISSIONS } = require('../utils/permissions');
+
+async function syncPermissionsCatalog(client) {
+  for (const [key, code] of Object.entries(PERMISSIONS)) {
+    const module = code.split('.')[0];
+    await client.query(
+      `INSERT INTO permissions (code, module, description) VALUES ($1, $2, $3)
+       ON CONFLICT (code) DO UPDATE SET module = EXCLUDED.module, description = EXCLUDED.description`,
+      [code, module, key]
+    );
+  }
+  logger.info('Permissions catalog synced');
+}
 
 async function syncAllRolePermissions(client) {
   for (const [roleName, perms] of Object.entries(ROLE_PERMISSIONS)) {
@@ -117,6 +129,8 @@ async function applyPatches() {
          AND EXISTS (SELECT 1 FROM test_categories WHERE code = 'MICRO')`
     );
     await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
+    await syncPermissionsCatalog(client);
+    await syncAllRolePermissions(client);
   } finally {
     client.release();
   }
