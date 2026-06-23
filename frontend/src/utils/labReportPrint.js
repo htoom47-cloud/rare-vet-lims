@@ -67,12 +67,12 @@ const LAB_REPORT_PRINT_STYLES = `
   .lab-rpt-images { margin: 4px 8px; }
   .lab-rpt-images-title { font-size: 7.5pt; font-weight: 700; color: #5B3A29; margin: 0 0 4px; border-bottom: 1px solid #C9A86A50; padding-bottom: 2px; }
   .lab-report-ar .lab-rpt-images-title { text-align: right; }
-  .lab-rpt-image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .lab-rpt-image-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
   .lab-rpt-image-card { margin: 0; border: 1px solid #e8e0d8; border-radius: 3px; overflow: hidden; background: #faf8f5; }
-  .lab-rpt-image { display: block; width: 100%; height: 72px; object-fit: cover; background: #f3f0eb; }
+  .lab-rpt-image { display: block; width: 100%; height: auto; max-height: 280px; object-fit: contain; background: #f3f0eb; }
   .lab-rpt-image-caption { padding: 2px 4px; font-size: 6.5pt; text-align: center; color: #5B3A29; }
-  .lab-rpt-image-fallback {
-    display: flex; align-items: center; justify-content: center; min-height: 72px;
+  .lab-rpt-image-missing, .lab-rpt-image-fallback {
+    display: flex; align-items: center; justify-content: center; min-height: 80px;
     padding: 6px; font-size: 7pt; color: #5B3A29; text-align: center; background: #f3f0eb;
   }
   .lab-rpt-notes {

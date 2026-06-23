@@ -306,30 +306,39 @@ const drawMicroscopeImages = async (doc, attachments) => {
   bilingualBar(doc, TX, y, TW, 14, 'Microscope Images', 'صور المجهر', BRAND.gold, { size: 7 });
   y += 18;
 
-  const imgW = (TW - 8) / 2;
-  const imgH = 110;
-  let col = 0;
+  const maxW = TW;
+  const maxH = 280;
 
-  images.forEach((img) => {
-    ensureSpace(doc, imgH + 20);
-    if (doc.y > y) y = doc.y;
-    const x = TX + col * (imgW + 8);
+  for (const img of images) {
+    let meta;
     try {
-      doc.image(img.source, x, y, { width: imgW, height: imgH, fit: [imgW, imgH] });
-      if (img.caption) {
-        cellLatin(doc, img.caption, x, y + imgH + 2, imgW, 12, { size: 6, color: BRAND.muted, align: 'center' });
-      }
+      meta = doc.openImage(img.source);
     } catch {
-      /* skip unreadable image */
+      continue;
     }
-    col += 1;
-    if (col >= 2) {
-      col = 0;
-      y += imgH + 18;
-    }
-  });
 
-  if (col > 0) y += imgH + 18;
+    let drawW = maxW;
+    let drawH = drawW * (meta.height / meta.width);
+    if (drawH > maxH) {
+      drawH = maxH;
+      drawW = drawH * (meta.width / meta.height);
+    }
+
+    ensureSpace(doc, drawH + 24);
+    y = Math.max(y, doc.y);
+    const x = TX + (TW - drawW) / 2;
+
+    doc.image(img.source, x, y, { width: drawW, height: drawH });
+
+    const caption = img.caption || img.test_name_ar || img.test_name || '';
+    if (caption) {
+      cellLatin(doc, caption, TX, y + drawH + 2, TW, 12, { size: 6, color: BRAND.muted, align: 'center' });
+      y += drawH + 16;
+    } else {
+      y += drawH + 8;
+    }
+  }
+
   doc.y = y + 4;
 };
 
