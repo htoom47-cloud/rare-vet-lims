@@ -13,6 +13,23 @@ const PARAS_BLOOD = 'PARAS-BLOOD';
 const PARAS_STOOL = 'PARAS-STOOL';
 const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
 
+/** Ensure mobile camera files have a recognizable name/type for the server. */
+const normalizeUploadFile = (file) => {
+  if (!file || typeof File === 'undefined') return file;
+  const hasExt = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(file.name || '');
+  if (hasExt && file.type && file.type.startsWith('image/')) return file;
+  const type = file.type && file.type.startsWith('image/')
+    ? file.type
+    : 'image/jpeg';
+  const ext = type.includes('png') ? '.png'
+    : type.includes('webp') ? '.webp'
+      : type.includes('gif') ? '.gif'
+        : type.includes('heic') ? '.heic'
+          : '.jpg';
+  const base = (file.name || 'microscope').replace(/\.[^.]+$/, '') || 'microscope';
+  return new File([file], `${base}${ext}`, { type, lastModified: file.lastModified });
+};
+
 const mediaUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http') || url.startsWith('blob:')) return url;
@@ -477,9 +494,10 @@ export default function Parasitology() {
     for (const finding of findings) {
       if (!finding.pendingFile || !finding.parameter_id) continue;
       try {
-        await withRetry(() => resultsAPI.uploadAttachment(testId, finding.pendingFile, {
+        const file = normalizeUploadFile(finding.pendingFile);
+        await withRetry(() => resultsAPI.uploadAttachment(testId, file, {
           parameter_id: finding.parameter_id,
-        }));
+        }), { retries: 3, delayMs: 3000 });
         const res = await resultsAPI.get(testId);
         const att = (res.data.data?.attachments || []).find(
           (a) => String(a.parameter_id) === String(finding.parameter_id)
@@ -559,21 +577,33 @@ export default function Parasitology() {
     setSaving(true);
     try {
       const sampleId = selectedSample.id;
-      await withRetry(() => resultsAPI.approveBatch(
-        jobs.map((job) => ({
+
+      // 1) Save result values first (required before images can attach to the result row)
+      for (const job of jobs) {
+        await withRetry(() => resultsAPI.enter({
           sample_test_id: job.test.id,
           values: job.values,
-          doctor_notes: job.notes?.trim() || '',
-        }))
-      ));
+          technician_notes: job.notes?.trim() || '',
+        }), { retries: 3, delayMs: 3000 });
+      }
 
+      // 2) Upload microscope images while the result row exists
       const uploadFailures = [];
       for (const job of jobs) {
         const failed = await uploadPendingImages(job.test.id, job.findings, job.setFindings);
         uploadFailures.push(...failed);
       }
+
+      // 3) Approve / validate
+      for (const job of jobs) {
+        await withRetry(() => resultsAPI.validate(job.test.id, job.notes?.trim() || ''), {
+          retries: 3,
+          delayMs: 3000,
+        });
+      }
+
       if (uploadFailures.length) {
-        toast.error(t('parasitology.imageUploadFailed'));
+        toast.error(uploadFailures[0] || t('parasitology.imageUploadFailed'));
       }
 
       const { data: queueData } = await samplesAPI.parasitologyQueue();

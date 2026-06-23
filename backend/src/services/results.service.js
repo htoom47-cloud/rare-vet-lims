@@ -293,7 +293,16 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
 
     const resultId = await ensureResultId(client, sampleTestId, userId);
     let safeName = file.originalname || file.mimetype?.replace('/', '.') || 'microscope.jpg';
-    if (!path.extname(safeName)) safeName = `${safeName}.jpg`;
+    if (!path.extname(safeName)) {
+      const mime = String(file.mimetype || '').toLowerCase();
+      const ext = mime.includes('png') ? '.png'
+        : mime.includes('webp') ? '.webp'
+          : mime.includes('gif') ? '.gif'
+            : mime.includes('heic') ? '.heic'
+              : mime.includes('heif') ? '.heif'
+                : '.jpg';
+      safeName = `${safeName}${ext}`;
+    }
 
     let saved;
     try {

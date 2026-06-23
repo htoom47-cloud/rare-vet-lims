@@ -10,10 +10,14 @@ const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i;
 
 const isImageUpload = (file) => {
   const mime = String(file.mimetype || '').toLowerCase();
+  const name = file.originalname || '';
+  if (IMAGE_EXT.test(name)) return true;
+  if (mime.startsWith('image/')) return true;
+  // Mobile cameras often send application/octet-stream with generic names (image, capture, blob).
   if (!mime || mime === 'application/octet-stream') {
-    return IMAGE_EXT.test(file.originalname || '');
+    return /^(image|capture|photo|blob|tmp|upload)$/i.test(name.replace(/\.[^.]+$/, ''));
   }
-  return mime.startsWith('image/');
+  return false;
 };
 
 const upload = multer({
@@ -93,7 +97,7 @@ router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), 
 
 router.post(
   '/sample-test/:id/attachments',
-  authorize(PERMISSIONS.RESULTS_ENTER),
+  authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE),
   handleUpload,
   async (req, res, next) => {
     try {
@@ -109,7 +113,7 @@ router.post(
   }
 );
 
-router.delete('/attachments/:id', authorize(PERMISSIONS.RESULTS_ENTER), async (req, res, next) => {
+router.delete('/attachments/:id', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
   try {
     const data = await service.removeAttachment(req.params.id);
     res.json({ success: true, data });

@@ -112,8 +112,19 @@ export const resultsAPI = {
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
   uploadAttachment: async (sampleTestId, file, opts = {}) => {
     const form = new FormData();
-    const name = file?.name || file?.filename || 'microscope.jpg';
-    form.append('image', file, name);
+    const raw = file;
+    let uploadFile = raw;
+    if (raw && typeof File !== 'undefined') {
+      const hasExt = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(raw.name || '');
+      if (!hasExt || !raw.type?.startsWith('image/')) {
+        const type = raw.type?.startsWith('image/') ? raw.type : 'image/jpeg';
+        const ext = type.includes('png') ? '.png' : '.jpg';
+        const base = (raw.name || 'microscope').replace(/\.[^.]+$/, '') || 'microscope';
+        uploadFile = new File([raw], `${base}${ext}`, { type, lastModified: raw.lastModified });
+      }
+    }
+    const name = uploadFile?.name || uploadFile?.filename || 'microscope.jpg';
+    form.append('image', uploadFile, name);
     if (opts.caption) form.append('caption', opts.caption);
     if (opts.parameter_id) form.append('parameter_id', opts.parameter_id);
 
@@ -122,6 +133,7 @@ export const resultsAPI = {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
+      signal: AbortSignal.timeout(90000),
     });
 
     let data;
