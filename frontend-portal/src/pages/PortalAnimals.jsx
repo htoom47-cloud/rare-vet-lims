@@ -32,7 +32,7 @@ export default function PortalAnimals() {
   };
 
   return (
-    <PortalLayout title={t('portal.myAnimals')} subtitle={t('portal.animalsHint')}>
+    <PortalLayout title={t('portal.myAnimals')} subtitle={t('portal.animalsHint')} wide>
       {loading && (
         <div className="text-center py-12 text-muted-foreground text-sm">{t('common.loading')}</div>
       )}

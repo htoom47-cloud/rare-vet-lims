@@ -21,7 +21,7 @@ export default function PortalReports() {
   }, [t]);
 
   return (
-    <PortalLayout title={t('portal.myReports')} subtitle={t('portal.reportsHint')}>
+    <PortalLayout title={t('portal.myReports')} subtitle={t('portal.reportsHint')} wide>
       {loading && (
         <div className="text-center py-12 text-muted-foreground text-sm">{t('common.loading')}</div>
       )}

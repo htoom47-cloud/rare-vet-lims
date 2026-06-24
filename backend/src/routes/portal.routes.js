@@ -40,6 +40,46 @@ router.get('/reports', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/dashboard', async (req, res, next) => {
+  try {
+    const data = await portalService.getDashboard(req.customer.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/search', async (req, res, next) => {
+  try {
+    const data = await portalService.searchPortal(req.customer.id, req.query.q);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/documents', async (req, res, next) => {
+  try {
+    const data = await portalService.listDocuments(req.customer.id, req.query);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/animals/:animalId/dashboard', async (req, res, next) => {
+  try {
+    const data = await portalService.getAnimalDashboard(req.customer.id, req.params.animalId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/animals/:animalId/trends/:parameterCode', async (req, res, next) => {
+  try {
+    const data = await portalService.getTrends(
+      req.customer.id,
+      req.params.animalId,
+      req.params.parameterCode,
+      req.query.limit
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/animals', async (req, res, next) => {
   try {
     const data = await portalService.listAnimals(req.customer.id);

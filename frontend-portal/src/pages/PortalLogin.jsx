@@ -55,7 +55,7 @@ export default function PortalLogin() {
     try {
       await verifyOtp(mobile, otp);
       toast.success(t('portal.loginSuccess'));
-      navigate('/reports');
+      navigate('/');
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('portal.invalidOtp'));
     } finally {

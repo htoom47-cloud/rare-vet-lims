@@ -32,7 +32,7 @@ export default function PortalReportView() {
   if (!report) return null;
 
   return (
-    <PortalLayout title={report.reportNumber}>
+    <PortalLayout title={report.reportNumber} wide>
       <LaboratoryReport initialReport={report} backPath="/reports" />
     </PortalLayout>
   );

@@ -12,3 +12,14 @@ export const animalLabel = (type, isAr) => {
   const e = ANIMAL_TYPES[type];
   return e ? (isAr ? e.ar : e.en) : (type || '—');
 };
+
+const GENDERS = {
+  male: { en: 'Male', ar: 'ذكر' },
+  female: { en: 'Female', ar: 'أنثى' },
+  unknown: { en: '—', ar: '—' },
+};
+
+export const genderLabel = (gender, isAr) => {
+  const e = GENDERS[gender];
+  return e ? (isAr ? e.ar : e.en) : (gender || '—');
+};

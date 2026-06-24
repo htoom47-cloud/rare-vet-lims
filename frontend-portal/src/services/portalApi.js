@@ -32,8 +32,25 @@ export const portalAuthAPI = {
   me: () => portalApi.get('/me'),
 };
 
+export const portalDashboardAPI = {
+  get: () => portalApi.get('/dashboard'),
+};
+
+export const portalSearchAPI = {
+  search: (q) => portalApi.get('/search', { params: { q } }),
+};
+
+export const portalDocumentsAPI = {
+  list: (params) => portalApi.get('/documents', { params }),
+};
+
 export const portalAnimalsAPI = {
   list: () => portalApi.get('/animals'),
+  dashboard: (animalId) => portalApi.get(`/animals/${animalId}/dashboard`),
+  trends: (animalId, parameterCode, limit) => portalApi.get(
+    `/animals/${animalId}/trends/${encodeURIComponent(parameterCode)}`,
+    { params: { limit } }
+  ),
   compare: (animalId, reportIds) => portalApi.get(`/animals/${animalId}/compare`, {
     params: { reportIds: reportIds.join(',') },
   }),

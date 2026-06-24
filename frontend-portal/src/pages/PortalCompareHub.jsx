@@ -24,7 +24,7 @@ export default function PortalCompareHub() {
   }, [t]);
 
   return (
-    <PortalLayout title={t('portal.navCompare')} subtitle={t('portal.compareHint')}>
+    <PortalLayout title={t('portal.navCompare')} subtitle={t('portal.compareHint')} wide>
       {loading && (
         <div className="text-center py-12 text-muted-foreground text-sm">{t('common.loading')}</div>
       )}

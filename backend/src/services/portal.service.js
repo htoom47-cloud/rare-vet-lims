@@ -7,6 +7,13 @@ const { hashToken, normalizeMobileDigits, paginate, buildPagination } = require(
 const { formatToE164 } = require('../utils/phone');
 const reportsService = require('./reports.service');
 const notificationProvider = require('./notification-providers');
+const {
+  PANELS,
+  panelStatusFromResults,
+  enrichParameters,
+  buildInterpretation,
+  flagSeverity,
+} = require('../utils/portal-analytics');
 
 const OTP_TTL_MINUTES = 10;
 const OTP_COOLDOWN_SECONDS = 60;
@@ -238,14 +245,56 @@ const listReports = async (customerId, { page, limit, animalId }) => {
 
 const assertAnimalOwnership = async (animalId, customerId) => {
   const result = await query(
-    `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age, a.color
+    `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age, a.color, a.rfid_chip,
+            c.full_name as owner_name, c.full_name_ar as owner_name_ar, c.farm_company
      FROM animals a
+     JOIN customers c ON a.owner_id = c.id
      WHERE a.id = $1 AND a.owner_id = $2 AND a.is_active = true`,
     [animalId, customerId]
   );
   if (!result.rows[0]) throw new AppError('Animal not found', 404, 'NOT_FOUND');
   return result.rows[0];
 };
+
+const fetchAnimalReports = async (customerId, animalId, limit = 20) => {
+  const params = [customerId, animalId];
+  let limitClause = '';
+  if (limit) {
+    params.push(limit);
+    limitClause = `LIMIT $${params.length}`;
+  }
+  const result = await query(
+    `SELECT r.id, r.report_number, r.pdf_url, r.created_at, r.is_final,
+            s.sample_code, s.collection_date
+     FROM reports r
+     JOIN samples s ON r.sample_id = s.id
+     WHERE s.customer_id = $1 AND s.animal_id = $2
+     ORDER BY r.created_at DESC
+     ${limitClause}`,
+    params
+  );
+  return result.rows;
+};
+
+const latestResultsForAnimal = async (customerId, animalId) => {
+  const reports = await fetchAnimalReports(customerId, animalId, 1);
+  if (!reports[0]) return { results: [], report: null };
+  await assertReportOwnership(reports[0].id, customerId);
+  const preview = await reportsService.getPreview(reports[0].id);
+  return {
+    results: sanitizePortalPreview(preview).results || [],
+    report: reports[0],
+  };
+};
+
+const buildPanels = (results) =>
+  PANELS.map((panel) => ({
+    key: panel.key,
+    status: panel.codes.length ? panelStatusFromResults(results, panel.codes) : 'none',
+  }));
+
+const countCriticalFlags = (results) =>
+  (results || []).filter((r) => flagSeverity(r.flag) >= 3).length;
 
 const listAnimals = async (customerId) => {
   const result = await query(
@@ -322,6 +371,7 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
           nameEn: item.nameEn,
           unit: item.unit,
           reference: item.reference,
+          categoryCode: item.categoryCode,
           values: {},
         });
       }
@@ -333,34 +383,43 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
     }
   }
 
-  const parameters = [...paramMap.values()]
-    .map((param) => {
-      const series = previews
-        .map((r) => param.values[r.id])
-        .filter(Boolean);
-      const nums = series
-        .map((v) => v.numericValue)
-        .filter((n) => n != null && !Number.isNaN(n));
-      let trend = null;
-      if (nums.length >= 2) {
-        const diff = nums[nums.length - 1] - nums[0];
-        if (Math.abs(diff) < 0.01) trend = 'stable';
-        else trend = diff > 0 ? 'up' : 'down';
-      }
-      return {
-        ...param,
-        values: previews.map((r) => ({
-          reportId: r.id,
-          reportNumber: r.reportNumber,
-          date: r.date,
-          ...(param.values[r.id] || { value: '—', numericValue: null, flag: null }),
-        })),
-        trend,
-        comparable: nums.length >= 2,
-      };
-    })
-    .filter((p) => p.values.some((v) => v.value && v.value !== '—'))
-    .sort((a, b) => (a.nameEn || '').localeCompare(b.nameEn || ''));
+  const parameters = enrichParameters(
+    [...paramMap.values()]
+      .map((param) => {
+        const series = previews
+          .map((r) => param.values[r.id])
+          .filter(Boolean);
+        const nums = series
+          .map((v) => v.numericValue)
+          .filter((n) => n != null && !Number.isNaN(n));
+        let trend = null;
+        if (nums.length >= 2) {
+          const diff = nums[nums.length - 1] - nums[0];
+          if (Math.abs(diff) < 0.01) trend = 'stable';
+          else trend = diff > 0 ? 'up' : 'down';
+        }
+        return {
+          ...param,
+          values: previews.map((r) => ({
+            reportId: r.id,
+            reportNumber: r.reportNumber,
+            date: r.date,
+            ...(param.values[r.id] || { value: '—', numericValue: null, flag: null }),
+          })),
+          trend,
+          comparable: nums.length >= 2,
+        };
+      })
+      .filter((p) => p.values.some((v) => v.value && v.value !== '—'))
+      .sort((a, b) => (a.nameEn || '').localeCompare(b.nameEn || ''))
+  );
+
+  const latestResults = previews[previews.length - 1]?.results || [];
+  const panels = buildPanels(latestResults);
+  const interpretation = {
+    ar: buildInterpretation(parameters, panels, true),
+    en: buildInterpretation(parameters, panels, false),
+  };
 
   logPortalAccess(customerId, 'animal_compare', animalId);
 
@@ -372,6 +431,7 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
       name: animal.name_tag,
       gender: animal.gender,
       age: animal.age,
+      chip: animal.rfid_chip,
     },
     reports: previews.map((r) => ({
       id: r.id,
@@ -380,7 +440,331 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
       date: r.date,
     })),
     parameters,
+    panels,
+    interpretation,
   };
+};
+
+const getDashboard = async (customerId) => {
+  const customerResult = await query(
+    `SELECT id, full_name, full_name_ar, mobile, city, farm_company FROM customers WHERE id = $1`,
+    [customerId]
+  );
+  const customer = customerResult.rows[0];
+
+  const statsResult = await query(
+    `SELECT
+       COUNT(DISTINCT r.id)::int AS report_count,
+       COUNT(DISTINCT a.id)::int AS animal_count,
+       COUNT(DISTINCT r.id) FILTER (WHERE r.created_at > NOW() - INTERVAL '7 days')::int AS new_reports_7d
+     FROM customers c
+     LEFT JOIN samples s ON s.customer_id = c.id
+     LEFT JOIN reports r ON r.sample_id = s.id
+     LEFT JOIN animals a ON a.owner_id = c.id AND a.is_active = true
+     WHERE c.id = $1`,
+    [customerId]
+  );
+  const stats = statsResult.rows[0] || { report_count: 0, animal_count: 0, new_reports_7d: 0 };
+
+  const animals = await listAnimals(customerId);
+  const animalSummaries = await Promise.all(
+    animals.slice(0, 12).map(async (row) => {
+      const { results } = await latestResultsForAnimal(customerId, row.id);
+      const panels = buildPanels(results);
+      const abnormalPanels = panels.filter((p) => p.status === 'abnormal').length;
+      return {
+        id: row.id,
+        code: row.animal_code,
+        name: row.name_tag,
+        type: row.animal_type,
+        gender: row.gender,
+        age: row.age,
+        reportCount: row.report_count,
+        latestReportAt: row.latest_report_at,
+        panels,
+        hasAbnormal: abnormalPanels > 0,
+        criticalCount: countCriticalFlags(results),
+      };
+    })
+  );
+
+  const recent = await listReports(customerId, { page: 1, limit: 6 });
+
+  const alerts = [];
+  if (parseInt(stats.new_reports_7d, 10) > 0) {
+    alerts.push({
+      type: 'new_reports',
+      severity: 'info',
+      count: parseInt(stats.new_reports_7d, 10),
+    });
+  }
+  const criticalTotal = animalSummaries.reduce((sum, a) => sum + (a.criticalCount || 0), 0);
+  if (criticalTotal > 0) {
+    alerts.push({ type: 'critical_results', severity: 'critical', count: criticalTotal });
+  }
+  const abnormalAnimals = animalSummaries.filter((a) => a.hasAbnormal);
+  if (abnormalAnimals.length > 0) {
+    alerts.push({
+      type: 'abnormal_panels',
+      severity: 'warning',
+      count: abnormalAnimals.length,
+    });
+  }
+
+  logPortalAccess(customerId, 'dashboard');
+
+  return {
+    customer,
+    stats: {
+      reportCount: parseInt(stats.report_count, 10) || 0,
+      animalCount: parseInt(stats.animal_count, 10) || 0,
+      newReports7d: parseInt(stats.new_reports_7d, 10) || 0,
+    },
+    alerts,
+    animals: animalSummaries,
+    recentReports: recent.data,
+  };
+};
+
+const getAnimalDashboard = async (customerId, animalId) => {
+  const animal = await assertAnimalOwnership(animalId, customerId);
+  const reports = await fetchAnimalReports(customerId, animalId, 20);
+  const { results, report: latestReport } = await latestResultsForAnimal(customerId, animalId);
+  const panels = buildPanels(results);
+
+  let comparison = null;
+  let keyParameters = [];
+  let interpretation = { ar: '', en: '' };
+  let trendCandidates = [];
+
+  if (reports.length >= 2) {
+    try {
+      comparison = await getComparison(customerId, animalId, []);
+      keyParameters = (comparison.parameters || [])
+        .filter((p) => p.comparable && p.current != null)
+        .sort((a, b) => flagSeverity(b.latestFlag) - flagSeverity(a.latestFlag))
+        .slice(0, 12);
+      interpretation = comparison.interpretation;
+      trendCandidates = keyParameters.slice(0, 6).map((p) => p.code);
+    } catch {
+      /* fewer than 2 comparable reports */
+    }
+  }
+
+  if (!trendCandidates.length && results.length) {
+    trendCandidates = results
+      .filter((r) => r.numericValue != null)
+      .slice(0, 4)
+      .map((r) => r.code);
+  }
+
+  logPortalAccess(customerId, 'animal_dashboard', animalId);
+
+  return {
+    animal: {
+      id: animal.id,
+      code: animal.animal_code,
+      name: animal.name_tag,
+      type: animal.animal_type,
+      gender: animal.gender,
+      age: animal.age,
+      color: animal.color,
+      chip: animal.rfid_chip,
+    },
+    owner: {
+      name: animal.owner_name,
+      nameAr: animal.owner_name_ar,
+      farm: animal.farm_company,
+    },
+    reportCount: reports.length,
+    latestReport: latestReport
+      ? {
+          id: latestReport.id,
+          reportNumber: latestReport.report_number,
+          createdAt: latestReport.created_at,
+          sampleCode: latestReport.sample_code,
+          collectedAt: latestReport.collection_date,
+        }
+      : null,
+    panels,
+    interpretation,
+    keyParameters,
+    trendCandidates,
+    recentReports: reports,
+    canCompare: reports.length >= 2,
+  };
+};
+
+const getTrends = async (customerId, animalId, parameterCode, limit = 15) => {
+  await assertAnimalOwnership(animalId, customerId);
+  const capped = Math.min(Math.max(parseInt(limit, 10) || 15, 5), 20);
+
+  const reportsResult = await query(
+    `SELECT r.id, r.report_number, r.created_at
+     FROM reports r
+     JOIN samples s ON r.sample_id = s.id
+     WHERE s.customer_id = $1 AND s.animal_id = $2
+     ORDER BY r.created_at ASC
+     LIMIT $3`,
+    [customerId, animalId, capped]
+  );
+
+  const reports = reportsResult.rows;
+  if (!reports.length) {
+    return { parameterCode, points: [], meta: null };
+  }
+
+  const points = [];
+  let meta = null;
+
+  for (const row of reports) {
+    await assertReportOwnership(row.id, customerId);
+    const preview = await reportsService.getPreview(row.id);
+    const results = sanitizePortalPreview(preview).results || [];
+    const match = results.find((r) => r.code === parameterCode);
+    if (!match) continue;
+    if (!meta) {
+      meta = {
+        code: match.code,
+        nameAr: match.nameAr,
+        nameEn: match.nameEn,
+        unit: match.unit,
+        reference: match.reference,
+      };
+    }
+    points.push({
+      reportId: row.id,
+      reportNumber: row.report_number,
+      date: row.created_at,
+      value: match.value,
+      numericValue: match.numericValue,
+      flag: match.flag,
+    });
+  }
+
+  logPortalAccess(customerId, 'animal_trends', animalId);
+
+  return { parameterCode, meta, points };
+};
+
+const listDocuments = async (customerId, { animalId, type } = {}) => {
+  const filters = ['s.customer_id = $1'];
+  const params = [customerId];
+  if (animalId) {
+    params.push(animalId);
+    filters.push(`s.animal_id = $${params.length}`);
+  }
+  const where = filters.join(' AND ');
+
+  const pdfs = await query(
+    `SELECT r.id, r.report_number, r.pdf_url, r.created_at, r.language,
+            a.animal_code, a.name_tag as animal_name, a.animal_type,
+            'pdf' as doc_type
+     FROM reports r
+     JOIN samples s ON r.sample_id = s.id
+     LEFT JOIN animals a ON s.animal_id = a.id
+     WHERE ${where} AND r.pdf_url IS NOT NULL
+     ORDER BY r.created_at DESC`,
+    params
+  );
+
+  const attachFilters = ['s.customer_id = $1'];
+  const attachParams = [customerId];
+  if (animalId) {
+    attachParams.push(animalId);
+    attachFilters.push(`s.animal_id = $${attachParams.length}`);
+  }
+  const attachWhere = attachFilters.join(' AND ');
+
+  let attachments = { rows: [] };
+  try {
+    attachments = await query(
+      `SELECT ra.id, ra.file_url, ra.caption, ra.created_at,
+              r.report_number, r.id as report_id,
+              a.animal_code, a.name_tag as animal_name,
+              CASE
+                WHEN ra.file_url ILIKE '%.pdf' THEN 'pdf'
+                WHEN ra.file_url ILIKE '%.png' OR ra.file_url ILIKE '%.jpg' OR ra.file_url ILIKE '%.jpeg' THEN 'image'
+                ELSE 'file'
+              END as doc_type
+       FROM result_attachments ra
+       JOIN results res ON ra.result_id = res.id
+       JOIN samples s ON res.sample_id = s.id
+       JOIN reports r ON r.sample_id = s.id
+       LEFT JOIN animals a ON s.animal_id = a.id
+       WHERE ${attachWhere}
+       ORDER BY ra.created_at DESC`,
+      attachParams
+    );
+  } catch (err) {
+    logger.warn('Portal documents: attachments unavailable', { error: err.message });
+  }
+
+  let docs = [
+    ...pdfs.rows.map((row) => ({
+      id: row.id,
+      type: 'pdf',
+      title: row.report_number,
+      url: row.pdf_url,
+      createdAt: row.created_at,
+      reportId: row.id,
+      reportNumber: row.report_number,
+      animalCode: row.animal_code,
+      animalName: row.animal_name,
+      animalType: row.animal_type,
+    })),
+    ...attachments.rows.map((row) => ({
+      id: row.id,
+      type: row.doc_type === 'image' ? 'image' : row.doc_type,
+      title: row.caption || row.report_number,
+      url: row.file_url,
+      createdAt: row.created_at,
+      reportId: row.report_id,
+      reportNumber: row.report_number,
+      animalCode: row.animal_code,
+      animalName: row.animal_name,
+    })),
+  ];
+
+  if (type && type !== 'all') {
+    docs = docs.filter((d) => d.type === type);
+  }
+
+  docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  logPortalAccess(customerId, 'documents');
+
+  return docs;
+};
+
+const searchPortal = async (customerId, q) => {
+  const term = String(q || '').trim();
+  if (term.length < 2) return { animals: [], reports: [] };
+
+  const like = `%${term}%`;
+  const animals = await query(
+    `SELECT DISTINCT a.id, a.animal_code, a.name_tag, a.animal_type, a.rfid_chip
+     FROM animals a
+     WHERE a.owner_id = $1 AND a.is_active = true
+       AND (a.animal_code ILIKE $2 OR a.name_tag ILIKE $2 OR a.rfid_chip ILIKE $2)
+     ORDER BY a.animal_code
+     LIMIT 8`,
+    [customerId, like]
+  );
+
+  const reports = await query(
+    `SELECT r.id, r.report_number, r.created_at, a.animal_code, a.name_tag as animal_name
+     FROM reports r
+     JOIN samples s ON r.sample_id = s.id
+     LEFT JOIN animals a ON s.animal_id = a.id
+     WHERE s.customer_id = $1
+       AND (r.report_number ILIKE $2 OR s.sample_code ILIKE $2)
+     ORDER BY r.created_at DESC
+     LIMIT 8`,
+    [customerId, like]
+  );
+
+  return { animals: animals.rows, reports: reports.rows };
 };
 
 const getReportPreview = async (reportId, customerId) => {
@@ -409,6 +793,11 @@ module.exports = {
   listReports,
   listAnimals,
   getComparison,
+  getDashboard,
+  getAnimalDashboard,
+  getTrends,
+  listDocuments,
+  searchPortal,
   getReportPreview,
   serveReportPdf,
 };

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { portalReportsAPI } from '../../services/portalApi';
 import { animalLabel } from '../../utils/animalTypes';
 
-export default function ReportListCard({ report, isAr, showAnimal = true }) {
+export default function ReportListCard({ report, isAr, showAnimal = true, compact = false }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -25,6 +25,25 @@ export default function ReportListCard({ report, isAr, showAnimal = true }) {
       toast.error(t('labReport.downloadFailed'));
     }
   };
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        className="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-accent/60 transition-colors text-start border border-border/50"
+        onClick={() => navigate(`/reports/${report.id}`)}
+      >
+        <div className="min-w-0">
+          <p className="font-mono font-medium text-sm">{report.report_number}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {formatDate(report.created_at)}
+            {showAnimal && report.animal_code ? ` · ${report.animal_code}` : ''}
+          </p>
+        </div>
+        <Eye size={16} className="text-muted-foreground shrink-0" />
+      </button>
+    );
+  }
 
   return (
     <Card className="hover:shadow-md transition-shadow">
