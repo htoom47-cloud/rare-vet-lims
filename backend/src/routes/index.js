@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const authRoutes = require('./auth.routes');
 const customersRoutes = require('./customers.routes');
@@ -38,7 +40,17 @@ router.use('/settings', settingsRoutes);
 router.use('/portal', portalRoutes);
 
 router.get('/health', (_req, res) => {
-  res.json({ success: true, status: 'healthy', timestamp: new Date().toISOString() });
+  const staffDist = path.join(__dirname, '../../../frontend/dist/index.html');
+  const portalDist = path.join(__dirname, '../../../frontend-portal/dist/index.html');
+  res.json({
+    success: true,
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    frontend: {
+      staff: fs.existsSync(staffDist),
+      portal: fs.existsSync(portalDist),
+    },
+  });
 });
 
 module.exports = router;

@@ -19,7 +19,8 @@ if (env.nodeEnv === 'production') {
 }
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({
+// CORS applies to API only — global CORS breaks Vite module scripts (crossorigin) on custom domains.
+app.use('/api', cors({
   origin(origin, callback) {
     if (!origin || env.corsOrigins.includes(origin)) {
       callback(null, true);
@@ -96,7 +97,12 @@ const portalDistReady = fs.existsSync(path.join(portalDistPath, 'index.html'));
 const staffDistReady = fs.existsSync(path.join(staffDistPath, 'index.html'));
 
 const portalHostSet = new Set(env.portalHosts.map((h) => h.toLowerCase()));
-const isPortalRequest = (req) => portalDistReady && portalHostSet.has((req.hostname || '').toLowerCase());
+const requestHost = (req) => {
+  const forwarded = req.headers['x-forwarded-host'];
+  const raw = (typeof forwarded === 'string' ? forwarded.split(',')[0] : req.hostname) || '';
+  return raw.trim().toLowerCase().replace(/:\d+$/, '');
+};
+const isPortalRequest = (req) => portalDistReady && portalHostSet.has(requestHost(req));
 
 const serveSpa = (distPath) => {
   const staticMw = express.static(distPath, { index: false, maxAge: '1d' });
@@ -105,6 +111,11 @@ const serveSpa = (distPath) => {
     staticMw(req, res, (err) => {
       if (err) return next(err);
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      // Missing hashed assets must 404 — returning index.html breaks module script loading.
+      if (req.path.startsWith('/assets/') || req.path.includes('.')) {
+        res.status(404).end();
+        return;
+      }
       res.sendFile(path.join(distPath, 'index.html'), (sendErr) => {
         if (sendErr) next(sendErr);
       });

@@ -6,7 +6,7 @@
   "scripts": {
     "dev:staff": "cd frontend && npm run dev",
     "dev:portal": "cd frontend-portal && npm run dev",
-    "build:cloud": "cd frontend && npm ci --include=dev && VITE_API_URL=/api npm run build && cd ../frontend-portal && npm ci --include=dev && VITE_API_URL=/api npm run build && cd ../backend && npm ci --omit=dev",
+    "build:cloud": "node scripts/build-cloud.js",
     "build:portal": "cd frontend-portal && npm ci --include=dev && VITE_API_URL=/api npm run build",
     "start:cloud": "cd backend && node src/scripts/cloud-start.js",
     "seed:cloud": "cd backend && node src/scripts/seed.js"

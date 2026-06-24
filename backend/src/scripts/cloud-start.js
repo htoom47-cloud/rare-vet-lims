@@ -28,8 +28,11 @@ if (!fs.existsSync(distPath)) {
   logger.error('frontend/dist not found — check Build Command includes vite build');
   process.exit(1);
 }
-if (!fs.existsSync(path.join(portalDistPath, 'index.html'))) {
-  logger.warn('frontend-portal/dist not found — portal host routing disabled until portal build is included');
+const portalIndex = path.join(portalDistPath, 'index.html');
+if (!fs.existsSync(portalIndex)) {
+  logger.error('frontend-portal/dist not found — portal.rarevetcare.com will show staff app or blank until build:cloud includes portal');
+} else {
+  logger.info('Client portal build ready', { path: portalDistPath });
 }
 
 // Start HTTP immediately so Render health checks pass during background boot tasks.
