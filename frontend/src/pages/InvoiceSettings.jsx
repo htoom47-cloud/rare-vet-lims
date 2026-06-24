@@ -15,7 +15,7 @@ const emptySettings = () => ({
   },
   labels: { title_en: '', title_ar: '' },
   footer: { note_en: '', note_ar: '' },
-  options: { show_qr: true, show_payment_history: true, default_tax_rate: 15 },
+  options: { show_qr: true, show_payment_history: true, default_tax_rate: 15, auto_invoice_trigger: 'manual' },
 });
 
 const Field = ({ label, children }) => (
@@ -225,6 +225,20 @@ export default function InvoiceSettings() {
             <input type="checkbox" checked={form.options.show_payment_history} onChange={(e) => setOptions('show_payment_history', e.target.checked)} disabled={!canEdit} />
             {t('invoiceSettings.showPayments')}
           </label>
+          <Field label={t('invoiceSettings.autoInvoice')}>
+            <select
+              className={`${inputClass} max-w-md`}
+              value={form.options.auto_invoice_trigger || 'manual'}
+              onChange={(e) => setOptions('auto_invoice_trigger', e.target.value)}
+              disabled={!canEdit}
+            >
+              <option value="manual">{t('invoiceSettings.autoInvoiceManual')}</option>
+              <option value="sample">{t('invoiceSettings.autoInvoiceSample')}</option>
+              <option value="validation">{t('invoiceSettings.autoInvoiceValidation')}</option>
+              <option value="both">{t('invoiceSettings.autoInvoiceBoth')}</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{t('invoiceSettings.autoInvoiceHint')}</p>
+          </Field>
           <div className="grid grid-cols-1 gap-4 pt-2 border-t">
             <Field label={t('invoiceSettings.footerEn')}>
               <textarea className={inputClass} rows={2} value={form.footer.note_en} onChange={(e) => setFooter('note_en', e.target.value)} disabled={!canEdit} />

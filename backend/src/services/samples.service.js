@@ -2,6 +2,7 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
+const autoInvoice = require('./auto-invoice.service');
 const { uuidv4 } = require('../utils/uuid');
 
 const list = async ({ status, search, awaiting_validation, page, limit }) => {
@@ -145,6 +146,8 @@ const create = async (data, userId) => {
       test_names: full.tests.map((t) => t.test_name),
       collection_date: full.collection_date,
     });
+
+    await autoInvoice.tryAutoInvoice(sample.id, userId, 'sample');
 
     return { ...full, barcode_image: barcodeImage };
   } catch (err) {

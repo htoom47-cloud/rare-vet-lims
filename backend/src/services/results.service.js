@@ -6,6 +6,7 @@ const { evaluateFlag } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
+const autoInvoice = require('./auto-invoice.service');
 
 const isPositiveQual = (raw) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(raw);
 const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(raw);
@@ -217,13 +218,15 @@ const validateResults = async (sampleTestId, userId, doctorNotes) => {
   );
 
   const st = await query('SELECT sample_id FROM sample_tests WHERE id = $1', [sampleTestId]);
+  const sampleId = st.rows[0].sample_id;
   const pending = await query(
     `SELECT COUNT(*) FROM sample_tests WHERE sample_id = $1 AND status != 'completed'`,
-    [st.rows[0].sample_id]
+    [sampleId]
   );
 
   if (parseInt(pending.rows[0].count, 10) === 0) {
-    await query(`UPDATE samples SET status = 'completed', completed_date = NOW(), updated_at = NOW() WHERE id = $1`, [st.rows[0].sample_id]);
+    await query(`UPDATE samples SET status = 'completed', completed_date = NOW(), updated_at = NOW() WHERE id = $1`, [sampleId]);
+    await autoInvoice.tryAutoInvoice(sampleId, userId, 'validation');
   }
 
   return getBySampleTest(sampleTestId);

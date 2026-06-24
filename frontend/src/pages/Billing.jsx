@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 import { Plus, CreditCard, Download, Printer, BarChart3, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -37,6 +38,8 @@ function groupItemsByAnimal(items, t) {
 
 export default function Billing() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canPay = hasPermission('billing.payment');
   const [invoices, setInvoices] = useState([]);
   const [packages, setPackages] = useState([]);
   const [tests, setTests] = useState([]);
@@ -182,7 +185,7 @@ export default function Billing() {
         >
           <Download size={14} />
         </button>
-        {r.status !== 'paid' && r.status !== 'cancelled' ? (
+        {canPay && r.status !== 'paid' && r.status !== 'cancelled' ? (
           <button type="button" onClick={() => openPayment(r)} className="text-primary-600 text-sm flex items-center gap-1">
             <CreditCard size={14} /> {t('billing.payment')}
           </button>
@@ -335,7 +338,7 @@ export default function Billing() {
               </div>
             )}
 
-            {detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
+            {canPay && detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
               <div className="flex justify-end">
                 <button onClick={() => openPayment(detailInvoice)} className="btn-primary flex items-center gap-2">
                   <CreditCard size={16} /> {t('billing.payment')}

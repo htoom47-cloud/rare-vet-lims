@@ -31,6 +31,7 @@ const getDefaultInvoiceSettings = () => ({
     show_qr: true,
     show_payment_history: true,
     default_tax_rate: 15,
+    auto_invoice_trigger: 'manual',
   },
 });
 
@@ -56,6 +57,10 @@ const mergeInvoiceSettings = (stored) => {
   merged.options.show_qr = merged.options.show_qr !== false;
   merged.options.show_payment_history = merged.options.show_payment_history !== false;
   merged.options.default_tax_rate = Number(merged.options.default_tax_rate) || defaults.options.default_tax_rate;
+  const validTriggers = ['manual', 'sample', 'validation', 'both'];
+  if (!validTriggers.includes(merged.options.auto_invoice_trigger)) {
+    merged.options.auto_invoice_trigger = defaults.options.auto_invoice_trigger;
+  }
 
   return merged;
 };

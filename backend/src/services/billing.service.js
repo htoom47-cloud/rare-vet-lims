@@ -9,6 +9,8 @@ const { generateInvoicePDF } = require('../utils/invoice-pdf');
 const invoiceSettingsService = require('./invoice-settings.service');
 const { syncCustomerArBalance } = require('./accounting.service');
 const ledger = require('./ledger.service');
+const { assertDayOpen } = require('./daily-closing.service');
+const { logBillingAudit } = require('../utils/billing-audit');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -21,22 +23,50 @@ const generateVatQR = (invoice) => {
   return Buffer.concat(tlv).toString('base64');
 };
 
-const listInvoices = async ({ status, customer_id, page, limit }) => {
+const invoiceDate = (invoice) => new Date(invoice.created_at).toISOString().slice(0, 10);
+
+const listInvoices = async ({
+  status, customer_id, page, limit, search, date_from, date_to, payment_method,
+}) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
   let where = 'WHERE 1=1';
 
   if (status) { params.push(status); where += ` AND i.status = $${params.length}`; }
   if (customer_id) { params.push(customer_id); where += ` AND i.customer_id = $${params.length}`; }
+  if (search) {
+    params.push(`%${search}%`);
+    where += ` AND (i.invoice_number ILIKE $${params.length} OR c.full_name ILIKE $${params.length} OR c.full_name_ar ILIKE $${params.length})`;
+  }
+  if (date_from) { params.push(date_from); where += ` AND i.created_at::date >= $${params.length}::date`; }
+  if (date_to) { params.push(date_to); where += ` AND i.created_at::date <= $${params.length}::date`; }
+  if (payment_method) {
+    params.push(payment_method);
+    where += ` AND EXISTS (SELECT 1 FROM payments px WHERE px.invoice_id = i.id AND px.method = $${params.length})`;
+  }
 
-  const countResult = await query(`SELECT COUNT(*) FROM invoices i ${where}`, params);
+  const countResult = await query(
+    `SELECT COUNT(*) FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id ${where}`,
+    params
+  );
   const total = parseInt(countResult.rows[0].count, 10);
 
   params.push(l, offset);
   const result = await query(
-    `SELECT i.*, c.full_name as customer_name FROM invoices i
+    `SELECT i.*, c.full_name AS customer_name, c.full_name_ar AS customer_name_ar,
+            COALESCE(pay.paid, 0) AS total_paid,
+            GREATEST(i.total - COALESCE(pay.paid, 0), 0) AS balance_due,
+            pay.methods AS payment_methods
+     FROM invoices i
      LEFT JOIN customers c ON i.customer_id = c.id
-     ${where} ORDER BY i.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+     LEFT JOIN (
+       SELECT invoice_id, SUM(amount) AS paid,
+              string_agg(DISTINCT method::text, ',') AS methods
+       FROM payments GROUP BY invoice_id
+     ) pay ON pay.invoice_id = i.id
+     ${where}
+     ORDER BY i.created_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
 
@@ -121,6 +151,13 @@ const createInvoice = async (data, userId) => {
     const issued = { ...invoice, vat_qr_data: vatQR };
     await syncCustomerArBalance(data.customer_id);
     try { await ledger.postInvoice(issued, userId); } catch (_) { /* ledger optional */ }
+    await logBillingAudit({
+      userId,
+      action: 'create_invoice',
+      entityType: 'invoice',
+      entityId: invoice.id,
+      newValues: { invoice_number: invoiceNumber, total, customer_id: data.customer_id },
+    });
     return issued;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -130,7 +167,7 @@ const createInvoice = async (data, userId) => {
   }
 };
 
-const recordPayment = async (data, userId) => {
+const recordPayment = async (data, userId, req = null) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -138,19 +175,29 @@ const recordPayment = async (data, userId) => {
     const invoiceResult = await client.query('SELECT * FROM invoices WHERE id = $1', [data.invoice_id]);
     const invoice = invoiceResult.rows[0];
     if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+    if (['cancelled', 'refunded'].includes(invoice.status)) {
+      throw new AppError('Cannot pay cancelled or refunded invoice', 400, 'INVALID_STATUS');
+    }
 
-    const paymentResult = await client.query(
-      `INSERT INTO payments (id, invoice_id, customer_id, amount, method, reference_number, notes, received_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [uuidv4(), data.invoice_id, invoice.customer_id, data.amount, data.method, data.reference_number, data.notes, userId]
-    );
+    await assertDayOpen(invoiceDate(invoice));
 
     const paidResult = await client.query(
       `SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments WHERE invoice_id = $1`,
       [data.invoice_id]
     );
-    const totalPaid = parseFloat(paidResult.rows[0].total_paid);
+    const alreadyPaid = parseFloat(paidResult.rows[0].total_paid);
+    const balance = Math.max(0, parseFloat(invoice.total) - alreadyPaid);
+    const amount = parseFloat(data.amount);
+    if (amount <= 0) throw new AppError('Invalid payment amount', 400, 'INVALID_AMOUNT');
+    if (amount > balance + 0.01) throw new AppError('Payment exceeds balance due', 400, 'OVERPAYMENT');
 
+    const paymentResult = await client.query(
+      `INSERT INTO payments (id, invoice_id, customer_id, amount, method, reference_number, notes, received_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [uuidv4(), data.invoice_id, invoice.customer_id, amount, data.method, data.reference_number, data.notes, userId]
+    );
+
+    const totalPaid = alreadyPaid + amount;
     let status = 'partial';
     if (totalPaid >= parseFloat(invoice.total)) status = 'paid';
     await client.query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
@@ -161,6 +208,19 @@ const recordPayment = async (data, userId) => {
     if (data.method !== 'credit') {
       try { await ledger.postPayment(payment, invoice, userId); } catch (_) { /* ledger optional */ }
     }
+    await logBillingAudit({
+      userId,
+      action: 'record_payment',
+      entityType: 'payment',
+      entityId: payment.id,
+      newValues: {
+        invoice_number: invoice.invoice_number,
+        amount,
+        method: data.method,
+        status,
+      },
+      req,
+    });
     return payment;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -180,13 +240,88 @@ const listPackages = async () => {
   return result.rows;
 };
 
-const processRefund = async (data, userId) => {
+const cancelInvoice = async (id, reason, userId, req) => {
+  const invoice = await getInvoiceById(id);
+  if (invoice.status === 'cancelled') throw new AppError('Invoice already cancelled', 400, 'ALREADY_CANCELLED');
+  if (invoice.status === 'refunded') throw new AppError('Cannot cancel refunded invoice', 400, 'INVALID_STATUS');
+  await assertDayOpen(invoiceDate(invoice));
+
+  const oldStatus = invoice.status;
+  await query(
+    `UPDATE invoices SET status = 'cancelled', pdf_url = NULL, notes = COALESCE(notes, '') || $2, updated_at = NOW() WHERE id = $1`,
+    [id, reason ? `\n[CANCEL] ${reason}` : '']
+  );
+  await syncCustomerArBalance(invoice.customer_id);
+  await logBillingAudit({
+    userId,
+    action: 'cancel_invoice',
+    entityType: 'invoice',
+    entityId: id,
+    oldValues: { status: oldStatus, total: invoice.total },
+    newValues: { status: 'cancelled', reason },
+    req,
+  });
+  return getInvoiceById(id);
+};
+
+const processRefund = async (data, userId, req) => {
+  const invoice = await getInvoiceById(data.invoice_id);
+  if (invoice.status === 'cancelled') throw new AppError('Cannot refund cancelled invoice', 400, 'INVALID_STATUS');
+  await assertDayOpen(invoiceDate(invoice));
+
+  const amount = parseFloat(data.amount);
+  if (amount <= 0 || amount > invoice.total_paid + 0.01) {
+    throw new AppError('Invalid refund amount', 400, 'INVALID_AMOUNT');
+  }
+
   const result = await query(
     `INSERT INTO refunds (id, payment_id, invoice_id, amount, reason, processed_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [uuidv4(), data.payment_id, data.invoice_id, data.amount, data.reason, userId]
+    [uuidv4(), data.payment_id || null, data.invoice_id, amount, data.reason, userId]
   );
-  await query('UPDATE invoices SET status = $1 WHERE id = $2', ['refunded', data.invoice_id]);
+
+  const refunded = await query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE invoice_id = $1`,
+    [data.invoice_id]
+  );
+  const refundedTotal = parseFloat(refunded.rows[0].total);
+  let status = invoice.status;
+  if (refundedTotal >= parseFloat(invoice.total_paid) - 0.01 && invoice.total_paid > 0) {
+    status = 'refunded';
+  } else if (refundedTotal > 0) {
+    status = 'partial_refunded';
+  }
+  await query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
+  await syncCustomerArBalance(invoice.customer_id);
+
+  await logBillingAudit({
+    userId,
+    action: 'refund',
+    entityType: 'invoice',
+    entityId: data.invoice_id,
+    oldValues: { status: invoice.status, total_paid: invoice.total_paid },
+    newValues: { refund_amount: amount, status, reason: data.reason },
+    req,
+  });
+
   return result.rows[0];
+};
+
+const exportInvoicesCsv = async (filters) => {
+  const { data } = await listInvoices({ ...filters, page: 1, limit: 10000 });
+  const header = ['Invoice No', 'Customer', 'Date', 'Subtotal', 'VAT', 'Total', 'Paid', 'Balance', 'Status', 'Methods'];
+  const rows = data.map((r) => [
+    r.invoice_number,
+    r.customer_name,
+    new Date(r.created_at).toISOString().slice(0, 10),
+    parseFloat(r.subtotal).toFixed(2),
+    parseFloat(r.tax_amount).toFixed(2),
+    parseFloat(r.total).toFixed(2),
+    parseFloat(r.total_paid || 0).toFixed(2),
+    parseFloat(r.balance_due || 0).toFixed(2),
+    r.status,
+    r.payment_methods || '',
+  ]);
+  return [header, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 };
 
 const invoicePdfDir = () => path.join(env.storage.path, 'invoices');
@@ -231,8 +366,10 @@ module.exports = {
   getInvoiceById,
   createInvoice,
   recordPayment,
+  cancelInvoice,
   listPackages,
   processRefund,
+  exportInvoicesCsv,
   generateVatQR,
   ensureInvoicePdf,
   serveInvoicePdf,

@@ -10,6 +10,7 @@ const statusColors = {
   paid: 'bg-green-100 text-green-700',
   partial: 'bg-orange-100 text-orange-700',
   cancelled: 'bg-red-100 text-red-700',
+  partial_refunded: 'bg-amber-100 text-amber-800',
   refunded: 'bg-purple-100 text-purple-700',
   NORMAL: 'bg-green-100 text-green-700',
   LOW: 'bg-blue-100 text-blue-700',

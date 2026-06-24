@@ -2,6 +2,7 @@ const express = require('express');
 const service = require('../services/billing.service');
 const invoiceSettingsService = require('../services/invoice-settings.service');
 const accounting = require('../services/accounting.service');
+const dailyClosing = require('../services/daily-closing.service');
 const ledger = require('../services/ledger.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -10,6 +11,98 @@ const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 router.use(authenticate);
+
+router.get('/dashboard-summary', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getDashboardSummary(req.query.date);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/daily-summary', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getDailyFullSummary(req.query.date);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/daily-closing', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await dailyClosing.getClosing(req.query.date);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/daily-closing/history', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await dailyClosing.listClosings(parseInt(req.query.limit, 10) || 30);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/daily-closing/close', authorize(PERMISSIONS.BILLING_DAY_CLOSE), async (req, res, next) => {
+  try {
+    const data = await dailyClosing.closeDay(req.body.date, req.user.id, req);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/daily-closing/reopen', authorize(PERMISSIONS.BILLING_DAY_REOPEN), async (req, res, next) => {
+  try {
+    const data = await dailyClosing.reopenDay(req.body.date, req.user.id, req);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/daily-closing/:id/pdf', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    await dailyClosing.serveClosingPdf(req.params.id, res);
+  } catch (err) { next(err); }
+});
+
+router.get('/invoices/export/csv', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const csv = await service.exportInvoicesCsv(req.query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="invoices.csv"');
+    res.send(`\uFEFF${csv}`);
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/unpaid', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getUnpaidInvoicesReport();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/vat', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getVatReport(req.query.from, req.query.to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/cancelled-refunded', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getCancelledRefundedReport(req.query.from, req.query.to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/by-service', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getRevenueByService(req.query.from, req.query.to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/by-customer', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getCustomerRevenueReport(req.query.from, req.query.to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
 
 router.get('/invoice-settings', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
@@ -73,6 +166,13 @@ router.get('/invoices', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, ne
   } catch (err) { next(err); }
 });
 
+router.post('/invoices/:id/cancel', authorize(PERMISSIONS.BILLING_CANCEL), async (req, res, next) => {
+  try {
+    const data = await service.cancelInvoice(req.params.id, req.body.reason, req.user.id, req);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/invoices/:id/pdf', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     await service.serveInvoicePdf(req.params.id, res, { regenerate: req.query.regenerate === '1' });
@@ -102,14 +202,14 @@ router.post('/invoices', authorize(PERMISSIONS.BILLING_CREATE), validate(invoice
 
 router.post('/payments', authorize(PERMISSIONS.BILLING_PAYMENT), validate(paymentSchema), async (req, res, next) => {
   try {
-    const data = await service.recordPayment(req.body, req.user.id);
+    const data = await service.recordPayment(req.body, req.user.id, req);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 });
 
 router.post('/refunds', authorize(PERMISSIONS.BILLING_REFUND), async (req, res, next) => {
   try {
-    const data = await service.processRefund(req.body, req.user.id);
+    const data = await service.processRefund(req.body, req.user.id, req);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 });

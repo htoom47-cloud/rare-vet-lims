@@ -177,6 +177,37 @@ async function applyPatches() {
       )
     `);
     await client.query('CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(entry_date DESC)');
+    try {
+      await client.query(`ALTER TYPE invoice_status ADD VALUE IF NOT EXISTS 'partial_refunded'`);
+    } catch (_) {
+      try { await client.query(`ALTER TYPE invoice_status ADD VALUE 'partial_refunded'`); } catch (e) { /* exists */ }
+    }
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS daily_closings (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        closing_number VARCHAR(50) UNIQUE NOT NULL,
+        closing_date DATE NOT NULL,
+        totals JSONB NOT NULL DEFAULT '{}',
+        status VARCHAR(20) DEFAULT 'closed',
+        closed_by UUID REFERENCES users(id),
+        closed_at TIMESTAMPTZ,
+        reopened_by UUID REFERENCES users(id),
+        reopened_at TIMESTAMPTZ,
+        pdf_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query('CREATE INDEX IF NOT EXISTS idx_daily_closings_date ON daily_closings(closing_date DESC)');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accounting_reports (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        report_type VARCHAR(50) NOT NULL,
+        params JSONB DEFAULT '{}',
+        generated_by UUID REFERENCES users(id),
+        file_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
   } finally {
     client.release();
   }

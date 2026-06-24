@@ -44,7 +44,7 @@ const getCustomerStatement = async (customerId) => {
        LEFT JOIN users u ON p.received_by = u.id
        WHERE p.customer_id = $1
        ORDER BY p.created_at DESC
-       LIMIT 100`,
+       LIMIT 50`,
       [customerId]
     ),
   ]);
@@ -155,10 +155,171 @@ const getRevenueSummary = async (from, to) => {
   };
 };
 
+const getDailyFullSummary = async (date) => {
+  const day = date || new Date().toISOString().slice(0, 10);
+
+  const [invoices, payments, byMethod] = await Promise.all([
+    query(
+      `SELECT
+        COUNT(*) AS invoice_count,
+        COALESCE(SUM(total), 0) AS invoiced_total,
+        COALESCE(SUM(tax_amount), 0) AS tax_total,
+        COALESCE(SUM(discount_amount), 0) AS discount_total,
+        COUNT(*) FILTER (WHERE status IN ('issued', 'partial')) AS unpaid_count,
+        COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
+        COUNT(*) FILTER (WHERE status IN ('refunded', 'partial_refunded')) AS refunded_count
+       FROM invoices
+       WHERE created_at::date = $1::date`,
+      [day]
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount), 0) AS collections_total FROM payments WHERE created_at::date = $1::date`,
+      [day]
+    ),
+    query(
+      `SELECT method, COALESCE(SUM(amount), 0) AS total
+       FROM payments WHERE created_at::date = $1::date GROUP BY method`,
+      [day]
+    ),
+  ]);
+
+  const inv = invoices.rows[0];
+  const by_method = {};
+  for (const row of byMethod.rows) by_method[row.method] = parseFloat(row.total);
+
+  const net_collections = parseFloat(payments.rows[0].collections_total);
+
+  return {
+    date: day,
+    invoiced_total: parseFloat(inv.invoiced_total),
+    tax_total: parseFloat(inv.tax_total),
+    discount_total: parseFloat(inv.discount_total),
+    net_collections,
+    collections_total: net_collections,
+    invoice_count: parseInt(inv.invoice_count, 10),
+    unpaid_count: parseInt(inv.unpaid_count, 10),
+    cancelled_count: parseInt(inv.cancelled_count, 10),
+    refunded_count: parseInt(inv.refunded_count, 10),
+    by_method,
+  };
+};
+
+const getDashboardSummary = async (date) => {
+  const day = date || new Date().toISOString().slice(0, 10);
+  const daily = await getDailyFullSummary(day);
+
+  const [unpaid, cancelled] = await Promise.all([
+    query(
+      `SELECT COUNT(*) AS c FROM invoices i
+       LEFT JOIN (SELECT invoice_id, SUM(amount) paid FROM payments GROUP BY invoice_id) p ON p.invoice_id = i.id
+       WHERE i.status IN ('issued', 'partial') AND GREATEST(i.total - COALESCE(p.paid, 0), 0) > 0.01`
+    ),
+    query(`SELECT COUNT(*) AS c FROM invoices WHERE status = 'cancelled' AND created_at::date = $1::date`, [day]),
+  ]);
+
+  return {
+    ...daily,
+    today_collections: daily.net_collections,
+    unpaid_invoices: parseInt(unpaid.rows[0].c, 10),
+    cancelled_today: parseInt(cancelled.rows[0].c, 10),
+  };
+};
+
+const getUnpaidInvoicesReport = async () => {
+  const result = await query(
+    `SELECT i.*, c.full_name AS customer_name,
+            COALESCE(p.paid, 0) AS total_paid,
+            GREATEST(i.total - COALESCE(p.paid, 0), 0) AS balance_due
+     FROM invoices i
+     JOIN customers c ON i.customer_id = c.id
+     LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments GROUP BY invoice_id) p ON p.invoice_id = i.id
+     WHERE i.status IN ('issued', 'partial') AND GREATEST(i.total - COALESCE(p.paid, 0), 0) > 0.01
+     ORDER BY i.created_at DESC`
+  );
+  return result.rows;
+};
+
+const getVatReport = async (from, to) => {
+  const fromDate = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const toDate = to || new Date().toISOString().slice(0, 10);
+  const result = await query(
+    `SELECT created_at::date AS day, SUM(tax_amount) AS tax, SUM(total) AS gross, COUNT(*) AS invoices
+     FROM invoices
+     WHERE created_at::date BETWEEN $1::date AND $2::date AND status NOT IN ('cancelled')
+     GROUP BY day ORDER BY day`,
+    [fromDate, toDate]
+  );
+  const totals = result.rows.reduce(
+    (acc, r) => ({ tax: acc.tax + parseFloat(r.tax), gross: acc.gross + parseFloat(r.gross), invoices: acc.invoices + parseInt(r.invoices, 10) }),
+    { tax: 0, gross: 0, invoices: 0 }
+  );
+  return { from: fromDate, to: toDate, days: result.rows, totals };
+};
+
+const getCancelledRefundedReport = async (from, to) => {
+  const fromDate = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const toDate = to || new Date().toISOString().slice(0, 10);
+  const result = await query(
+    `SELECT i.invoice_number, i.status, i.total, i.created_at, c.full_name AS customer_name,
+            COALESCE(r.refunded, 0) AS refunded_amount
+     FROM invoices i
+     JOIN customers c ON i.customer_id = c.id
+     LEFT JOIN (SELECT invoice_id, SUM(amount) AS refunded FROM refunds GROUP BY invoice_id) r ON r.invoice_id = i.id
+     WHERE i.created_at::date BETWEEN $1::date AND $2::date
+       AND i.status IN ('cancelled', 'refunded', 'partial_refunded')
+     ORDER BY i.created_at DESC`,
+    [fromDate, toDate]
+  );
+  return { from: fromDate, to: toDate, invoices: result.rows };
+};
+
+const getRevenueByService = async (from, to) => {
+  const fromDate = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const toDate = to || new Date().toISOString().slice(0, 10);
+  const result = await query(
+    `SELECT COALESCE(ii.description, t.name, 'General') AS service_name,
+            SUM(ii.total_price) AS revenue, COUNT(*) AS line_count
+     FROM invoice_items ii
+     JOIN invoices i ON ii.invoice_id = i.id
+     LEFT JOIN tests t ON ii.test_id = t.id
+     WHERE i.created_at::date BETWEEN $1::date AND $2::date AND i.status NOT IN ('cancelled')
+     GROUP BY service_name
+     ORDER BY revenue DESC`,
+    [fromDate, toDate]
+  );
+  return { from: fromDate, to: toDate, services: result.rows };
+};
+
+const getCustomerRevenueReport = async (from, to) => {
+  const fromDate = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const toDate = to || new Date().toISOString().slice(0, 10);
+  const result = await query(
+    `SELECT c.full_name, c.mobile,
+            COUNT(i.id) AS invoice_count,
+            COALESCE(SUM(i.total), 0) AS invoiced,
+            COALESCE(SUM(p.paid), 0) AS collected
+     FROM customers c
+     JOIN invoices i ON i.customer_id = c.id
+     LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments GROUP BY invoice_id) p ON p.invoice_id = i.id
+     WHERE i.created_at::date BETWEEN $1::date AND $2::date AND i.status NOT IN ('cancelled')
+     GROUP BY c.id
+     ORDER BY invoiced DESC`,
+    [fromDate, toDate]
+  );
+  return { from: fromDate, to: toDate, customers: result.rows };
+};
+
 module.exports = {
   syncCustomerArBalance,
   getCustomerStatement,
   getDailyCollections,
   getArAging,
   getRevenueSummary,
+  getDailyFullSummary,
+  getDashboardSummary,
+  getUnpaidInvoicesReport,
+  getVatReport,
+  getCancelledRefundedReport,
+  getRevenueByService,
+  getCustomerRevenueReport,
 };

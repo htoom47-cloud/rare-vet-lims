@@ -236,6 +236,44 @@ export const billingAPI = {
   recordPayment: (data) => api.post('/billing/payments', data),
   packages: () => api.get('/billing/packages'),
   refund: (data) => api.post('/billing/refunds', data),
+  cancelInvoice: (id, reason) => api.post(`/billing/invoices/${id}/cancel`, { reason }),
+  dashboardSummary: (params) => api.get('/billing/dashboard-summary', { params }),
+  dailySummary: (params) => api.get('/billing/daily-summary', { params }),
+  dailyClosing: (params) => api.get('/billing/daily-closing', { params }),
+  dailyClosingHistory: (params) => api.get('/billing/daily-closing/history', { params }),
+  closeDay: (date) => api.post('/billing/daily-closing/close', { date }),
+  reopenDay: (date) => api.post('/billing/daily-closing/reopen', { date }),
+  unpaidReport: () => api.get('/billing/reports/unpaid'),
+  vatReport: (params) => api.get('/billing/reports/vat', { params }),
+  cancelledRefundedReport: (params) => api.get('/billing/reports/cancelled-refunded', { params }),
+  revenueByServiceReport: (params) => api.get('/billing/reports/by-service', { params }),
+  revenueByCustomerReport: (params) => api.get('/billing/reports/by-customer', { params }),
+  exportInvoicesCsv: async (params) => {
+    const token = localStorage.getItem('accessToken');
+    const qs = new URLSearchParams(params || {}).toString();
+    const url = `${API_URL}/billing/invoices/export/csv${qs ? `?${qs}` : ''}`;
+    const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!response.ok) throw new Error('Export failed');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = 'invoices.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  },
+  openClosingPdf: async (id) => {
+    const token = localStorage.getItem('accessToken');
+    const url = `${API_URL}/billing/daily-closing/${id}/pdf`;
+    const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!response.ok) throw new Error('Closing PDF not found');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  },
   openInvoicePdf: async (id, { regenerate = false } = {}) => {
     const token = localStorage.getItem('accessToken');
     const url = `${API_URL}/billing/invoices/${id}/pdf${regenerate ? '?regenerate=1' : ''}`;

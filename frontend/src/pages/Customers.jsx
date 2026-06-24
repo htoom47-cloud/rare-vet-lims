@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
-import { customersAPI } from '../services/api';
+import StatusBadge from '../components/ui/StatusBadge';
+import { customersAPI, billingAPI } from '../services/api';
+
+const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 
 export default function Customers() {
   const { t } = useTranslation();
@@ -118,24 +121,93 @@ export default function Customers() {
               <div><span className="text-gray-500">Credit Limit:</span> SAR {parseFloat(selected.credit_limit).toFixed(2)}</div>
             </div>
             <h4 className="font-semibold">{t('customers.financialStatement')}</h4>
-            <div className="text-sm grid grid-cols-2 gap-2 mb-3">
-              <div><span className="text-gray-500">{t('billing.total')}:</span> SAR {(selected.financial_statement?.total_invoiced || 0).toFixed(2)}</div>
-              <div><span className="text-gray-500">{t('billing.paid')}:</span> SAR {(selected.financial_statement?.total_paid || 0).toFixed(2)}</div>
-              <div><span className="text-gray-500">{t('billing.balanceDue')}:</span> <strong className="text-amber-700">SAR {(selected.financial_statement?.balance_due || 0).toFixed(2)}</strong></div>
-              <div><span className="text-gray-500">{t('customers.creditLimit')}:</span> SAR {parseFloat(selected.credit_limit).toFixed(2)}</div>
-            </div>
-            {selected.invoices?.length > 0 && (
-              <>
-                <h4 className="font-semibold text-sm">{t('billing.invoice')}</h4>
-                <div className="text-sm space-y-1 mb-3 max-h-32 overflow-y-auto">
-                  {selected.invoices.slice(0, 8).map((inv) => (
-                    <p key={inv.id} className="flex justify-between gap-2">
-                      <span>{inv.invoice_number}</span>
-                      <span>SAR {parseFloat(inv.balance_due || 0).toFixed(2)}</span>
-                    </p>
-                  ))}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                [t('billing.total'), selected.financial_statement?.total_invoiced],
+                [t('billing.paid'), selected.financial_statement?.total_paid],
+                [t('billing.balanceDue'), selected.financial_statement?.balance_due],
+                [t('customers.creditLimit'), selected.credit_limit],
+              ].map(([label, val]) => (
+                <div key={label} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm">
+                  <p className="text-gray-500 text-xs mb-1">{label}</p>
+                  <p className={`font-bold ${label === t('billing.balanceDue') ? 'text-amber-700' : ''}`}>{fmt(val)}</p>
                 </div>
-              </>
+              ))}
+            </div>
+
+            {(selected.invoices?.length > 0) && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Receipt size={16} /> {t('customers.invoices')}
+                  </h4>
+                  <Link to="/accounting" className="text-primary-600 text-xs hover:underline" onClick={() => setProfileOpen(false)}>
+                    {t('nav.accounting')}
+                  </Link>
+                </div>
+                <div className="border rounded-lg overflow-x-auto text-sm">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-primary-50 dark:bg-primary-900/20 border-b text-start">
+                        <th className="p-2 font-medium">{t('billing.invoice')}</th>
+                        <th className="p-2 font-medium">{t('common.date')}</th>
+                        <th className="p-2 font-medium">{t('billing.total')}</th>
+                        <th className="p-2 font-medium">{t('billing.paid')}</th>
+                        <th className="p-2 font-medium">{t('billing.balanceDue')}</th>
+                        <th className="p-2 font-medium">{t('common.status')}</th>
+                        <th className="p-2 font-medium">{t('common.actions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selected.invoices.map((inv) => (
+                        <tr key={inv.id} className="border-b">
+                          <td className="p-2 font-medium">{inv.invoice_number}</td>
+                          <td className="p-2">{new Date(inv.created_at).toLocaleDateString()}</td>
+                          <td className="p-2">{fmt(inv.total)}</td>
+                          <td className="p-2 text-green-700">{fmt(inv.total_paid)}</td>
+                          <td className="p-2 text-amber-700">{fmt(inv.balance_due)}</td>
+                          <td className="p-2">
+                            <StatusBadge status={inv.status} label={t(`billing.invoiceStatus.${inv.status}`, { defaultValue: inv.status })} />
+                          </td>
+                          <td className="p-2">
+                            <button type="button" onClick={() => billingAPI.openInvoicePdf(inv.id)} className="text-primary-600 text-xs hover:underline">PDF</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {(selected.payments?.length > 0) && (
+              <div className="space-y-2">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <CreditCard size={16} /> {t('customers.paymentHistory')}
+                </h4>
+                <div className="border rounded-lg overflow-x-auto text-sm max-h-48 overflow-y-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b text-start sticky top-0">
+                        <th className="p-2 font-medium">{t('common.date')}</th>
+                        <th className="p-2 font-medium">{t('billing.invoice')}</th>
+                        <th className="p-2 font-medium">{t('billing.paymentMethod')}</th>
+                        <th className="p-2 font-medium">{t('billing.amount')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selected.payments.map((p) => (
+                        <tr key={p.id} className="border-b">
+                          <td className="p-2">{new Date(p.created_at).toLocaleString()}</td>
+                          <td className="p-2">{p.invoice_number || '—'}</td>
+                          <td className="p-2">{t(`billing.paymentMethods.${p.method}`, { defaultValue: p.method })}</td>
+                          <td className="p-2 font-medium text-green-700">{fmt(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
             <h4 className="font-semibold">Animals ({selected.animals?.length || 0})</h4>
             <div className="text-sm space-y-1">
