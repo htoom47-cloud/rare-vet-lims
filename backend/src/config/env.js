@@ -18,6 +18,17 @@ const corsOrigins = [...new Set([
   appUrl,
 ].filter(Boolean))];
 
+const smsEnabled = process.env.SMS_ENABLED === 'true';
+
+/** Shared portal OTP until SMS is configured. Override with PORTAL_OTP_STATIC or disable with PORTAL_OTP_STATIC=off */
+const resolvePortalStaticOtp = () => {
+  const raw = process.env.PORTAL_OTP_STATIC;
+  if (raw === 'off' || raw === 'false' || raw === '0') return null;
+  if (raw?.trim()) return raw.trim();
+  if (smsEnabled) return null;
+  return '1234';
+};
+
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 5000,
@@ -71,8 +82,7 @@ const env = {
     vatNumber: process.env.VAT_NUMBER || '300000000000003',
   },
   portal: {
-    /** Temporary: same OTP for all customers (e.g. 1234). Unset when SMS is ready. */
-    staticOtp: process.env.PORTAL_OTP_STATIC?.trim() || null,
+    staticOtp: resolvePortalStaticOtp(),
   },
   notifications: {
     provider: process.env.NOTIFICATION_PROVIDER || 'twilio',
