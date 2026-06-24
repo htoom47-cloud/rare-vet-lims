@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, CreditCard } from 'lucide-react';
+import { Plus, CreditCard, Download, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -53,6 +53,10 @@ export default function Billing() {
     amount: '', method: 'cash', reference_number: '', notes: '',
   });
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
+
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
   const load = () => {
     setLoading(true);
@@ -132,10 +136,31 @@ export default function Billing() {
     }
   };
 
-  const openPayment = (invoice) => {
-    setSelectedInvoice(invoice);
-    setPaymentForm({ amount: invoice.total, method: 'cash', reference_number: '', notes: '' });
+  const openPayment = async (invoice) => {
+    let inv = invoice;
+    if (inv.balance_due === undefined) {
+      try {
+        const { data } = await billingAPI.getInvoice(invoice.id);
+        inv = data.data;
+      } catch {
+        inv = invoice;
+      }
+    }
+    setSelectedInvoice(inv);
+    const due = inv.balance_due ?? inv.total;
+    setPaymentForm({ amount: String(parseFloat(due).toFixed(2)), method: 'cash', reference_number: '', notes: '' });
     setPaymentModal(true);
+  };
+
+  const openInvoicePdf = async (invoiceId, regenerate = false) => {
+    setPdfLoading(true);
+    try {
+      await billingAPI.openInvoicePdf(invoiceId, { regenerate });
+    } catch {
+      toast.error(t('billing.pdfFailed'));
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const columns = [
@@ -147,11 +172,21 @@ export default function Billing() {
     { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} /> },
     { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
     { key: 'actions', label: t('common.actions'), render: (r) => (
-      r.status !== 'paid' && r.status !== 'cancelled' ? (
-        <button onClick={(e) => { e.stopPropagation(); openPayment(r); }} className="text-primary-600 text-sm flex items-center gap-1">
-          <CreditCard size={14} /> {t('billing.payment')}
+      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => openInvoicePdf(r.id)}
+          className="text-primary-600 text-sm flex items-center gap-1"
+          title={t('billing.downloadPdf')}
+        >
+          <Download size={14} />
         </button>
-      ) : null
+        {r.status !== 'paid' && r.status !== 'cancelled' ? (
+          <button type="button" onClick={() => openPayment(r)} className="text-primary-600 text-sm flex items-center gap-1">
+            <CreditCard size={14} /> {t('billing.payment')}
+          </button>
+        ) : null}
+      </div>
     )},
   ];
 
@@ -205,11 +240,32 @@ export default function Billing() {
           <p className="text-center py-8 text-gray-500">{t('common.loading')}</p>
         ) : detailInvoice && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailInvoice.customer_name}</div>
               <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={detailInvoice.status} /></div>
               <div><span className="text-gray-500">{t('common.date')}:</span> {new Date(detailInvoice.created_at).toLocaleString()}</div>
               <div><span className="text-gray-500">{t('billing.total')}:</span> <strong>SAR {parseFloat(detailInvoice.total).toFixed(2)}</strong></div>
+              <div><span className="text-gray-500">{t('billing.paid')}:</span> SAR {parseFloat(detailInvoice.total_paid || 0).toFixed(2)}</div>
+              <div><span className="text-gray-500">{t('billing.balanceDue')}:</span> <strong className="text-amber-700">SAR {parseFloat(detailInvoice.balance_due || 0).toFixed(2)}</strong></div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => openInvoicePdf(detailInvoice.id)}
+                disabled={pdfLoading}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                <Download size={16} /> {pdfLoading ? t('common.loading') : t('billing.downloadPdf')}
+              </button>
+              <button
+                type="button"
+                onClick={() => openInvoicePdf(detailInvoice.id, true)}
+                disabled={pdfLoading}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                <Printer size={16} /> {t('billing.regeneratePdf')}
+              </button>
             </div>
 
             <div>
@@ -236,11 +292,39 @@ export default function Billing() {
             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
               <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>SAR {parseFloat(detailInvoice.subtotal).toFixed(2)}</span></div>
               {parseFloat(detailInvoice.discount_amount) > 0 && (
-                <div className="flex justify-between"><span>خصم:</span><span>- SAR {parseFloat(detailInvoice.discount_amount).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>{t('billing.discount')}:</span><span>- SAR {parseFloat(detailInvoice.discount_amount).toFixed(2)}</span></div>
               )}
               <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>SAR {parseFloat(detailInvoice.tax_amount).toFixed(2)}</span></div>
               <div className="flex justify-between font-bold"><span>{t('billing.total')}:</span><span>SAR {parseFloat(detailInvoice.total).toFixed(2)}</span></div>
+              {parseFloat(detailInvoice.total_paid || 0) > 0 && (
+                <div className="flex justify-between text-green-700"><span>{t('billing.paid')}:</span><span>SAR {parseFloat(detailInvoice.total_paid).toFixed(2)}</span></div>
+              )}
+              {parseFloat(detailInvoice.balance_due || 0) > 0.009 && (
+                <div className="flex justify-between font-bold text-amber-700"><span>{t('billing.balanceDue')}:</span><span>SAR {parseFloat(detailInvoice.balance_due).toFixed(2)}</span></div>
+              )}
             </div>
+
+            {(detailInvoice.payments || []).length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2">{t('billing.paymentHistory')}</h4>
+                <div className="border rounded-lg overflow-hidden text-sm">
+                  <div className="grid grid-cols-4 gap-2 bg-primary-50 dark:bg-primary-900/30 px-3 py-2 font-medium text-xs">
+                    <span>{t('common.date')}</span>
+                    <span>{t('billing.paymentMethod')}</span>
+                    <span>{t('billing.amount')}</span>
+                    <span>{t('billing.reference')}</span>
+                  </div>
+                  {detailInvoice.payments.map((p) => (
+                    <div key={p.id} className="grid grid-cols-4 gap-2 px-3 py-2 border-t">
+                      <span>{new Date(p.created_at).toLocaleString()}</span>
+                      <span>{paymentMethodLabel(p.method)}</span>
+                      <span className="font-medium">SAR {parseFloat(p.amount).toFixed(2)}</span>
+                      <span className="text-gray-500 truncate">{p.reference_number || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
               <div className="flex justify-end">
@@ -316,16 +400,16 @@ export default function Billing() {
             <input type="number" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">طريقة الدفع</label>
+            <label className="block text-sm font-medium mb-1">{t('billing.paymentMethod')}</label>
             <select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })} className="input-field">
-              <option value="cash">نقدي</option>
-              <option value="card">بطاقة</option>
-              <option value="bank_transfer">تحويل بنكي</option>
-              <option value="credit">آجل / حساب</option>
+              <option value="cash">{t('billing.paymentMethods.cash')}</option>
+              <option value="card">{t('billing.paymentMethods.card')}</option>
+              <option value="bank_transfer">{t('billing.paymentMethods.bank_transfer')}</option>
+              <option value="credit">{t('billing.paymentMethods.credit')}</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">رقم المرجع</label>
+            <label className="block text-sm font-medium mb-1">{t('billing.reference')}</label>
             <input value={paymentForm.reference_number} onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })} className="input-field" />
           </div>
           <div className="flex gap-2 justify-end">

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, FileText, PawPrint, GitCompare, FolderOpen, LogOut,
-  Globe, Sun, Moon, Menu, Bell, Search,
+  Globe, Sun, Moon, Menu, Bell, Search, Receipt,
 } from 'lucide-react';
 import { usePortal } from '../../context/PortalContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -37,6 +37,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
     { to: '/', icon: LayoutDashboard, label: t('portal.navDashboard'), end: true },
     { to: '/animals', icon: PawPrint, label: t('portal.navAnimals') },
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
+    { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
     { to: '/compare', icon: GitCompare, label: t('portal.navCompare') },
     { to: '/documents', icon: FolderOpen, label: t('portal.navDocuments') },
   ];

@@ -115,4 +115,17 @@ router.get('/reports/download/:filename', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/invoices', async (req, res, next) => {
+  try {
+    const data = await portalService.listInvoices(req.customer.id, req.query);
+    res.json({ success: true, ...data });
+  } catch (err) { next(err); }
+});
+
+router.get('/invoices/:id/pdf', async (req, res, next) => {
+  try {
+    await portalService.serveInvoicePdf(req.params.id, req.customer.id, res);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

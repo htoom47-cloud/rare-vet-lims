@@ -145,6 +145,38 @@ async function applyPatches() {
     await client.query(
       'CREATE INDEX IF NOT EXISTS idx_customer_otp_customer ON customer_otp_codes(customer_id, created_at DESC)'
     );
+    await client.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pdf_url TEXT');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ledger_accounts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        code VARCHAR(20) UNIQUE NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        name_ar VARCHAR(100),
+        type VARCHAR(20) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        entry_date TIMESTAMPTZ DEFAULT NOW(),
+        description VARCHAR(255),
+        source_type VARCHAR(50),
+        source_id UUID,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS journal_lines (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+        account_id UUID NOT NULL REFERENCES ledger_accounts(id),
+        debit DECIMAL(12,2) DEFAULT 0,
+        credit DECIMAL(12,2) DEFAULT 0
+      )
+    `);
+    await client.query('CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(entry_date DESC)');
   } finally {
     client.release();
   }

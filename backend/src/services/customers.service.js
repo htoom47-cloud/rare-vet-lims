@@ -2,6 +2,7 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
+const { getCustomerStatement } = require('./accounting.service');
 
 const list = async ({ search, mobile, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -47,25 +48,20 @@ const getById = async (id) => {
 const getProfile = async (id) => {
   const customer = await getById(id);
 
-  const [animals, samples, payments] = await Promise.all([
+  const [animals, samples, statement] = await Promise.all([
     query('SELECT * FROM animals WHERE owner_id = $1 ORDER BY created_at DESC', [id]),
     query(`SELECT s.*, a.animal_code FROM samples s LEFT JOIN animals a ON s.animal_id = a.id
            WHERE s.customer_id = $1 ORDER BY s.created_at DESC LIMIT 50`, [id]),
-    query(`SELECT p.*, i.invoice_number FROM payments p
-           LEFT JOIN invoices i ON p.invoice_id = i.id
-           WHERE p.customer_id = $1 ORDER BY p.created_at DESC LIMIT 50`, [id]),
+    getCustomerStatement(id),
   ]);
 
   return {
     ...customer,
     animals: animals.rows,
     samples: samples.rows,
-    payments: payments.rows,
-    financial_statement: {
-      balance: customer.account_balance,
-      credit_limit: customer.credit_limit,
-      total_payments: payments.rows.reduce((sum, p) => sum + parseFloat(p.amount), 0),
-    },
+    payments: statement.payments,
+    invoices: statement.invoices,
+    financial_statement: statement.summary,
   };
 };
 

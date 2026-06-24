@@ -3,6 +3,11 @@ const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const env = require('../config/env');
 const { uuidv4 } = require('../utils/uuid');
+const path = require('path');
+const fs = require('fs');
+const { generateInvoicePDF } = require('../utils/invoice-pdf');
+const { syncCustomerArBalance } = require('./accounting.service');
+const ledger = require('./ledger.service');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -58,14 +63,23 @@ const getInvoiceById = async (id) => {
   );
 
   const paymentsResult = await query(
-    `SELECT * FROM payments WHERE invoice_id = $1 ORDER BY created_at DESC`,
+    `SELECT p.*, u.full_name as received_by_name
+     FROM payments p
+     LEFT JOIN users u ON p.received_by = u.id
+     WHERE p.invoice_id = $1 ORDER BY p.created_at DESC`,
     [id]
   );
+
+  const totalPaid = paymentsResult.rows.reduce((s, p) => s + parseFloat(p.amount), 0);
+  const total = parseFloat(invoiceResult.rows[0].total);
+  const balanceDue = Math.max(0, total - totalPaid);
 
   return {
     ...invoiceResult.rows[0],
     items: itemsResult.rows,
     payments: paymentsResult.rows,
+    total_paid: totalPaid,
+    balance_due: balanceDue,
   };
 };
 
@@ -103,7 +117,10 @@ const createInvoice = async (data, userId) => {
     await client.query('UPDATE invoices SET vat_qr_data = $1 WHERE id = $2', [vatQR, invoice.id]);
 
     await client.query('COMMIT');
-    return { ...invoice, vat_qr_data: vatQR };
+    const issued = { ...invoice, vat_qr_data: vatQR };
+    await syncCustomerArBalance(data.customer_id);
+    try { await ledger.postInvoice(issued, userId); } catch (_) { /* ledger optional */ }
+    return issued;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -135,17 +152,15 @@ const recordPayment = async (data, userId) => {
 
     let status = 'partial';
     if (totalPaid >= parseFloat(invoice.total)) status = 'paid';
-    await client.query('UPDATE invoices SET status = $1 WHERE id = $2', [status, data.invoice_id]);
-
-    if (data.method === 'credit') {
-      await client.query(
-        'UPDATE customers SET account_balance = account_balance + $1 WHERE id = $2',
-        [data.amount, invoice.customer_id]
-      );
-    }
+    await client.query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
 
     await client.query('COMMIT');
-    return paymentResult.rows[0];
+    const payment = paymentResult.rows[0];
+    await syncCustomerArBalance(invoice.customer_id);
+    if (data.method !== 'credit') {
+      try { await ledger.postPayment(payment, invoice, userId); } catch (_) { /* ledger optional */ }
+    }
+    return payment;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -173,4 +188,50 @@ const processRefund = async (data, userId) => {
   return result.rows[0];
 };
 
-module.exports = { listInvoices, getInvoiceById, createInvoice, recordPayment, listPackages, processRefund, generateVatQR };
+const invoicePdfDir = () => path.join(env.storage.path, 'invoices');
+
+const ensureInvoicePdf = async (id) => {
+  const invoice = await getInvoiceById(id);
+  const existingName = invoice.pdf_url?.split('/').pop();
+  if (existingName) {
+    const filePath = path.join(invoicePdfDir(), existingName);
+    if (fs.existsSync(filePath)) {
+      return { invoice, filename: existingName, url: invoice.pdf_url };
+    }
+  }
+
+  const filename = `invoice-${invoice.invoice_number}-${uuidv4().slice(0, 8)}.pdf`;
+  const pdf = await generateInvoicePDF(invoice, invoicePdfDir(), { filename });
+  await query('UPDATE invoices SET pdf_url = $1, updated_at = NOW() WHERE id = $2', [pdf.url, id]);
+  return { invoice: { ...invoice, pdf_url: pdf.url }, filename: pdf.filename, url: pdf.url };
+};
+
+const serveInvoicePdf = async (id, res, { regenerate = false } = {}) => {
+  if (regenerate) {
+    await query('UPDATE invoices SET pdf_url = NULL WHERE id = $1', [id]);
+  }
+  const { filename } = await ensureInvoicePdf(id);
+  const filePath = path.join(invoicePdfDir(), filename);
+  if (!fs.existsSync(filePath)) throw new AppError('Invoice PDF not found', 404, 'NOT_FOUND');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  await new Promise((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', reject);
+    stream.on('end', resolve);
+    stream.pipe(res);
+  });
+};
+
+module.exports = {
+  listInvoices,
+  getInvoiceById,
+  createInvoice,
+  recordPayment,
+  listPackages,
+  processRefund,
+  generateVatQR,
+  ensureInvoicePdf,
+  serveInvoicePdf,
+};

@@ -89,4 +89,27 @@ export const portalReportsAPI = {
   },
 };
 
+export const portalInvoicesAPI = {
+  list: (params) => portalApi.get('/invoices', { params }),
+  openPdf: async (id) => {
+    const token = localStorage.getItem('portalAccessToken');
+    const response = await fetch(`${API_URL}/portal/invoices/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Invoice PDF not found');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const opened = window.open(objectUrl, '_blank');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `invoice-${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  },
+};
+
 export default portalApi;

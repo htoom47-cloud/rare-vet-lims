@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, PawPrint, FlaskConical, TestTube, FileText, Activity, Stethoscope,
-  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera,
+  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isReception, userRole } from '../../utils/roles';
@@ -30,6 +30,7 @@ const navSections = [
       { path: '/workflow', icon: Route, label: 'nav.workflow', permission: 'samples.create' },
       { path: '/samples', icon: FlaskConical, label: 'nav.samples', permission: 'samples.view' },
       { path: '/billing', icon: CreditCard, label: 'nav.billing', permission: 'billing.view' },
+      { path: '/accounting', icon: BarChart3, label: 'nav.accounting', permission: 'billing.view' },
       { path: '/reports', icon: FileText, label: 'nav.reports', permission: 'reports.view' },
     ],
   },

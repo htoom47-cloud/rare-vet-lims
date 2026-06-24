@@ -10,7 +10,9 @@ const getStats = async () => {
     statusBreakdown,
   ] = await Promise.all([
     query(`SELECT COUNT(*) as count FROM samples WHERE created_at >= CURRENT_DATE`),
-    query(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE created_at >= CURRENT_DATE AND status IN ('paid', 'partial')`),
+    query(`SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p
+           JOIN invoices i ON p.invoice_id = i.id
+           WHERE p.created_at >= CURRENT_DATE`),
     query(
       `SELECT t.name, t.name_ar, COUNT(st.id) as count
        FROM sample_tests st JOIN tests t ON st.test_id = t.id
@@ -28,8 +30,9 @@ const getStats = async () => {
   ]);
 
   const monthlyRevenue = await query(
-    `SELECT DATE_TRUNC('day', created_at) as date, SUM(total) as revenue
-     FROM invoices WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' AND status IN ('paid', 'partial')
+    `SELECT DATE_TRUNC('day', p.created_at) as date, SUM(p.amount) as revenue
+     FROM payments p
+     WHERE p.created_at >= CURRENT_DATE - INTERVAL '30 days'
      GROUP BY date ORDER BY date`
   );
 

@@ -12,6 +12,7 @@ import PortalCompareHub from './pages/PortalCompareHub';
 import PortalAnimalCompare from './pages/PortalAnimalCompare';
 import PortalReportView from './pages/PortalReportView';
 import PortalDocuments from './pages/PortalDocuments';
+import PortalInvoices from './pages/PortalInvoices';
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/animals/:animalId/compare" element={<ProtectedPortalRoute><PortalAnimalCompare /></ProtectedPortalRoute>} />
             <Route path="/compare" element={<ProtectedPortalRoute><PortalCompareHub /></ProtectedPortalRoute>} />
             <Route path="/documents" element={<ProtectedPortalRoute><PortalDocuments /></ProtectedPortalRoute>} />
+            <Route path="/invoices" element={<ProtectedPortalRoute><PortalInvoices /></ProtectedPortalRoute>} />
             <Route path="/reports/:id" element={<ProtectedPortalRoute><PortalReportView /></ProtectedPortalRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

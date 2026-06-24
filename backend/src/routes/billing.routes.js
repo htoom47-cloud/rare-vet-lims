@@ -1,5 +1,7 @@
 const express = require('express');
 const service = require('../services/billing.service');
+const accounting = require('../services/accounting.service');
+const ledger = require('../services/ledger.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { invoiceSchema, paymentSchema } = require('../validators/schemas');
@@ -8,10 +10,51 @@ const { PERMISSIONS } = require('../utils/permissions');
 const router = express.Router();
 router.use(authenticate);
 
+router.get('/reports/collections', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getDailyCollections(req.query.date);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/ar-aging', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getArAging();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/revenue', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getRevenueSummary(req.query.from, req.query.to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/journal', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await ledger.listJournalEntries(parseInt(req.query.limit, 10) || 50);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/customers/:customerId/statement', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getCustomerStatement(req.params.customerId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/invoices', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     const data = await service.listInvoices(req.query);
     res.json({ success: true, ...data });
+  } catch (err) { next(err); }
+});
+
+router.get('/invoices/:id/pdf', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    await service.serveInvoicePdf(req.params.id, res, { regenerate: req.query.regenerate === '1' });
   } catch (err) { next(err); }
 });
 

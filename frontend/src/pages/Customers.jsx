@@ -118,7 +118,25 @@ export default function Customers() {
               <div><span className="text-gray-500">Credit Limit:</span> SAR {parseFloat(selected.credit_limit).toFixed(2)}</div>
             </div>
             <h4 className="font-semibold">{t('customers.financialStatement')}</h4>
-            <p className="text-sm">Total Payments: SAR {(selected.financial_statement?.total_payments || 0).toFixed(2)}</p>
+            <div className="text-sm grid grid-cols-2 gap-2 mb-3">
+              <div><span className="text-gray-500">{t('billing.total')}:</span> SAR {(selected.financial_statement?.total_invoiced || 0).toFixed(2)}</div>
+              <div><span className="text-gray-500">{t('billing.paid')}:</span> SAR {(selected.financial_statement?.total_paid || 0).toFixed(2)}</div>
+              <div><span className="text-gray-500">{t('billing.balanceDue')}:</span> <strong className="text-amber-700">SAR {(selected.financial_statement?.balance_due || 0).toFixed(2)}</strong></div>
+              <div><span className="text-gray-500">{t('customers.creditLimit')}:</span> SAR {parseFloat(selected.credit_limit).toFixed(2)}</div>
+            </div>
+            {selected.invoices?.length > 0 && (
+              <>
+                <h4 className="font-semibold text-sm">{t('billing.invoice')}</h4>
+                <div className="text-sm space-y-1 mb-3 max-h-32 overflow-y-auto">
+                  {selected.invoices.slice(0, 8).map((inv) => (
+                    <p key={inv.id} className="flex justify-between gap-2">
+                      <span>{inv.invoice_number}</span>
+                      <span>SAR {parseFloat(inv.balance_due || 0).toFixed(2)}</span>
+                    </p>
+                  ))}
+                </div>
+              </>
+            )}
             <h4 className="font-semibold">Animals ({selected.animals?.length || 0})</h4>
             <div className="text-sm space-y-1">
               {selected.animals?.map((a) => <p key={a.id}>{a.animal_code} - {a.animal_type} ({a.name_tag})</p>)}

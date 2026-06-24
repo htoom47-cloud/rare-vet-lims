@@ -236,6 +236,31 @@ export const billingAPI = {
   recordPayment: (data) => api.post('/billing/payments', data),
   packages: () => api.get('/billing/packages'),
   refund: (data) => api.post('/billing/refunds', data),
+  openInvoicePdf: async (id, { regenerate = false } = {}) => {
+    const token = localStorage.getItem('accessToken');
+    const url = `${API_URL}/billing/invoices/${id}/pdf${regenerate ? '?regenerate=1' : ''}`;
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Invoice PDF not found');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const opened = window.open(objectUrl, '_blank');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `invoice-${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  },
+  collectionsReport: (params) => api.get('/billing/reports/collections', { params }),
+  arAgingReport: () => api.get('/billing/reports/ar-aging'),
+  revenueReport: (params) => api.get('/billing/reports/revenue', { params }),
+  journalReport: (params) => api.get('/billing/reports/journal', { params }),
+  customerStatement: (customerId) => api.get(`/billing/customers/${customerId}/statement`),
 };
 
 export const inventoryAPI = {

@@ -6,6 +6,7 @@ const { AppError } = require('../middleware/errorHandler');
 const { hashToken, normalizeMobileDigits, paginate, buildPagination } = require('../utils/helpers');
 const { formatToE164 } = require('../utils/phone');
 const reportsService = require('./reports.service');
+const billingService = require('./billing.service');
 const notificationProvider = require('./notification-providers');
 const {
   PANELS,
@@ -804,6 +805,40 @@ const serveReportPdf = async (filename, customerId, res) => {
   return reportsService.servePdf(filename, res);
 };
 
+const listInvoices = async (customerId, { page, limit } = {}) => {
+  const { offset, page: p, limit: l } = paginate(page, limit);
+  const countResult = await query(
+    'SELECT COUNT(*) FROM invoices WHERE customer_id = $1 AND status NOT IN (\'cancelled\', \'refunded\')',
+    [customerId]
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  const result = await query(
+    `SELECT i.id, i.invoice_number, i.total, i.status, i.created_at, i.pdf_url,
+            COALESCE(p.paid, 0) AS total_paid,
+            GREATEST(i.total - COALESCE(p.paid, 0), 0) AS balance_due
+     FROM invoices i
+     LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments GROUP BY invoice_id) p ON p.invoice_id = i.id
+     WHERE i.customer_id = $1 AND i.status NOT IN ('cancelled', 'refunded')
+     ORDER BY i.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [customerId, l, offset]
+  );
+
+  logPortalAccess(customerId, 'invoices_list');
+  return { data: result.rows, pagination: buildPagination(total, p, l) };
+};
+
+const serveInvoicePdf = async (invoiceId, customerId, res) => {
+  const invoice = await query(
+    'SELECT id FROM invoices WHERE id = $1 AND customer_id = $2',
+    [invoiceId, customerId]
+  );
+  if (!invoice.rows[0]) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+  logPortalAccess(customerId, 'invoice_pdf', invoiceId);
+  return billingService.serveInvoicePdf(invoiceId, res);
+};
+
 module.exports = {
   requestOtp,
   verifyOtp,
@@ -817,4 +852,6 @@ module.exports = {
   searchPortal,
   getReportPreview,
   serveReportPdf,
+  listInvoices,
+  serveInvoicePdf,
 };
