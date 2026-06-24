@@ -73,7 +73,7 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
   }
 
   return (
-    <Card className="portal-report-card hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all border-[#E5E7EB] bg-white">
+    <Card className="portal-report-card transition-all border-border bg-card">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">

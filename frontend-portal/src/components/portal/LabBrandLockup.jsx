@@ -13,7 +13,7 @@ export default function LabBrandLockup({ compact = false, className = '' }) {
         <div className={cn('min-w-0 flex-1 leading-tight', isAr ? 'text-end' : 'text-start')}>
           <p
             className={cn(
-              'portal-lab-brand-name font-bold text-[#302419]',
+              'portal-lab-brand-name font-bold text-primary-800',
               compact ? 'text-[11px] sm:text-xs' : 'text-[13px] sm:text-sm'
             )}
           >
@@ -21,7 +21,7 @@ export default function LabBrandLockup({ compact = false, className = '' }) {
           </p>
           <p
             className={cn(
-              'portal-lab-brand-tag text-[#C5A059] font-medium',
+              'portal-lab-brand-tag text-primary-400 font-medium',
               compact ? 'text-[9px] sm:text-[10px] mt-0.5' : 'text-[10px] sm:text-[11px] mt-0.5'
             )}
           >

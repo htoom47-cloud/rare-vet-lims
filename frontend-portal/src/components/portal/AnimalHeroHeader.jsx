@@ -56,18 +56,18 @@ export default function AnimalHeroHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-[#111827] leading-tight truncate">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight truncate">
                 {displayName}
               </h1>
               {showCodeSeparately && (
-                <span className="text-xs sm:text-sm font-mono font-medium text-[#6B7280] tracking-tight shrink-0">
+                <span className="text-xs sm:text-sm font-mono font-medium text-muted-foreground tracking-tight shrink-0">
                   {animal.code}
                 </span>
               )}
               <StatusBadge status={status === 'unknown' ? 'none' : status} />
             </div>
-            <p className="text-xs text-[#6B7280] mt-1 truncate">{meta}</p>
-            <p className="text-[11px] text-[#9CA3AF] mt-0.5 truncate">
+            <p className="text-xs text-muted-foreground mt-1 truncate">{meta}</p>
+            <p className="text-[11px] text-muted-foreground/80 mt-0.5 truncate">
               {isAr ? (owner?.nameAr || owner?.name) : owner?.name}
               {owner?.farm ? ` · ${owner.farm}` : ''}
               {latestReport ? ` · ${t('portal.lastVisit')}: ${formatDate(latestReport.createdAt)}` : ''}

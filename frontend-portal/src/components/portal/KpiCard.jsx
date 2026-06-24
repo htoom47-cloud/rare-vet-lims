@@ -4,12 +4,12 @@ const VARIANT = {
   blue: {
     card: 'med-kpi-card--blue',
     icon: 'med-kpi-icon-glow--blue',
-    value: 'text-[#2563EB]',
+    value: 'text-primary-600 dark:text-primary-400',
   },
   purple: {
     card: 'med-kpi-card--purple',
     icon: 'med-kpi-icon-glow--purple',
-    value: 'text-[#8B5CF6]',
+    value: 'text-primary-500 dark:text-primary-300',
   },
   green: {
     card: 'med-kpi-card--green',
@@ -29,7 +29,7 @@ const VARIANT = {
   neutral: {
     card: 'med-kpi-card--neutral',
     icon: 'med-kpi-icon-glow--neutral',
-    value: 'text-[#111827]',
+    value: 'text-foreground',
   },
 };
 
@@ -58,7 +58,7 @@ export default function KpiCard({
   return (
     <div
       className={cn(
-        'med-kpi-card rounded-xl bg-white',
+        'med-kpi-card rounded-xl',
         v.card,
         compact ? 'p-3' : 'p-4',
         className
@@ -66,7 +66,7 @@ export default function KpiCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280] leading-tight">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground leading-tight">
             {label}
           </p>
           <p className={cn(
@@ -78,7 +78,7 @@ export default function KpiCard({
             {value}
           </p>
           {hint && (
-            <p className="text-[11px] text-[#6B7280] mt-1 truncate">{hint}</p>
+            <p className="text-[11px] text-muted-foreground mt-1 truncate">{hint}</p>
           )}
         </div>
         {Icon && (

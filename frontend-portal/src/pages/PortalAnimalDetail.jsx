@@ -79,7 +79,7 @@ export default function PortalAnimalDetail() {
     <PortalLayout compact wide>
       <div className="med-page space-y-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-[#D1D5DB] hover:text-white hover:bg-white/10" onClick={() => navigate('/animals')}>
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground" onClick={() => navigate('/animals')}>
             <BackIcon size={15} /> {t('labReport.back')}
           </Button>
         </div>
@@ -122,7 +122,7 @@ export default function PortalAnimalDetail() {
                   <section className="med-section-card p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <h2 className="med-section-title mb-0 flex items-center gap-1.5">
-                        <TrendingUp size={16} className="text-[#2563EB]" />
+                        <TrendingUp size={16} className="text-primary-600" />
                         {t('portal.trendChart')}
                       </h2>
                       <select
@@ -147,13 +147,13 @@ export default function PortalAnimalDetail() {
                       const p = dashboard.keyParameters?.find((x) => x.code === code);
                       const data = sparklines[code];
                       const name = p ? (isAr ? p.nameAr : p.nameEn) : code;
-                      const color = p?.latestFlag && !['NORMAL', 'NEG'].includes(p.latestFlag) ? '#EF4444' : '#2563EB';
+                      const color = p?.latestFlag && !['NORMAL', 'NEG'].includes(p.latestFlag) ? '#EF4444' : '#4A3728';
                       return (
                         <button
                           key={code}
                           type="button"
                           className={`med-spark-card text-start p-2.5 rounded-xl transition-all ${
-                            selectedParam === code ? 'border-[#2563EB] ring-2 ring-[#2563EB]/25' : ''
+                            selectedParam === code ? 'border-primary-600 ring-2 ring-primary-600/25' : ''
                           }`}
                           onClick={() => setSelectedParam(code)}
                         >
@@ -184,7 +184,7 @@ export default function PortalAnimalDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full mt-2 h-8 text-xs text-[#2563EB]"
+                        className="w-full mt-2 h-8 text-xs text-primary-600"
                         onClick={() => navigate(`/animals/${animalId}/compare`)}
                       >
                         {t('portal.viewAllCompare')}

@@ -73,9 +73,9 @@ export default function TrendChart({ data, meta, isAr, title, height = 280, bare
           <Line
             type="monotone"
             dataKey="y"
-            stroke="#2563EB"
+            stroke="#4A3728"
             strokeWidth={2.5}
-            dot={{ r: 3, fill: '#2563EB', strokeWidth: 0 }}
+            dot={{ r: 3, fill: '#4A3728', strokeWidth: 0 }}
             activeDot={{ r: 5 }}
           />
         </LineChart>

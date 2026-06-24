@@ -12,8 +12,12 @@ import { Button } from '../ui/button';
 import PwaInstallBanner from './PwaInstallBanner';
 import { portalSearchAPI } from '../../services/portalApi';
 
-const navClass = ({ isActive }) =>
-  `portal-nav-item ${isActive ? 'portal-nav-item-active' : ''}`;
+const navLinkClass = ({ isActive }) =>
+  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+    isActive
+      ? 'bg-primary-600 text-white shadow-sm'
+      : 'text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70'
+  }`;
 
 export default function PortalLayout({ children, title, subtitle, alertCount = 0, wide = false, compact = false }) {
   const { t, i18n } = useTranslation();
@@ -73,17 +77,17 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
 
   const searchBox = (
     <div className="relative" ref={searchRef}>
-      <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 portal-shell-muted pointer-events-none" />
+      <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
       <input
         type="search"
-        className="portal-search-input h-9 ps-9 text-sm w-full lg:w-64 rounded-xl outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+        className="input-field h-9 ps-9 text-sm w-full lg:w-64"
         placeholder={t('portal.searchPlaceholder')}
         value={searchQ}
         onChange={(e) => setSearchQ(e.target.value)}
         onFocus={() => searchResults && setSearchOpen(true)}
       />
       {searchOpen && searchResults && (
-        <div className="absolute top-full mt-1 inset-x-0 lg:inset-x-auto lg:w-80 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.2)] overflow-hidden">
+        <div className="absolute top-full mt-1 inset-x-0 lg:inset-x-auto lg:w-80 z-50 bg-card border border-border rounded-xl shadow-card-hover overflow-hidden">
           {searchResults.animals?.length > 0 && (
             <div className="p-2 border-b border-border">
               <p className="text-[10px] uppercase text-muted-foreground px-2 py-1">{t('portal.navAnimals')}</p>
@@ -124,13 +128,13 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
   );
 
   const sidebar = (
-    <div className="flex flex-col h-full portal-sidebar">
+    <div className="flex flex-col h-full bg-card">
       {isAr && <LabBrandLockup />}
 
-      <div className={`px-4 py-2.5 border-b portal-shell-border ${isAr ? '' : 'pt-4'}`}>
+      <div className={`px-4 py-2.5 border-b border-primary-200/80 dark:border-primary-700 ${isAr ? '' : 'pt-4'}`}>
         {!isAr && <LabBrandLockup compact className="!w-auto mb-3 rounded-xl overflow-hidden" />}
-        <p className="portal-brand-title text-xs font-semibold">{t('portal.title')}</p>
-        <p className="portal-brand-sub text-[11px] truncate mt-0.5">{displayName}</p>
+        <p className="text-xs font-semibold text-primary-800 dark:text-primary-100">{t('portal.title')}</p>
+        <p className="text-[11px] text-primary-400 truncate mt-0.5">{displayName}</p>
       </div>
 
       <div className="p-3 hidden lg:block">{searchBox}</div>
@@ -141,7 +145,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
             key={to}
             to={to}
             end={end}
-            className={navClass}
+            className={navLinkClass}
             onClick={() => setMenuOpen(false)}
           >
             <Icon size={18} />
@@ -150,15 +154,15 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
         ))}
       </nav>
 
-      <div className="p-3 border-t portal-shell-border space-y-1">
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 portal-sidebar-action" onClick={toggleLanguage}>
+      <div className="p-3 border-t border-primary-200/80 dark:border-primary-700 space-y-1">
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70" onClick={toggleLanguage}>
           <Globe size={18} /> {isAr ? 'English' : 'العربية'}
         </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 portal-sidebar-action" onClick={toggleTheme}>
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70" onClick={toggleTheme}>
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           {theme === 'dark' ? t('portal.lightMode') : t('portal.darkMode')}
         </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-[#EF4444] hover:text-[#FCA5A5] hover:bg-red-500/10" onClick={handleLogout}>
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={handleLogout}>
           <LogOut size={18} /> {t('portal.logout')}
         </Button>
       </div>
@@ -166,36 +170,36 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
   );
 
   return (
-    <div className="min-h-screen bg-background portal-app flex" dir={isAr ? 'rtl' : 'ltr'}>
-      <aside className="hidden lg:flex w-72 shrink-0 border-e portal-shell-border portal-sidebar sticky top-0 h-screen">
+    <div className="min-h-screen bg-background bg-app-mesh flex" dir={isAr ? 'rtl' : 'ltr'}>
+      <aside className="hidden lg:flex w-72 shrink-0 bg-card border-e border-border/80 sticky top-0 h-screen shadow-lg lg:shadow-none">
         {sidebar}
       </aside>
 
       {menuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} aria-label="Close" />
-          <aside className="relative w-80 max-w-[90vw] h-full portal-sidebar shadow-xl">
+          <button type="button" className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} aria-label="Close" />
+          <aside className="relative w-80 max-w-[90vw] h-full bg-card shadow-xl border-e border-border/80">
             {sidebar}
           </aside>
         </div>
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 border-b portal-header">
+        <header className="sticky top-0 z-20 bg-card/85 backdrop-blur-md border-b border-border/80 shadow-header">
           <div className="px-4 py-3 flex items-center justify-between gap-3 max-w-[90rem] mx-auto w-full">
-            <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0 portal-header-action" onClick={() => setMenuOpen(true)}>
+            <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setMenuOpen(true)}>
               <Menu size={20} />
             </Button>
             <div className="min-w-0 flex-1 lg:hidden flex justify-end">
               {isAr && <LabBrandLockup compact className="!w-auto max-w-[13.5rem] rounded-lg overflow-hidden" />}
               {!isAr && (
-                <p className="portal-header-title font-semibold text-sm truncate">{title || t('portal.title')}</p>
+                <p className="font-semibold text-sm truncate text-foreground">{title || t('portal.title')}</p>
               )}
             </div>
             <div className="hidden lg:flex items-center gap-4 flex-1">
               <div className="min-w-0">
-                {title && <h1 className="portal-header-title text-lg font-bold truncate">{title}</h1>}
-                {subtitle && <p className="text-xs portal-header-subtitle truncate">{subtitle}</p>}
+                {title && <h1 className="text-lg font-bold truncate text-foreground">{title}</h1>}
+                {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
               </div>
               <div className="ms-auto flex items-center gap-3">
                 {!isAr && <LabBrandLockup compact className="!w-auto max-w-[15rem] rounded-xl overflow-hidden shrink-0" />}
@@ -203,7 +207,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
                 {alertCount > 0 && (
                   <button
                     type="button"
-                    className="relative p-2 rounded-xl portal-header-action"
+                    className="relative p-2 rounded-xl hover:bg-accent text-foreground"
                     onClick={() => navigate('/')}
                     aria-label={t('portal.notifications')}
                   >
@@ -230,13 +234,13 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
         <main className={`flex-1 w-full mx-auto px-3 sm:px-4 ${compact ? 'py-3 pb-20 lg:py-4 lg:pb-6' : 'py-6 pb-24 lg:pb-8'} ${wide ? 'max-w-[90rem]' : 'max-w-5xl'}`}>
           {(title || subtitle) && !compact && (
             <div className="hidden lg:block mb-6">
-              {!title && <h1 className="text-2xl font-bold">{t('portal.title')}</h1>}
+              {!title && <h1 className="text-2xl font-bold text-foreground">{t('portal.title')}</h1>}
             </div>
           )}
           {children}
         </main>
 
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t portal-bottom-nav pb-[env(safe-area-inset-bottom)]">
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border/80 bg-card/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around px-1 py-1.5">
             {navItems.slice(0, 5).map(({ to, icon: Icon, label, end }) => (
               <NavLink
@@ -245,7 +249,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
                 end={end}
                 className={({ isActive }) =>
                   `flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-[9px] font-medium min-w-[3.5rem] ${
-                    isActive ? 'portal-nav-bottom-active' : 'portal-nav-bottom'
+                    isActive ? 'text-primary-600' : 'text-muted-foreground'
                   }`
                 }
               >

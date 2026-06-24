@@ -35,7 +35,7 @@ function LogoFallback({ size, className, variant }) {
       className={cn(
         s.frame,
         s.radius,
-        'bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] flex items-center justify-center text-white font-bold shadow-lg',
+        'bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold shadow-lg',
         size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-2xl' : 'text-lg',
         className
       )}
@@ -103,7 +103,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
           className={cn(
             'absolute -inset-0.5',
             s.radius,
-            'bg-gradient-to-br from-[#2563EB]/30 to-[#8B5CF6]/30 blur-[2px]'
+            'bg-gradient-to-br from-primary-400/30 to-primary-600/30 blur-[2px]'
           )}
           aria-hidden
         />
@@ -112,7 +112,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
             'relative h-full w-full flex items-center justify-center',
             s.radius,
             s.pad,
-            'bg-white shadow-[0_10px_30px_rgba(0,0,0,0.12)] ring-1 ring-[#E5E7EB]'
+            'bg-card shadow-card ring-1 ring-border'
           )}
         >
           <img

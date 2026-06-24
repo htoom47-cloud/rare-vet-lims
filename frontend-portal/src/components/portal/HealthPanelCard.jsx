@@ -71,7 +71,7 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-1">
-            <p className="font-semibold text-[13px] text-[#111827] leading-tight">
+            <p className="font-semibold text-[13px] text-foreground leading-tight">
               {t(`portal.panels.${panel.key}`)}
             </p>
             <StatusDot status={status} />
@@ -87,7 +87,7 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
               {status === 'normal' && (
                 <span className="text-lg font-bold text-[#10B981] leading-none">✓</span>
               )}
-              <span className="text-[11px] text-[#6B7280]">
+              <span className="text-[11px] text-muted-foreground">
                 {status === 'abnormal'
                   ? t('portal.outOfRangeShort')
                   : status === 'attention'
@@ -97,9 +97,9 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
               </span>
             </div>
           ) : (
-            <p className="text-[11px] text-[#9CA3AF] mt-1">{t('portal.panelNotTested')}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{t('portal.panelNotTested')}</p>
           )}
-          <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2 leading-snug">{summary()}</p>
+          <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">{summary()}</p>
         </div>
       </div>
     </div>

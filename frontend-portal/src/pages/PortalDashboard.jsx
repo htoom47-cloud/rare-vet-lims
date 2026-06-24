@@ -49,13 +49,13 @@ export default function PortalDashboard() {
     <PortalLayout compact alertCount={data?.alerts?.length || 0} wide>
       <div className="med-page space-y-3">
         <div className="med-hero premium-card px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t('portal.dashboard')}
           </p>
-          <h1 className="text-xl font-bold text-[#111827] mt-0.5">
+          <h1 className="text-xl font-bold text-foreground mt-0.5">
             {customerName ? `${t('portal.welcomeBack')}, ${customerName}` : t('portal.dashboard')}
           </h1>
-          <p className="text-xs text-[#6B7280] mt-0.5">{t('portal.dashboardHint')}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('portal.dashboardHint')}</p>
         </div>
 
         {loading && (
@@ -108,7 +108,7 @@ export default function PortalDashboard() {
                   <h2 className="med-section-title mb-0">{t('portal.myAnimals')}</h2>
                   <button
                     type="button"
-                    className="text-xs text-[#2563EB] font-semibold flex items-center gap-0.5 hover:underline"
+                    className="text-xs text-primary-600 font-semibold flex items-center gap-0.5 hover:underline"
                     onClick={() => navigate('/animals')}
                   >
                     {t('portal.viewAll')} <Chevron size={14} />
@@ -178,7 +178,7 @@ export default function PortalDashboard() {
                   <h2 className="med-section-title mb-0">{t('portal.recentReports')}</h2>
                   <button
                     type="button"
-                    className="text-xs text-[#2563EB] font-semibold hover:underline"
+                    className="text-xs text-primary-600 font-semibold hover:underline"
                     onClick={() => navigate('/reports')}
                   >
                     {t('portal.viewAll')}
@@ -195,8 +195,8 @@ export default function PortalDashboard() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50/80 text-start"
                         onClick={() => navigate(`/reports/${report.id}`)}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 flex items-center justify-center shrink-0">
-                          <FileText size={14} className="text-[#2563EB]" />
+                        <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center shrink-0">
+                          <FileText size={14} className="text-primary-600 dark:text-primary-300" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className={`font-bold text-slate-900 truncate ${report.animal_name ? 'text-sm' : 'text-xs font-mono'}`}>
