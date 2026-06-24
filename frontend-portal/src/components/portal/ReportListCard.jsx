@@ -7,6 +7,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { portalReportsAPI } from '../../services/portalApi';
 import { animalLabel } from '../../utils/animalTypes';
 
+function reportHeading(report, showAnimal) {
+  if (showAnimal && report.animal_name) return report.animal_name;
+  if (showAnimal && report.animal_code) return report.animal_code;
+  return report.report_number;
+}
+
+function reportSubline(report, showAnimal, isAr, formatDate) {
+  const parts = [];
+  if (showAnimal && report.animal_name && report.animal_type) {
+    parts.push(animalLabel(report.animal_type, isAr));
+  }
+  if (showAnimal && report.animal_code && report.animal_name) {
+    parts.push(report.animal_code);
+  }
+  if (showAnimal && report.animal_name) {
+    parts.push(report.report_number);
+  }
+  parts.push(formatDate(report.created_at));
+  return parts.filter(Boolean).join(' · ');
+}
+
 export default function ReportListCard({ report, isAr, showAnimal = true, compact = false }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -17,6 +38,9 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
       day: '2-digit', month: 'short', year: 'numeric',
     });
   };
+
+  const heading = reportHeading(report, showAnimal);
+  const hasAnimalName = showAnimal && !!report.animal_name;
 
   const openPdf = async () => {
     try {
@@ -30,51 +54,77 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
     return (
       <button
         type="button"
-        className="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-accent/60 transition-colors text-start border border-border/50"
+        className="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-start border border-slate-200/80 bg-white"
         onClick={() => navigate(`/reports/${report.id}`)}
       >
         <div className="min-w-0">
-          <p className="font-mono font-medium text-sm">{report.report_number}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {formatDate(report.created_at)}
-            {showAnimal && report.animal_code ? ` · ${report.animal_code}` : ''}
+          <p className={`font-bold text-slate-900 truncate ${hasAnimalName ? 'text-base' : 'text-sm font-mono'}`}>
+            {heading}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+            {hasAnimalName
+              ? reportSubline(report, showAnimal, isAr, formatDate)
+              : `${formatDate(report.created_at)}${report.animal_code ? ` · ${report.animal_code}` : ''}`}
           </p>
         </div>
-        <Eye size={16} className="text-muted-foreground shrink-0" />
+        <Eye size={16} className="text-slate-400 shrink-0" />
       </button>
     );
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow border-slate-200/80 bg-white">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center justify-between gap-2">
-          <span className="font-mono">{report.report_number}</span>
-          <span className={`text-xs font-normal px-2 py-0.5 rounded-full ${report.is_final ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+        <CardTitle className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className={`leading-tight truncate ${hasAnimalName ? 'text-lg font-bold text-slate-900' : 'text-base font-mono font-semibold'}`}>
+              {heading}
+            </p>
+            {hasAnimalName && (
+              <p className="text-xs text-slate-500 font-normal mt-1 truncate">
+                {reportSubline(report, showAnimal, isAr, formatDate)}
+              </p>
+            )}
+          </div>
+          <span className={`text-xs font-normal px-2 py-0.5 rounded-full shrink-0 ${report.is_final ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
             {report.is_final ? t('labReport.final') : t('labReport.preliminary')}
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          {hasAnimalName && (
+            <div>
+              <dt className="text-muted-foreground">{t('reports.reportNo')}</dt>
+              <dd className="font-mono text-xs">{report.report_number}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-muted-foreground">{t('reports.sampleNo')}</dt>
-            <dd className="font-mono">{report.sample_code}</dd>
+            <dd className="font-mono text-xs">{report.sample_code}</dd>
           </div>
-          <div>
-            <dt className="text-muted-foreground">{t('common.date')}</dt>
-            <dd>{formatDate(report.created_at)}</dd>
-          </div>
-          {showAnimal && report.animal_code && (
+          {!hasAnimalName && (
+            <div>
+              <dt className="text-muted-foreground">{t('common.date')}</dt>
+              <dd>{formatDate(report.created_at)}</dd>
+            </div>
+          )}
+          {showAnimal && report.animal_code && !hasAnimalName && (
             <div>
               <dt className="text-muted-foreground">{t('animals.animalId')}</dt>
-              <dd>{report.animal_code}{report.animal_name ? ` — ${report.animal_name}` : ''}</dd>
+              <dd className="font-mono text-xs">{report.animal_code}</dd>
             </div>
           )}
           {showAnimal && report.animal_type && (
             <div>
               <dt className="text-muted-foreground">{t('animals.type')}</dt>
               <dd>{animalLabel(report.animal_type, isAr)}</dd>
+            </div>
+          )}
+          {hasAnimalName && (
+            <div>
+              <dt className="text-muted-foreground">{t('animals.animalId')}</dt>
+              <dd className="font-mono text-xs">{report.animal_code || '—'}</dd>
             </div>
           )}
         </dl>

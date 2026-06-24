@@ -199,9 +199,13 @@ export default function PortalDashboard() {
                           <FileText size={14} className="text-[#302419]" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-mono text-xs font-semibold text-slate-800">{report.report_number}</p>
+                          <p className={`font-bold text-slate-900 truncate ${report.animal_name ? 'text-sm' : 'text-xs font-mono'}`}>
+                            {report.animal_name || report.animal_code || report.report_number}
+                          </p>
                           <p className="text-[10px] text-slate-400 truncate">
-                            {report.animal_code} · {formatDate(report.created_at)}
+                            {report.animal_name
+                              ? [animalLabel(report.animal_type, isAr), report.animal_code, report.report_number, formatDate(report.created_at)].filter(Boolean).join(' · ')
+                              : `${report.animal_code || ''} · ${formatDate(report.created_at)}`}
                           </p>
                         </div>
                         <CheckCircle2

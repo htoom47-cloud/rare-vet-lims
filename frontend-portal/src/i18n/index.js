@@ -124,7 +124,7 @@ const resources = {
         animalId: 'Animal ID', type: 'Animal Type',
         types: { camel: 'Camel', horse: 'Horse', sheep: 'Sheep', goat: 'Goat', bird: 'Bird', cat: 'Cat', dog: 'Dog' },
       },
-      reports: { sampleNo: 'Sample No.' },
+      reports: { sampleNo: 'Sample No.', reportNo: 'Report No.' },
       labReport: {
         back: 'Back', final: 'Final', preliminary: 'Preliminary',
         loadFailed: 'Could not load report', downloadPdf: 'Download PDF',
@@ -255,7 +255,7 @@ const resources = {
         animalId: 'رقم الحيوان', type: 'نوع الحيوان',
         types: { camel: 'جمل', horse: 'حصان', sheep: 'غنم', goat: 'ماعز', bird: 'طائر', cat: 'قط', dog: 'كلب' },
       },
-      reports: { sampleNo: 'رقم العينة' },
+      reports: { sampleNo: 'رقم العينة', reportNo: 'رقم التقرير' },
       labReport: {
         back: 'رجوع', final: 'نهائي', preliminary: 'مبدئي',
         loadFailed: 'تعذّر تحميل التقرير', downloadPdf: 'تحميل PDF',
