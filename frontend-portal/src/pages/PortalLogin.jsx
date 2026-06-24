@@ -83,7 +83,7 @@ export default function PortalLogin() {
 
       <div className="w-full max-w-md relative z-10">
         <FadeIn className="text-center mb-8">
-          <LabBrandLockup className="max-w-sm mx-auto rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.08)]" />
+          <LabBrandLockup stacked />
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mt-6">{t('portal.title')}</h1>
           <p className="text-muted-foreground font-medium mt-2 text-sm sm:text-base">{t('portal.subtitle')}</p>
         </FadeIn>

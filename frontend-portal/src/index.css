@@ -236,6 +236,13 @@
       0 4px 14px rgba(0, 0, 0, 0.28);
   }
 
+  .portal-lab-brand--hero {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    @apply text-center px-2 py-2;
+  }
+
   .portal-lab-brand--no-divider::after {
     display: none;
   }

@@ -6,6 +6,7 @@ const SIZES = {
   sm: { frame: 'w-11 h-11', img: 'w-9 h-9', pad: 'p-1.5', radius: 'rounded-xl' },
   md: { frame: 'w-16 h-16', img: 'w-12 h-12', pad: 'p-2', radius: 'rounded-2xl' },
   lg: { frame: 'w-24 h-24', img: 'w-[4.5rem] h-[4.5rem]', pad: 'p-3', radius: 'rounded-[1.35rem]' },
+  xl: { frame: 'w-32 h-32', img: 'w-24 h-24', pad: 'p-3.5', radius: 'rounded-[1.5rem]' },
 };
 
 function LogoFallback({ size, className, variant }) {

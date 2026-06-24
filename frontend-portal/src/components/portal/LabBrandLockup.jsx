@@ -2,9 +2,29 @@ import { useTranslation } from 'react-i18next';
 import AppLogo from '../ui/AppLogo';
 import { cn } from '../../lib/utils';
 
-export default function LabBrandLockup({ compact = false, embedded = false, noDivider = false, className = '' }) {
+export default function LabBrandLockup({
+  compact = false,
+  embedded = false,
+  stacked = false,
+  noDivider = false,
+  className = '',
+}) {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
+
+  if (stacked) {
+    return (
+      <div className={cn('portal-lab-brand portal-lab-brand--hero w-full', className)}>
+        <AppLogo size="xl" variant="light" className="mx-auto" />
+        <p className="portal-lab-brand-name mt-5 text-lg sm:text-xl font-bold text-foreground leading-snug">
+          {t('portal.labName')}
+        </p>
+        <p className="portal-lab-brand-tag mt-1.5 text-xs sm:text-sm text-primary-500 dark:text-primary-400 font-medium max-w-[18rem] mx-auto leading-relaxed">
+          {t('portal.labTagline')}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
