@@ -6,26 +6,12 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { portalReportsAPI } from '../../services/portalApi';
 import { animalLabel } from '../../utils/animalTypes';
+import { cn } from '../../lib/utils';
 
-function reportHeading(report, showAnimal) {
+function reportTitle(report, showAnimal, isAr) {
   if (showAnimal && report.animal_name) return report.animal_name;
-  if (showAnimal && report.animal_code) return report.animal_code;
+  if (showAnimal && report.animal_type) return animalLabel(report.animal_type, isAr);
   return report.report_number;
-}
-
-function reportSubline(report, showAnimal, isAr, formatDate) {
-  const parts = [];
-  if (showAnimal && report.animal_name && report.animal_type) {
-    parts.push(animalLabel(report.animal_type, isAr));
-  }
-  if (showAnimal && report.animal_code && report.animal_name) {
-    parts.push(report.animal_code);
-  }
-  if (showAnimal && report.animal_name) {
-    parts.push(report.report_number);
-  }
-  parts.push(formatDate(report.created_at));
-  return parts.filter(Boolean).join(' · ');
 }
 
 export default function ReportListCard({ report, isAr, showAnimal = true, compact = false }) {
@@ -39,8 +25,8 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
     });
   };
 
-  const heading = reportHeading(report, showAnimal);
   const hasAnimalName = showAnimal && !!report.animal_name;
+  const title = reportTitle(report, showAnimal, isAr);
 
   const openPdf = async () => {
     try {
@@ -50,6 +36,33 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
     }
   };
 
+  const titleBlock = (
+    <>
+      <p className={cn(
+        'font-bold text-foreground leading-tight truncate',
+        hasAnimalName ? 'text-lg' : 'text-base font-mono'
+      )}
+      >
+        {title}
+      </p>
+      {hasAnimalName && report.animal_type && (
+        <p className="text-sm text-muted-foreground mt-0.5 truncate">
+          {animalLabel(report.animal_type, isAr)}
+        </p>
+      )}
+      {showAnimal && report.animal_code && (
+        <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate">
+          {report.animal_code}
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground mt-1 truncate">
+        {report.report_number}
+        {' · '}
+        {formatDate(report.created_at)}
+      </p>
+    </>
+  );
+
   if (compact) {
     return (
       <button
@@ -57,17 +70,8 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
         className="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:-translate-y-0.5 transition-all text-start premium-card premium-card-interactive"
         onClick={() => navigate(`/reports/${report.id}`)}
       >
-        <div className="min-w-0">
-          <p className={`font-bold text-slate-900 truncate ${hasAnimalName ? 'text-base' : 'text-sm font-mono'}`}>
-            {heading}
-          </p>
-          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-            {hasAnimalName
-              ? reportSubline(report, showAnimal, isAr, formatDate)
-              : `${formatDate(report.created_at)}${report.animal_code ? ` · ${report.animal_code}` : ''}`}
-          </p>
-        </div>
-        <Eye size={16} className="text-slate-400 shrink-0" />
+        <div className="min-w-0 flex-1">{titleBlock}</div>
+        <Eye size={16} className="text-muted-foreground shrink-0" />
       </button>
     );
   }
@@ -76,55 +80,22 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
     <Card className="portal-report-card transition-all border-border bg-card">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className={`leading-tight truncate ${hasAnimalName ? 'text-lg font-bold text-slate-900' : 'text-base font-mono font-semibold'}`}>
-              {heading}
-            </p>
-            {hasAnimalName && (
-              <p className="text-xs text-slate-500 font-normal mt-1 truncate">
-                {reportSubline(report, showAnimal, isAr, formatDate)}
-              </p>
-            )}
-          </div>
-          <span className={`text-xs font-normal px-2 py-0.5 rounded-full shrink-0 ${report.is_final ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+          <div className="min-w-0 flex-1">{titleBlock}</div>
+          <span className={`text-xs font-normal px-2 py-0.5 rounded-full shrink-0 ${report.is_final ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
             {report.is_final ? t('labReport.final') : t('labReport.preliminary')}
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          {hasAnimalName && (
-            <div>
-              <dt className="text-muted-foreground">{t('reports.reportNo')}</dt>
-              <dd className="font-mono text-xs">{report.report_number}</dd>
-            </div>
-          )}
           <div>
             <dt className="text-muted-foreground">{t('reports.sampleNo')}</dt>
             <dd className="font-mono text-xs">{report.sample_code}</dd>
           </div>
-          {!hasAnimalName && (
-            <div>
-              <dt className="text-muted-foreground">{t('common.date')}</dt>
-              <dd>{formatDate(report.created_at)}</dd>
-            </div>
-          )}
-          {showAnimal && report.animal_code && !hasAnimalName && (
-            <div>
-              <dt className="text-muted-foreground">{t('animals.animalId')}</dt>
-              <dd className="font-mono text-xs">{report.animal_code}</dd>
-            </div>
-          )}
           {showAnimal && report.animal_type && (
             <div>
               <dt className="text-muted-foreground">{t('animals.type')}</dt>
               <dd>{animalLabel(report.animal_type, isAr)}</dd>
-            </div>
-          )}
-          {hasAnimalName && (
-            <div>
-              <dt className="text-muted-foreground">{t('animals.animalId')}</dt>
-              <dd className="font-mono text-xs">{report.animal_code || '—'}</dd>
             </div>
           )}
         </dl>

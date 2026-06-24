@@ -46,7 +46,7 @@ export default function PortalDashboard() {
     : data?.customer?.full_name;
 
   return (
-    <PortalLayout compact alertCount={data?.alerts?.length || 0} wide>
+    <PortalLayout compact wide>
       <div className="med-page space-y-3">
         <div className="med-hero premium-card px-4 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -190,28 +190,38 @@ export default function PortalDashboard() {
                     {t('portal.viewAll')}
                   </button>
                 </div>
-                <div className="divide-y divide-slate-50">
+                <div className="divide-y divide-border/60">
                   {(data.recentReports || []).length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-8">{t('portal.noReports')}</p>
+                    <p className="text-sm text-muted-foreground text-center py-8">{t('portal.noReports')}</p>
                   ) : (
                     data.recentReports.map((report) => (
                       <button
                         key={report.id}
                         type="button"
-                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50/80 text-start"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent/50 text-start"
                         onClick={() => navigate(`/reports/${report.id}`)}
                       >
                         <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center shrink-0">
                           <FileText size={14} className="text-primary-600 dark:text-primary-300" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`font-bold text-slate-900 truncate ${report.animal_name ? 'text-sm' : 'text-xs font-mono'}`}>
+                          <p className={`font-bold text-foreground truncate ${report.animal_name ? 'text-sm' : 'text-xs font-mono'}`}>
                             {report.animal_name || report.animal_code || report.report_number}
                           </p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {report.animal_name
-                              ? [animalLabel(report.animal_type, isAr), report.animal_code, report.report_number, formatDate(report.created_at)].filter(Boolean).join(' · ')
-                              : `${report.animal_code || ''} · ${formatDate(report.created_at)}`}
+                          {report.animal_name && report.animal_type && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {animalLabel(report.animal_type, isAr)}
+                            </p>
+                          )}
+                          {report.animal_code && report.animal_name && (
+                            <p className="text-[10px] font-mono text-muted-foreground truncate">
+                              {report.animal_code}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {report.report_number}
+                            {' · '}
+                            {formatDate(report.created_at)}
                           </p>
                         </div>
                         <CheckCircle2

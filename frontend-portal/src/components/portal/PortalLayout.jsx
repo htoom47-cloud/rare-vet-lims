@@ -3,11 +3,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, FileText, PawPrint, GitCompare, FolderOpen, LogOut,
-  Globe, Sun, Moon, Menu, Bell, Search, Receipt,
+  Globe, Sun, Moon, Menu, Search, Receipt,
 } from 'lucide-react';
 import { usePortal } from '../../context/PortalContext';
 import { useTheme } from '../../context/ThemeContext';
 import LabBrandLockup from './LabBrandLockup';
+import PortalNotifications from './PortalNotifications';
 import { Button } from '../ui/button';
 import PwaInstallBanner from './PwaInstallBanner';
 import { portalSearchAPI } from '../../services/portalApi';
@@ -19,7 +20,7 @@ const navLinkClass = ({ isActive }) =>
       : 'text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70'
   }`;
 
-export default function PortalLayout({ children, title, subtitle, alertCount = 0, wide = false, compact = false }) {
+export default function PortalLayout({ children, title, subtitle, wide = false, compact = false }) {
   const { t, i18n } = useTranslation();
   const { customer, logout } = usePortal();
   const { toggleLanguage, theme, toggleTheme } = useTheme();
@@ -205,28 +206,11 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
               <div className="ms-auto flex items-center gap-3">
                 {!isAr && <LabBrandLockup compact className="!w-auto max-w-[15rem] rounded-xl overflow-hidden shrink-0" />}
                 {searchBox}
-                {alertCount > 0 && (
-                  <button
-                    type="button"
-                    className="relative p-2 rounded-xl hover:bg-accent text-foreground"
-                    onClick={() => navigate('/')}
-                    aria-label={t('portal.notifications')}
-                  >
-                    <Bell size={20} />
-                    <span className="absolute -top-0.5 -end-0.5 w-4 h-4 rounded-full bg-rose-500 text-[10px] text-white flex items-center justify-center font-bold">
-                      {alertCount > 9 ? '9+' : alertCount}
-                    </span>
-                  </button>
-                )}
+                <PortalNotifications />
               </div>
             </div>
             <div className="lg:hidden flex items-center gap-1">
-              {alertCount > 0 && (
-                <button type="button" className="relative p-2" onClick={() => navigate('/')}>
-                  <Bell size={20} />
-                  <span className="absolute top-0 end-0 w-2 h-2 rounded-full bg-rose-500" />
-                </button>
-              )}
+              <PortalNotifications />
             </div>
           </div>
           <div className="lg:hidden px-4 pb-3">{searchBox}</div>
