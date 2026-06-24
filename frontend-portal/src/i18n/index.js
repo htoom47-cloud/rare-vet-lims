@@ -120,6 +120,7 @@ const resources = {
         numericCompare: 'Numeric parameters',
         otherResults: 'Other results',
         parameter: 'Parameter',
+        analysisDate: 'Analysis date',
         trend: 'Trend',
       },
       billing: {
@@ -265,6 +266,7 @@ const resources = {
         numericCompare: 'القيم الرقمية',
         otherResults: 'نتائج أخرى',
         parameter: 'المعامل',
+        analysisDate: 'تاريخ التحليل',
         trend: 'الاتجاه',
       },
       billing: {

@@ -131,6 +131,27 @@ export default function PortalAnimalCompare() {
     [numericParams]
   );
 
+  const reportHeaderCell = (r) => (
+    <th key={r.id} className="text-center py-2 px-2 font-medium min-w-[5.5rem]">
+      <div className="font-mono text-xs">{r.reportNumber}</div>
+      <div className="text-[10px] text-muted-foreground font-normal">{formatDate(r.date)}</div>
+    </th>
+  );
+
+  const analysisDateRow = (extraCells = null) => (
+    <tr className="border-b border-border/60 bg-muted/25">
+      <td className="py-2.5 pe-3 font-medium text-muted-foreground sticky start-0 bg-muted/25 z-10 whitespace-nowrap">
+        {t('portal.analysisDate')}
+      </td>
+      {comparison.reports.map((r) => (
+        <td key={r.id} className="text-center py-2.5 px-2 text-sm whitespace-nowrap">
+          {formatDate(r.date)}
+        </td>
+      ))}
+      {extraCells}
+    </tr>
+  );
+
   return (
     <PortalLayout title={title} subtitle={subtitle} wide>
       <Button variant="ghost" size="sm" className="mb-4 gap-1 -ms-2" onClick={() => navigate(`/animals/${animalId}`)}>
@@ -249,17 +270,18 @@ export default function PortalAnimalCompare() {
                           <th className="text-start py-2 pe-3 font-medium text-muted-foreground sticky start-0 bg-card z-10">
                             {t('portal.parameter')}
                           </th>
-                          {comparison.reports.map((r) => (
-                            <th key={r.id} className="text-center py-2 px-2 font-medium min-w-[5.5rem]">
-                              <div className="font-mono text-xs">{r.reportNumber}</div>
-                              <div className="text-[10px] text-muted-foreground font-normal">{formatDate(r.date)}</div>
-                            </th>
-                          ))}
+                          {comparison.reports.map(reportHeaderCell)}
                           <th className="text-center py-2 px-2 w-16">{t('portal.changePercent')}</th>
                           <th className="text-center py-2 ps-2 w-10">{t('portal.trend')}</th>
                         </tr>
                       </thead>
                       <tbody>
+                        {analysisDateRow(
+                          <>
+                            <td className="py-2.5" />
+                            <td className="py-2.5" />
+                          </>
+                        )}
                         {numericParams.map((param) => (
                           <tr key={param.code} className="border-b border-border/60">
                             <td className="py-2.5 pe-3 sticky start-0 bg-card z-10">
@@ -301,14 +323,11 @@ export default function PortalAnimalCompare() {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="text-start py-2 pe-3 font-medium text-muted-foreground">{t('portal.parameter')}</th>
-                          {comparison.reports.map((r) => (
-                            <th key={r.id} className="text-center py-2 px-2 font-medium text-xs font-mono">
-                              {r.reportNumber}
-                            </th>
-                          ))}
+                          {comparison.reports.map(reportHeaderCell)}
                         </tr>
                       </thead>
                       <tbody>
+                        {analysisDateRow()}
                         {otherParams.map((param) => (
                           <tr key={param.code} className="border-b border-border/60">
                             <td className="py-2.5 pe-3 font-medium">{isAr ? param.nameAr : param.nameEn}</td>
