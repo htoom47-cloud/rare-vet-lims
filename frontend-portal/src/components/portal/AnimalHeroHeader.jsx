@@ -1,7 +1,8 @@
-import { PawPrint, GitCompare, FolderOpen, FileText } from 'lucide-react';
+import { GitCompare, FolderOpen, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { animalLabel, genderLabel } from '../../utils/animalTypes';
+import AnimalTypeIcon from './AnimalTypeIcon';
 import StatusBadge from './StatusBadge';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
@@ -25,6 +26,8 @@ export default function AnimalHeroHeader({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const status = kpis?.overallStatus || 'unknown';
+  const displayName = animal?.name || animal?.code;
+  const showCodeSeparately = Boolean(animal?.name && animal?.code);
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -36,8 +39,8 @@ export default function AnimalHeroHeader({
   const meta = [
     animalLabel(animal?.type, isAr),
     genderLabel(animal?.gender, isAr),
-    animal?.age,
-    animal?.chip || animal?.code,
+    showCodeSeparately ? animal.code : null,
+    animal?.chip && animal.chip !== animal?.code ? animal.chip : null,
   ].filter((x) => x && x !== '—').join(' · ');
 
   return (
@@ -45,22 +48,26 @@ export default function AnimalHeroHeader({
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className={cn(
-            'shrink-0 w-12 h-12 rounded-xl border-2 flex items-center justify-center',
+            'shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl border-2 flex items-center justify-center',
             STATUS_RING[status] || STATUS_RING.unknown
           )}
           >
-            <PawPrint size={22} />
+            <AnimalTypeIcon type={animal?.type} size={26} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold font-mono text-[#111827]">{animal?.code}</h1>
-              {animal?.name && (
-                <span className="text-sm text-[#6B7280] truncate">{animal.name}</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#111827] leading-tight truncate">
+                {displayName}
+              </h1>
+              {showCodeSeparately && (
+                <span className="text-xs sm:text-sm font-mono font-medium text-[#6B7280] tracking-tight shrink-0">
+                  {animal.code}
+                </span>
               )}
               <StatusBadge status={status === 'unknown' ? 'none' : status} />
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 truncate">{meta}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+            <p className="text-xs text-[#6B7280] mt-1 truncate">{meta}</p>
+            <p className="text-[11px] text-[#9CA3AF] mt-0.5 truncate">
               {isAr ? (owner?.nameAr || owner?.name) : owner?.name}
               {owner?.farm ? ` · ${owner.farm}` : ''}
               {latestReport ? ` · ${t('portal.lastVisit')}: ${formatDate(latestReport.createdAt)}` : ''}
