@@ -83,7 +83,7 @@ export default function PortalLogin() {
 
       <div className="w-full max-w-md relative z-10">
         <FadeIn className="text-center mb-8">
-          <AppLogo size="lg" className="mx-auto mb-5 drop-shadow-sm" />
+          <AppLogo size="lg" variant="light" className="mx-auto mb-5" />
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('portal.title')}</h1>
           <p className="text-muted-foreground font-medium mt-2 text-sm sm:text-base">{t('portal.subtitle')}</p>
         </FadeIn>

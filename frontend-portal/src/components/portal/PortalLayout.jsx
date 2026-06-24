@@ -127,10 +127,10 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
     <div className="flex flex-col h-full portal-sidebar text-[#9CA3AF]">
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <AppLogo size="sm" />
-          <div className="min-w-0">
-            <p className="portal-brand-title font-semibold text-sm truncate">{t('portal.title')}</p>
-            <p className="portal-brand-sub text-xs truncate">{displayName}</p>
+          <AppLogo size="sm" variant="portal" />
+          <div className="min-w-0 flex-1">
+            <p className="portal-brand-title font-bold text-sm truncate leading-tight">{t('portal.title')}</p>
+            <p className="portal-brand-sub text-[11px] truncate mt-0.5">{displayName}</p>
           </div>
         </div>
       </div>
