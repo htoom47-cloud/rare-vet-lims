@@ -26,6 +26,11 @@ const resources = {
         noReports: 'No reports available yet',
         loadFailed: 'Could not load reports',
         logout: 'Sign out',
+        pwaTitle: 'Install the app',
+        pwaAndroidHint: 'Add the client portal to your home screen for quick access.',
+        pwaIosHint: 'Tap Share, then "Add to Home Screen" to install the app.',
+        pwaInstall: 'Install app',
+        pwaDismiss: 'Dismiss',
       },
       common: {
         loading: 'Loading...', date: 'Date', view: 'View', print: 'Print', download: 'Download',
@@ -67,6 +72,11 @@ const resources = {
         noReports: 'لا توجد تقارير متاحة حالياً',
         loadFailed: 'تعذّر تحميل التقارير',
         logout: 'تسجيل الخروج',
+        pwaTitle: 'ثبّت التطبيق',
+        pwaAndroidHint: 'أضف بوابة العميل إلى الشاشة الرئيسية للوصول السريع.',
+        pwaIosHint: 'اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية» لتثبيت التطبيق.',
+        pwaInstall: 'تثبيت التطبيق',
+        pwaDismiss: 'إغلاق',
       },
       common: {
         loading: 'جاري التحميل...', date: 'التاريخ', view: 'عرض', print: 'طباعة', download: 'تحميل',

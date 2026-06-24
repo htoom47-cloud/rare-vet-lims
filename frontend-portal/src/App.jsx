@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { PortalProvider } from './context/PortalContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedPortalRoute from './components/portal/ProtectedPortalRoute';
+import PwaInstallBanner from './components/portal/PwaInstallBanner';
 import PortalLogin from './pages/PortalLogin';
 import PortalReports from './pages/PortalReports';
 import PortalReportView from './pages/PortalReportView';
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/reports" replace />} />
             <Route path="*" element={<Navigate to="/reports" replace />} />
           </Routes>
+          <PwaInstallBanner />
         </PortalProvider>
       </ThemeProvider>
     </BrowserRouter>
