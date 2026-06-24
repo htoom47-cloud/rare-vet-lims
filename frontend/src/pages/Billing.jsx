@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, CreditCard, Download, Printer, BarChart3 } from 'lucide-react';
+import { Plus, CreditCard, Download, Printer, BarChart3, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -203,6 +203,9 @@ export default function Billing() {
         <div className="flex flex-wrap items-center gap-2">
           <Link to="/accounting" className="btn-secondary flex items-center gap-2">
             <BarChart3 size={18} /> {t('nav.accounting')}
+          </Link>
+          <Link to="/invoice-settings" className="btn-secondary flex items-center gap-2">
+            <Receipt size={18} /> {t('nav.invoiceSettings')}
           </Link>
           <button onClick={() => setInvoiceModal(true)} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> {t('billing.invoice')}

@@ -1,5 +1,6 @@
 const express = require('express');
 const service = require('../services/billing.service');
+const invoiceSettingsService = require('../services/invoice-settings.service');
 const accounting = require('../services/accounting.service');
 const ledger = require('../services/ledger.service');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -9,6 +10,26 @@ const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 router.use(authenticate);
+
+router.get('/invoice-settings', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await invoiceSettingsService.getInvoiceSettings();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/invoice-settings', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await invoiceSettingsService.updateInvoiceSettings(req.body, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/invoice-settings/preview', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    await invoiceSettingsService.previewInvoicePdf(res, req.body || null);
+  } catch (err) { next(err); }
+});
 
 router.get('/reports/collections', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {

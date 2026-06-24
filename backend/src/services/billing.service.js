@@ -6,6 +6,7 @@ const { uuidv4 } = require('../utils/uuid');
 const path = require('path');
 const fs = require('fs');
 const { generateInvoicePDF } = require('../utils/invoice-pdf');
+const invoiceSettingsService = require('./invoice-settings.service');
 const { syncCustomerArBalance } = require('./accounting.service');
 const ledger = require('./ledger.service');
 
@@ -201,7 +202,8 @@ const ensureInvoicePdf = async (id) => {
   }
 
   const filename = `invoice-${invoice.invoice_number}-${uuidv4().slice(0, 8)}.pdf`;
-  const pdf = await generateInvoicePDF(invoice, invoicePdfDir(), { filename });
+  const settings = await invoiceSettingsService.getInvoiceSettings();
+  const pdf = await generateInvoicePDF(invoice, invoicePdfDir(), { filename, settings });
   await query('UPDATE invoices SET pdf_url = $1, updated_at = NOW() WHERE id = $2', [pdf.url, id]);
   return { invoice: { ...invoice, pdf_url: pdf.url }, filename: pdf.filename, url: pdf.url };
 };

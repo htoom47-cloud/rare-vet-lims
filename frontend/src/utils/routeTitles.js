@@ -8,6 +8,7 @@ export const routeTitleKey = (pathname, isReception) => {
     '/workflow': isReception ? 'reception.newCase' : 'nav.workflow',
     '/billing': isReception ? 'reception.billing' : 'nav.billing',
     '/accounting': 'nav.accounting',
+    '/invoice-settings': 'nav.invoiceSettings',
     '/reports': 'nav.reports',
     '/workbench': 'nav.workbench',
     '/parasitology/upload': 'nav.parasitologyUpload',

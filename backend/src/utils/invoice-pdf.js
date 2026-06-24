@@ -2,8 +2,8 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
-const env = require('../config/env');
 const { drawArBox, drawEn, registerPdfFonts, hasArabic } = require('./pdf-arabic');
+const { mergeInvoiceSettings } = require('./invoice-settings');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 const HAS_LOGO = fs.existsSync(LOGO_PATH);
@@ -12,13 +12,23 @@ const MARGIN = 36;
 const PAGE_W = 595;
 const TW = PAGE_W - MARGIN * 2;
 
-const BRAND = {
+const DEFAULT_BRAND = {
   brown: '#5B3A29',
   gold: '#C9A86A',
   cream: '#F7F5F2',
   border: '#e8e0d8',
   muted: '#6b5344',
 };
+
+let activeBrand = DEFAULT_BRAND;
+
+const brandFromSettings = (settings) => ({
+  brown: settings?.design?.primary_color || DEFAULT_BRAND.brown,
+  gold: settings?.design?.accent_color || DEFAULT_BRAND.gold,
+  cream: settings?.design?.cream_color || DEFAULT_BRAND.cream,
+  border: DEFAULT_BRAND.border,
+  muted: DEFAULT_BRAND.muted,
+});
 
 const STATUS_LABEL = {
   draft: { ar: 'مسودة', en: 'Draft' },
@@ -42,14 +52,14 @@ const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit',
 const pinY = (doc, y) => { doc.y = y; };
 
 const cellLatin = (doc, text, x, y, w, opts = {}) => {
-  const { size = 7.5, color = BRAND.brown, bold = false, align = 'left' } = opts;
+  const { size = 7.5, color = activeBrand.brown, bold = false, align = 'left' } = opts;
   const savedY = doc.y;
   drawEn(doc, String(text ?? ''), x, y, { size, color, bold, width: w, align, fromTop: true });
   pinY(doc, savedY);
 };
 
 const cellArabic = (doc, text, x, y, w, opts = {}) => {
-  const { size = 7.5, color = BRAND.brown, bold = false, align = 'right' } = opts;
+  const { size = 7.5, color = activeBrand.brown, bold = false, align = 'right' } = opts;
   const str = String(text ?? '').trim();
   if (!str) return;
   const savedY = doc.y;
@@ -59,14 +69,14 @@ const cellArabic = (doc, text, x, y, w, opts = {}) => {
 
 const strokeBox = (doc, x, y, w, h, fill) => {
   if (fill) doc.rect(x, y, w, h).fill(fill);
-  doc.rect(x, y, w, h).lineWidth(0.4).strokeColor(BRAND.border).stroke();
+  doc.rect(x, y, w, h).lineWidth(0.4).strokeColor(activeBrand.border).stroke();
 };
 
 /** English left half + Arabic right half — never mixed in one draw call */
 const bilingualBar = (doc, x, y, w, h, textEn, textAr, bg, opts = {}) => {
   const { size = 8, color = '#fff' } = opts;
   doc.rect(x, y, w, h).fill(bg);
-  doc.rect(x, y, w, h).strokeColor(BRAND.border).stroke();
+  doc.rect(x, y, w, h).strokeColor(activeBrand.border).stroke();
   const half = w / 2;
   const padY = y + Math.max(2, (h - size) / 2);
   cellLatin(doc, textEn, x + 8, padY, half - 12, { size, color, bold: true });
@@ -87,8 +97,8 @@ const metaRow = (doc, y, h, labelEn, labelAr, value) => {
 const drawTableHeader = (doc, cols, y, h) => {
   let x = MARGIN;
   cols.forEach((col) => {
-    doc.rect(x, y, col.w, h).fill(BRAND.brown);
-    doc.rect(x, y, col.w, h).lineWidth(0.4).strokeColor(BRAND.border).stroke();
+    doc.rect(x, y, col.w, h).fill(activeBrand.brown);
+    doc.rect(x, y, col.w, h).lineWidth(0.4).strokeColor(activeBrand.border).stroke();
     if (col.ar) {
       cellArabic(doc, col.ar, x + 2, y + 3, col.w - 4, { size: 7, color: '#fff', bold: true, align: 'center' });
     }
@@ -115,6 +125,13 @@ const drawTableRow = (doc, cols, y, h, fill) => {
 };
 
 const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
+  const settings = mergeInvoiceSettings(options.settings);
+  activeBrand = brandFromSettings(settings);
+  const lab = settings.lab;
+  const showLogo = settings.design.show_logo !== false && HAS_LOGO;
+  const showQr = settings.options.show_qr !== false;
+  const showPayments = settings.options.show_payment_history !== false;
+
   const filename = options.filename || `invoice-${invoice.invoice_number}.pdf`;
   fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, filename);
@@ -126,7 +143,7 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
   const customerEn = invoice.customer_name || '-';
 
   let qrDataUrl = null;
-  if (invoice.vat_qr_data) {
+  if (showQr && invoice.vat_qr_data) {
     try {
       qrDataUrl = await QRCode.toDataURL(invoice.vat_qr_data, { width: 140, margin: 1 });
     } catch { /* skip QR */ }
@@ -142,23 +159,23 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     const headerTextW = TW - 50;
     const half = headerTextW / 2;
 
-    if (HAS_LOGO) {
+    if (showLogo) {
       try { doc.image(LOGO_PATH, PAGE_W - MARGIN - 42, y, { width: 42, height: 42 }); } catch { /* */ }
     }
-    cellLatin(doc, env.lab.name, MARGIN, y + 4, half, { size: 9, bold: true });
-    cellArabic(doc, env.lab.nameAr, MARGIN + half, y + 4, half, { size: 11, bold: true, align: 'right' });
+    cellLatin(doc, lab.name, MARGIN, y + 4, half, { size: 9, bold: true });
+    cellArabic(doc, lab.name_ar, MARGIN + half, y + 4, half, { size: 11, bold: true, align: 'right' });
     y += 18;
-    cellLatin(doc, env.lab.subtitle, MARGIN, y, half, { size: 7, color: BRAND.muted });
-    cellArabic(doc, env.lab.subtitleAr || '', MARGIN + half, y, half, { size: 7, color: BRAND.muted, align: 'right' });
+    cellLatin(doc, lab.subtitle, MARGIN, y, half, { size: 7, color: activeBrand.muted });
+    cellArabic(doc, lab.subtitle_ar || '', MARGIN + half, y, half, { size: 7, color: activeBrand.muted, align: 'right' });
     y += 16;
 
-    doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).lineWidth(1.5).strokeColor(BRAND.gold).stroke();
+    doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).lineWidth(1.5).strokeColor(activeBrand.gold).stroke();
     y += 8;
 
-    y = bilingualBar(doc, MARGIN, y, TW, 22, 'SIMPLIFIED TAX INVOICE', 'فاتورة ضريبية مبسطة', BRAND.brown) + 6;
+    y = bilingualBar(doc, MARGIN, y, TW, 22, settings.labels.title_en, settings.labels.title_ar, activeBrand.brown) + 6;
 
     const metaH = 54;
-    strokeBox(doc, MARGIN, y, TW, metaH, BRAND.cream);
+    strokeBox(doc, MARGIN, y, TW, metaH, activeBrand.cream);
     metaRow(doc, y, 16, 'Invoice No', 'رقم الفاتورة', invoice.invoice_number);
     metaRow(doc, y + 16, 16, 'Date', 'التاريخ', fmtDate(invoice.created_at));
     metaRow(doc, y + 32, 16, 'Status', 'الحالة', `${status.en} / ${status.ar}`);
@@ -223,9 +240,9 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     if (totalPaid > 0) totalLine('Paid', 'المدفوع', fmtMoney(totalPaid));
     if (balanceDue > 0.009) totalLine('Balance Due', 'المتبقي', fmtMoney(balanceDue), true);
 
-    if ((invoice.payments || []).length > 0) {
+    if (showPayments && (invoice.payments || []).length > 0) {
       y += 10;
-      y = bilingualBar(doc, MARGIN, y, TW, 18, 'Payment History', 'سجل المدفوعات', BRAND.cream, { size: 7.5, color: BRAND.brown }) + 4;
+      y = bilingualBar(doc, MARGIN, y, TW, 18, 'Payment History', 'سجل المدفوعات', activeBrand.cream, { size: 7.5, color: activeBrand.brown }) + 4;
       invoice.payments.forEach((p) => {
         const lbl = PAYMENT_LABEL[p.method] || { ar: p.method, en: p.method };
         const rowH = 14;
@@ -250,9 +267,19 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
         doc.image(Buffer.from(b64, 'base64'), MARGIN, footerY - 10, { width: 64, height: 64 });
       } catch { /* */ }
     }
-    cellLatin(doc, `VAT No: ${env.lab.vatNumber}`, MARGIN + 72, footerY, TW - 80, { size: 7, color: BRAND.muted });
-    cellLatin(doc, `${env.lab.phone}  |  ${env.lab.email}`, MARGIN + 72, footerY + 12, TW - 80, { size: 7, color: BRAND.muted });
-    cellArabic(doc, env.lab.nameAr, MARGIN, footerY + 28, TW, { size: 7, color: BRAND.muted, align: 'center' });
+    cellLatin(doc, `VAT No: ${lab.vat_number}`, MARGIN + 72, footerY, TW - 80, { size: 7, color: activeBrand.muted });
+    cellLatin(doc, `${lab.phone}  |  ${lab.email}`, MARGIN + 72, footerY + 12, TW - 80, { size: 7, color: activeBrand.muted });
+    if (lab.address) {
+      cellLatin(doc, lab.address, MARGIN + 72, footerY + 24, TW - 80, { size: 7, color: activeBrand.muted });
+    }
+    if (settings.footer.note_en) {
+      cellLatin(doc, settings.footer.note_en, MARGIN + 72, footerY + 36, TW - 80, { size: 7, color: activeBrand.muted });
+    }
+    if (settings.footer.note_ar) {
+      cellArabic(doc, settings.footer.note_ar, MARGIN, footerY + (lab.address ? 48 : 36), TW, { size: 7, color: activeBrand.muted, align: 'center' });
+    } else {
+      cellArabic(doc, lab.name_ar, MARGIN, footerY + 28, TW, { size: 7, color: activeBrand.muted, align: 'center' });
+    }
 
     doc.end();
     stream.on('finish', () => resolve({ filePath, filename, url: `/uploads/invoices/${filename}` }));

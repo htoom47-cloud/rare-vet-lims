@@ -261,6 +261,32 @@ export const billingAPI = {
   revenueReport: (params) => api.get('/billing/reports/revenue', { params }),
   journalReport: (params) => api.get('/billing/reports/journal', { params }),
   customerStatement: (customerId) => api.get(`/billing/customers/${customerId}/statement`),
+  invoiceSettings: () => api.get('/billing/invoice-settings'),
+  updateInvoiceSettings: (data) => api.put('/billing/invoice-settings', data),
+  previewInvoiceSettings: async (draft) => {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${API_URL}/billing/invoice-settings/preview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(draft),
+    });
+    if (!response.ok) throw new Error('Preview failed');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const opened = window.open(objectUrl, '_blank');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'invoice-preview.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  },
 };
 
 export const inventoryAPI = {

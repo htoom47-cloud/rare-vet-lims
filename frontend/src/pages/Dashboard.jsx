@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { m } from 'framer-motion';
-import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp } from 'lucide-react';
+import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import StatCard from '../components/ui/StatCard';
 import PageHeader from '../components/ui/PageHeader';
@@ -30,7 +31,8 @@ function DashboardSkeleton() {
 
 export default function Dashboard() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, hasPermission } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -85,6 +87,32 @@ export default function Dashboard() {
         <m.div variants={staggerItem}><StatCard title={t('dashboard.rejected')} value={stats?.rejected_samples || 0} icon={AlertTriangle} color="red" /></m.div>
         <m.div variants={staggerItem}><StatCard title={t('dashboard.activeTests')} value={stats?.top_tests?.length || 0} icon={TrendingUp} color="blue" /></m.div>
       </m.div>
+
+      {hasPermission('billing.view') && (
+        <m.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.1 }}
+        >
+          <Card className="border-primary-200/80 bg-gradient-to-br from-primary-50/80 to-white dark:from-primary-950/40 dark:to-card">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center shrink-0">
+                  <Receipt size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">{t('invoiceSettings.title')}</p>
+                  <p className="text-sm text-muted-foreground">{t('invoiceSettings.dashboardHint')}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => navigate('/invoice-settings')} className="btn-primary shrink-0">
+                {t('invoiceSettings.open')}
+              </button>
+            </CardContent>
+          </Card>
+        </m.div>
+      )}
 
       <m.div
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
