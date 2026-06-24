@@ -44,7 +44,7 @@ const listInvoices = async ({ status, customer_id, page, limit }) => {
 
 const getInvoiceById = async (id) => {
   const invoiceResult = await query(
-    `SELECT i.*, c.full_name as customer_name, c.mobile as customer_mobile
+    `SELECT i.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar, c.mobile as customer_mobile
      FROM invoices i
      LEFT JOIN customers c ON i.customer_id = c.id
      WHERE i.id = $1`,

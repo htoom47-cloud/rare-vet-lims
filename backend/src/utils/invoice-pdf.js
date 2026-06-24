@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
 const env = require('../config/env');
-const { drawArBox, drawEn, registerPdfFonts } = require('./pdf-arabic');
+const { drawArBox, drawEn, registerPdfFonts, hasArabic } = require('./pdf-arabic');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 const HAS_LOGO = fs.existsSync(LOGO_PATH);
@@ -39,28 +39,77 @@ const PAYMENT_LABEL = {
 const fmtMoney = (n) => `${parseFloat(n || 0).toFixed(2)} SAR`;
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-const drawBanner = (doc, y, textAr, textEn) => {
-  const h = 22;
-  doc.rect(MARGIN, y, TW, h).fill(BRAND.brown);
-  drawEn(doc, textEn, MARGIN + 8, y + 6, { size: 8, color: '#fff', bold: true });
-  drawArBox(doc, textAr, MARGIN, y + 6, TW - 8, { size: 8, color: '#fff', bold: true, align: 'right', fromTop: true });
+const pinY = (doc, y) => { doc.y = y; };
+
+const cellLatin = (doc, text, x, y, w, opts = {}) => {
+  const { size = 7.5, color = BRAND.brown, bold = false, align = 'left' } = opts;
+  const savedY = doc.y;
+  drawEn(doc, String(text ?? ''), x, y, { size, color, bold, width: w, align, fromTop: true });
+  pinY(doc, savedY);
+};
+
+const cellArabic = (doc, text, x, y, w, opts = {}) => {
+  const { size = 7.5, color = BRAND.brown, bold = false, align = 'right' } = opts;
+  const str = String(text ?? '').trim();
+  if (!str) return;
+  const savedY = doc.y;
+  drawArBox(doc, str, x, y, w, { size, color, bold, align, fromTop: true });
+  pinY(doc, savedY);
+};
+
+const strokeBox = (doc, x, y, w, h, fill) => {
+  if (fill) doc.rect(x, y, w, h).fill(fill);
+  doc.rect(x, y, w, h).lineWidth(0.4).strokeColor(BRAND.border).stroke();
+};
+
+/** English left half + Arabic right half — never mixed in one draw call */
+const bilingualBar = (doc, x, y, w, h, textEn, textAr, bg, opts = {}) => {
+  const { size = 8, color = '#fff' } = opts;
+  doc.rect(x, y, w, h).fill(bg);
+  doc.rect(x, y, w, h).strokeColor(BRAND.border).stroke();
+  const half = w / 2;
+  const padY = y + Math.max(2, (h - size) / 2);
+  cellLatin(doc, textEn, x + 8, padY, half - 12, { size, color, bold: true });
+  cellArabic(doc, textAr, x + half + 4, padY, half - 12, { size, color, bold: true, align: 'right' });
   return y + h;
 };
 
-const drawRow = (doc, cols, y, h, opts = {}) => {
-  const { header = false, fill } = opts;
+const metaRow = (doc, y, h, labelEn, labelAr, value) => {
+  const mid = MARGIN + TW / 2;
+  const half = TW / 2;
+  const val = String(value ?? '-');
+  cellLatin(doc, `${labelEn}: ${val}`, MARGIN + 8, y + 5, half - 16, h, { size: 8 });
+  const labelW = 68;
+  cellArabic(doc, `${labelAr}:`, mid + half - labelW - 8, y + 5, labelW, h, { size: 8, align: 'right' });
+  cellLatin(doc, val, mid + 8, y + 5, half - labelW - 20, h, { size: 8, align: 'left' });
+};
+
+const drawTableHeader = (doc, cols, y, h) => {
   let x = MARGIN;
-  cols.forEach(({ w, text, ar, align }) => {
-    if (fill) doc.rect(x, y, w, h).fill(fill);
-    doc.rect(x, y, w, h).lineWidth(0.4).strokeColor(BRAND.border).stroke();
-    const color = header ? '#fff' : BRAND.brown;
-    if (header) doc.rect(x, y, w, h).fill(BRAND.brown);
-    if (ar) {
-      drawArBox(doc, text, x + 2, y + 3, w - 4, { size: 7, color, bold: header, align: align || 'right', fromTop: true });
-    } else {
-      drawEn(doc, text, x + 3, y + 3, { size: 7, color, bold: header, width: w - 6, align: align || 'left', fromTop: true });
+  cols.forEach((col) => {
+    doc.rect(x, y, col.w, h).fill(BRAND.brown);
+    doc.rect(x, y, col.w, h).lineWidth(0.4).strokeColor(BRAND.border).stroke();
+    if (col.ar) {
+      cellArabic(doc, col.ar, x + 2, y + 3, col.w - 4, { size: 7, color: '#fff', bold: true, align: 'center' });
     }
-    x += w;
+    if (col.en) {
+      cellLatin(doc, col.en, x + 2, y + (col.ar ? 10 : 3), col.w - 4, { size: 6.5, color: '#fff', bold: true, align: 'center' });
+    }
+    x += col.w;
+  });
+  return y + h;
+};
+
+const drawTableRow = (doc, cols, y, h, fill) => {
+  let x = MARGIN;
+  cols.forEach((col) => {
+    strokeBox(doc, x, y, col.w, h, fill);
+    if (col.arabic) {
+      cellArabic(doc, col.text, x + 2, y + 3, col.w - 4, { size: 7, align: col.align || 'right' });
+    } else {
+      cellLatin(doc, col.text, x + 2, y + 3, col.w - 4, { size: 7, align: col.align || 'left' });
+    }
+    x += col.w;
   });
   return y + h;
 };
@@ -73,6 +122,8 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
   const totalPaid = parseFloat(invoice.total_paid || 0);
   const balanceDue = Math.max(0, parseFloat(invoice.total) - totalPaid);
   const status = STATUS_LABEL[invoice.status] || STATUS_LABEL.issued;
+  const customerAr = invoice.customer_name_ar || (hasArabic(invoice.customer_name) ? invoice.customer_name : null);
+  const customerEn = invoice.customer_name || '-';
 
   let qrDataUrl = null;
   if (invoice.vat_qr_data) {
@@ -88,57 +139,64 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     doc.pipe(stream);
 
     let y = MARGIN;
+    const headerTextW = TW - 50;
+    const half = headerTextW / 2;
 
     if (HAS_LOGO) {
       try { doc.image(LOGO_PATH, PAGE_W - MARGIN - 42, y, { width: 42, height: 42 }); } catch { /* */ }
     }
-    drawArBox(doc, env.lab.nameAr, MARGIN, y, TW - 50, { size: 12, bold: true, align: 'right', fromTop: true });
-    y += 16;
-    drawEn(doc, env.lab.name, MARGIN, y, { size: 8, color: BRAND.muted, width: TW - 50, align: 'right', fromTop: true });
-    y += 14;
-    drawEn(doc, env.lab.subtitle, MARGIN, y, { size: 7, color: BRAND.muted, width: TW - 50, align: 'right', fromTop: true });
+    cellLatin(doc, env.lab.name, MARGIN, y + 4, half, { size: 9, bold: true });
+    cellArabic(doc, env.lab.nameAr, MARGIN + half, y + 4, half, { size: 11, bold: true, align: 'right' });
     y += 18;
+    cellLatin(doc, env.lab.subtitle, MARGIN, y, half, { size: 7, color: BRAND.muted });
+    cellArabic(doc, env.lab.subtitleAr || '', MARGIN + half, y, half, { size: 7, color: BRAND.muted, align: 'right' });
+    y += 16;
 
     doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).lineWidth(1.5).strokeColor(BRAND.gold).stroke();
     y += 8;
 
-    y = drawBanner(doc, y, 'فاتورة ضريبية مبسطة', 'SIMPLIFIED TAX INVOICE');
-    y += 6;
+    y = bilingualBar(doc, MARGIN, y, TW, 22, 'SIMPLIFIED TAX INVOICE', 'فاتورة ضريبية مبسطة', BRAND.brown) + 6;
 
-    const metaH = 52;
-    doc.rect(MARGIN, y, TW, metaH).fill(BRAND.cream);
-    doc.rect(MARGIN, y, TW, metaH).lineWidth(0.5).strokeColor(BRAND.border).stroke();
-    drawArBox(doc, `رقم الفاتورة: ${invoice.invoice_number}`, MARGIN + 8, y + 8, TW / 2, { size: 8, bold: true, align: 'right', fromTop: true });
-    drawEn(doc, `Invoice No: ${invoice.invoice_number}`, MARGIN + TW / 2, y + 8, { size: 8, bold: true, fromTop: true });
-    drawArBox(doc, `التاريخ: ${fmtDate(invoice.created_at)}`, MARGIN + 8, y + 22, TW / 2, { size: 7.5, align: 'right', fromTop: true });
-    drawEn(doc, `Date: ${fmtDate(invoice.created_at)}`, MARGIN + TW / 2, y + 22, { size: 7.5, fromTop: true });
-    drawArBox(doc, `الحالة: ${status.ar}`, MARGIN + 8, y + 36, TW / 2, { size: 7.5, align: 'right', fromTop: true });
-    drawEn(doc, `Status: ${status.en}`, MARGIN + TW / 2, y + 36, { size: 7.5, fromTop: true });
+    const metaH = 54;
+    strokeBox(doc, MARGIN, y, TW, metaH, BRAND.cream);
+    metaRow(doc, y, 16, 'Invoice No', 'رقم الفاتورة', invoice.invoice_number);
+    metaRow(doc, y + 16, 16, 'Date', 'التاريخ', fmtDate(invoice.created_at));
+    metaRow(doc, y + 32, 16, 'Status', 'الحالة', `${status.en} / ${status.ar}`);
     y += metaH + 8;
 
-    doc.rect(MARGIN, y, TW, 36).strokeColor(BRAND.border).stroke();
-    drawArBox(doc, `العميل: ${invoice.customer_name || '-'}`, MARGIN + 8, y + 6, TW - 16, { size: 8, bold: true, align: 'right', fromTop: true });
-    drawEn(doc, `Customer: ${invoice.customer_name || '-'}`, MARGIN + 8, y + 20, { size: 7.5, fromTop: true });
-    if (invoice.customer_mobile) {
-      drawEn(doc, `Mobile: ${invoice.customer_mobile}`, MARGIN + TW / 2, y + 20, { size: 7.5, fromTop: true });
+    const custH = customerAr ? 40 : 32;
+    strokeBox(doc, MARGIN, y, TW, custH);
+    cellLatin(doc, `Customer: ${customerEn}`, MARGIN + 8, y + 6, TW / 2 - 12, { size: 8, bold: true });
+    cellArabic(doc, 'العميل:', MARGIN + TW / 2 + 8, y + 6, 52, { size: 8, bold: true, align: 'right' });
+    if (customerAr) {
+      cellArabic(doc, customerAr, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
+    } else {
+      cellLatin(doc, customerEn, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
     }
-    y += 44;
+    if (invoice.customer_mobile) {
+      cellLatin(doc, `Mobile: ${invoice.customer_mobile}`, MARGIN + 8, y + 22, TW / 2 - 12, { size: 7.5 });
+      cellArabic(doc, 'الجوال:', MARGIN + TW / 2 + 8, y + 22, 52, { size: 7.5, align: 'right' });
+      cellLatin(doc, invoice.customer_mobile, MARGIN + TW / 2 + 60, y + 22, TW / 2 - 68, { size: 7.5, align: 'right' });
+    }
+    y += custH + 8;
 
-    const cols = [
-      { w: 24, text: '#', align: 'center' },
-      { w: TW - 24 - 52 - 40 - 58 - 58, text: 'الوصف / Description', ar: true },
-      { w: 52, text: 'الكمية', ar: true, align: 'center' },
-      { w: 58, text: 'السعر', ar: true, align: 'center' },
-      { w: 58, text: 'الإجمالي', ar: true, align: 'center' },
+    const colDesc = TW - 24 - 52 - 58 - 58;
+    const tableCols = [
+      { w: 24, en: '#', ar: '#' },
+      { w: colDesc, en: 'Description', ar: 'الوصف' },
+      { w: 52, en: 'Qty', ar: 'الكمية' },
+      { w: 58, en: 'Price', ar: 'السعر' },
+      { w: 58, en: 'Total', ar: 'الإجمالي' },
     ];
-    y = drawRow(doc, cols, y, 16, { header: true });
+    y = drawTableHeader(doc, tableCols, y, 22);
 
     (invoice.items || []).forEach((item, i) => {
       const desc = item.description || item.test_name || '-';
       const animal = item.name_tag ? ` (${item.name_tag})` : '';
-      y = drawRow(doc, [
+      const fullDesc = `${desc}${animal}`;
+      y = drawTableRow(doc, [
         { w: 24, text: String(i + 1), align: 'center' },
-        { w: cols[1].w, text: `${desc}${animal}`, ar: /[\u0600-\u06FF]/.test(desc) },
+        { w: colDesc, text: fullDesc, arabic: hasArabic(fullDesc), align: hasArabic(fullDesc) ? 'right' : 'left' },
         { w: 52, text: String(item.quantity), align: 'center' },
         { w: 58, text: parseFloat(item.unit_price).toFixed(2), align: 'center' },
         { w: 58, text: parseFloat(item.total_price).toFixed(2), align: 'center' },
@@ -146,32 +204,42 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     });
 
     y += 8;
-    const totalsX = MARGIN + TW - 200;
-    const totalsW = 200;
-    const line = (labelAr, labelEn, val, bold = false) => {
-      doc.rect(totalsX, y, totalsW, 16).fill('#faf8f5').strokeColor(BRAND.border).stroke();
-      drawArBox(doc, labelAr, totalsX + 4, y + 3, 90, { size: 7, bold, align: 'right', fromTop: true });
-      drawEn(doc, val, totalsX + 96, y + 3, { size: 7, bold, width: 100, align: 'right', fromTop: true });
+    const totalsX = MARGIN + TW - 210;
+    const totalsW = 210;
+    const labelW = 100;
+    const totalLine = (labelEn, labelAr, val, bold = false) => {
+      strokeBox(doc, totalsX, y, totalsW, 16, '#faf8f5');
+      cellLatin(doc, labelEn, totalsX + 4, y + 3, 48, { size: 7, bold });
+      cellLatin(doc, val, totalsX + totalsW - 72, y + 3, 68, { size: 7, bold, align: 'right' });
+      cellArabic(doc, labelAr, totalsX + 52, y + 3, labelW, { size: 7, bold, align: 'right' });
       y += 16;
     };
-    line('المجموع الفرعي', 'Subtotal', fmtMoney(invoice.subtotal));
+    totalLine('Subtotal', 'المجموع الفرعي', fmtMoney(invoice.subtotal));
     if (parseFloat(invoice.discount_amount) > 0) {
-      line('الخصم', 'Discount', `- ${fmtMoney(invoice.discount_amount)}`);
+      totalLine('Discount', 'الخصم', `- ${fmtMoney(invoice.discount_amount)}`);
     }
-    line(`ضريبة ${invoice.tax_rate || 15}%`, `VAT ${invoice.tax_rate || 15}%`, fmtMoney(invoice.tax_amount));
-    line('الإجمالي', 'Total', fmtMoney(invoice.total), true);
-    if (totalPaid > 0) line('المدفوع', 'Paid', fmtMoney(totalPaid));
-    if (balanceDue > 0.009) line('المتبقي', 'Balance Due', fmtMoney(balanceDue), true);
+    totalLine(`VAT ${invoice.tax_rate || 15}%`, `ضريبة ${invoice.tax_rate || 15}%`, fmtMoney(invoice.tax_amount));
+    totalLine('Total', 'الإجمالي', fmtMoney(invoice.total), true);
+    if (totalPaid > 0) totalLine('Paid', 'المدفوع', fmtMoney(totalPaid));
+    if (balanceDue > 0.009) totalLine('Balance Due', 'المتبقي', fmtMoney(balanceDue), true);
 
     if ((invoice.payments || []).length > 0) {
       y += 10;
-      drawArBox(doc, 'سجل المدفوعات', MARGIN, y, TW, { size: 8, bold: true, align: 'right', fromTop: true });
-      y += 14;
+      y = bilingualBar(doc, MARGIN, y, TW, 18, 'Payment History', 'سجل المدفوعات', BRAND.cream, { size: 7.5, color: BRAND.brown }) + 4;
       invoice.payments.forEach((p) => {
         const lbl = PAYMENT_LABEL[p.method] || { ar: p.method, en: p.method };
-        const row = `${fmtDate(p.created_at)}  |  ${lbl.ar}  |  ${fmtMoney(p.amount)}${p.reference_number ? `  |  Ref: ${p.reference_number}` : ''}`;
-        drawEn(doc, row, MARGIN, y, { size: 7, width: TW, fromTop: true });
-        y += 12;
+        const rowH = 14;
+        strokeBox(doc, MARGIN, y, TW, rowH);
+        cellLatin(
+          doc,
+          `${fmtDate(p.created_at)}  |  ${lbl.en}  |  ${fmtMoney(p.amount)}${p.reference_number ? `  |  Ref: ${p.reference_number}` : ''}`,
+          MARGIN + 6,
+          y + 3,
+          TW / 2 - 8,
+          { size: 7 }
+        );
+        cellArabic(doc, lbl.ar, MARGIN + TW / 2 + 6, y + 3, TW / 2 - 12, { size: 7, align: 'right' });
+        y += rowH;
       });
     }
 
@@ -182,9 +250,9 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
         doc.image(Buffer.from(b64, 'base64'), MARGIN, footerY - 10, { width: 64, height: 64 });
       } catch { /* */ }
     }
-    drawEn(doc, `VAT No: ${env.lab.vatNumber}`, MARGIN + 72, footerY, { size: 7, color: BRAND.muted, fromTop: true });
-    drawEn(doc, `${env.lab.phone}  |  ${env.lab.email}`, MARGIN + 72, footerY + 12, { size: 7, color: BRAND.muted, fromTop: true });
-    drawArBox(doc, env.lab.nameAr, MARGIN, footerY + 28, TW, { size: 7, color: BRAND.muted, align: 'center', fromTop: true });
+    cellLatin(doc, `VAT No: ${env.lab.vatNumber}`, MARGIN + 72, footerY, TW - 80, { size: 7, color: BRAND.muted });
+    cellLatin(doc, `${env.lab.phone}  |  ${env.lab.email}`, MARGIN + 72, footerY + 12, TW - 80, { size: 7, color: BRAND.muted });
+    cellArabic(doc, env.lab.nameAr, MARGIN, footerY + 28, TW, { size: 7, color: BRAND.muted, align: 'center' });
 
     doc.end();
     stream.on('finish', () => resolve({ filePath, filename, url: `/uploads/invoices/${filename}` }));
