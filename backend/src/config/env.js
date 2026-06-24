@@ -70,6 +70,10 @@ const env = {
     email: process.env.LAB_EMAIL || 'alnwader.10hz@gmail.com',
     vatNumber: process.env.VAT_NUMBER || '300000000000003',
   },
+  portal: {
+    /** Temporary: same OTP for all customers (e.g. 1234). Unset when SMS is ready. */
+    staticOtp: process.env.PORTAL_OTP_STATIC?.trim() || null,
+  },
   notifications: {
     provider: process.env.NOTIFICATION_PROVIDER || 'twilio',
     defaultChannel: process.env.NOTIFICATION_DEFAULT_CHANNEL || 'sms',

@@ -138,14 +138,14 @@ export default function PortalLogin() {
                       maxLength={6}
                       dir="ltr"
                       className="text-center text-2xl tracking-[0.5em] font-mono"
-                      placeholder="000000"
+                      placeholder="1234"
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       required
                       autoFocus
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
+                  <Button type="submit" className="w-full" disabled={loading || otp.length < 4}>
                     {loading ? t('common.loading') : t('portal.verifyAndLogin')}
                   </Button>
                   <Button

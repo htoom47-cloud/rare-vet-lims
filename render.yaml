@@ -69,3 +69,5 @@ services:
         value: https://lims.rarevetcare.com,https://portal.rarevetcare.com,https://rare-vet-lims.onrender.com
       - key: PORTAL_JWT_EXPIRES_IN
         value: 48h
+      - key: PORTAL_OTP_STATIC
+        value: "1234"

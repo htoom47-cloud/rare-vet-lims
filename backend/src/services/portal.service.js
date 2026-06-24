@@ -12,7 +12,27 @@ const OTP_TTL_MINUTES = 10;
 const OTP_COOLDOWN_SECONDS = 60;
 const OTP_MAX_ATTEMPTS = 5;
 
-const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateOtp = () => env.portal.staticOtp || String(Math.floor(100000 + Math.random() * 900000));
+
+const issuePortalToken = (customer) => {
+  const accessToken = jwt.sign(
+    { customerId: customer.id, type: 'customer' },
+    env.jwt.secret,
+    { expiresIn: env.jwt.portalExpiresIn }
+  );
+
+  return {
+    accessToken,
+    customer: {
+      id: customer.id,
+      full_name: customer.full_name,
+      full_name_ar: customer.full_name_ar,
+      mobile: customer.mobile,
+      city: customer.city,
+      farm_company: customer.farm_company,
+    },
+  };
+};
 
 const findCustomerByMobile = async (mobile) => {
   const digits = normalizeMobileDigits(mobile);
@@ -35,6 +55,17 @@ const requestOtp = async (mobile) => {
   const customer = await findCustomerByMobile(mobile);
   if (!customer) {
     throw new AppError('No account found for this mobile number', 404, 'CUSTOMER_NOT_FOUND');
+  }
+
+  if (env.portal.staticOtp) {
+    logger.warn('Portal static OTP enabled — remove PORTAL_OTP_STATIC when SMS is ready');
+    return {
+      message: 'Verification code sent',
+      message_ar: 'تم إرسال رمز التحقق',
+      expiresIn: OTP_TTL_MINUTES * 60,
+      customerName: customer.full_name_ar || customer.full_name,
+      debugOtp: env.portal.staticOtp,
+    };
   }
 
   const recent = await query(
@@ -108,7 +139,13 @@ const verifyOtp = async (mobile, otp) => {
     throw new AppError('Invalid verification code', 401, 'INVALID_OTP');
   }
 
-  const otpHash = hashToken(String(otp).trim());
+  const code = String(otp).trim();
+  if (env.portal.staticOtp && code === env.portal.staticOtp) {
+    logger.warn('Portal login via static OTP', { customerId: customer.id });
+    return issuePortalToken(customer);
+  }
+
+  const otpHash = hashToken(code);
   const record = await query(
     `SELECT id, attempts FROM customer_otp_codes
      WHERE customer_id = $1 AND otp_hash = $2 AND used_at IS NULL AND expires_at > NOW()
@@ -137,23 +174,7 @@ const verifyOtp = async (mobile, otp) => {
 
   await query('UPDATE customer_otp_codes SET used_at = NOW() WHERE id = $1', [record.rows[0].id]);
 
-  const accessToken = jwt.sign(
-    { customerId: customer.id, type: 'customer' },
-    env.jwt.secret,
-    { expiresIn: env.jwt.portalExpiresIn }
-  );
-
-  return {
-    accessToken,
-    customer: {
-      id: customer.id,
-      full_name: customer.full_name,
-      full_name_ar: customer.full_name_ar,
-      mobile: customer.mobile,
-      city: customer.city,
-      farm_company: customer.farm_company,
-    },
-  };
+  return issuePortalToken(customer);
 };
 
 const assertReportOwnership = async (reportId, customerId) => {
