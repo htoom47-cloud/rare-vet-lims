@@ -19,7 +19,7 @@ const navClass = ({ isActive }) =>
       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
   }`;
 
-export default function PortalLayout({ children, title, subtitle, alertCount = 0, wide = false }) {
+export default function PortalLayout({ children, title, subtitle, alertCount = 0, wide = false, compact = false }) {
   const { t, i18n } = useTranslation();
   const { customer, logout } = usePortal();
   const { toggleLanguage, theme, toggleTheme } = useTheme();
@@ -229,8 +229,8 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
           <div className="lg:hidden px-4 pb-3">{searchBox}</div>
         </header>
 
-        <main className={`flex-1 w-full mx-auto px-4 py-6 pb-24 lg:pb-8 ${wide ? 'max-w-[90rem]' : 'max-w-5xl'}`}>
-          {(title || subtitle) && (
+        <main className={`flex-1 w-full mx-auto px-3 sm:px-4 ${compact ? 'py-3 pb-20 lg:py-4 lg:pb-6' : 'py-6 pb-24 lg:pb-8'} ${wide ? 'max-w-[90rem]' : 'max-w-5xl'}`}>
+          {(title || subtitle) && !compact && (
             <div className="hidden lg:block mb-6">
               {!title && <h1 className="text-2xl font-bold">{t('portal.title')}</h1>}
             </div>

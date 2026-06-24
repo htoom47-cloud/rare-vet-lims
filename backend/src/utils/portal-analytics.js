@@ -15,12 +15,78 @@ const flagSeverity = (flag) => {
 };
 
 const panelStatusFromResults = (results, codes) => {
+  const detail = panelDetailFromResults(results, { codes });
+  return detail.status;
+};
+
+const panelDetailFromResults = (results, { codes, key }) => {
   const rows = (results || []).filter((r) => codes.includes(r.categoryCode));
-  if (!rows.length) return 'none';
-  const max = rows.reduce((m, r) => Math.max(m, flagSeverity(r.flag)), 0);
-  if (max >= 2) return 'abnormal';
-  if (max === 1) return 'attention';
-  return 'normal';
+  if (!rows.length) {
+    return {
+      key,
+      status: 'none',
+      total: 0,
+      abnormal: 0,
+      attention: 0,
+      normal: 0,
+      critical: 0,
+    };
+  }
+  let abnormal = 0;
+  let attention = 0;
+  let critical = 0;
+  for (const row of rows) {
+    const sev = flagSeverity(row.flag);
+    if (sev >= 3) critical += 1;
+    if (sev >= 2) abnormal += 1;
+    else if (sev === 1) attention += 1;
+  }
+  const normal = rows.length - abnormal - attention;
+  let status = 'normal';
+  if (abnormal > 0) status = 'abnormal';
+  else if (attention > 0) status = 'attention';
+
+  return {
+    key,
+    status,
+    total: rows.length,
+    abnormal,
+    attention,
+    normal,
+    critical,
+  };
+};
+
+const buildPanelDetails = (results) =>
+  PANELS.map((panel) => panelDetailFromResults(results, panel));
+
+const summarizeResults = (results) => {
+  const rows = results || [];
+  let abnormal = 0;
+  let attention = 0;
+  let critical = 0;
+  let normal = 0;
+  for (const row of rows) {
+    const sev = flagSeverity(row.flag);
+    if (sev >= 3) critical += 1;
+    if (sev >= 2) abnormal += 1;
+    else if (sev === 1) attention += 1;
+    else normal += 1;
+  }
+  let overallStatus = 'unknown';
+  if (rows.length) {
+    if (abnormal > 0) overallStatus = 'abnormal';
+    else if (attention > 0) overallStatus = 'attention';
+    else overallStatus = 'normal';
+  }
+  return {
+    total: rows.length,
+    abnormal,
+    attention,
+    normal,
+    critical,
+    overallStatus,
+  };
 };
 
 const pctChange = (current, previous) => {
@@ -98,6 +164,9 @@ const buildInterpretation = (parameters, panels, isArabic) => {
 module.exports = {
   PANELS,
   panelStatusFromResults,
+  panelDetailFromResults,
+  buildPanelDetails,
+  summarizeResults,
   enrichParameters,
   buildInterpretation,
   pctChange,

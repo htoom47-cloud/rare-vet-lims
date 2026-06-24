@@ -10,6 +10,8 @@ const notificationProvider = require('./notification-providers');
 const {
   PANELS,
   panelStatusFromResults,
+  buildPanelDetails,
+  summarizeResults,
   enrichParameters,
   buildInterpretation,
   flagSeverity,
@@ -287,11 +289,7 @@ const latestResultsForAnimal = async (customerId, animalId) => {
   };
 };
 
-const buildPanels = (results) =>
-  PANELS.map((panel) => ({
-    key: panel.key,
-    status: panel.codes.length ? panelStatusFromResults(results, panel.codes) : 'none',
-  }));
+const buildPanels = (results) => buildPanelDetails(results);
 
 const countCriticalFlags = (results) =>
   (results || []).filter((r) => flagSeverity(r.flag) >= 3).length;
@@ -471,6 +469,7 @@ const getDashboard = async (customerId) => {
     animals.slice(0, 12).map(async (row) => {
       const { results } = await latestResultsForAnimal(customerId, row.id);
       const panels = buildPanels(results);
+      const panelSummary = summarizeResults(results);
       const abnormalPanels = panels.filter((p) => p.status === 'abnormal').length;
       return {
         id: row.id,
@@ -484,6 +483,8 @@ const getDashboard = async (customerId) => {
         panels,
         hasAbnormal: abnormalPanels > 0,
         criticalCount: countCriticalFlags(results),
+        abnormalCount: panelSummary.abnormal,
+        overallStatus: panelSummary.overallStatus,
       };
     })
   );
@@ -499,6 +500,8 @@ const getDashboard = async (customerId) => {
     });
   }
   const criticalTotal = animalSummaries.reduce((sum, a) => sum + (a.criticalCount || 0), 0);
+  const abnormalTotal = animalSummaries.reduce((sum, a) => sum + (a.abnormalCount || 0), 0);
+
   if (criticalTotal > 0) {
     alerts.push({ type: 'critical_results', severity: 'critical', count: criticalTotal });
   }
@@ -519,6 +522,9 @@ const getDashboard = async (customerId) => {
       reportCount: parseInt(stats.report_count, 10) || 0,
       animalCount: parseInt(stats.animal_count, 10) || 0,
       newReports7d: parseInt(stats.new_reports_7d, 10) || 0,
+      abnormalResults: abnormalTotal,
+      criticalResults: criticalTotal,
+      animalsNeedingFollowUp: abnormalAnimals.length,
     },
     alerts,
     animals: animalSummaries,
@@ -531,6 +537,7 @@ const getAnimalDashboard = async (customerId, animalId) => {
   const reports = await fetchAnimalReports(customerId, animalId, 20);
   const { results, report: latestReport } = await latestResultsForAnimal(customerId, animalId);
   const panels = buildPanels(results);
+  const summary = summarizeResults(results);
 
   let comparison = null;
   let keyParameters = [];
@@ -587,6 +594,16 @@ const getAnimalDashboard = async (customerId, animalId) => {
         }
       : null,
     panels,
+    summary,
+    kpis: {
+      reportCount: reports.length,
+      abnormalCount: summary.abnormal,
+      criticalCount: summary.critical,
+      normalCount: summary.normal,
+      panelsOk: panels.filter((p) => p.status === 'normal').length,
+      panelsAlert: panels.filter((p) => ['abnormal', 'attention'].includes(p.status)).length,
+      overallStatus: summary.overallStatus,
+    },
     interpretation,
     keyParameters,
     trendCandidates,

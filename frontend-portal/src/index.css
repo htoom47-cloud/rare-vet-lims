@@ -145,9 +145,9 @@
 
   /* Portal — medical dashboard */
   .portal-app {
+    background-color: #f4f6f9;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(38 45% 55% / 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 100%, hsl(25 28% 22% / 0.04), transparent);
+      radial-gradient(ellipse 70% 40% at 50% 0%, rgba(197, 160, 89, 0.06), transparent);
   }
 
   .portal-sidebar {
@@ -208,6 +208,35 @@
 
   .portal-before-after .portal-ba-col {
     @apply transition-colors;
+  }
+
+  /* Medical dashboard — IDEXX-style dense layout */
+  .med-page {
+    @apply text-slate-800;
+  }
+
+  .med-section-title {
+    @apply text-xs font-bold uppercase tracking-wide text-slate-500 mb-2;
+  }
+
+  .med-section-card {
+    @apply rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden;
+  }
+
+  .med-section {
+    @apply space-y-2;
+  }
+
+  .med-kpi-card {
+    @apply transition-shadow hover:shadow-md;
+  }
+
+  .med-animal-tile:active {
+    @apply scale-[0.99];
+  }
+
+  .med-spark-card:hover {
+    @apply border-[#C5A059]/50;
   }
 }
 

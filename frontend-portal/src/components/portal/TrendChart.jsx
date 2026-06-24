@@ -19,19 +19,19 @@ const formatDate = (iso, isAr) => {
   });
 };
 
-export default function TrendChart({ data, meta, isAr, title, height = 280 }) {
+export default function TrendChart({ data, meta, isAr, title, height = 280, bare = false }) {
   const { t } = useTranslation();
   const points = (data?.points || []).filter((p) => p.numericValue != null);
   const refRange = parseReference(meta?.reference);
 
   if (!points.length) {
-    return (
-      <Card className="portal-chart-card">
-        <CardContent className="py-12 text-center text-sm text-muted-foreground">
-          {t('portal.noTrendData')}
-        </CardContent>
-      </Card>
+    const empty = (
+      <div className="py-8 text-center text-sm text-slate-400">
+        {t('portal.noTrendData')}
+      </div>
     );
+    if (bare) return empty;
+    return <Card className="portal-chart-card"><CardContent>{empty}</CardContent></Card>;
   }
 
   const chartData = points.map((p) => ({
@@ -41,6 +41,58 @@ export default function TrendChart({ data, meta, isAr, title, height = 280 }) {
   }));
 
   const name = isAr ? (meta?.nameAr || meta?.nameEn) : (meta?.nameEn || meta?.nameAr);
+
+  const chart = (
+    <div style={{ height }} dir="ltr">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+          <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} width={38} stroke="#94a3b8" />
+          <Tooltip
+            contentStyle={{
+              borderRadius: 8,
+              border: '1px solid #e2e8f0',
+              background: '#fff',
+              fontSize: 11,
+            }}
+            formatter={(value) => [value, meta?.unit || '']}
+            labelFormatter={(_, payload) => {
+              const row = payload?.[0]?.payload;
+              return row?.reportNumber || row?.label || '';
+            }}
+          />
+          {refRange && (
+            <ReferenceArea
+              y1={refRange.low}
+              y2={refRange.high}
+              fill="rgba(16, 185, 129, 0.08)"
+              strokeOpacity={0}
+            />
+          )}
+          <Line
+            type="monotone"
+            dataKey="y"
+            stroke="#C5A059"
+            strokeWidth={2.5}
+            dot={{ r: 3, fill: '#C5A059', strokeWidth: 0 }}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  if (bare) {
+    return (
+      <div>
+        {meta?.reference && (
+          <p className="text-[10px] text-slate-400 mb-1">{t('portal.reference')}: {meta.reference}</p>
+        )}
+        {chart}
+      </div>
+    );
+  }
 
   return (
     <Card className="portal-chart-card">
@@ -57,46 +109,7 @@ export default function TrendChart({ data, meta, isAr, title, height = 280 }) {
           <p className="text-xs text-muted-foreground">{t('portal.reference')}: {meta.reference}</p>
         )}
       </CardHeader>
-      <CardContent className="pb-4">
-        <div style={{ height }} dir="ltr">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} width={42} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: 12,
-                  border: '1px solid hsl(var(--border))',
-                  background: 'hsl(var(--card))',
-                  fontSize: 12,
-                }}
-                formatter={(value) => [value, meta?.unit || '']}
-                labelFormatter={(_, payload) => {
-                  const row = payload?.[0]?.payload;
-                  return row?.reportNumber || row?.label || '';
-                }}
-              />
-              {refRange && (
-                <ReferenceArea
-                  y1={refRange.low}
-                  y2={refRange.high}
-                  fill="hsl(142 76% 36% / 0.08)"
-                  strokeOpacity={0}
-                />
-              )}
-              <Line
-                type="monotone"
-                dataKey="y"
-                stroke="hsl(38 45% 45%)"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: 'hsl(38 45% 45%)', strokeWidth: 0 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
+      <CardContent className="pb-4">{chart}</CardContent>
     </Card>
   );
 }

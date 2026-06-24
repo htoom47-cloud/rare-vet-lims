@@ -1,23 +1,25 @@
 import { Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { cn } from '../../lib/utils';
 
-export default function ClinicalInsight({ interpretation, isAr }) {
+export default function ClinicalInsight({ interpretation, isAr, compact = false }) {
   const { t } = useTranslation();
   const text = isAr ? interpretation?.ar : interpretation?.en;
   if (!text) return null;
 
   return (
-    <Card className="portal-insight-card border-primary/20 bg-gradient-to-br from-card via-card to-primary/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Sparkles size={18} className="text-primary" />
+    <div className={cn(
+      'rounded-xl border border-[#C5A059]/25 bg-gradient-to-br from-white to-amber-50/40 shadow-sm',
+      compact ? 'p-3' : 'p-4'
+    )}
+    >
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Sparkles size={compact ? 14 : 16} className="text-[#C5A059]" />
+        <h3 className={cn('font-semibold text-slate-800', compact ? 'text-xs' : 'text-sm')}>
           {t('portal.clinicalInterpretation')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm leading-relaxed text-foreground/90">{text}</p>
-      </CardContent>
-    </Card>
+        </h3>
+      </div>
+      <p className={cn('leading-relaxed text-slate-600', compact ? 'text-[11px]' : 'text-sm')}>{text}</p>
+    </div>
   );
 }
