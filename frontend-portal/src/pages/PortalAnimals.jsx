@@ -56,10 +56,16 @@ export default function PortalAnimals() {
                   className="flex-1 text-start min-w-0"
                   onClick={() => navigate(`/animals/${animal.id}`)}
                 >
-                  <p className="font-semibold font-mono">{animal.animal_code}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {animalLabel(animal.animal_type, isAr)}
-                    {animal.name_tag ? ` · ${animal.name_tag}` : ''}
+                  <p className="text-lg font-bold text-foreground leading-tight truncate">
+                    {animal.name_tag || animalLabel(animal.animal_type, isAr)}
+                  </p>
+                  {animal.name_tag && (
+                    <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                      {animalLabel(animal.animal_type, isAr)}
+                    </p>
+                  )}
+                  <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate">
+                    {animal.animal_code}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {t('portal.reportCount', { count: animal.report_count })}

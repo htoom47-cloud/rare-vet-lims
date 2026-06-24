@@ -98,8 +98,8 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
                   className="w-full text-start px-3 py-2 rounded-lg hover:bg-accent text-sm"
                   onClick={() => { navigate(`/animals/${a.id}`); setSearchOpen(false); setSearchQ(''); }}
                 >
-                  <span className="font-mono font-medium">{a.animal_code}</span>
-                  {a.name_tag && <span className="text-muted-foreground"> · {a.name_tag}</span>}
+                  <span className="font-medium">{a.name_tag || a.animal_code}</span>
+                  {a.name_tag && <span className="text-muted-foreground font-mono text-xs"> · {a.animal_code}</span>}
                 </button>
               ))}
             </div>

@@ -47,12 +47,18 @@ export default function PortalCompareHub() {
                   <PawPrint size={18} className="text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold font-mono">{animal.animal_code}</p>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {animalLabel(animal.animal_type, isAr)}
-                    {animal.name_tag ? ` · ${animal.name_tag}` : ''}
+                  <p className="text-base font-bold text-foreground leading-tight truncate">
+                    {animal.name_tag || animalLabel(animal.animal_type, isAr)}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  {animal.name_tag && (
+                    <p className="text-sm text-muted-foreground truncate">
+                      {animalLabel(animal.animal_type, isAr)}
+                    </p>
+                  )}
+                  <p className="text-xs font-mono text-muted-foreground truncate">
+                    {animal.animal_code}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     {t('portal.reportCount', { count: animal.report_count })}
                   </p>
                 </div>

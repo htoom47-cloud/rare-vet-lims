@@ -128,10 +128,16 @@ export default function PortalDashboard() {
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
-                            <p className="font-bold font-mono text-sm text-slate-900">{animal.code}</p>
-                            <p className="text-[11px] text-slate-500 truncate">
-                              {animalLabel(animal.type, isAr)}
-                              {animal.name ? ` · ${animal.name}` : ''}
+                            <p className="font-bold text-sm text-foreground truncate">
+                              {animal.name || animalLabel(animal.type, isAr)}
+                            </p>
+                            {animal.name && (
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {animalLabel(animal.type, isAr)}
+                              </p>
+                            )}
+                            <p className="text-[11px] font-mono text-muted-foreground truncate">
+                              {animal.code}
                             </p>
                           </div>
                           <StatusBadge
