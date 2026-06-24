@@ -149,8 +149,27 @@
     border-bottom: 1px solid rgba(197, 160, 89, 0.22);
   }
 
+  .dark .portal-lab-brand:not(.portal-lab-brand--embedded) {
+    background: linear-gradient(
+      165deg,
+      hsl(25 22% 17%) 0%,
+      hsl(25 25% 13%) 55%,
+      hsl(25 25% 11%) 100%
+    );
+    border-bottom-color: rgba(197, 160, 89, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
   .portal-lab-brand-name {
     letter-spacing: -0.01em;
+  }
+
+  .dark .portal-lab-brand:not(.portal-lab-brand--embedded) .portal-lab-brand-name {
+    color: #FDFAF3;
+  }
+
+  .dark .portal-lab-brand:not(.portal-lab-brand--embedded) .portal-lab-brand-tag {
+    color: #D9C48A;
   }
 
   .portal-lab-brand-tag {
@@ -162,13 +181,63 @@
     border-bottom: none;
   }
 
+  .dark .portal-lab-brand--embedded .portal-lab-brand-name {
+    color: #FDFAF3;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .dark .portal-lab-brand--embedded .portal-lab-brand-tag {
+    color: #D9C48A;
+  }
+
+  .portal-lab-brand--embedded::after {
+    content: '';
+    display: block;
+    height: 1px;
+    margin: 0.65rem 1rem 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(197, 160, 89, 0.35) 20%,
+      rgba(197, 160, 89, 0.35) 80%,
+      transparent
+    );
+  }
+
   .portal-sidebar-brand {
-    @apply shrink-0 border-b border-primary-200/80 dark:border-primary-700;
+    @apply shrink-0 border-b border-primary-200/80 dark:border-primary-700/80;
     background: linear-gradient(180deg, hsl(var(--primary) / 0.06) 0%, hsl(var(--card)) 100%);
   }
 
   .dark .portal-sidebar-brand {
-    background: linear-gradient(180deg, hsl(25 25% 14%) 0%, hsl(var(--card)) 100%);
+    background:
+      radial-gradient(ellipse 130% 90% at 100% 0%, rgba(197, 160, 89, 0.14), transparent 55%),
+      linear-gradient(180deg, hsl(25 22% 16%) 0%, hsl(var(--card)) 100%);
+    border-bottom-color: rgba(197, 160, 89, 0.12);
+  }
+
+  .portal-sidebar-user-card {
+    @apply rounded-xl border border-primary-200/70 bg-primary-50/60 px-3 py-2.5;
+  }
+
+  .dark .portal-sidebar-user-card {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(197, 160, 89, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .portal-logo-mark--brand {
+    @apply bg-white shadow-sm ring-1 ring-black/5;
+  }
+
+  .dark .portal-logo-mark--brand {
+    box-shadow:
+      0 0 0 1px rgba(197, 160, 89, 0.28),
+      0 4px 14px rgba(0, 0, 0, 0.28);
+  }
+
+  .portal-lab-brand--no-divider::after {
+    display: none;
   }
 
   .premium-card {

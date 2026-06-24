@@ -135,11 +135,14 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
   const sidebar = (
     <div className="flex flex-col h-full bg-card">
       <div className="portal-sidebar-brand">
-        {isAr && <LabBrandLockup embedded />}
-        <div className={`px-4 pb-3 ${isAr ? 'pt-0' : 'pt-4'}`}>
-          {!isAr && <LabBrandLockup compact embedded className="!w-auto mb-3 rounded-xl overflow-hidden px-0" />}
-          <p className="text-xs font-semibold text-primary-800 dark:text-primary-100">{t('portal.title')}</p>
-          <p className="text-[11px] text-primary-400 truncate mt-0.5">{displayName}</p>
+        <LabBrandLockup embedded />
+        <div className="px-4 pb-4 pt-1">
+          <div className="portal-sidebar-user-card">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-500 dark:text-primary-400">
+              {t('portal.title')}
+            </p>
+            <p className="text-sm font-semibold text-foreground truncate mt-1">{displayName}</p>
+          </div>
         </div>
       </div>
 
@@ -191,7 +194,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 border-b border-border/80 shadow-header bg-card/85 backdrop-blur-md lg:bg-gradient-to-b lg:from-primary-50/70 lg:to-card/90 lg:dark:from-primary-900/90 lg:dark:to-card/90">
+        <header className="sticky top-0 z-20 border-b border-border/80 shadow-header bg-card/90 backdrop-blur-md lg:bg-gradient-to-b lg:from-primary-50/80 lg:to-card/95 lg:dark:from-[hsl(25_22%_16%)] lg:dark:to-card/95">
           <div className="px-4 py-3 flex items-center justify-between gap-3 max-w-[90rem] mx-auto w-full">
             <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setMenuOpen(true)}>
               <Menu size={20} />
@@ -241,7 +244,14 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
                 )}
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                {!isAr && <LabBrandLockup compact className="!w-auto max-w-[15rem] rounded-xl overflow-hidden shrink-0 hidden xl:block" />}
+                {!isAr && (
+                  <LabBrandLockup
+                    compact
+                    embedded
+                    noDivider
+                    className="!w-auto max-w-[15rem] shrink-0 hidden xl:block"
+                  />
+                )}
                 {searchBox}
                 <PortalNotifications />
               </div>

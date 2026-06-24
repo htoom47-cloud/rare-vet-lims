@@ -78,7 +78,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
     return (
       <div
         className={cn(
-          'relative shrink-0 flex items-center justify-center bg-white',
+          'portal-logo-mark--brand relative shrink-0 flex items-center justify-center bg-white',
           s.frame,
           s.radius,
           s.pad,
