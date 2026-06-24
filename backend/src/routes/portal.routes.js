@@ -40,6 +40,28 @@ router.get('/reports', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/animals', async (req, res, next) => {
+  try {
+    const data = await portalService.listAnimals(req.customer.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/animals/:animalId/compare', async (req, res, next) => {
+  try {
+    const reportIds = (req.query.reportIds || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const data = await portalService.getComparison(
+      req.customer.id,
+      req.params.animalId,
+      reportIds
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/reports/:id/preview', async (req, res, next) => {
   try {
     const data = await portalService.getReportPreview(req.params.id, req.customer.id);

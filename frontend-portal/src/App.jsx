@@ -3,9 +3,12 @@ import { Toaster } from 'react-hot-toast';
 import { PortalProvider } from './context/PortalContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedPortalRoute from './components/portal/ProtectedPortalRoute';
-import PwaInstallBanner from './components/portal/PwaInstallBanner';
 import PortalLogin from './pages/PortalLogin';
 import PortalReports from './pages/PortalReports';
+import PortalAnimals from './pages/PortalAnimals';
+import PortalAnimalDetail from './pages/PortalAnimalDetail';
+import PortalCompareHub from './pages/PortalCompareHub';
+import PortalAnimalCompare from './pages/PortalAnimalCompare';
 import PortalReportView from './pages/PortalReportView';
 
 export default function App() {
@@ -33,11 +36,14 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<PortalLogin />} />
             <Route path="/reports" element={<ProtectedPortalRoute><PortalReports /></ProtectedPortalRoute>} />
+            <Route path="/animals" element={<ProtectedPortalRoute><PortalAnimals /></ProtectedPortalRoute>} />
+            <Route path="/animals/:animalId" element={<ProtectedPortalRoute><PortalAnimalDetail /></ProtectedPortalRoute>} />
+            <Route path="/animals/:animalId/compare" element={<ProtectedPortalRoute><PortalAnimalCompare /></ProtectedPortalRoute>} />
+            <Route path="/compare" element={<ProtectedPortalRoute><PortalCompareHub /></ProtectedPortalRoute>} />
             <Route path="/reports/:id" element={<ProtectedPortalRoute><PortalReportView /></ProtectedPortalRoute>} />
             <Route path="/" element={<Navigate to="/reports" replace />} />
             <Route path="*" element={<Navigate to="/reports" replace />} />
           </Routes>
-          <PwaInstallBanner />
         </PortalProvider>
       </ThemeProvider>
     </BrowserRouter>

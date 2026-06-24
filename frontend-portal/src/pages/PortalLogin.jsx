@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { FadeIn } from '../components/motion/AnimatedPage';
+import PwaInstallBanner from '../components/portal/PwaInstallBanner';
 
 export default function PortalLogin() {
   const { t } = useTranslation();
@@ -162,6 +163,7 @@ export default function PortalLogin() {
           </Card>
         </m.div>
       </div>
+      <PwaInstallBanner />
     </div>
   );
 }

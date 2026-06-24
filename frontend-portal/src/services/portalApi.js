@@ -32,6 +32,13 @@ export const portalAuthAPI = {
   me: () => portalApi.get('/me'),
 };
 
+export const portalAnimalsAPI = {
+  list: () => portalApi.get('/animals'),
+  compare: (animalId, reportIds) => portalApi.get(`/animals/${animalId}/compare`, {
+    params: { reportIds: reportIds.join(',') },
+  }),
+};
+
 export const portalReportsAPI = {
   list: (params) => portalApi.get('/reports', { params }),
   getPreview: (id) => portalApi.get(`/reports/${id}/preview`),

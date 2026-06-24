@@ -199,31 +199,188 @@ const sanitizePortalPreview = (preview) => {
   };
 };
 
-const listReports = async (customerId, { page, limit }) => {
+const listReports = async (customerId, { page, limit, animalId }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
+
+  const filters = ['s.customer_id = $1'];
+  const params = [customerId];
+  if (animalId) {
+    params.push(animalId);
+    filters.push(`a.id = $${params.length}`);
+  }
+  const where = filters.join(' AND ');
 
   const countResult = await query(
     `SELECT COUNT(*) FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1`,
-    [customerId]
+     LEFT JOIN animals a ON s.animal_id = a.id
+     WHERE ${where}`,
+    params
   );
   const total = parseInt(countResult.rows[0].count, 10);
 
+  const listParams = [...params, l, offset];
   const result = await query(
     `SELECT r.id, r.report_number, r.pdf_url, r.language, r.is_final, r.created_at,
-            s.sample_code, s.status as sample_status,
+            s.sample_code, s.status as sample_status, s.animal_id,
             a.animal_code, a.animal_type, a.name_tag as animal_name
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE s.customer_id = $1
+     WHERE ${where}
      ORDER BY r.created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [customerId, l, offset]
+     LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+    listParams
   );
 
   return { data: result.rows, pagination: buildPagination(total, p, l) };
+};
+
+const assertAnimalOwnership = async (animalId, customerId) => {
+  const result = await query(
+    `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age, a.color
+     FROM animals a
+     WHERE a.id = $1 AND a.owner_id = $2 AND a.is_active = true`,
+    [animalId, customerId]
+  );
+  if (!result.rows[0]) throw new AppError('Animal not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
+const listAnimals = async (customerId) => {
+  const result = await query(
+    `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age,
+            COUNT(DISTINCT r.id)::int AS report_count,
+            MAX(r.created_at) AS latest_report_at
+     FROM animals a
+     JOIN samples s ON s.animal_id = a.id
+     JOIN reports r ON r.sample_id = s.id
+     WHERE a.owner_id = $1 AND a.is_active = true
+     GROUP BY a.id
+     ORDER BY latest_report_at DESC NULLS LAST, a.animal_code`,
+    [customerId]
+  );
+  return result.rows;
+};
+
+const getComparison = async (customerId, animalId, reportIds = []) => {
+  const animal = await assertAnimalOwnership(animalId, customerId);
+
+  let reportsQuery;
+  let reportsParams;
+  if (reportIds.length >= 2) {
+    reportsQuery = `
+      SELECT r.id, r.report_number, r.created_at, s.sample_code
+      FROM reports r
+      JOIN samples s ON r.sample_id = s.id
+      WHERE s.customer_id = $1 AND s.animal_id = $2 AND r.id = ANY($3::uuid[])
+      ORDER BY r.created_at ASC`;
+    reportsParams = [customerId, animalId, reportIds];
+  } else {
+    reportsQuery = `
+      SELECT r.id, r.report_number, r.created_at, s.sample_code
+      FROM reports r
+      JOIN samples s ON r.sample_id = s.id
+      WHERE s.customer_id = $1 AND s.animal_id = $2
+      ORDER BY r.created_at DESC
+      LIMIT 5`;
+    reportsParams = [customerId, animalId];
+  }
+
+  const reportsResult = await query(reportsQuery, reportsParams);
+  const reports = reportsResult.rows.sort(
+    (a, b) => new Date(a.created_at) - new Date(b.created_at)
+  );
+
+  if (reports.length < 2) {
+    throw new AppError('At least two reports are required for comparison', 400, 'NEED_MORE_REPORTS');
+  }
+
+  const previews = await Promise.all(
+    reports.map(async (row) => {
+      await assertReportOwnership(row.id, customerId);
+      const preview = await reportsService.getPreview(row.id);
+      return {
+        id: row.id,
+        reportNumber: row.report_number,
+        sampleCode: row.sample_code,
+        date: row.created_at,
+        results: sanitizePortalPreview(preview).results || [],
+      };
+    })
+  );
+
+  const paramMap = new Map();
+  for (const report of previews) {
+    for (const item of report.results) {
+      const key = item.code || item.nameEn;
+      if (!key) continue;
+      if (!paramMap.has(key)) {
+        paramMap.set(key, {
+          code: item.code,
+          nameAr: item.nameAr,
+          nameEn: item.nameEn,
+          unit: item.unit,
+          reference: item.reference,
+          values: {},
+        });
+      }
+      paramMap.get(key).values[report.id] = {
+        value: item.value,
+        numericValue: item.numericValue,
+        flag: item.flag,
+      };
+    }
+  }
+
+  const parameters = [...paramMap.values()]
+    .map((param) => {
+      const series = previews
+        .map((r) => param.values[r.id])
+        .filter(Boolean);
+      const nums = series
+        .map((v) => v.numericValue)
+        .filter((n) => n != null && !Number.isNaN(n));
+      let trend = null;
+      if (nums.length >= 2) {
+        const diff = nums[nums.length - 1] - nums[0];
+        if (Math.abs(diff) < 0.01) trend = 'stable';
+        else trend = diff > 0 ? 'up' : 'down';
+      }
+      return {
+        ...param,
+        values: previews.map((r) => ({
+          reportId: r.id,
+          reportNumber: r.reportNumber,
+          date: r.date,
+          ...(param.values[r.id] || { value: '—', numericValue: null, flag: null }),
+        })),
+        trend,
+        comparable: nums.length >= 2,
+      };
+    })
+    .filter((p) => p.values.some((v) => v.value && v.value !== '—'))
+    .sort((a, b) => (a.nameEn || '').localeCompare(b.nameEn || ''));
+
+  logPortalAccess(customerId, 'animal_compare', animalId);
+
+  return {
+    animal: {
+      id: animal.id,
+      code: animal.animal_code,
+      type: animal.animal_type,
+      name: animal.name_tag,
+      gender: animal.gender,
+      age: animal.age,
+    },
+    reports: previews.map((r) => ({
+      id: r.id,
+      reportNumber: r.reportNumber,
+      sampleCode: r.sampleCode,
+      date: r.date,
+    })),
+    parameters,
+  };
 };
 
 const getReportPreview = async (reportId, customerId) => {
@@ -250,6 +407,8 @@ module.exports = {
   requestOtp,
   verifyOtp,
   listReports,
+  listAnimals,
+  getComparison,
   getReportPreview,
   serveReportPdf,
 };
