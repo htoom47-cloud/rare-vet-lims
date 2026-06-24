@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, CreditCard, Download, Printer } from 'lucide-react';
+import { Plus, CreditCard, Download, Printer, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -199,9 +200,14 @@ export default function Billing() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t('billing.title')}</h1>
-        <button onClick={() => setInvoiceModal(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={18} /> {t('billing.invoice')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/accounting" className="btn-secondary flex items-center gap-2">
+            <BarChart3 size={18} /> {t('nav.accounting')}
+          </Link>
+          <button onClick={() => setInvoiceModal(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> {t('billing.invoice')}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-6">

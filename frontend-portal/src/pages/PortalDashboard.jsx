@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   PawPrint, FileText, Bell, AlertTriangle, ChevronLeft, ChevronRight,
-  Activity, CheckCircle2,
+  Activity, CheckCircle2, Receipt,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
@@ -56,6 +56,13 @@ export default function PortalDashboard() {
             {customerName ? `${t('portal.welcomeBack')}, ${customerName}` : t('portal.dashboard')}
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">{t('portal.dashboardHint')}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/invoices')}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 hover:underline"
+          >
+            <Receipt size={14} /> {t('portal.myInvoices')}
+          </button>
         </div>
 
         {loading && (

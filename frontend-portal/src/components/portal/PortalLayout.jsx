@@ -227,7 +227,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
 
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border/80 bg-card/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around px-1 py-1.5">
-            {navItems.slice(0, 5).map(({ to, icon: Icon, label, end }) => (
+            {navItems.slice(0, 6).map(({ to, icon: Icon, label, end }) => (
               <NavLink
                 key={to}
                 to={to}
