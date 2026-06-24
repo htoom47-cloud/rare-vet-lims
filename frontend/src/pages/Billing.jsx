@@ -201,6 +201,16 @@ export default function Billing() {
 
   return (
     <div>
+      <div className="mb-6 card p-4 border-primary-200 bg-primary-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-primary-800">{t('accounting.billingHintTitle')}</p>
+          <p className="text-sm text-primary-600">{t('accounting.billingHintBody')}</p>
+        </div>
+        <Link to="/accounting" className="btn-primary flex items-center gap-2 shrink-0">
+          <BarChart3 size={18} /> {t('accounting.openModule')}
+        </Link>
+      </div>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t('billing.title')}</h1>
         <div className="flex flex-wrap items-center gap-2">

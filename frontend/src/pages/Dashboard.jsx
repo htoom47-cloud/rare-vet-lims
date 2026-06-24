@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { m } from 'framer-motion';
-import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt } from 'lucide-react';
+import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt, BarChart3, CreditCard } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import StatCard from '../components/ui/StatCard';
 import PageHeader from '../components/ui/PageHeader';
@@ -49,7 +49,7 @@ export default function Dashboard() {
       <div>
         <PageHeader title={t('nav.dashboard')} subtitle={t('dashboard.labOverview')} />
         <m.div
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
           variants={staggerContainer}
           initial="hidden"
           animate="show"
@@ -64,6 +64,37 @@ export default function Dashboard() {
             <StatCard title={t('dashboard.critical')} value={stats?.critical_alerts || 0} icon={AlertTriangle} color="red" />
           </m.div>
         </m.div>
+
+        {hasPermission('billing.view') && (
+          <m.div
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="border-primary-200/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/accounting')}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center shrink-0">
+                  <BarChart3 size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold">{t('accounting.titleFull')}</p>
+                  <p className="text-sm text-muted-foreground">{t('accounting.subtitle')}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-primary-200/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/billing')}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-600 text-white flex items-center justify-center shrink-0">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold">{t('nav.billing')}</p>
+                  <p className="text-sm text-muted-foreground">{t('billing.title')}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </m.div>
+        )}
       </div>
     );
   }
@@ -90,11 +121,27 @@ export default function Dashboard() {
 
       {hasPermission('billing.view') && (
         <m.div
-          className="mb-6"
+          className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.1 }}
         >
+          <Card className="border-primary-200/80 bg-gradient-to-br from-primary-50/80 to-white dark:from-primary-950/40 dark:to-card cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/accounting')}>
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center shrink-0">
+                  <BarChart3 size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">{t('accounting.titleFull')}</p>
+                  <p className="text-sm text-muted-foreground">{t('accounting.subtitle')}</p>
+                </div>
+              </div>
+              <button type="button" onClick={(e) => { e.stopPropagation(); navigate('/accounting'); }} className="btn-primary shrink-0">
+                {t('accounting.openModule')}
+              </button>
+            </CardContent>
+          </Card>
           <Card className="border-primary-200/80 bg-gradient-to-br from-primary-50/80 to-white dark:from-primary-950/40 dark:to-card">
             <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
