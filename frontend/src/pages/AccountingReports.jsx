@@ -36,6 +36,7 @@ export default function AccountingReports() {
   const [reportTab, setReportTab] = useState('collections');
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState(null);
+  const [dayClosed, setDayClosed] = useState(false);
 
   const [invoices, setInvoices] = useState([]);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
@@ -76,6 +77,15 @@ export default function AccountingReports() {
       setDashboard(data.data);
     } catch {
       /* optional */
+    }
+  }, []);
+
+  const loadDayStatus = useCallback(async () => {
+    try {
+      const { data } = await billingAPI.dailyClosing({ date: today() });
+      setDayClosed(!!data.data?.is_closed);
+    } catch {
+      setDayClosed(false);
     }
   }, []);
 
@@ -144,7 +154,7 @@ export default function AccountingReports() {
     }
   }, [reportTab, closingDate, reportRange, t]);
 
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { loadDashboard(); loadDayStatus(); }, [loadDashboard, loadDayStatus]);
   useEffect(() => { if (mainTab === 'invoices') loadInvoices(); }, [mainTab, loadInvoices]);
   useEffect(() => { if (mainTab === 'closing') loadClosing(); }, [mainTab, loadClosing, closingDate]);
   useEffect(() => { if (mainTab === 'reports') loadReports(); }, [mainTab, loadReports, reportTab, closingDate, reportRange]);
@@ -183,6 +193,8 @@ export default function AccountingReports() {
       setPaymentModal(false);
       loadInvoices();
       loadDashboard();
+      loadDayStatus();
+      loadDayStatus();
       if (detailInvoice?.id === selectedInvoice.id) openDetail(selectedInvoice);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('accounting.loadFailed'));
@@ -201,6 +213,8 @@ export default function AccountingReports() {
       setRefundModal(false);
       loadInvoices();
       loadDashboard();
+      loadDayStatus();
+      loadDayStatus();
       if (detailInvoice?.id === selectedInvoice.id) openDetail(selectedInvoice);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('accounting.loadFailed'));
@@ -215,6 +229,8 @@ export default function AccountingReports() {
       toast.success(t('accounting.cancelDone'));
       loadInvoices();
       loadDashboard();
+      loadDayStatus();
+      loadDayStatus();
       if (detailInvoice?.id === invoice.id) setDetailInvoice(null);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('accounting.loadFailed'));
@@ -259,6 +275,8 @@ export default function AccountingReports() {
       toast.success(t('accounting.dayClosed'));
       loadClosing();
       loadDashboard();
+      loadDayStatus();
+      loadDayStatus();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('accounting.loadFailed'));
     }
@@ -270,6 +288,7 @@ export default function AccountingReports() {
       await billingAPI.reopenDay(closingDate);
       toast.success(t('accounting.dayReopened'));
       loadClosing();
+      loadDayStatus();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('accounting.loadFailed'));
     }
@@ -337,6 +356,17 @@ export default function AccountingReports() {
           <SummaryCard key={c.label} {...c} />
         ))}
       </div>
+
+      {dayClosed && (
+        <div className="card p-4 border-amber-300 bg-amber-50 text-amber-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p>{t('accounting.dayClosedWarning')}</p>
+          {canReopenDay && (
+            <button type="button" onClick={handleReopenDay} className="btn-secondary text-amber-800 shrink-0">
+              {t('accounting.reopenDay')}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b pb-2">
         {mainTabs.map(({ id, icon: Icon, label }) => (
