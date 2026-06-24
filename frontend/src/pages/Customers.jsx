@@ -1,24 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route, Receipt, CreditCard } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/ui/StatusBadge';
 import { customersAPI, billingAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
+const emptyForm = () => ({
+  full_name: '', full_name_ar: '', mobile: '', city: '', farm_company: '', notes: '', credit_limit: 0,
+});
 
 export default function Customers() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('customers.update');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ full_name: '', mobile: '', city: '', farm_company: '', notes: '', credit_limit: 0 });
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm());
 
   const load = () => {
     setLoading(true);
@@ -33,21 +40,46 @@ export default function Customers() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setModalOpen(true);
+  };
+
+  const openEdit = (customer) => {
+    setEditingId(customer.id);
+    setForm({
+      full_name: customer.full_name || '',
+      full_name_ar: customer.full_name_ar || '',
+      mobile: customer.mobile || '',
+      city: customer.city || '',
+      farm_company: customer.farm_company || '',
+      notes: customer.notes || '',
+      credit_limit: customer.credit_limit ?? 0,
+    });
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (selected?.id) {
-        await customersAPI.update(selected.id, form);
-        toast.success('Customer updated');
+      if (editingId) {
+        await customersAPI.update(editingId, form);
+        toast.success(t('customers.updated'));
+        if (profileOpen && selected?.id === editingId) {
+          const { data } = await customersAPI.get(editingId);
+          setSelected(data.data);
+        }
       } else {
         await customersAPI.create(form);
-        toast.success('Customer created');
+        toast.success(t('customers.created'));
       }
       setModalOpen(false);
-      setForm({ full_name: '', mobile: '', city: '', farm_company: '', notes: '', credit_limit: 0 });
+      setEditingId(null);
+      setForm(emptyForm());
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
+      toast.error(err.response?.data?.error?.message || t('common.error'));
     }
   };
 
@@ -65,7 +97,14 @@ export default function Customers() {
     { key: 'account_balance', label: t('customers.balance'), render: (r) => `SAR ${parseFloat(r.account_balance).toFixed(2)}` },
     { key: 'animal_count', label: 'Animals' },
     { key: 'actions', label: t('common.actions'), render: (r) => (
-      <button onClick={(e) => { e.stopPropagation(); viewProfile(r); }} className="text-primary-600 text-sm hover:underline">{t('common.view')}</button>
+      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={() => viewProfile(r)} className="text-primary-600 text-sm hover:underline">{t('common.view')}</button>
+        {canEdit && (
+          <button type="button" onClick={() => openEdit(r)} className="text-primary-600 text-sm hover:underline flex items-center gap-1">
+            <Pencil size={14} /> {t('common.edit')}
+          </button>
+        )}
+      </div>
     )},
   ];
 
@@ -84,7 +123,7 @@ export default function Customers() {
               className="input-field ps-10"
             />
           </div>
-          <button onClick={() => { setSelected(null); setModalOpen(true); }} className="btn-primary flex items-center gap-2">
+          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> {t('common.add')}
           </button>
         </div>
@@ -92,20 +131,44 @@ export default function Customers() {
 
       <DataTable columns={columns} data={customers} loading={loading} onRowClick={viewProfile} />
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={t('common.add')}>
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => { setModalOpen(false); setEditingId(null); setForm(emptyForm()); }}
+        title={editingId ? t('customers.editCustomer') : t('customers.addCustomer')}
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {['full_name', 'mobile', 'city', 'farm_company'].map((field) => (
-            <div key={field}>
-              <label className="block text-sm font-medium mb-1">{t(`customers.${field === 'farm_company' ? 'farm' : field === 'full_name' ? 'fullName' : field}`)}</label>
-              <input value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} className="input-field" required={field === 'full_name' || field === 'mobile'} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.fullName')}</label>
+              <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="input-field" required />
             </div>
-          ))}
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.fullNameAr')}</label>
+              <input value={form.full_name_ar} onChange={(e) => setForm({ ...form, full_name_ar: e.target.value })} className="input-field" dir="rtl" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.mobile')}</label>
+              <input type="tel" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} className="input-field" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.city')}</label>
+              <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.farm')}</label>
+              <input value={form.farm_company} onChange={(e) => setForm({ ...form, farm_company: e.target.value })} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.creditLimit')}</label>
+              <input type="number" min="0" step="0.01" value={form.credit_limit} onChange={(e) => setForm({ ...form, credit_limit: e.target.value })} className="input-field" />
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('common.notes')}</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field" rows={2} />
           </div>
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="button" onClick={() => { setModalOpen(false); setEditingId(null); }} className="btn-secondary">{t('common.cancel')}</button>
             <button type="submit" className="btn-primary">{t('common.save')}</button>
           </div>
         </form>
@@ -114,12 +177,27 @@ export default function Customers() {
       <Modal isOpen={profileOpen} onClose={() => setProfileOpen(false)} title={selected?.full_name} size="lg">
         {selected && (
           <div className="space-y-4">
+            {canEdit && (
+              <div className="flex justify-end">
+                <button type="button" onClick={() => openEdit(selected)} className="btn-secondary flex items-center gap-2 text-sm">
+                  <Pencil size={16} /> {t('customers.editCustomer')}
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><span className="text-gray-500">{t('customers.fullName')}:</span> {selected.full_name}</div>
+              {selected.full_name_ar && (
+                <div><span className="text-gray-500">{t('customers.fullNameAr')}:</span> {selected.full_name_ar}</div>
+              )}
               <div><span className="text-gray-500">{t('customers.mobile')}:</span> {selected.mobile}</div>
-              <div><span className="text-gray-500">{t('customers.city')}:</span> {selected.city}</div>
-              <div><span className="text-gray-500">{t('customers.balance')}:</span> SAR {parseFloat(selected.account_balance).toFixed(2)}</div>
-              <div><span className="text-gray-500">Credit Limit:</span> SAR {parseFloat(selected.credit_limit).toFixed(2)}</div>
+              <div><span className="text-gray-500">{t('customers.city')}:</span> {selected.city || '—'}</div>
+              <div><span className="text-gray-500">{t('customers.farm')}:</span> {selected.farm_company || '—'}</div>
+              <div><span className="text-gray-500">{t('customers.balance')}:</span> {fmt(selected.account_balance)}</div>
+              <div><span className="text-gray-500">{t('customers.creditLimit')}:</span> {fmt(selected.credit_limit)}</div>
             </div>
+            {selected.notes && (
+              <div className="text-sm"><span className="text-gray-500">{t('common.notes')}:</span> {selected.notes}</div>
+            )}
             <h4 className="font-semibold">{t('customers.financialStatement')}</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {[
