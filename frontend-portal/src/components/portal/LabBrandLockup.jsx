@@ -21,6 +21,7 @@ export default function LabBrandLockup({ compact = false, embedded = false, clas
           <p
             className={cn(
               'portal-lab-brand-name font-bold text-primary-800',
+              embedded && 'dark:text-primary-50',
               compact ? 'text-[11px] sm:text-xs' : 'text-[13px] sm:text-sm'
             )}
           >
@@ -29,6 +30,7 @@ export default function LabBrandLockup({ compact = false, embedded = false, clas
           <p
             className={cn(
               'portal-lab-brand-tag text-primary-400 font-medium',
+              embedded && 'dark:text-primary-300',
               compact ? 'text-[9px] sm:text-[10px] mt-0.5' : 'text-[10px] sm:text-[11px] mt-0.5'
             )}
           >
