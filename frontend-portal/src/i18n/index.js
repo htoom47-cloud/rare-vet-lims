@@ -6,6 +6,8 @@ const resources = {
     translation: {
       portal: {
         title: 'Client Portal',
+        labName: 'Rare Veterinary Care Center',
+        labTagline: 'Veterinary Medical & Research Laboratory',
         subtitle: 'View your laboratory reports',
         signIn: 'Sign in with mobile',
         mobileHint: 'Enter the mobile number registered with the laboratory',
@@ -137,6 +139,8 @@ const resources = {
     translation: {
       portal: {
         title: 'بوابة العميل',
+        labName: 'مركز رعاية النوادر البيطري',
+        labTagline: 'للتحاليل الطبية والبحثية البيطرية',
         subtitle: 'اطّلع على تقاريرك المخبرية',
         signIn: 'الدخول برقم الجوال',
         mobileHint: 'أدخل رقم الجوال المسجل لدى المختبر',

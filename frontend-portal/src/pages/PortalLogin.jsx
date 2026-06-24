@@ -6,7 +6,7 @@ import { m } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { usePortal } from '../context/PortalContext';
 import { useTheme } from '../context/ThemeContext';
-import AppLogo from '../components/ui/AppLogo';
+import LabBrandLockup from '../components/portal/LabBrandLockup';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -83,8 +83,8 @@ export default function PortalLogin() {
 
       <div className="w-full max-w-md relative z-10">
         <FadeIn className="text-center mb-8">
-          <AppLogo size="lg" variant="light" className="mx-auto mb-5" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('portal.title')}</h1>
+          <LabBrandLockup className="max-w-sm mx-auto rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.08)]" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mt-6">{t('portal.title')}</h1>
           <p className="text-muted-foreground font-medium mt-2 text-sm sm:text-base">{t('portal.subtitle')}</p>
         </FadeIn>
 

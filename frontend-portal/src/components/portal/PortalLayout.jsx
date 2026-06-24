@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { usePortal } from '../../context/PortalContext';
 import { useTheme } from '../../context/ThemeContext';
-import AppLogo from '../ui/AppLogo';
+import LabBrandLockup from './LabBrandLockup';
 import { Button } from '../ui/button';
 import PwaInstallBanner from './PwaInstallBanner';
 import { portalSearchAPI } from '../../services/portalApi';
@@ -73,7 +73,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
 
   const searchBox = (
     <div className="relative" ref={searchRef}>
-      <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 text-[#6B7280] pointer-events-none" />
+      <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 portal-shell-muted pointer-events-none" />
       <input
         type="search"
         className="portal-search-input h-9 ps-9 text-sm w-full lg:w-64 rounded-xl outline-none focus:ring-2 focus:ring-[#2563EB]/40"
@@ -124,15 +124,13 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
   );
 
   const sidebar = (
-    <div className="flex flex-col h-full portal-sidebar text-[#9CA3AF]">
-      <div className="p-4 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <AppLogo size="sm" variant="portal" />
-          <div className="min-w-0 flex-1">
-            <p className="portal-brand-title font-bold text-sm truncate leading-tight">{t('portal.title')}</p>
-            <p className="portal-brand-sub text-[11px] truncate mt-0.5">{displayName}</p>
-          </div>
-        </div>
+    <div className="flex flex-col h-full portal-sidebar">
+      {isAr && <LabBrandLockup />}
+
+      <div className={`px-4 py-2.5 border-b portal-shell-border ${isAr ? '' : 'pt-4'}`}>
+        {!isAr && <LabBrandLockup compact className="!w-auto mb-3 rounded-xl overflow-hidden" />}
+        <p className="portal-brand-title text-xs font-semibold">{t('portal.title')}</p>
+        <p className="portal-brand-sub text-[11px] truncate mt-0.5">{displayName}</p>
       </div>
 
       <div className="p-3 hidden lg:block">{searchBox}</div>
@@ -152,11 +150,11 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
         ))}
       </nav>
 
-      <div className="p-3 border-t border-white/10 space-y-1">
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-[#9CA3AF] hover:text-white hover:bg-white/10" onClick={toggleLanguage}>
+      <div className="p-3 border-t portal-shell-border space-y-1">
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 portal-sidebar-action" onClick={toggleLanguage}>
           <Globe size={18} /> {isAr ? 'English' : 'العربية'}
         </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-[#9CA3AF] hover:text-white hover:bg-white/10" onClick={toggleTheme}>
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 portal-sidebar-action" onClick={toggleTheme}>
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           {theme === 'dark' ? t('portal.lightMode') : t('portal.darkMode')}
         </Button>
@@ -169,7 +167,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
 
   return (
     <div className="min-h-screen bg-background portal-app flex" dir={isAr ? 'rtl' : 'ltr'}>
-      <aside className="hidden lg:flex w-72 shrink-0 border-e border-white/10 portal-sidebar sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-72 shrink-0 border-e portal-shell-border portal-sidebar sticky top-0 h-screen">
         {sidebar}
       </aside>
 
@@ -185,23 +183,27 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-20 border-b portal-header">
           <div className="px-4 py-3 flex items-center justify-between gap-3 max-w-[90rem] mx-auto w-full">
-            <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0 text-[#E5E7EB] hover:bg-white/10" onClick={() => setMenuOpen(true)}>
+            <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0 portal-header-action" onClick={() => setMenuOpen(true)}>
               <Menu size={20} />
             </Button>
-            <div className="min-w-0 flex-1 lg:hidden">
-              <p className="portal-header-title font-semibold text-sm truncate">{title || t('portal.title')}</p>
+            <div className="min-w-0 flex-1 lg:hidden flex justify-end">
+              {isAr && <LabBrandLockup compact className="!w-auto max-w-[13.5rem] rounded-lg overflow-hidden" />}
+              {!isAr && (
+                <p className="portal-header-title font-semibold text-sm truncate">{title || t('portal.title')}</p>
+              )}
             </div>
             <div className="hidden lg:flex items-center gap-4 flex-1">
               <div className="min-w-0">
                 {title && <h1 className="portal-header-title text-lg font-bold truncate">{title}</h1>}
-                {subtitle && <p className="text-xs text-[#9CA3AF] truncate">{subtitle}</p>}
+                {subtitle && <p className="text-xs portal-header-subtitle truncate">{subtitle}</p>}
               </div>
               <div className="ms-auto flex items-center gap-3">
+                {!isAr && <LabBrandLockup compact className="!w-auto max-w-[15rem] rounded-xl overflow-hidden shrink-0" />}
                 {searchBox}
                 {alertCount > 0 && (
                   <button
                     type="button"
-                    className="relative p-2 rounded-xl hover:bg-white/10 text-[#E5E7EB]"
+                    className="relative p-2 rounded-xl portal-header-action"
                     onClick={() => navigate('/')}
                     aria-label={t('portal.notifications')}
                   >
