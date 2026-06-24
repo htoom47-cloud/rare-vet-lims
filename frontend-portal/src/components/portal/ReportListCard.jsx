@@ -54,7 +54,7 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
     return (
       <button
         type="button"
-        className="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-start border border-slate-200/80 bg-white"
+        className="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:-translate-y-0.5 transition-all text-start premium-card premium-card-interactive"
         onClick={() => navigate(`/reports/${report.id}`)}
       >
         <div className="min-w-0">
@@ -73,7 +73,7 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow border-slate-200/80 bg-white">
+    <Card className="portal-report-card hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all border-[#E5E7EB] bg-white">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">

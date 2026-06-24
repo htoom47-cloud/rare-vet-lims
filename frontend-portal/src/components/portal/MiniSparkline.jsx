@@ -1,6 +1,6 @@
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
-export default function MiniSparkline({ points, color = '#C5A059', height = 44 }) {
+export default function MiniSparkline({ points, color = '#2563EB', height = 44 }) {
   const data = (points || [])
     .filter((p) => p.numericValue != null)
     .map((p, i) => ({ i, v: p.numericValue }));

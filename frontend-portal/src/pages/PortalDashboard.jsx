@@ -48,18 +48,18 @@ export default function PortalDashboard() {
   return (
     <PortalLayout compact alertCount={data?.alerts?.length || 0} wide>
       <div className="med-page space-y-3">
-        <div className="med-hero rounded-xl border border-slate-200/80 bg-white shadow-sm px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        <div className="med-hero premium-card px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
             {t('portal.dashboard')}
           </p>
-          <h1 className="text-xl font-bold text-slate-900 mt-0.5">
+          <h1 className="text-xl font-bold text-[#111827] mt-0.5">
             {customerName ? `${t('portal.welcomeBack')}, ${customerName}` : t('portal.dashboard')}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">{t('portal.dashboardHint')}</p>
+          <p className="text-xs text-[#6B7280] mt-0.5">{t('portal.dashboardHint')}</p>
         </div>
 
         {loading && (
-          <div className="text-center py-10 text-slate-500 text-sm">{t('common.loading')}</div>
+          <div className="text-center py-10 med-loading text-sm">{t('common.loading')}</div>
         )}
 
         {!loading && data && (
@@ -83,22 +83,22 @@ export default function PortalDashboard() {
             )}
 
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-              <KpiCard compact icon={PawPrint} label={t('portal.statAnimals')} value={data.stats.animalCount} accent="primary" />
-              <KpiCard compact icon={FileText} label={t('portal.statReports')} value={data.stats.reportCount} accent="info" />
-              <KpiCard compact icon={Bell} label={t('portal.statNew')} value={data.stats.newReports7d} accent="success" />
+              <KpiCard compact icon={PawPrint} label={t('portal.statAnimals')} value={data.stats.animalCount} accent="purple" />
+              <KpiCard compact icon={FileText} label={t('portal.statReports')} value={data.stats.reportCount} accent="blue" />
+              <KpiCard compact icon={Bell} label={t('portal.statNew')} value={data.stats.newReports7d} accent="green" />
               <KpiCard
                 compact
                 icon={AlertTriangle}
                 label={t('portal.kpiAbnormal')}
                 value={data.stats.abnormalResults ?? 0}
-                accent={(data.stats.abnormalResults ?? 0) > 0 ? 'danger' : 'default'}
+                accent={(data.stats.abnormalResults ?? 0) > 0 ? 'red' : 'neutral'}
               />
               <KpiCard
                 compact
                 icon={Activity}
                 label={t('portal.kpiFollowUp')}
                 value={data.stats.animalsNeedingFollowUp ?? 0}
-                accent={(data.stats.animalsNeedingFollowUp ?? 0) > 0 ? 'warning' : 'default'}
+                accent={(data.stats.animalsNeedingFollowUp ?? 0) > 0 ? 'orange' : 'neutral'}
               />
             </div>
 
@@ -108,7 +108,7 @@ export default function PortalDashboard() {
                   <h2 className="med-section-title mb-0">{t('portal.myAnimals')}</h2>
                   <button
                     type="button"
-                    className="text-xs text-[#302419] font-semibold flex items-center gap-0.5 hover:underline"
+                    className="text-xs text-[#2563EB] font-semibold flex items-center gap-0.5 hover:underline"
                     onClick={() => navigate('/animals')}
                   >
                     {t('portal.viewAll')} <Chevron size={14} />
@@ -123,7 +123,7 @@ export default function PortalDashboard() {
                       <button
                         key={animal.id}
                         type="button"
-                        className="med-animal-tile text-start rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm hover:shadow-md hover:border-[#C5A059]/40 transition-all"
+                        className="med-animal-tile text-start rounded-xl p-3"
                         onClick={() => navigate(`/animals/${animal.id}`)}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -178,7 +178,7 @@ export default function PortalDashboard() {
                   <h2 className="med-section-title mb-0">{t('portal.recentReports')}</h2>
                   <button
                     type="button"
-                    className="text-xs text-[#302419] font-semibold hover:underline"
+                    className="text-xs text-[#2563EB] font-semibold hover:underline"
                     onClick={() => navigate('/reports')}
                   >
                     {t('portal.viewAll')}
@@ -195,8 +195,8 @@ export default function PortalDashboard() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50/80 text-start"
                         onClick={() => navigate(`/reports/${report.id}`)}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-[#302419]/5 flex items-center justify-center shrink-0">
-                          <FileText size={14} className="text-[#302419]" />
+                        <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 flex items-center justify-center shrink-0">
+                          <FileText size={14} className="text-[#2563EB]" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className={`font-bold text-slate-900 truncate ${report.animal_name ? 'text-sm' : 'text-xs font-mono'}`}>

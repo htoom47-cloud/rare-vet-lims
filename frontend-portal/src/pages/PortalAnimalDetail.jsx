@@ -79,13 +79,13 @@ export default function PortalAnimalDetail() {
     <PortalLayout compact wide>
       <div className="med-page space-y-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-slate-600" onClick={() => navigate('/animals')}>
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-[#D1D5DB] hover:text-white hover:bg-white/10" onClick={() => navigate('/animals')}>
             <BackIcon size={15} /> {t('labReport.back')}
           </Button>
         </div>
 
         {loading && (
-          <div className="text-center py-10 text-slate-500 text-sm">{t('common.loading')}</div>
+          <div className="text-center py-10 med-loading text-sm">{t('common.loading')}</div>
         )}
 
         {!loading && dashboard && (
@@ -101,37 +101,10 @@ export default function PortalAnimalDetail() {
             />
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              <KpiCard
-                compact
-                icon={FileText}
-                label={t('portal.testsCount')}
-                value={kpis?.reportCount ?? 0}
-                accent="primary"
-              />
-              <KpiCard
-                compact
-                icon={CheckCircle2}
-                label={t('portal.kpiNormal')}
-                value={kpis?.normalCount ?? 0}
-                accent="success"
-                hint={t('portal.kpiLatestReport')}
-              />
-              <KpiCard
-                compact
-                icon={AlertTriangle}
-                label={t('portal.kpiAbnormal')}
-                value={kpis?.abnormalCount ?? 0}
-                accent={kpis?.abnormalCount > 0 ? 'danger' : 'default'}
-                hint={t('portal.outOfRangeShort')}
-              />
-              <KpiCard
-                compact
-                icon={Activity}
-                label={t('portal.kpiPanels')}
-                value={`${kpis?.panelsOk ?? 0}/${dashboard.panels?.filter((p) => p.status !== 'none').length || 0}`}
-                accent={kpis?.panelsAlert > 0 ? 'warning' : 'success'}
-                hint={t('portal.kpiPanelsHint')}
-              />
+              <KpiCard compact icon={FileText} label={t('portal.testsCount')} value={kpis?.reportCount ?? 0} accent="purple" />
+              <KpiCard compact icon={CheckCircle2} label={t('portal.kpiNormal')} value={kpis?.normalCount ?? 0} accent="green" hint={t('portal.kpiLatestReport')} />
+              <KpiCard compact icon={AlertTriangle} label={t('portal.kpiAbnormal')} value={kpis?.abnormalCount ?? 0} accent={kpis?.abnormalCount > 0 ? 'red' : 'neutral'} hint={t('portal.outOfRangeShort')} />
+              <KpiCard compact icon={Activity} label={t('portal.kpiPanels')} value={`${kpis?.panelsOk ?? 0}/${dashboard.panels?.filter((p) => p.status !== 'none').length || 0}`} accent={kpis?.panelsAlert > 0 ? 'orange' : 'blue'} hint={t('portal.kpiPanelsHint')} />
             </div>
 
             <section className="med-section">
@@ -149,7 +122,7 @@ export default function PortalAnimalDetail() {
                   <section className="med-section-card p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <h2 className="med-section-title mb-0 flex items-center gap-1.5">
-                        <TrendingUp size={16} className="text-[#C5A059]" />
+                        <TrendingUp size={16} className="text-[#2563EB]" />
                         {t('portal.trendChart')}
                       </h2>
                       <select
@@ -174,13 +147,13 @@ export default function PortalAnimalDetail() {
                       const p = dashboard.keyParameters?.find((x) => x.code === code);
                       const data = sparklines[code];
                       const name = p ? (isAr ? p.nameAr : p.nameEn) : code;
-                      const color = p?.latestFlag && !['NORMAL', 'NEG'].includes(p.latestFlag) ? '#e11d48' : '#C5A059';
+                      const color = p?.latestFlag && !['NORMAL', 'NEG'].includes(p.latestFlag) ? '#EF4444' : '#2563EB';
                       return (
                         <button
                           key={code}
                           type="button"
-                          className={`med-spark-card text-start p-2.5 rounded-xl border bg-white shadow-sm transition-all ${
-                            selectedParam === code ? 'border-[#C5A059] ring-1 ring-[#C5A059]/30' : 'border-slate-200/80'
+                          className={`med-spark-card text-start p-2.5 rounded-xl transition-all ${
+                            selectedParam === code ? 'border-[#2563EB] ring-2 ring-[#2563EB]/25' : ''
                           }`}
                           onClick={() => setSelectedParam(code)}
                         >
@@ -211,7 +184,7 @@ export default function PortalAnimalDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full mt-2 h-8 text-xs text-[#302419]"
+                        className="w-full mt-2 h-8 text-xs text-[#2563EB]"
                         onClick={() => navigate(`/animals/${animalId}/compare`)}
                       >
                         {t('portal.viewAllCompare')}

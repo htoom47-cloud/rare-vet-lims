@@ -143,100 +143,269 @@
     @apply hover:bg-accent/40 transition-colors duration-150;
   }
 
-  /* Portal — medical dashboard */
+  /* Portal — High Contrast Premium Dashboard */
   .portal-app {
-    background-color: #f4f6f9;
-    background-image:
-      radial-gradient(ellipse 70% 40% at 50% 0%, rgba(197, 160, 89, 0.06), transparent);
+    --portal-bg: #0A1020;
+    --portal-bg-secondary: #111827;
+    --portal-sidebar: #08111F;
+    --portal-card: #FFFFFF;
+    --portal-text: #111827;
+    --portal-text-muted: #6B7280;
+    --portal-primary: #2563EB;
+    --portal-accent: #8B5CF6;
+    --portal-success: #10B981;
+    --portal-warning: #F59E0B;
+    --portal-danger: #EF4444;
+    --portal-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    --portal-card-shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(180deg, #08111F 0%, #0A1020 100%);
+    color: #E5E7EB;
   }
 
   .portal-sidebar {
-    background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.95) 100%);
+    background: #08111F;
+    border-color: rgba(255, 255, 255, 0.06);
   }
 
-  .portal-stat-card {
-    @apply border-border/60 shadow-sm hover:shadow-md transition-shadow;
+  .portal-sidebar .portal-brand-title {
+    color: #F9FAFB;
   }
 
-  .portal-profile-card {
-    @apply shadow-md border-primary/10;
+  .portal-sidebar .portal-brand-sub {
+    color: #9CA3AF;
   }
 
-  .portal-profile-banner {
-    background: linear-gradient(90deg, hsl(25 28% 22%), hsl(38 45% 45%), hsl(25 28% 22%));
+  .portal-header {
+    background: #111827;
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
-  .portal-farm-badge {
-    @apply shrink-0;
+  .portal-header .portal-header-title {
+    color: #F9FAFB;
   }
 
-  .portal-health-card {
-    @apply border-border/60;
+  .portal-bottom-nav {
+    background: #111827;
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
-  .portal-health-card-alert {
-    @apply border-rose-500/30;
+  .portal-search-input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #F3F4F6;
   }
 
-  .portal-chart-card {
-    @apply border-border/60 shadow-sm;
+  .portal-search-input::placeholder {
+    color: #6B7280;
   }
 
-  .portal-insight-card {
-    @apply shadow-md;
+  .portal-nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
+    color: #9CA3AF;
   }
 
-  .portal-alert {
-    @apply border;
+  .portal-nav-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #F3F4F6;
   }
 
-  .portal-alert-info {
-    @apply bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200;
+  .portal-nav-item-active {
+    background: rgba(37, 99, 235, 0.18);
+    color: #FFFFFF;
+    box-shadow: inset 3px 0 0 0 #2563EB;
   }
 
-  .portal-alert-critical {
-    @apply bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200;
+  [dir="rtl"] .portal-nav-item-active {
+    box-shadow: inset -3px 0 0 0 #2563EB;
   }
 
-  .portal-animal-card {
-    @apply border-border/60 hover:border-primary/30;
+  .portal-nav-bottom-active {
+    color: #2563EB !important;
   }
 
-  .portal-doc-card {
-    @apply hover:shadow-lg transition-shadow border-border/60;
+  .portal-nav-bottom {
+    color: #6B7280;
   }
 
-  .portal-before-after .portal-ba-col {
-    @apply transition-colors;
+  .premium-card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    box-shadow: var(--portal-card-shadow);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
   }
 
-  /* Medical dashboard — IDEXX-style dense layout */
+  .premium-card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--portal-card-shadow-hover);
+  }
+
   .med-page {
-    @apply text-slate-800;
+    color: #D1D5DB;
+  }
+
+  .med-page .med-loading {
+    color: #9CA3AF;
   }
 
   .med-section-title {
-    @apply text-xs font-bold uppercase tracking-wide text-slate-500 mb-2;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6B7280;
+    margin-bottom: 0.5rem;
   }
 
   .med-section-card {
-    @apply rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden;
+    @apply rounded-xl overflow-hidden premium-card;
   }
 
-  .med-section {
-    @apply space-y-2;
+  .med-hero {
+    @apply premium-card;
   }
 
   .med-kpi-card {
-    @apply transition-shadow hover:shadow-md;
+    @apply premium-card premium-card-interactive;
+    border-top-width: 3px;
+    border-top-style: solid;
   }
 
-  .med-animal-tile:active {
-    @apply scale-[0.99];
+  .med-kpi-card--blue { border-top-color: #2563EB; }
+  .med-kpi-card--purple { border-top-color: #8B5CF6; }
+  .med-kpi-card--green { border-top-color: #10B981; }
+  .med-kpi-card--orange { border-top-color: #F59E0B; }
+  .med-kpi-card--red { border-top-color: #EF4444; }
+  .med-kpi-card--neutral { border-top-color: #E5E7EB; }
+
+  .med-kpi-icon-glow--blue {
+    background: #EFF6FF;
+    color: #2563EB;
+    box-shadow: 0 0 14px rgba(37, 99, 235, 0.35);
+  }
+
+  .med-kpi-icon-glow--purple {
+    background: #F5F3FF;
+    color: #8B5CF6;
+    box-shadow: 0 0 14px rgba(139, 92, 246, 0.35);
+  }
+
+  .med-kpi-icon-glow--green {
+    background: #ECFDF5;
+    color: #10B981;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
+  }
+
+  .med-kpi-icon-glow--orange {
+    background: #FFFBEB;
+    color: #F59E0B;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+  }
+
+  .med-kpi-icon-glow--red {
+    background: #FEF2F2;
+    color: #EF4444;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+  }
+
+  .med-kpi-icon-glow--neutral {
+    background: #F3F4F6;
+    color: #6B7280;
+  }
+
+  .med-panel-card {
+    @apply premium-card;
+    border-width: 1px;
+    border-style: solid;
+  }
+
+  .med-panel-card--normal {
+    border-color: #10B981;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(16, 185, 129, 0.15);
+  }
+
+  .med-panel-card--attention {
+    border-color: #F59E0B;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(245, 158, 11, 0.15);
+  }
+
+  .med-panel-card--abnormal {
+    border-color: #EF4444;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(239, 68, 68, 0.18);
+  }
+
+  .med-panel-card--none {
+    border-color: #E5E7EB;
+  }
+
+  .med-panel-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--portal-card-shadow-hover);
+  }
+
+  .med-animal-tile {
+    @apply premium-card premium-card-interactive;
+  }
+
+  .med-spark-card {
+    @apply premium-card;
+    background: #FFFFFF;
   }
 
   .med-spark-card:hover {
-    @apply border-[#C5A059]/50;
+    border-color: #2563EB;
+    box-shadow: var(--portal-card-shadow-hover);
+    transform: translateY(-2px);
+  }
+
+  .portal-stat-card {
+    @apply premium-card premium-card-interactive;
+  }
+
+  .portal-profile-card {
+    @apply premium-card;
+  }
+
+  .portal-chart-card {
+    @apply premium-card;
+  }
+
+  .portal-insight-card {
+    @apply premium-card;
+    border-color: #C7D2FE;
+    background: linear-gradient(135deg, #FFFFFF 0%, #EEF2FF 100%);
+  }
+
+  .portal-animal-card {
+    @apply premium-card premium-card-interactive;
+  }
+
+  .portal-doc-card {
+    @apply premium-card premium-card-interactive;
+  }
+
+  .portal-alert-info {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #FCD34D;
+  }
+
+  .portal-alert-critical {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #FCA5A5;
+  }
+
+  .portal-report-card {
+    @apply premium-card premium-card-interactive;
+  }
+
+  .portal-btn-primary {
+    background: #2563EB;
+    color: #FFFFFF;
+  }
+
+  .portal-btn-primary:hover {
+    background: #1D4ED8;
   }
 }
 

@@ -7,10 +7,10 @@ import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 
 const STATUS_RING = {
-  normal: 'border-emerald-500 bg-emerald-50 text-emerald-700',
-  attention: 'border-amber-500 bg-amber-50 text-amber-700',
-  abnormal: 'border-rose-500 bg-rose-50 text-rose-700',
-  unknown: 'border-slate-300 bg-slate-50 text-slate-500',
+  normal: 'border-[#10B981] bg-[#ECFDF5] text-[#10B981] shadow-[0_0_16px_rgba(16,185,129,0.35)]',
+  attention: 'border-[#F59E0B] bg-[#FFFBEB] text-[#F59E0B] shadow-[0_0_16px_rgba(245,158,11,0.35)]',
+  abnormal: 'border-[#EF4444] bg-[#FEF2F2] text-[#EF4444] shadow-[0_0_16px_rgba(239,68,68,0.35)]',
+  unknown: 'border-[#E5E7EB] bg-[#F3F4F6] text-[#6B7280]',
 };
 
 export default function AnimalHeroHeader({
@@ -41,7 +41,7 @@ export default function AnimalHeroHeader({
   ].filter((x) => x && x !== '—').join(' · ');
 
   return (
-    <div className="med-hero rounded-xl border border-slate-200/80 bg-white shadow-sm p-3 sm:p-4">
+    <div className="med-hero premium-card p-3 sm:p-4">
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className={cn(
@@ -53,9 +53,9 @@ export default function AnimalHeroHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold font-mono text-slate-900">{animal?.code}</h1>
+              <h1 className="text-lg sm:text-xl font-bold font-mono text-[#111827]">{animal?.code}</h1>
               {animal?.name && (
-                <span className="text-sm text-slate-600 truncate">{animal.name}</span>
+                <span className="text-sm text-[#6B7280] truncate">{animal.name}</span>
               )}
               <StatusBadge status={status === 'unknown' ? 'none' : status} />
             </div>
@@ -70,7 +70,7 @@ export default function AnimalHeroHeader({
 
         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
           {latestReport && (
-            <Button size="sm" variant="default" className="h-8 gap-1.5 text-xs" onClick={() => navigate(`/reports/${latestReport.id}`)}>
+            <Button size="sm" className="h-8 gap-1.5 text-xs portal-btn-primary" onClick={() => navigate(`/reports/${latestReport.id}`)}>
               <FileText size={14} />
               {latestReport.reportNumber}
             </Button>

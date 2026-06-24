@@ -13,11 +13,7 @@ import PwaInstallBanner from './PwaInstallBanner';
 import { portalSearchAPI } from '../../services/portalApi';
 
 const navClass = ({ isActive }) =>
-  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-    isActive
-      ? 'bg-primary text-primary-foreground shadow-sm'
-      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-  }`;
+  `portal-nav-item ${isActive ? 'portal-nav-item-active' : ''}`;
 
 export default function PortalLayout({ children, title, subtitle, alertCount = 0, wide = false, compact = false }) {
   const { t, i18n } = useTranslation();
@@ -77,17 +73,17 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
 
   const searchBox = (
     <div className="relative" ref={searchRef}>
-      <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
+      <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 text-[#6B7280] pointer-events-none" />
       <input
         type="search"
-        className="input-field h-9 ps-9 text-sm w-full lg:w-64 bg-background/80"
+        className="portal-search-input h-9 ps-9 text-sm w-full lg:w-64 rounded-xl outline-none focus:ring-2 focus:ring-[#2563EB]/40"
         placeholder={t('portal.searchPlaceholder')}
         value={searchQ}
         onChange={(e) => setSearchQ(e.target.value)}
         onFocus={() => searchResults && setSearchOpen(true)}
       />
       {searchOpen && searchResults && (
-        <div className="absolute top-full mt-1 inset-x-0 lg:inset-x-auto lg:w-80 z-50 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+        <div className="absolute top-full mt-1 inset-x-0 lg:inset-x-auto lg:w-80 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.2)] overflow-hidden">
           {searchResults.animals?.length > 0 && (
             <div className="p-2 border-b border-border">
               <p className="text-[10px] uppercase text-muted-foreground px-2 py-1">{t('portal.navAnimals')}</p>
@@ -128,13 +124,13 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
   );
 
   const sidebar = (
-    <div className="flex flex-col h-full portal-sidebar">
-      <div className="p-4 border-b border-border/60">
+    <div className="flex flex-col h-full portal-sidebar text-[#9CA3AF]">
+      <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <AppLogo size="sm" />
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate">{t('portal.title')}</p>
-            <p className="text-xs text-muted-foreground truncate">{displayName}</p>
+            <p className="portal-brand-title font-semibold text-sm truncate">{t('portal.title')}</p>
+            <p className="portal-brand-sub text-xs truncate">{displayName}</p>
           </div>
         </div>
       </div>
@@ -156,15 +152,15 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
         ))}
       </nav>
 
-      <div className="p-3 border-t border-border/60 space-y-1">
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3" onClick={toggleLanguage}>
+      <div className="p-3 border-t border-white/10 space-y-1">
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-[#9CA3AF] hover:text-white hover:bg-white/10" onClick={toggleLanguage}>
           <Globe size={18} /> {isAr ? 'English' : 'العربية'}
         </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3" onClick={toggleTheme}>
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-[#9CA3AF] hover:text-white hover:bg-white/10" onClick={toggleTheme}>
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           {theme === 'dark' ? t('portal.lightMode') : t('portal.darkMode')}
         </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-destructive" onClick={handleLogout}>
+        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-[#EF4444] hover:text-[#FCA5A5] hover:bg-red-500/10" onClick={handleLogout}>
           <LogOut size={18} /> {t('portal.logout')}
         </Button>
       </div>
@@ -173,39 +169,39 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
 
   return (
     <div className="min-h-screen bg-background portal-app flex" dir={isAr ? 'rtl' : 'ltr'}>
-      <aside className="hidden lg:flex w-72 shrink-0 border-e border-border/60 bg-card/90 backdrop-blur-md sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-72 shrink-0 border-e border-white/10 portal-sidebar sticky top-0 h-screen">
         {sidebar}
       </aside>
 
       {menuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} aria-label="Close" />
-          <aside className="relative w-80 max-w-[90vw] h-full bg-card shadow-xl">
+          <aside className="relative w-80 max-w-[90vw] h-full portal-sidebar shadow-xl">
             {sidebar}
           </aside>
         </div>
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 border-b border-border/60 bg-card/95 backdrop-blur-md">
+        <header className="sticky top-0 z-20 border-b portal-header">
           <div className="px-4 py-3 flex items-center justify-between gap-3 max-w-[90rem] mx-auto w-full">
-            <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setMenuOpen(true)}>
+            <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0 text-[#E5E7EB] hover:bg-white/10" onClick={() => setMenuOpen(true)}>
               <Menu size={20} />
             </Button>
             <div className="min-w-0 flex-1 lg:hidden">
-              <p className="font-semibold text-sm truncate">{title || t('portal.title')}</p>
+              <p className="portal-header-title font-semibold text-sm truncate">{title || t('portal.title')}</p>
             </div>
             <div className="hidden lg:flex items-center gap-4 flex-1">
               <div className="min-w-0">
-                {title && <h1 className="text-lg font-bold truncate">{title}</h1>}
-                {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+                {title && <h1 className="portal-header-title text-lg font-bold truncate">{title}</h1>}
+                {subtitle && <p className="text-xs text-[#9CA3AF] truncate">{subtitle}</p>}
               </div>
               <div className="ms-auto flex items-center gap-3">
                 {searchBox}
                 {alertCount > 0 && (
                   <button
                     type="button"
-                    className="relative p-2 rounded-xl hover:bg-accent"
+                    className="relative p-2 rounded-xl hover:bg-white/10 text-[#E5E7EB]"
                     onClick={() => navigate('/')}
                     aria-label={t('portal.notifications')}
                   >
@@ -238,7 +234,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
           {children}
         </main>
 
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border/60 bg-card/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t portal-bottom-nav pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around px-1 py-1.5">
             {navItems.slice(0, 5).map(({ to, icon: Icon, label, end }) => (
               <NavLink
@@ -247,7 +243,7 @@ export default function PortalLayout({ children, title, subtitle, alertCount = 0
                 end={end}
                 className={({ isActive }) =>
                   `flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-[9px] font-medium min-w-[3.5rem] ${
-                    isActive ? 'text-primary' : 'text-muted-foreground'
+                    isActive ? 'portal-nav-bottom-active' : 'portal-nav-bottom'
                   }`
                 }
               >

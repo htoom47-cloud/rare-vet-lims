@@ -14,25 +14,18 @@ const PANEL_ICONS = {
   reproduction: Baby,
 };
 
-const STATUS_BORDER = {
-  normal: 'border-emerald-200/80 ring-emerald-500/10',
-  attention: 'border-amber-200/80 ring-amber-500/10',
-  abnormal: 'border-rose-200/80 ring-rose-500/15',
-  none: 'border-slate-200/80',
+const STATUS_PANEL = {
+  normal: 'med-panel-card--normal',
+  attention: 'med-panel-card--attention',
+  abnormal: 'med-panel-card--abnormal',
+  none: 'med-panel-card--none',
 };
 
 const STATUS_BG = {
-  normal: 'bg-emerald-50',
-  attention: 'bg-amber-50',
-  abnormal: 'bg-rose-50',
-  none: 'bg-slate-50',
-};
-
-const STATUS_TEXT = {
-  normal: 'text-emerald-700',
-  attention: 'text-amber-700',
-  abnormal: 'text-rose-700',
-  none: 'text-slate-500',
+  normal: 'bg-[#ECFDF5] text-[#10B981]',
+  attention: 'bg-[#FFFBEB] text-[#F59E0B]',
+  abnormal: 'bg-[#FEF2F2] text-[#EF4444]',
+  none: 'bg-[#F3F4F6] text-[#6B7280]',
 };
 
 export default function HealthPanelCard({ panel, onClick, compact = false, className }) {
@@ -55,9 +48,9 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
   return (
     <div
       className={cn(
-        'med-panel-card w-full text-start rounded-xl border bg-white shadow-sm ring-1 ring-inset transition-all',
-        STATUS_BORDER[status],
-        onClick && 'hover:shadow-md hover:-translate-y-px cursor-pointer',
+        'med-panel-card w-full text-start rounded-xl bg-white transition-all duration-200',
+        STATUS_PANEL[status],
+        onClick && 'cursor-pointer',
         compact ? 'p-3' : 'p-3.5',
         className
       )}
@@ -68,17 +61,17 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
     >
       <div className="flex items-start gap-2.5">
         <div className={cn(
-          'shrink-0 rounded-lg flex items-center justify-center',
+          'shrink-0 rounded-xl flex items-center justify-center',
           compact ? 'w-8 h-8' : 'w-9 h-9',
           STATUS_BG[status],
-          STATUS_TEXT[status]
+          status !== 'none' && 'shadow-[0_0_12px_rgba(0,0,0,0.06)]'
         )}
         >
-          <Icon size={compact ? 15 : 17} />
+          <Icon size={compact ? 15 : 17} strokeWidth={2.25} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-1">
-            <p className="font-semibold text-[13px] text-slate-800 leading-tight">
+            <p className="font-semibold text-[13px] text-[#111827] leading-tight">
               {t(`portal.panels.${panel.key}`)}
             </p>
             <StatusDot status={status} />
@@ -86,15 +79,15 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
           {total > 0 ? (
             <div className="flex items-baseline gap-2 mt-1">
               {abnormal > 0 && (
-                <span className="text-lg font-bold text-rose-600 leading-none tabular-nums">{abnormal}</span>
+                <span className="text-lg font-bold text-[#EF4444] leading-none tabular-nums">{abnormal}</span>
               )}
               {attention > 0 && abnormal === 0 && (
-                <span className="text-lg font-bold text-amber-600 leading-none tabular-nums">{attention}</span>
+                <span className="text-lg font-bold text-[#F59E0B] leading-none tabular-nums">{attention}</span>
               )}
               {status === 'normal' && (
-                <span className="text-lg font-bold text-emerald-600 leading-none">✓</span>
+                <span className="text-lg font-bold text-[#10B981] leading-none">✓</span>
               )}
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-[#6B7280]">
                 {status === 'abnormal'
                   ? t('portal.outOfRangeShort')
                   : status === 'attention'
@@ -104,9 +97,9 @@ export default function HealthPanelCard({ panel, onClick, compact = false, class
               </span>
             </div>
           ) : (
-            <p className="text-[11px] text-slate-400 mt-1">{t('portal.panelNotTested')}</p>
+            <p className="text-[11px] text-[#9CA3AF] mt-1">{t('portal.panelNotTested')}</p>
           )}
-          <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-snug">{summary()}</p>
+          <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2 leading-snug">{summary()}</p>
         </div>
       </div>
     </div>

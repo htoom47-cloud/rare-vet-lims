@@ -1,30 +1,46 @@
 import { cn } from '../../lib/utils';
 
-const ACCENTS = {
-  default: 'bg-white border-slate-200/80 text-slate-900',
-  primary: 'bg-white border-slate-200/80',
-  success: 'bg-white border-emerald-200/80',
-  warning: 'bg-white border-amber-200/80',
-  danger: 'bg-white border-rose-200/80',
-  info: 'bg-white border-sky-200/80',
+const VARIANT = {
+  blue: {
+    card: 'med-kpi-card--blue',
+    icon: 'med-kpi-icon-glow--blue',
+    value: 'text-[#2563EB]',
+  },
+  purple: {
+    card: 'med-kpi-card--purple',
+    icon: 'med-kpi-icon-glow--purple',
+    value: 'text-[#8B5CF6]',
+  },
+  green: {
+    card: 'med-kpi-card--green',
+    icon: 'med-kpi-icon-glow--green',
+    value: 'text-[#10B981]',
+  },
+  orange: {
+    card: 'med-kpi-card--orange',
+    icon: 'med-kpi-icon-glow--orange',
+    value: 'text-[#F59E0B]',
+  },
+  red: {
+    card: 'med-kpi-card--red',
+    icon: 'med-kpi-icon-glow--red',
+    value: 'text-[#EF4444]',
+  },
+  neutral: {
+    card: 'med-kpi-card--neutral',
+    icon: 'med-kpi-icon-glow--neutral',
+    value: 'text-[#111827]',
+  },
 };
 
-const ICON_ACCENTS = {
-  default: 'bg-slate-100 text-slate-600',
-  primary: 'bg-[#302419]/10 text-[#302419]',
-  success: 'bg-emerald-50 text-emerald-600',
-  warning: 'bg-amber-50 text-amber-600',
-  danger: 'bg-rose-50 text-rose-600',
-  info: 'bg-sky-50 text-sky-600',
-};
-
-const VALUE_ACCENTS = {
-  default: 'text-slate-900',
-  primary: 'text-[#302419]',
-  success: 'text-emerald-600',
-  warning: 'text-amber-600',
-  danger: 'text-rose-600',
-  info: 'text-sky-600',
+/** @deprecated use blue|purple|green|orange|red|neutral */
+const LEGACY_MAP = {
+  primary: 'blue',
+  info: 'blue',
+  success: 'green',
+  warning: 'orange',
+  danger: 'red',
+  default: 'neutral',
 };
 
 export default function KpiCard({
@@ -32,44 +48,47 @@ export default function KpiCard({
   label,
   value,
   hint,
-  accent = 'default',
+  accent = 'neutral',
   compact = false,
   className,
 }) {
+  const variantKey = VARIANT[accent] ? accent : (LEGACY_MAP[accent] || 'neutral');
+  const v = VARIANT[variantKey];
+
   return (
     <div
       className={cn(
-        'med-kpi-card rounded-xl border shadow-sm',
-        ACCENTS[accent] || ACCENTS.default,
+        'med-kpi-card rounded-xl bg-white',
+        v.card,
         compact ? 'p-3' : 'p-4',
         className
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280] leading-tight">
             {label}
           </p>
           <p className={cn(
             'font-bold tabular-nums leading-none mt-1.5',
             compact ? 'text-xl' : 'text-2xl',
-            VALUE_ACCENTS[accent] || VALUE_ACCENTS.default
+            v.value
           )}
           >
             {value}
           </p>
           {hint && (
-            <p className="text-[11px] text-slate-500 mt-1 truncate">{hint}</p>
+            <p className="text-[11px] text-[#6B7280] mt-1 truncate">{hint}</p>
           )}
         </div>
         {Icon && (
           <div className={cn(
-            'shrink-0 rounded-lg flex items-center justify-center',
-            compact ? 'w-8 h-8' : 'w-10 h-10',
-            ICON_ACCENTS[accent] || ICON_ACCENTS.default
+            'shrink-0 rounded-xl flex items-center justify-center',
+            compact ? 'w-9 h-9' : 'w-10 h-10',
+            v.icon
           )}
           >
-            <Icon size={compact ? 16 : 18} />
+            <Icon size={compact ? 17 : 19} strokeWidth={2.25} />
           </div>
         )}
       </div>
