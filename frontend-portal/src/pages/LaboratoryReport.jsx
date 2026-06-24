@@ -7,6 +7,7 @@ import QRCode from 'react-qr-code';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft,
+  ArrowRight,
   Download,
   Printer,
 } from 'lucide-react';
@@ -224,7 +225,8 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
         className="no-print flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between mb-4"
       >
         <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="gap-2 h-8">
-          <ArrowLeft size={14} /> {t('labReport.back')}
+          {isAr ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
+          {t('labReport.back')}
         </Button>
         <div className="flex flex-wrap gap-1.5">
           <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>

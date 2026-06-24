@@ -2,12 +2,19 @@ import { useTranslation } from 'react-i18next';
 import AppLogo from '../ui/AppLogo';
 import { cn } from '../../lib/utils';
 
-export default function LabBrandLockup({ compact = false, className = '' }) {
+export default function LabBrandLockup({ compact = false, embedded = false, className = '' }) {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
 
   return (
-    <div className={cn('portal-lab-brand w-full', compact ? 'px-2.5 py-2' : 'px-3.5 py-3', className)}>
+    <div
+      className={cn(
+        'portal-lab-brand w-full',
+        embedded ? 'portal-lab-brand--embedded' : '',
+        compact ? 'px-2.5 py-2' : 'px-3.5 py-3',
+        className
+      )}
+    >
       <div className="flex items-center gap-2.5 w-full">
         <AppLogo size={compact ? 'xs' : 'sm'} variant="brand" className="shrink-0" />
         <div className={cn('min-w-0 flex-1 leading-tight', isAr ? 'text-end' : 'text-start')}>

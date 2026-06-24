@@ -31,8 +31,12 @@ export default function PortalReportView() {
 
   if (!report) return null;
 
+  const animalName = report.animal?.name || report.animal?.name_tag;
+  const pageTitle = animalName || report.reportNumber;
+  const pageSubtitle = animalName ? report.reportNumber : undefined;
+
   return (
-    <PortalLayout title={report.reportNumber} wide>
+    <PortalLayout title={pageTitle} subtitle={pageSubtitle} wide compact>
       <LaboratoryReport initialReport={report} backPath="/reports" />
     </PortalLayout>
   );

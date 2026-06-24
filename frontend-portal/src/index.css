@@ -157,6 +157,20 @@
     letter-spacing: 0.01em;
   }
 
+  .portal-lab-brand--embedded {
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .portal-sidebar-brand {
+    @apply shrink-0 border-b border-primary-200/80 dark:border-primary-700;
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.06) 0%, hsl(var(--card)) 100%);
+  }
+
+  .dark .portal-sidebar-brand {
+    background: linear-gradient(180deg, hsl(25 25% 14%) 0%, hsl(var(--card)) 100%);
+  }
+
   .premium-card {
     @apply bg-card text-card-foreground rounded-2xl shadow-card border border-border/60;
     transition: transform 0.22s ease, box-shadow 0.22s ease;

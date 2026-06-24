@@ -12,6 +12,7 @@ import PortalNotifications from './PortalNotifications';
 import { Button } from '../ui/button';
 import PwaInstallBanner from './PwaInstallBanner';
 import { portalSearchAPI } from '../../services/portalApi';
+import { cn } from '../../lib/utils';
 
 const navLinkClass = ({ isActive }) =>
   `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -131,12 +132,13 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
 
   const sidebar = (
     <div className="flex flex-col h-full bg-card">
-      {isAr && <LabBrandLockup />}
-
-      <div className={`px-4 py-2.5 border-b border-primary-200/80 dark:border-primary-700 ${isAr ? '' : 'pt-4'}`}>
-        {!isAr && <LabBrandLockup compact className="!w-auto mb-3 rounded-xl overflow-hidden" />}
-        <p className="text-xs font-semibold text-primary-800 dark:text-primary-100">{t('portal.title')}</p>
-        <p className="text-[11px] text-primary-400 truncate mt-0.5">{displayName}</p>
+      <div className="portal-sidebar-brand">
+        {isAr && <LabBrandLockup embedded />}
+        <div className={`px-4 pb-3 ${isAr ? 'pt-0' : 'pt-4'}`}>
+          {!isAr && <LabBrandLockup compact embedded className="!w-auto mb-3 rounded-xl overflow-hidden px-0" />}
+          <p className="text-xs font-semibold text-primary-800 dark:text-primary-100">{t('portal.title')}</p>
+          <p className="text-[11px] text-primary-400 truncate mt-0.5">{displayName}</p>
+        </div>
       </div>
 
       <div className="p-3 hidden lg:block">{searchBox}</div>
@@ -192,19 +194,41 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
             <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setMenuOpen(true)}>
               <Menu size={20} />
             </Button>
-            <div className="min-w-0 flex-1 lg:hidden flex justify-end">
-              {isAr && <LabBrandLockup compact className="!w-auto max-w-[13.5rem] rounded-lg overflow-hidden" />}
+            <div className="min-w-0 flex-1 lg:hidden">
+              {isAr && !title && (
+                <LabBrandLockup compact embedded className="!w-auto max-w-[13.5rem] ms-auto rounded-lg overflow-hidden" />
+              )}
+              {isAr && title && (
+                <div className="text-end min-w-0">
+                  <p className="font-semibold text-sm truncate text-foreground">{title}</p>
+                  {subtitle && (
+                    <p className="text-[10px] font-mono text-muted-foreground truncate">{subtitle}</p>
+                  )}
+                </div>
+              )}
               {!isAr && (
                 <p className="font-semibold text-sm truncate text-foreground">{title || t('portal.title')}</p>
               )}
             </div>
-            <div className="hidden lg:flex items-center gap-4 flex-1">
-              <div className="min-w-0">
-                {title && <h1 className="text-lg font-bold truncate text-foreground">{title}</h1>}
-                {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+            <div className="hidden lg:flex items-center gap-4 flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
+                {title && (
+                  <h1 className="text-lg font-bold truncate text-foreground leading-tight">
+                    {title}
+                  </h1>
+                )}
+                {subtitle && (
+                  <p className={cn(
+                    'text-xs truncate mt-0.5',
+                    subtitle.startsWith('RPT-') ? 'font-mono text-muted-foreground' : 'text-muted-foreground'
+                  )}
+                  >
+                    {subtitle}
+                  </p>
+                )}
               </div>
-              <div className="ms-auto flex items-center gap-3">
-                {!isAr && <LabBrandLockup compact className="!w-auto max-w-[15rem] rounded-xl overflow-hidden shrink-0" />}
+              <div className="flex items-center gap-3 shrink-0">
+                {!isAr && <LabBrandLockup compact className="!w-auto max-w-[15rem] rounded-xl overflow-hidden shrink-0 hidden xl:block" />}
                 {searchBox}
                 <PortalNotifications />
               </div>
