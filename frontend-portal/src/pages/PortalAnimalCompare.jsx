@@ -103,10 +103,12 @@ export default function PortalAnimalCompare() {
     });
   };
 
-  const title = comparison?.animal?.code || reports[0]?.animal_code || t('portal.navCompare');
-  const subtitle = comparison?.animal
-    ? `${animalLabel(comparison.animal.type, isAr)}${comparison.animal.name ? ` · ${comparison.animal.name}` : ''}`
-    : '';
+  const animalName = comparison?.animal?.name || reports[0]?.animal_name;
+  const animalCode = comparison?.animal?.code || reports[0]?.animal_code;
+  const pageTitle = animalName || animalCode || t('portal.navCompare');
+  const pageSubtitle = animalName && animalCode
+    ? animalCode
+    : (comparison?.animal?.type ? animalLabel(comparison.animal.type, isAr) : '');
 
   const numericParams = useMemo(
     () => (comparison?.parameters || []).filter((p) => p.comparable),
@@ -153,7 +155,7 @@ export default function PortalAnimalCompare() {
   );
 
   return (
-    <PortalLayout title={title} subtitle={subtitle} wide>
+    <PortalLayout title={pageTitle} subtitle={pageSubtitle} wide compact>
       <Button variant="ghost" size="sm" className="mb-4 gap-1 -ms-2" onClick={() => navigate(`/animals/${animalId}`)}>
         <BackIcon size={16} /> {t('labReport.back')}
       </Button>

@@ -74,9 +74,12 @@ export default function PortalAnimalDetail() {
   };
 
   const kpis = dashboard?.kpis;
+  const animal = dashboard?.animal;
+  const pageTitle = animal?.name || animal?.code || (loading ? t('common.loading') : t('portal.navAnimals'));
+  const pageSubtitle = animal?.name && animal?.code ? animal.code : undefined;
 
   return (
-    <PortalLayout compact wide>
+    <PortalLayout title={pageTitle} subtitle={pageSubtitle} compact wide>
       <div className="med-page space-y-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground" onClick={() => navigate('/animals')}>

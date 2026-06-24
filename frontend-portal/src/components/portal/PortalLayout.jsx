@@ -21,6 +21,8 @@ const navLinkClass = ({ isActive }) =>
       : 'text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70'
   }`;
 
+const isMonoSubtitle = (value) => /^[A-Z]{2,5}-\d/.test(String(value || ''));
+
 export default function PortalLayout({ children, title, subtitle, wide = false, compact = false }) {
   const { t, i18n } = useTranslation();
   const { customer, logout } = usePortal();
@@ -189,7 +191,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 bg-card/85 backdrop-blur-md border-b border-border/80 shadow-header">
+        <header className="sticky top-0 z-20 border-b border-border/80 shadow-header bg-card/85 backdrop-blur-md lg:bg-gradient-to-b lg:from-primary-50/70 lg:to-card/90 lg:dark:from-primary-900/90 lg:dark:to-card/90">
           <div className="px-4 py-3 flex items-center justify-between gap-3 max-w-[90rem] mx-auto w-full">
             <Button type="button" variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setMenuOpen(true)}>
               <Menu size={20} />
@@ -207,7 +209,18 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
                 </div>
               )}
               {!isAr && (
-                <p className="font-semibold text-sm truncate text-foreground">{title || t('portal.title')}</p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate text-foreground">{title || t('portal.title')}</p>
+                  {subtitle && (
+                    <p className={cn(
+                      'text-[10px] truncate',
+                      isMonoSubtitle(subtitle) ? 'font-mono text-muted-foreground' : 'text-muted-foreground'
+                    )}
+                    >
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
             <div className="hidden lg:flex items-center gap-4 flex-1 min-w-0">
@@ -220,7 +233,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
                 {subtitle && (
                   <p className={cn(
                     'text-xs truncate mt-0.5',
-                    subtitle.startsWith('RPT-') ? 'font-mono text-muted-foreground' : 'text-muted-foreground'
+                    isMonoSubtitle(subtitle) ? 'font-mono text-muted-foreground' : 'text-muted-foreground'
                   )}
                   >
                     {subtitle}
