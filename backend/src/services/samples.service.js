@@ -2,6 +2,7 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
+const { PARAS_TEST_CODES } = require('../utils/parasitologyTests');
 const autoInvoice = require('./auto-invoice.service');
 const { uuidv4 } = require('../utils/uuid');
 
@@ -194,8 +195,6 @@ const updateStatus = async (id, status, extra = {}) => {
   );
   return result.rows[0];
 };
-
-const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL'];
 
 const getQueue = async (technicianId) => {
   const params = [PARAS_TEST_CODES];

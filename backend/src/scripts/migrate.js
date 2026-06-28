@@ -4,6 +4,7 @@ const path = require('path');
 const { pool } = require('../config/database');
 const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
+const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ROLE_PERMISSIONS, PERMISSIONS } = require('../utils/permissions');
 
 async function syncPermissionsCatalog(client) {
@@ -125,10 +126,11 @@ async function applyPatches() {
     );
     await client.query(
       `UPDATE tests SET category_id = (SELECT id FROM test_categories WHERE code = 'MICRO')
-       WHERE code IN ('PARAS-BLOOD', 'PARAS-STOOL')
+       WHERE code IN ('PARAS-BLOOD', 'PARAS-STOOL', 'BRU-ROSE-BENGAL')
          AND EXISTS (SELECT 1 FROM test_categories WHERE code = 'MICRO')`
     );
     await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
+    await ensureParasitologyCatalog();
     await syncPermissionsCatalog(client);
     await syncAllRolePermissions(client);
     await client.query(`

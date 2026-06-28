@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2, Loader2 } from 'lucide-react';
+import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2, Loader2, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { isParasitologyTest } from '../utils/parasitologyTests';
+import { isParasitologyTest, PARAS_BRU_ROSE } from '../utils/parasitologyTests';
 
 const PARAS_BLOOD = 'PARAS-BLOOD';
 const PARAS_STOOL = 'PARAS-STOOL';
@@ -367,15 +367,19 @@ export default function Parasitology() {
 
   const [bloodFindings, setBloodFindings] = useState([]);
   const [stoolFindings, setStoolFindings] = useState([]);
+  const [brucFindings, setBrucFindings] = useState([]);
   const [bloodNotes, setBloodNotes] = useState('');
   const [stoolNotes, setStoolNotes] = useState('');
+  const [brucNotes, setBrucNotes] = useState('');
   const [bloodNotesParamId, setBloodNotesParamId] = useState(null);
   const [stoolNotesParamId, setStoolNotesParamId] = useState(null);
+  const [brucNotesParamId, setBrucNotesParamId] = useState(null);
 
   const [typesOpen, setTypesOpen] = useState(false);
   const [typesTab, setTypesTab] = useState('blood');
   const [bloodMeta, setBloodMeta] = useState(null);
   const [stoolMeta, setStoolMeta] = useState(null);
+  const [brucMeta, setBrucMeta] = useState(null);
   const [paramFormOpen, setParamFormOpen] = useState(false);
   const [paramTargetTest, setParamTargetTest] = useState(null);
   const [editingParam, setEditingParam] = useState(null);
@@ -408,12 +412,15 @@ export default function Parasitology() {
       const { data } = await testsAPI.list({ limit: 100 });
       const blood = data.data.find((tst) => tst.code === PARAS_BLOOD);
       const stool = data.data.find((tst) => tst.code === PARAS_STOOL);
-      const [bloodDetail, stoolDetail] = await Promise.all([
+      const bruc = data.data.find((tst) => tst.code === PARAS_BRU_ROSE);
+      const [bloodDetail, stoolDetail, brucDetail] = await Promise.all([
         blood ? testsAPI.get(blood.id) : null,
         stool ? testsAPI.get(stool.id) : null,
+        bruc ? testsAPI.get(bruc.id) : null,
       ]);
       setBloodMeta(bloodDetail?.data?.data || null);
       setStoolMeta(stoolDetail?.data?.data || null);
+      setBrucMeta(brucDetail?.data?.data || null);
     } catch {
       /* ignore */
     }
@@ -425,12 +432,23 @@ export default function Parasitology() {
 
   const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);
   const stoolTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_STOOL);
+  const brucTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BRU_ROSE);
   const hasBloodPanel = !!bloodTest;
   const hasStoolPanel = !!stoolTest;
+  const hasBrucPanel = !!brucTest;
+  const panelCount = [hasBloodPanel, hasStoolPanel, hasBrucPanel].filter(Boolean).length;
 
-  const sectionLabel = (testMeta) => (
-    testMeta?.code === PARAS_BLOOD ? t('parasitology.bloodSection') : t('parasitology.stoolSection')
-  );
+  const orderedPanelLabels = [
+    hasBloodPanel && t('parasitology.bloodSection'),
+    hasBrucPanel && t('parasitology.brucellaSection'),
+    hasStoolPanel && t('parasitology.stoolSection'),
+  ].filter(Boolean);
+
+  const sectionLabel = (testMeta) => {
+    if (testMeta?.code === PARAS_BLOOD) return t('parasitology.bloodSection');
+    if (testMeta?.code === PARAS_BRU_ROSE) return t('parasitology.brucellaSection');
+    return t('parasitology.stoolSection');
+  };
 
   const openSample = async (sample) => {
     const { data } = await samplesAPI.get(sample.id);
@@ -439,38 +457,32 @@ export default function Parasitology() {
     const tests = parasTests(data.data);
     const bt = tests.find((tst) => tst.test_code === PARAS_BLOOD);
     const st = tests.find((tst) => tst.test_code === PARAS_STOOL);
+    const br = tests.find((tst) => tst.test_code === PARAS_BRU_ROSE);
 
-    if (bt) {
-      const testDetail = (await testsAPI.get(bt.test_id)).data.data;
+    const loadPanel = async (sampleTest) => {
+      if (!sampleTest) return { findings: [], notes: '', notesParamId: null };
+      const testDetail = (await testsAPI.get(sampleTest.test_id)).data.data;
       let existing = null;
       try {
-        existing = (await resultsAPI.get(bt.id)).data.data;
+        existing = (await resultsAPI.get(sampleTest.id)).data.data;
       } catch { /* none */ }
-      const loaded = buildFindingsFromExisting(testDetail, existing);
-      setBloodFindings(loaded.findings);
-      setBloodNotes(loaded.notes);
-      setBloodNotesParamId(loaded.notesParamId);
-    } else {
-      setBloodFindings([]);
-      setBloodNotes('');
-      setBloodNotesParamId(null);
-    }
+      return buildFindingsFromExisting(testDetail, existing);
+    };
 
-    if (st) {
-      const testDetail = (await testsAPI.get(st.test_id)).data.data;
-      let existing = null;
-      try {
-        existing = (await resultsAPI.get(st.id)).data.data;
-      } catch { /* none */ }
-      const loaded = buildFindingsFromExisting(testDetail, existing);
-      setStoolFindings(loaded.findings);
-      setStoolNotes(loaded.notes);
-      setStoolNotesParamId(loaded.notesParamId);
-    } else {
-      setStoolFindings([]);
-      setStoolNotes('');
-      setStoolNotesParamId(null);
-    }
+    const [bloodLoaded, stoolLoaded, brucLoaded] = await Promise.all([
+      loadPanel(bt),
+      loadPanel(st),
+      loadPanel(br),
+    ]);
+    setBloodFindings(bloodLoaded.findings);
+    setBloodNotes(bloodLoaded.notes);
+    setBloodNotesParamId(bloodLoaded.notesParamId);
+    setStoolFindings(stoolLoaded.findings);
+    setStoolNotes(stoolLoaded.notes);
+    setStoolNotesParamId(stoolLoaded.notesParamId);
+    setBrucFindings(brucLoaded.findings);
+    setBrucNotes(brucLoaded.notes);
+    setBrucNotesParamId(brucLoaded.notesParamId);
   };
 
   useEffect(() => {
@@ -502,7 +514,10 @@ export default function Parasitology() {
 
   const bloodValuesCount = buildValues(bloodFindings, bloodNotesParamId, bloodNotes).length;
   const stoolValuesCount = buildValues(stoolFindings, stoolNotesParamId, stoolNotes).length;
-  const canSave = (hasBloodPanel && bloodValuesCount > 0) || (hasStoolPanel && stoolValuesCount > 0);
+  const brucValuesCount = buildValues(brucFindings, brucNotesParamId, brucNotes).length;
+  const canSave = (hasBloodPanel && bloodValuesCount > 0)
+    || (hasStoolPanel && stoolValuesCount > 0)
+    || (hasBrucPanel && brucValuesCount > 0);
 
   const uploadOneImage = async (testId, finding, setFindings) => {
     if (!finding.pendingFile || !finding.parameter_id || !testId) return null;
@@ -618,6 +633,18 @@ export default function Parasitology() {
           findings: stoolFindings,
           setFindings: setStoolFindings,
           notes: stoolNotes,
+        });
+      }
+    }
+    if (brucTest) {
+      const values = buildValues(brucFindings, brucNotesParamId, brucNotes);
+      if (values.length) {
+        jobs.push({
+          test: brucTest,
+          values,
+          findings: brucFindings,
+          setFindings: setBrucFindings,
+          notes: brucNotes,
         });
       }
     }
@@ -803,17 +830,13 @@ export default function Parasitology() {
                   {selectedSample.customer_name} · {selectedSample.animal_code}
                 </p>
                 <p className="text-xs text-primary-700 dark:text-primary-300 mt-2">
-                  {hasBloodPanel && hasStoolPanel
-                    ? t('parasitology.orderedBoth')
-                    : hasBloodPanel
-                      ? t('parasitology.orderedBloodOnly')
-                      : hasStoolPanel
-                        ? t('parasitology.orderedStoolOnly')
-                        : t('parasitology.noParasTests')}
+                  {orderedPanelLabels.length
+                    ? t('parasitology.orderedTests', { tests: orderedPanelLabels.join(' · ') })
+                    : t('parasitology.noParasTests')}
                 </p>
               </div>
 
-              <div className={`grid gap-4 ${hasBloodPanel && hasStoolPanel ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+              <div className={`grid gap-4 ${panelCount > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
                 {hasBloodPanel && (
                 <FindingPanel
                   title={t('parasitology.bloodSection')}
@@ -828,6 +851,22 @@ export default function Parasitology() {
                   displayName={displayName}
                   onQueueImage={(finding, file) => uploadImageForFinding(bloodTest?.id, finding, file, setBloodFindings)}
                   onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBloodFindings)}
+                />
+                )}
+                {hasBrucPanel && (
+                <FindingPanel
+                  title={t('parasitology.brucellaSection')}
+                  icon={Shield}
+                  test={brucTest}
+                  testMeta={brucMeta}
+                  findings={brucFindings}
+                  notes={brucNotes}
+                  onFindingsChange={setBrucFindings}
+                  onNotesChange={setBrucNotes}
+                  labels={labels}
+                  displayName={displayName}
+                  onQueueImage={(finding, file) => uploadImageForFinding(brucTest?.id, finding, file, setBrucFindings)}
+                  onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBrucFindings)}
                 />
                 )}
                 {hasStoolPanel && (
@@ -881,6 +920,14 @@ export default function Parasitology() {
             <Bug size={16} />
             {t('parasitology.stoolSection')}
           </button>
+          <button
+            type="button"
+            onClick={() => setTypesTab('brucella')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === 'brucella' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+          >
+            <Shield size={16} />
+            {t('parasitology.brucellaSection')}
+          </button>
         </div>
         {typesTab === 'blood' ? (
           <ParasiteTypeList
@@ -895,12 +942,25 @@ export default function Parasitology() {
             displayName={displayName}
             addLabel={t('parasitology.addParasite')}
           />
-        ) : (
+        ) : typesTab === 'stool' ? (
           <ParasiteTypeList
             title={t('parasitology.stoolSection')}
             icon={Bug}
             testMeta={stoolMeta}
             params={(stoolMeta?.parameters || []).filter((p) => p.unit === 'qual')}
+            canManage={canManage}
+            onAdd={openAddParasite}
+            onEdit={openEditParasite}
+            onDelete={handleDeleteParasite}
+            displayName={displayName}
+            addLabel={t('parasitology.addParasite')}
+          />
+        ) : (
+          <ParasiteTypeList
+            title={t('parasitology.brucellaSection')}
+            icon={Shield}
+            testMeta={brucMeta}
+            params={(brucMeta?.parameters || []).filter((p) => p.unit === 'qual')}
             canManage={canManage}
             onAdd={openAddParasite}
             onEdit={openEditParasite}

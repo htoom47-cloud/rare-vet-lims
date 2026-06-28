@@ -2,9 +2,18 @@ require('dotenv').config();
 const { query, pool } = require('../config/database');
 const logger = require('../config/logger');
 
+const { PARAS_TEST_CODES } = require('../utils/parasitologyTests');
+
 const PARAS_TESTS = [
   { code: 'PARAS-BLOOD', name: 'Blood Parasites', name_ar: 'طفيليات الدم', price: 120, method: 'Microscope' },
   { code: 'PARAS-STOOL', name: 'Stool Parasites', name_ar: 'طفيليات البراز', price: 120, method: 'Microscope' },
+  {
+    code: 'BRU-ROSE-BENGAL',
+    name: 'Brucellosis Rose Bengal',
+    name_ar: 'المالطية روز بنغال',
+    price: 150,
+    method: 'Rose Bengal',
+  },
 ];
 
 const PARAS_PARAMS = {
@@ -34,6 +43,12 @@ const PARAS_PARAMS = {
       { code: 'TAPEWORM', name: 'Tapeworm Eggs', name_ar: 'بيض الديدان الشريطية', unit: 'qual' },
       { code: 'NEMATODE', name: 'Nematode Eggs', name_ar: 'بيض الديدان المستديرة', unit: 'qual' },
       { code: 'BALANTIDIUM', name: 'Balantidium', name_ar: 'بالانتيديوم', unit: 'qual' },
+      { code: 'NOTES', name: 'Comments', name_ar: 'ملاحظات', unit: '' },
+    ],
+  },
+  'BRU-ROSE-BENGAL': {
+    params: [
+      { code: 'RESULT', name: 'Rose Bengal', name_ar: 'روز بنغال', unit: 'qual' },
       { code: 'NOTES', name: 'Comments', name_ar: 'ملاحظات', unit: '' },
     ],
   },

@@ -1,4 +1,5 @@
-export const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL'];
+export const PARAS_BRU_ROSE = 'BRU-ROSE-BENGAL';
+export const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL', PARAS_BRU_ROSE];
 export const PARAS_TEST_CODES_SET = new Set(PARAS_TEST_CODES);
 
 export const isParasitologyTest = (test) =>
