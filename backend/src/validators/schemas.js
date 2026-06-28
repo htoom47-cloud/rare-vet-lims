@@ -60,6 +60,23 @@ const testSchema = Joi.object({
   label_copies: Joi.number().integer().min(1).max(20).default(1),
 });
 
+const testCategorySchema = Joi.object({
+  code: Joi.string().max(20).required(),
+  name: Joi.string().required(),
+  name_ar: Joi.string().allow('', null),
+  department: Joi.string().allow('', null),
+  sort_order: Joi.number().integer().default(0),
+});
+
+const packageSchema = Joi.object({
+  name: Joi.string().required(),
+  name_ar: Joi.string().allow('', null),
+  description: Joi.string().allow('', null),
+  price: Joi.number().min(0).required(),
+  discount_percent: Joi.number().min(0).max(100).default(0),
+  test_ids: Joi.array().items(Joi.string().uuid()).min(1).required(),
+});
+
 const resultEntrySchema = Joi.object({
   sample_test_id: Joi.string().uuid().required(),
   values: Joi.array().items(Joi.object({
@@ -154,6 +171,8 @@ module.exports = {
   animalSchema,
   sampleSchema,
   testSchema,
+  testCategorySchema,
+  packageSchema,
   resultEntrySchema,
   resultApproveBatchSchema,
   invoiceSchema,

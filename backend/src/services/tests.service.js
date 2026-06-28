@@ -2,9 +2,45 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 
-const listCategories = async () => {
-  const result = await query('SELECT * FROM test_categories WHERE is_active = true ORDER BY sort_order');
+const listCategories = async ({ includeInactive } = {}) => {
+  const where = includeInactive ? '' : 'WHERE is_active = true';
+  const result = await query(`SELECT * FROM test_categories ${where} ORDER BY sort_order, name`);
   return result.rows;
+};
+
+const getCategoryById = async (id) => {
+  const result = await query('SELECT * FROM test_categories WHERE id = $1', [id]);
+  if (!result.rows[0]) throw new AppError('Category not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
+const createCategory = async (data) => {
+  const result = await query(
+    `INSERT INTO test_categories (code, name, name_ar, department, sort_order)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [data.code, data.name, data.name_ar, data.department, data.sort_order ?? 0]
+  );
+  return result.rows[0];
+};
+
+const updateCategory = async (id, data) => {
+  await getCategoryById(id);
+  const result = await query(
+    `UPDATE test_categories SET code = $1, name = $2, name_ar = $3, department = $4, sort_order = $5
+     WHERE id = $6 RETURNING *`,
+    [data.code, data.name, data.name_ar, data.department, data.sort_order ?? 0, id]
+  );
+  return result.rows[0];
+};
+
+const deleteCategory = async (id) => {
+  await getCategoryById(id);
+  const tests = await query('SELECT COUNT(*) FROM tests WHERE category_id = $1 AND is_active = true', [id]);
+  if (parseInt(tests.rows[0].count, 10) > 0) {
+    throw new AppError('Cannot delete category with active tests', 400, 'CATEGORY_HAS_TESTS');
+  }
+  await query('UPDATE test_categories SET is_active = false WHERE id = $1', [id]);
+  return { deleted: true };
 };
 
 const list = async ({ category_id, search, page, limit }) => {
@@ -133,7 +169,93 @@ const addReferenceRange = async (parameterId, range) => {
   return result.rows[0];
 };
 
+const deleteTest = async (id) => {
+  await getById(id);
+  await query('UPDATE tests SET is_active = false, updated_at = NOW() WHERE id = $1', [id]);
+  return { deleted: true };
+};
+
+const packageSelectSql = `
+  SELECT p.*,
+    COALESCE(array_agg(t.id) FILTER (WHERE t.id IS NOT NULL), '{}') AS test_ids,
+    COALESCE(array_agg(t.name) FILTER (WHERE t.id IS NOT NULL), '{}') AS test_names,
+    COALESCE(array_agg(t.name_ar) FILTER (WHERE t.id IS NOT NULL), '{}') AS test_names_ar
+  FROM packages p
+  LEFT JOIN package_tests pt ON p.id = pt.package_id
+  LEFT JOIN tests t ON pt.test_id = t.id
+`;
+
+const listPackages = async ({ includeInactive } = {}) => {
+  const where = includeInactive ? '' : 'WHERE p.is_active = true';
+  const result = await query(
+    `${packageSelectSql} ${where} GROUP BY p.id ORDER BY p.name`,
+    []
+  );
+  return result.rows;
+};
+
+const getPackageById = async (id) => {
+  const result = await query(`${packageSelectSql} WHERE p.id = $1 GROUP BY p.id`, [id]);
+  if (!result.rows[0]) throw new AppError('Package not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
+const createPackage = async (data) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const pkg = await client.query(
+      `INSERT INTO packages (name, name_ar, description, price, discount_percent)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [data.name, data.name_ar, data.description, data.price, data.discount_percent ?? 0]
+    );
+    const packageId = pkg.rows[0].id;
+    for (const testId of data.test_ids) {
+      await client.query('INSERT INTO package_tests (package_id, test_id) VALUES ($1, $2)', [packageId, testId]);
+    }
+    await client.query('COMMIT');
+    return getPackageById(packageId);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+const updatePackage = async (id, data) => {
+  await getPackageById(id);
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE packages SET name = $1, name_ar = $2, description = $3, price = $4, discount_percent = $5
+       WHERE id = $6`,
+      [data.name, data.name_ar, data.description, data.price, data.discount_percent ?? 0, id]
+    );
+    await client.query('DELETE FROM package_tests WHERE package_id = $1', [id]);
+    for (const testId of data.test_ids) {
+      await client.query('INSERT INTO package_tests (package_id, test_id) VALUES ($1, $2)', [id, testId]);
+    }
+    await client.query('COMMIT');
+    return getPackageById(id);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+const deletePackage = async (id) => {
+  await getPackageById(id);
+  await query('UPDATE packages SET is_active = false WHERE id = $1', [id]);
+  return { deleted: true };
+};
+
 module.exports = {
-  listCategories, list, getById, create, update,
+  listCategories, getCategoryById, createCategory, updateCategory, deleteCategory,
+  list, getById, create, update, deleteTest,
   addParameter, updateParameter, deleteParameter, addReferenceRange,
+  listPackages, getPackageById, createPackage, updatePackage, deletePackage,
 };

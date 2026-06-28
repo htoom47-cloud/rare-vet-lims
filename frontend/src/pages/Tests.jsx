@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3, Trash2, Package, FolderTree } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -23,13 +23,24 @@ const emptyRangeForm = () => ({
   animal_type: 'camel', min_value: '', max_value: '', critical_low: '', critical_high: '', unit: '', notes: '',
 });
 
+const emptyCategoryForm = () => ({
+  code: '', name: '', name_ar: '', department: '', sort_order: 0,
+});
+
+const emptyPackageForm = () => ({
+  name: '', name_ar: '', description: '', price: 0, discount_percent: 0, test_ids: [],
+});
+
 export default function Tests() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canManage = hasPermission('tests.manage');
 
+  const [pageTab, setPageTab] = useState('tests');
   const [tests, setTests] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [allTests, setAllTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -50,8 +61,18 @@ export default function Tests() {
   const [rangeParam, setRangeParam] = useState(null);
   const [rangeForm, setRangeForm] = useState(emptyRangeForm());
 
+  const [categoryFormOpen, setCategoryFormOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [categoryForm, setCategoryForm] = useState(emptyCategoryForm());
+
+  const [packageFormOpen, setPackageFormOpen] = useState(false);
+  const [editingPackageId, setEditingPackageId] = useState(null);
+  const [packageForm, setPackageForm] = useState(emptyPackageForm());
+  const [packageSearch, setPackageSearch] = useState('');
+
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
   const catLabel = (cat) => (i18n.language === 'ar' && cat?.name_ar ? cat.name_ar : cat?.name);
+  const activeCategories = categories.filter((c) => c.is_active !== false);
 
   const load = () => {
     setLoading(true);
@@ -75,9 +96,23 @@ export default function Tests() {
     }
   };
 
+  const loadCategories = () => {
+    testsAPI.categories(canManage ? { all: 1 } : undefined).then(({ data }) => setCategories(data.data));
+  };
+
+  const loadPackages = () => {
+    testsAPI.listPackages().then(({ data }) => setPackages(data.data)).catch(() => setPackages([]));
+  };
+
+  const loadAllTests = () => {
+    testsAPI.list({ limit: 500 }).then(({ data }) => setAllTests(data.data));
+  };
+
   useEffect(() => {
-    testsAPI.categories().then(({ data }) => setCategories(data.data));
-  }, []);
+    loadCategories();
+    loadPackages();
+    loadAllTests();
+  }, [canManage]);
 
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
@@ -133,6 +168,7 @@ export default function Tests() {
       }
       setFormOpen(false);
       load();
+      loadAllTests();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
     }
@@ -210,6 +246,151 @@ export default function Tests() {
     }
   };
 
+  const handleDeleteTest = async (test) => {
+    if (!window.confirm(t('tests.confirmDeleteTest'))) return;
+    try {
+      await testsAPI.delete(test.id);
+      toast.success(t('tests.testDeleted'));
+      load();
+      loadAllTests();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const openCreateCategory = () => {
+    setEditingCategoryId(null);
+    setCategoryForm(emptyCategoryForm());
+    setCategoryFormOpen(true);
+  };
+
+  const openEditCategory = (cat) => {
+    setEditingCategoryId(cat.id);
+    setCategoryForm({
+      code: cat.code || '',
+      name: cat.name || '',
+      name_ar: cat.name_ar || '',
+      department: cat.department || '',
+      sort_order: cat.sort_order ?? 0,
+    });
+    setCategoryFormOpen(true);
+  };
+
+  const handleCategorySubmit = async (e) => {
+    e.preventDefault();
+    const payload = { ...categoryForm, sort_order: Number(categoryForm.sort_order) || 0 };
+    try {
+      if (editingCategoryId) {
+        await testsAPI.updateCategory(editingCategoryId, payload);
+        toast.success(t('tests.categoryUpdated'));
+      } else {
+        await testsAPI.createCategory(payload);
+        toast.success(t('tests.categoryCreated'));
+      }
+      setCategoryFormOpen(false);
+      loadCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!window.confirm(t('tests.confirmDeleteCategory'))) return;
+    try {
+      await testsAPI.deleteCategory(cat.id);
+      toast.success(t('tests.categoryDeleted'));
+      loadCategories();
+      if (categoryFilter === String(cat.id)) setCategoryFilter('');
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      toast.error(code === 'CATEGORY_HAS_TESTS' ? t('tests.categoryHasTests') : (err.response?.data?.error?.message || 'خطأ'));
+    }
+  };
+
+  const openCreatePackage = () => {
+    setEditingPackageId(null);
+    setPackageForm(emptyPackageForm());
+    setPackageSearch('');
+    setPackageFormOpen(true);
+  };
+
+  const openEditPackage = (pkg) => {
+    setEditingPackageId(pkg.id);
+    setPackageForm({
+      name: pkg.name || '',
+      name_ar: pkg.name_ar || '',
+      description: pkg.description || '',
+      price: pkg.price ?? 0,
+      discount_percent: pkg.discount_percent ?? 0,
+      test_ids: Array.isArray(pkg.test_ids) ? pkg.test_ids : [],
+    });
+    setPackageSearch('');
+    setPackageFormOpen(true);
+  };
+
+  const togglePackageTest = (testId) => {
+    setPackageForm((prev) => ({
+      ...prev,
+      test_ids: prev.test_ids.includes(testId)
+        ? prev.test_ids.filter((id) => id !== testId)
+        : [...prev.test_ids, testId],
+    }));
+  };
+
+  const packageIndividualTotal = packageForm.test_ids.reduce((sum, id) => {
+    const test = allTests.find((x) => x.id === id);
+    return sum + (test ? Number(test.price) || 0 : 0);
+  }, 0);
+
+  const handlePackageSubmit = async (e) => {
+    e.preventDefault();
+    if (!packageForm.test_ids.length) {
+      toast.error(t('tests.noTestsSelected'));
+      return;
+    }
+    const payload = {
+      ...packageForm,
+      price: Number(packageForm.price),
+      discount_percent: Number(packageForm.discount_percent) || 0,
+    };
+    try {
+      if (editingPackageId) {
+        await testsAPI.updatePackage(editingPackageId, payload);
+        toast.success(t('tests.packageUpdated'));
+      } else {
+        await testsAPI.createPackage(payload);
+        toast.success(t('tests.packageCreated'));
+      }
+      setPackageFormOpen(false);
+      loadPackages();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const handleDeletePackage = async (pkg) => {
+    if (!window.confirm(t('tests.confirmDeletePackage'))) return;
+    try {
+      await testsAPI.deletePackage(pkg.id);
+      toast.success(t('tests.packageDeleted'));
+      loadPackages();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const packageTestLabel = (pkg) => {
+    const names = (pkg.test_names || []).filter(Boolean);
+    if (!names.length) return '—';
+    return names.join(', ');
+  };
+
+  const filteredPackageTests = allTests.filter((test) => {
+    if (!packageSearch.trim()) return true;
+    const q = packageSearch.trim().toLowerCase();
+    return test.code?.toLowerCase().includes(q) || test.name?.toLowerCase().includes(q) || test.name_ar?.includes(q);
+  });
+
   const rangesForParam = (paramId) => detail?.reference_ranges?.filter((r) => r.parameter_id === paramId) || [];
 
   const columns = [
@@ -251,6 +432,74 @@ export default function Tests() {
               <Pencil size={14} /> {t('common.edit')}
             </button>
           )}
+          {canManage && (
+            <button onClick={() => handleDeleteTest(r)} className="text-red-600 text-sm flex items-center gap-1">
+              <Trash2 size={14} /> {t('common.delete')}
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const categoryColumns = [
+    { key: 'code', label: t('tests.categoryCode') },
+    {
+      key: 'name',
+      label: t('common.name'),
+      render: (r) => (
+        <div>
+          <p className="font-medium">{catLabel(r)}</p>
+          {r.name_ar && i18n.language !== 'ar' && <p className="text-xs text-gray-500">{r.name_ar}</p>}
+        </div>
+      ),
+    },
+    { key: 'department', label: t('tests.department'), render: (r) => r.department || '—' },
+    { key: 'sort_order', label: t('tests.sortOrder') },
+    {
+      key: 'actions',
+      label: t('common.actions'),
+      render: (r) => canManage && (
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => openEditCategory(r)} className="text-primary-600 text-sm flex items-center gap-1">
+            <Pencil size={14} /> {t('common.edit')}
+          </button>
+          <button onClick={() => handleDeleteCategory(r)} className="text-red-600 text-sm flex items-center gap-1">
+            <Trash2 size={14} /> {t('common.delete')}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const packageColumns = [
+    {
+      key: 'name',
+      label: t('tests.packageName'),
+      render: (r) => (
+        <div>
+          <p className="font-medium">{i18n.language === 'ar' && r.name_ar ? r.name_ar : r.name}</p>
+          {r.name_ar && i18n.language !== 'ar' && <p className="text-xs text-gray-500">{r.name_ar}</p>}
+        </div>
+      ),
+    },
+    { key: 'price', label: t('tests.price'), render: (r) => `${Number(r.price).toFixed(2)} SAR` },
+    {
+      key: 'test_names',
+      label: t('tests.testsInPackage'),
+      render: (r) => <span className="text-sm text-gray-600 dark:text-gray-400">{packageTestLabel(r)}</span>,
+    },
+    {
+      key: 'actions',
+      label: t('common.actions'),
+      render: (r) => canManage && (
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => openEditPackage(r)} className="text-primary-600 text-sm flex items-center gap-1">
+            <Pencil size={14} /> {t('common.edit')}
+          </button>
+          <button onClick={() => handleDeletePackage(r)} className="text-red-600 text-sm flex items-center gap-1">
+            <Trash2 size={14} /> {t('common.delete')}
+          </button>
         </div>
       ),
     },
@@ -258,12 +507,39 @@ export default function Tests() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-bold">{t('tests.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{tests.length} {t('nav.tests').toLowerCase()}</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {pageTab === 'tests' && `${tests.length} ${t('nav.tests').toLowerCase()}`}
+            {pageTab === 'categories' && `${categories.filter((c) => c.is_active !== false).length} ${t('tests.tabCategories').toLowerCase()}`}
+            {pageTab === 'packages' && `${packages.length} ${t('tests.tabPackages').toLowerCase()}`}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        {[
+          { id: 'tests', label: t('tests.tabTests'), icon: FlaskConical },
+          { id: 'categories', label: t('tests.tabCategories'), icon: FolderTree },
+          { id: 'packages', label: t('tests.tabPackages'), icon: Package },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setPageTab(id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${pageTab === id ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+          >
+            <Icon size={16} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {pageTab === 'tests' && (
+      <>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div className="hidden" />
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:ms-auto">
           <div className="relative flex-1 sm:flex-initial sm:min-w-[220px]">
             <Search size={16} className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400" />
             <input
@@ -275,7 +551,7 @@ export default function Tests() {
           </div>
           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="input-field w-auto">
             <option value="">{t('tests.allCategories')}</option>
-            {categories.map((c) => (
+            {activeCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {getCategoryEmoji(c)} {catLabel(c)}
               </option>
@@ -298,7 +574,7 @@ export default function Tests() {
           <FlaskConical size={20} className="mx-auto mb-1 text-primary-600" />
           <p className="font-semibold text-sm">{t('tests.allCategories')}</p>
         </button>
-        {categories.map((cat) => (
+        {activeCategories.map((cat) => (
           <button
             key={cat.id}
             type="button"
@@ -313,6 +589,38 @@ export default function Tests() {
       </div>
 
       <DataTable columns={columns} data={tests} loading={loading} onRowClick={openDetail} />
+      </>
+      )}
+
+      {pageTab === 'categories' && (
+        <>
+          <div className="flex justify-end mb-4">
+            {canManage && (
+              <button onClick={openCreateCategory} className="btn-primary flex items-center gap-2">
+                <Plus size={18} /> {t('tests.newCategory')}
+              </button>
+            )}
+          </div>
+          <DataTable
+            columns={categoryColumns}
+            data={categories.filter((c) => c.is_active !== false)}
+            loading={false}
+          />
+        </>
+      )}
+
+      {pageTab === 'packages' && (
+        <>
+          <div className="flex justify-end mb-4">
+            {canManage && (
+              <button onClick={openCreatePackage} className="btn-primary flex items-center gap-2">
+                <Plus size={18} /> {t('tests.newPackage')}
+              </button>
+            )}
+          </div>
+          <DataTable columns={packageColumns} data={packages} loading={false} />
+        </>
+      )}
 
       {/* إنشاء / تعديل فحص */}
       <Modal
@@ -352,7 +660,7 @@ export default function Tests() {
             <label className="block text-sm font-medium mb-1">{t('tests.category')}</label>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field" required>
               <option value="">—</option>
-              {categories.map((c) => (
+              {activeCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {getCategoryEmoji(c)} {catLabel(c)}
               </option>
@@ -381,6 +689,147 @@ export default function Tests() {
           </div>
           <div className="md:col-span-2 flex gap-2 justify-end">
             <button type="button" onClick={() => setFormOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary">{t('common.save')}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* إنشاء / تعديل نوع تحليل */}
+      <Modal
+        isOpen={categoryFormOpen}
+        onClose={() => setCategoryFormOpen(false)}
+        title={editingCategoryId ? t('tests.editCategory') : t('tests.newCategory')}
+        size="md"
+      >
+        <form onSubmit={handleCategorySubmit} className="space-y-4">
+          {[
+            { key: 'code', label: t('tests.categoryCode'), required: true },
+            { key: 'name', label: t('tests.nameEn'), required: true },
+            { key: 'name_ar', label: t('tests.nameAr') },
+            { key: 'department', label: t('tests.department') },
+          ].map((f) => (
+            <div key={f.key}>
+              <label className="block text-sm font-medium mb-1">{f.label}</label>
+              <input
+                value={categoryForm[f.key]}
+                onChange={(e) => setCategoryForm({ ...categoryForm, [f.key]: e.target.value })}
+                className="input-field"
+                required={f.required}
+              />
+            </div>
+          ))}
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('tests.sortOrder')}</label>
+            <input
+              type="number"
+              min="0"
+              value={categoryForm.sort_order}
+              onChange={(e) => setCategoryForm({ ...categoryForm, sort_order: e.target.value })}
+              className="input-field"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setCategoryFormOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary">{t('common.save')}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* إنشاء / تعديل باقة */}
+      <Modal
+        isOpen={packageFormOpen}
+        onClose={() => setPackageFormOpen(false)}
+        title={editingPackageId ? t('tests.editPackage') : t('tests.newPackage')}
+        size="lg"
+      >
+        <form onSubmit={handlePackageSubmit} className="space-y-4">
+          {[
+            { key: 'name', label: t('tests.nameEn'), required: true },
+            { key: 'name_ar', label: t('tests.nameAr') },
+          ].map((f) => (
+            <div key={f.key}>
+              <label className="block text-sm font-medium mb-1">{f.label}</label>
+              <input
+                value={packageForm[f.key]}
+                onChange={(e) => setPackageForm({ ...packageForm, [f.key]: e.target.value })}
+                className="input-field"
+                required={f.required}
+              />
+            </div>
+          ))}
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('tests.description')}</label>
+            <textarea
+              value={packageForm.description}
+              onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
+              className="input-field"
+              rows={2}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={packageForm.price}
+                onChange={(e) => setPackageForm({ ...packageForm, price: e.target.value })}
+                className="input-field"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('tests.discountPercent')}</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={packageForm.discount_percent}
+                onChange={(e) => setPackageForm({ ...packageForm, discount_percent: e.target.value })}
+                className="input-field"
+              />
+            </div>
+          </div>
+          {packageForm.test_ids.length > 0 && (
+            <p className="text-sm text-gray-500">
+              {t('tests.individualTotal')}: {packageIndividualTotal.toFixed(2)} SAR
+            </p>
+          )}
+          <div>
+            <label className="block text-sm font-medium mb-2">{t('tests.selectTestsForPackage')}</label>
+            <input
+              value={packageSearch}
+              onChange={(e) => setPackageSearch(e.target.value)}
+              placeholder={t('tests.searchPlaceholder')}
+              className="input-field mb-2"
+            />
+            <div className="max-h-56 overflow-y-auto border rounded-lg dark:border-gray-700 divide-y dark:divide-gray-700">
+              {filteredPackageTests.map((test) => (
+                <label key={test.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <input
+                    type="checkbox"
+                    checked={packageForm.test_ids.includes(test.id)}
+                    onChange={() => togglePackageTest(test.id)}
+                  />
+                  <span className="flex-1 text-sm">
+                    <span className="font-medium">{displayName(test)}</span>
+                    <span className="text-gray-500 ms-2">({test.code})</span>
+                  </span>
+                  <span className="text-sm text-gray-500">{Number(test.price).toFixed(2)} SAR</span>
+                </label>
+              ))}
+              {!filteredPackageTests.length && (
+                <p className="text-center text-gray-500 py-4 text-sm">{t('common.noData')}</p>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {packageForm.test_ids.length} {t('tests.tabTests').toLowerCase()}
+            </p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setPackageFormOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
             <button type="submit" className="btn-primary">{t('common.save')}</button>
           </div>
         </form>

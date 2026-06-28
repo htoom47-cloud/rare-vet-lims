@@ -2,7 +2,7 @@ const express = require('express');
 const service = require('../services/tests.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { testSchema } = require('../validators/schemas');
+const { testSchema, testCategorySchema, packageSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
@@ -10,7 +10,63 @@ router.use(authenticate);
 
 router.get('/categories', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
   try {
-    const data = await service.listCategories();
+    const data = await service.listCategories({ includeInactive: req.query.all === '1' });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/categories', authorize(PERMISSIONS.TESTS_MANAGE), validate(testCategorySchema), async (req, res, next) => {
+  try {
+    const data = await service.createCategory(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/categories/:id', authorize(PERMISSIONS.TESTS_MANAGE), validate(testCategorySchema), async (req, res, next) => {
+  try {
+    const data = await service.updateCategory(Number(req.params.id), req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/categories/:id', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.deleteCategory(Number(req.params.id));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/packages', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.listPackages({ includeInactive: req.query.all === '1' });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/packages/:id', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.getPackageById(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/packages', authorize(PERMISSIONS.TESTS_MANAGE), validate(packageSchema), async (req, res, next) => {
+  try {
+    const data = await service.createPackage(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/packages/:id', authorize(PERMISSIONS.TESTS_MANAGE), validate(packageSchema), async (req, res, next) => {
+  try {
+    const data = await service.updatePackage(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/packages/:id', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.deletePackage(req.params.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -39,6 +95,13 @@ router.post('/', authorize(PERMISSIONS.TESTS_MANAGE), validate(testSchema), asyn
 router.put('/:id', authorize(PERMISSIONS.TESTS_MANAGE), validate(testSchema), async (req, res, next) => {
   try {
     const data = await service.update(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.deleteTest(req.params.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
