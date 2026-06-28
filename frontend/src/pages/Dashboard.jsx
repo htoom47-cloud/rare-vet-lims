@@ -30,7 +30,7 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user, hasPermission, hasAnyPermission } = useAuth();
   const [stats, setStats] = useState(null);
@@ -43,6 +43,21 @@ export default function Dashboard() {
   if (loading) return <DashboardSkeleton />;
 
   const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+
+  const statusChartData = (stats?.status_breakdown || []).map((row) => ({
+    ...row,
+    count: Number(row.count) || 0,
+    label: t(`samples.statuses.${row.status}`, { defaultValue: row.status }),
+  }));
+
+  const formatMoney = (amount) => {
+    const n = Number(amount);
+    if (!Number.isFinite(n)) return '0';
+    return n.toLocaleString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+  };
 
   if (!isAdmin) {
     return (
@@ -129,9 +144,17 @@ export default function Dashboard() {
         animate="show"
       >
         <m.div variants={staggerItem}><StatCard title={t('dashboard.dailySamples')} value={stats?.daily_samples || 0} icon={FlaskConical} color="primary" /></m.div>
-        <m.div variants={staggerItem}><StatCard title={t('dashboard.revenue')} value={`SAR ${(stats?.daily_revenue || 0).toLocaleString()}`} icon={DollarSign} color="green" /></m.div>
+        <m.div variants={staggerItem}>
+          <StatCard
+            title={t('dashboard.revenue')}
+            value={`SAR ${formatMoney(stats?.daily_revenue)}`}
+            subtitle={stats?.daily_invoiced > 0 ? t('dashboard.invoicedToday', { amount: formatMoney(stats.daily_invoiced) }) : undefined}
+            icon={DollarSign}
+            color="green"
+          />
+        </m.div>
         <m.div variants={staggerItem}><StatCard title={t('dashboard.rejected')} value={stats?.rejected_samples || 0} icon={AlertTriangle} color="red" /></m.div>
-        <m.div variants={staggerItem}><StatCard title={t('dashboard.activeTests')} value={stats?.top_tests?.length || 0} icon={TrendingUp} color="blue" /></m.div>
+        <m.div variants={staggerItem}><StatCard title={t('dashboard.activeTests')} value={stats?.active_tests || 0} icon={TrendingUp} color="blue" /></m.div>
       </m.div>
 
       {hasAnyPermission('price_list.view', 'tests.view') && (
@@ -214,9 +237,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={stats?.top_tests || []}>
+              <BarChart data={(stats?.top_tests || []).map((row) => ({ ...row, count: Number(row.count) || 0 }))}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} stroke="#4A3728" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#A88644' }} />
+                <XAxis dataKey={i18n.language === 'ar' ? 'name_ar' : 'name'} tick={{ fontSize: 11, fill: '#A88644' }} />
                 <YAxis tick={{ fill: '#A88644' }} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #EDE0C8' }} />
                 <Bar dataKey="count" fill="#4A3728" radius={[6, 6, 0, 0]} />
@@ -232,8 +255,8 @@ export default function Dashboard() {
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={stats?.status_breakdown || []} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={80} label>
-                  {(stats?.status_breakdown || []).map((_, i) => (
+                <Pie data={statusChartData} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={80} label>
+                  {statusChartData.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
