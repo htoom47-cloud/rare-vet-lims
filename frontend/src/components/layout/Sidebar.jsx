@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, PawPrint, FlaskConical, TestTube, FileText, Activity, Stethoscope,
-  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt,
+  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isReception, userRole } from '../../utils/roles';
@@ -15,6 +15,7 @@ const receptionNavSections = [
       { path: '/', icon: LayoutDashboard, label: 'reception.home', permission: 'dashboard.view' },
       { path: '/workflow', icon: Route, label: 'reception.newCase', permission: 'samples.create' },
       { path: '/samples', icon: FlaskConical, label: 'reception.viewSamples', permission: 'samples.view' },
+      { path: '/price-list', icon: Tags, label: 'nav.priceList', permission: 'tests.view' },
       { path: '/billing', icon: CreditCard, label: 'reception.billing', permission: 'billing.view' },
       { path: '/accounting', icon: BarChart3, label: 'nav.accounting', permission: 'billing.view' },
       { path: '/invoice-settings', icon: Receipt, label: 'nav.invoiceSettings', permission: 'billing.view' },
@@ -31,6 +32,7 @@ const navSections = [
       { path: '/animals', icon: PawPrint, label: 'nav.animals', permission: 'animals.view' },
       { path: '/workflow', icon: Route, label: 'nav.workflow', permission: 'samples.create' },
       { path: '/samples', icon: FlaskConical, label: 'nav.samples', permission: 'samples.view' },
+      { path: '/price-list', icon: Tags, label: 'nav.priceList', permission: 'tests.view' },
       { path: '/billing', icon: CreditCard, label: 'nav.billing', permission: 'billing.view' },
       { path: '/accounting', icon: BarChart3, label: 'nav.accounting', permission: 'billing.view' },
       { path: '/invoice-settings', icon: Receipt, label: 'nav.invoiceSettings', permission: 'billing.view' },

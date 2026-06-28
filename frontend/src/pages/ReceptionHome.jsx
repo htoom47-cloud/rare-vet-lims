@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, FlaskConical, CreditCard, Search, BarChart3 } from 'lucide-react';
+import { Plus, FlaskConical, CreditCard, Search, BarChart3, Tags } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import { samplesAPI } from '../services/api';
@@ -62,16 +62,20 @@ export default function ReceptionHome() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <button onClick={() => navigate('/samples')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
           <FlaskConical className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('reception.viewSamples')}</span>
+        </button>
+        <button onClick={() => navigate('/price-list')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
+          <Tags className="text-primary-600" size={24} />
+          <span className="text-sm font-medium">{t('nav.priceList')}</span>
         </button>
         <button onClick={() => navigate('/billing')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
           <CreditCard className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('reception.billing')}</span>
         </button>
-        <button onClick={() => navigate('/accounting')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50 col-span-2 sm:col-span-1">
+        <button onClick={() => navigate('/accounting')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
           <BarChart3 className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('nav.accounting')}</span>
         </button>
