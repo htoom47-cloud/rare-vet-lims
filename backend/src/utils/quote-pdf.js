@@ -215,7 +215,10 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
     };
     totalLine('Subtotal', 'المجموع الفرعي', fmtMoney(quote.subtotal));
     if (parseFloat(quote.discount_amount) > 0) {
-      totalLine('Discount', 'الخصم', `- ${fmtMoney(quote.discount_amount)}`);
+      const pct = parseFloat(quote.discount_percent) || 0;
+      const discEn = pct > 0 ? `Discount (${pct}%)` : 'Discount';
+      const discAr = pct > 0 ? `خصم (${pct}%)` : 'الخصم';
+      totalLine(discEn, discAr, `- ${fmtMoney(quote.discount_amount)}`);
     }
     totalLine(`VAT ${quote.tax_rate || 15}%`, `ضريبة ${quote.tax_rate || 15}%`, fmtMoney(quote.tax_amount));
     totalLine('Total', 'الإجمالي', fmtMoney(quote.total), true);

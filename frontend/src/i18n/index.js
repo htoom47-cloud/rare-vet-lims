@@ -555,6 +555,9 @@ const resources = {
         invoiceDetails: 'Invoice details', itemsByAnimal: 'Items by animal', generalItems: 'General items',
         animalLabel: '{{type}} — {{tag}}', subtotal: 'Subtotal', tax: 'VAT 15%', total: 'Total',
         paid: 'Paid', balanceDue: 'Balance due', discount: 'Discount',
+        discountType: 'Discount type', discountNone: 'No discount',
+        discountPercent: 'Percentage (%)', discountFixed: 'Fixed amount (SAR)',
+        discountApplied: 'Applied discount',
         paymentHistory: 'Payment history', paymentMethod: 'Payment method', amount: 'Amount', reference: 'Reference',
         downloadPdf: 'Download PDF', regeneratePdf: 'Regenerate PDF', pdfFailed: 'Could not open invoice PDF',
         paymentMethods: {
@@ -1254,6 +1257,9 @@ const resources = {
         invoiceDetails: 'تفاصيل الفاتورة', itemsByAnimal: 'البنود حسب الحيوان', generalItems: 'بنود عامة',
         animalLabel: '{{type}} — {{tag}}', subtotal: 'المجموع', tax: 'ض.ق.م 15%', total: 'الإجمالي',
         paid: 'المدفوع', balanceDue: 'المتبقي', discount: 'الخصم',
+        discountType: 'نوع الخصم', discountNone: 'بدون خصم',
+        discountPercent: 'نسبة مئوية (%)', discountFixed: 'مبلغ محدد (ر.س)',
+        discountApplied: 'الخصم المطبّق',
         paymentHistory: 'سجل المدفوعات', paymentMethod: 'طريقة الدفع', amount: 'المبلغ', reference: 'المرجع',
         downloadPdf: 'تحميل PDF', regeneratePdf: 'إعادة إنشاء PDF', pdfFailed: 'تعذر فتح ملف الفاتورة',
         paymentMethods: {

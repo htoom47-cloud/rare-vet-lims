@@ -8,6 +8,8 @@ import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
+import DiscountField from '../components/billing/DiscountField';
+import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
 import { billingAPI, testsAPI } from '../services/api';
 
 function groupItemsByAnimal(items, t) {
@@ -51,8 +53,10 @@ export default function Billing() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [invoiceForm, setInvoiceForm] = useState({
-    customer_id: '', sample_id: '', discount_amount: 0, notes: '', items: [],
+    customer_id: '', sample_id: '', notes: '', items: [],
   });
+  const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [discountValue, setDiscountValue] = useState('');
   const [paymentForm, setPaymentForm] = useState({
     amount: '', method: 'cash', reference_number: '', notes: '',
   });
@@ -110,10 +114,14 @@ export default function Billing() {
     e.preventDefault();
     if (!invoiceForm.customer_id || !invoiceForm.items.length) return toast.error('اختر العميل وأضف بنود الفاتورة');
     try {
-      await billingAPI.createInvoice(invoiceForm);
+      const subtotal = invoiceForm.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+      const discountFields = buildDiscountPayload(subtotal, discountType, discountValue);
+      await billingAPI.createInvoice({ ...invoiceForm, ...discountFields });
       toast.success('تم إنشاء الفاتورة');
       setInvoiceModal(false);
-      setInvoiceForm({ customer_id: '', sample_id: '', discount_amount: 0, notes: '', items: [] });
+      setInvoiceForm({ customer_id: '', sample_id: '', notes: '', items: [] });
+      setDiscountType(DISCOUNT_TYPES.NONE);
+      setDiscountValue('');
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -195,7 +203,8 @@ export default function Billing() {
   ];
 
   const subtotal = invoiceForm.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
-  const afterDiscount = subtotal - (Number(invoiceForm.discount_amount) || 0);
+  const discountAmount = resolveDiscountAmount(subtotal, discountType, discountValue);
+  const afterDiscount = subtotal - discountAmount;
   const tax = afterDiscount * 0.15;
   const total = afterDiscount + tax;
 
@@ -370,8 +379,13 @@ export default function Billing() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">خصم (SAR)</label>
-              <input type="number" min="0" value={invoiceForm.discount_amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, discount_amount: e.target.value })} className="input-field" />
+              <DiscountField
+                subtotal={subtotal}
+                type={discountType}
+                value={discountValue}
+                onTypeChange={setDiscountType}
+                onValueChange={setDiscountValue}
+              />
             </div>
           </div>
 
@@ -404,6 +418,12 @@ export default function Billing() {
 
           <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
             <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>SAR {subtotal.toFixed(2)}</span></div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-red-600">
+                <span>{t('billing.discount')}:</span>
+                <span>- SAR {discountAmount.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>SAR {tax.toFixed(2)}</span></div>
             <div className="flex justify-between font-bold text-base"><span>{t('billing.total')}:</span><span>SAR {total.toFixed(2)}</span></div>
           </div>

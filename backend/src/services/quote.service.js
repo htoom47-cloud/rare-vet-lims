@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { generateQuotePDF } = require('../utils/quote-pdf');
 const invoiceSettingsService = require('./invoice-settings.service');
+const { resolveDiscount } = require('../utils/discount');
 
 const quotePdfDir = () => path.join(env.storage.path, 'quotes');
 
@@ -94,7 +95,8 @@ const createQuote = async (data, userId) => {
     if (!customerName) throw new AppError('Customer name is required', 400, 'VALIDATION_ERROR');
 
     const subtotal = data.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-    const discount = data.discount_amount || 0;
+    const discount = resolveDiscount(subtotal, data);
+    const discountPercent = parseFloat(data.discount_percent) || 0;
     const taxable = Math.max(0, subtotal - discount);
     const taxRate = 15;
     const taxAmount = taxable * (taxRate / 100);
@@ -107,11 +109,11 @@ const createQuote = async (data, userId) => {
     const quoteResult = await client.query(
       `INSERT INTO price_quotes (
         id, quote_number, customer_id, customer_name, customer_name_ar, customer_mobile,
-        subtotal, discount_amount, tax_rate, tax_amount, total, notes, valid_until, status, created_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'sent',$14) RETURNING *`,
+        subtotal, discount_amount, discount_percent, tax_rate, tax_amount, total, notes, valid_until, status, created_by
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'sent',$15) RETURNING *`,
       [
         quoteId, quoteNumber, customerId, customerName, customerNameAr, customerMobile,
-        subtotal, discount, taxRate, taxAmount, total, data.notes || null, validUntil, userId,
+        subtotal, discount, discountPercent, taxRate, taxAmount, total, data.notes || null, validUntil, userId,
       ]
     );
 

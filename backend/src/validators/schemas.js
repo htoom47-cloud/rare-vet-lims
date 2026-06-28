@@ -110,6 +110,7 @@ const invoiceSchema = Joi.object({
     unit_price: Joi.number().min(0).required(),
   })).min(1).required(),
   discount_amount: Joi.number().min(0).default(0),
+  discount_percent: Joi.number().min(0).max(100).default(0),
   notes: Joi.string().allow('', null),
 });
 
@@ -126,6 +127,7 @@ const quoteSchema = Joi.object({
     unit_price: Joi.number().min(0).required(),
   })).min(1).required(),
   discount_amount: Joi.number().min(0).default(0),
+  discount_percent: Joi.number().min(0).max(100).default(0),
   notes: Joi.string().allow('', null),
   valid_until: Joi.date().iso().allow(null),
 });

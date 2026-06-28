@@ -11,6 +11,7 @@ const { syncCustomerArBalance } = require('./accounting.service');
 const ledger = require('./ledger.service');
 const { assertDayOpen } = require('./daily-closing.service');
 const { logBillingAudit } = require('../utils/billing-audit');
+const { resolveDiscount } = require('../utils/discount');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -121,7 +122,8 @@ const createInvoice = async (data, userId) => {
 
     const invoiceNumber = generateCode('INV');
     const subtotal = data.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-    const discount = data.discount_amount || 0;
+    const discount = resolveDiscount(subtotal, data);
+    const discountPercent = parseFloat(data.discount_percent) || 0;
     const taxable = subtotal - discount;
     const taxRate = 15;
     const taxAmount = taxable * (taxRate / 100);
@@ -129,9 +131,9 @@ const createInvoice = async (data, userId) => {
 
     const invoiceId = uuidv4();
     const invoiceResult = await client.query(
-      `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, tax_rate, tax_amount, total, status, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'issued',$10,$11) RETURNING *`,
-      [invoiceId, invoiceNumber, data.customer_id, data.sample_id, subtotal, discount, taxRate, taxAmount, total, data.notes, userId]
+      `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, discount_percent, tax_rate, tax_amount, total, status, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'issued',$11,$12) RETURNING *`,
+      [invoiceId, invoiceNumber, data.customer_id, data.sample_id, subtotal, discount, discountPercent, taxRate, taxAmount, total, data.notes, userId]
     );
 
     const invoice = invoiceResult.rows[0];

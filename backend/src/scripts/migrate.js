@@ -218,6 +218,7 @@ async function applyPatches() {
         customer_mobile VARCHAR(50),
         subtotal DECIMAL(12,2) NOT NULL,
         discount_amount DECIMAL(12,2) DEFAULT 0,
+        discount_percent DECIMAL(5,2) DEFAULT 0,
         tax_rate DECIMAL(5,2) DEFAULT 15,
         tax_amount DECIMAL(12,2) NOT NULL,
         total DECIMAL(12,2) NOT NULL,
@@ -244,6 +245,12 @@ async function applyPatches() {
     `);
     await client.query('CREATE INDEX IF NOT EXISTS idx_price_quotes_created ON price_quotes(created_at DESC)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_price_quote_items_quote ON price_quote_items(quote_id)');
+    await client.query(`
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) DEFAULT 0
+    `);
+    await client.query(`
+      ALTER TABLE price_quotes ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) DEFAULT 0
+    `);
   } finally {
     client.release();
   }

@@ -7,6 +7,8 @@ import { testsAPI, billingAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import CustomerSearch from '../components/customers/CustomerSearch';
+import DiscountField from '../components/billing/DiscountField';
+import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
@@ -17,12 +19,12 @@ const defaultValidUntil = () => {
   return d.toISOString().slice(0, 10);
 };
 
-const calcTotals = (items, discount = 0) => {
+const calcTotals = (items, discountType, discountValue) => {
   const subtotal = items.reduce((s, i) => s + parseFloat(i.unit_price || 0) * (i.quantity || 1), 0);
-  const disc = parseFloat(discount) || 0;
+  const disc = resolveDiscountAmount(subtotal, discountType, discountValue);
   const taxable = Math.max(0, subtotal - disc);
   const taxAmount = taxable * 0.15;
-  return { subtotal, taxAmount, total: taxable + taxAmount };
+  return { subtotal, discountAmount: disc, taxAmount, total: taxable + taxAmount };
 };
 
 const newLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -50,7 +52,8 @@ export default function PriceList() {
   const [lineItems, setLineItems] = useState([]);
   const [selectedTestId, setSelectedTestId] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState('');
-  const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [discountValue, setDiscountValue] = useState('');
   const [notes, setNotes] = useState('');
   const [validUntil, setValidUntil] = useState(defaultValidUntil());
   const [submitting, setSubmitting] = useState(false);
@@ -115,7 +118,7 @@ export default function PriceList() {
     });
   }, [filtered, categories, i18n.language]);
 
-  const totals = useMemo(() => calcTotals(lineItems, discount), [lineItems, discount]);
+  const totals = useMemo(() => calcTotals(lineItems, discountType, discountValue), [lineItems, discountType, discountValue]);
   const totalTests = filtered.length;
 
   const handleCustomerChange = (id, customer) => {
@@ -168,7 +171,8 @@ export default function PriceList() {
     setCustomerNameAr('');
     setCustomerMobile('');
     setLineItems([]);
-    setDiscount(0);
+    setDiscountType(DISCOUNT_TYPES.NONE);
+    setDiscountValue('');
     setNotes('');
     setValidUntil(defaultValidUntil());
     setLastQuote(null);
@@ -198,6 +202,8 @@ export default function PriceList() {
     }
     setSubmitting(true);
     try {
+      const subtotal = lineItems.reduce((s, i) => s + (parseFloat(i.unit_price) || 0) * (parseInt(i.quantity, 10) || 1), 0);
+      const discountFields = buildDiscountPayload(subtotal, discountType, discountValue);
       const payload = {
         customer_id: customerId || null,
         customer_name: customerName.trim(),
@@ -210,7 +216,7 @@ export default function PriceList() {
           quantity: parseInt(quantity, 10) || 1,
           unit_price: parseFloat(unit_price) || 0,
         })),
-        discount_amount: parseFloat(discount) || 0,
+        ...discountFields,
         notes: notes.trim() || null,
         valid_until: validUntil || null,
       };
@@ -424,17 +430,13 @@ export default function PriceList() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">{t('priceList.discount')}</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="input-field"
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                />
-              </div>
+              <DiscountField
+                subtotal={totals.subtotal}
+                type={discountType}
+                value={discountValue}
+                onTypeChange={setDiscountType}
+                onValueChange={setDiscountValue}
+              />
               <div>
                 <label className="block text-sm font-medium mb-1">{t('priceList.notes')}</label>
                 <input
@@ -448,8 +450,8 @@ export default function PriceList() {
 
             <div className="bg-primary-50 rounded-lg p-4 space-y-1 text-sm max-w-xs ms-auto">
               <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmt(totals.subtotal)}</span></div>
-              {parseFloat(discount) > 0 && (
-                <div className="flex justify-between text-red-600"><span>{t('priceList.discount')}</span><span>- {fmt(discount)}</span></div>
+              {totals.discountAmount > 0 && (
+                <div className="flex justify-between text-red-600"><span>{t('priceList.discount')}</span><span>- {fmt(totals.discountAmount)}</span></div>
               )}
               <div className="flex justify-between"><span>{t('priceList.vat')}</span><span>{fmt(totals.taxAmount)}</span></div>
               <div className="flex justify-between font-bold text-base border-t pt-1 mt-1"><span>{t('priceList.grandTotal')}</span><span>{fmt(totals.total)}</span></div>

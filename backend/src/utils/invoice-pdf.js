@@ -245,7 +245,10 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     };
     totalLine('Subtotal', 'المجموع الفرعي', fmtMoney(invoice.subtotal));
     if (parseFloat(invoice.discount_amount) > 0) {
-      totalLine('Discount', 'الخصم', `- ${fmtMoney(invoice.discount_amount)}`);
+      const pct = parseFloat(invoice.discount_percent) || 0;
+      const discEn = pct > 0 ? `Discount (${pct}%)` : 'Discount';
+      const discAr = pct > 0 ? `خصم (${pct}%)` : 'الخصم';
+      totalLine(discEn, discAr, `- ${fmtMoney(invoice.discount_amount)}`);
     }
     totalLine(`VAT ${invoice.tax_rate || 15}%`, `ضريبة ${invoice.tax_rate || 15}%`, fmtMoney(invoice.tax_amount));
     totalLine('Total', 'الإجمالي', fmtMoney(invoice.total), true);
