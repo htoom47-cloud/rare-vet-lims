@@ -2,7 +2,7 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
-const { drawArBox, drawEn, registerPdfFonts, hasArabic } = require('./pdf-arabic');
+const { drawArBox, drawEn, registerPdfFonts, hasArabic, resolveBilingualCustomer } = require('./pdf-arabic');
 const { mergeInvoiceSettings } = require('./invoice-settings');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
@@ -139,8 +139,7 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
   const totalPaid = parseFloat(invoice.total_paid || 0);
   const balanceDue = Math.max(0, parseFloat(invoice.total) - totalPaid);
   const status = STATUS_LABEL[invoice.status] || STATUS_LABEL.issued;
-  const customerAr = invoice.customer_name_ar || (hasArabic(invoice.customer_name) ? invoice.customer_name : null);
-  const customerEn = invoice.customer_name || '-';
+  const { customerEn, customerAr } = resolveBilingualCustomer(invoice.customer_name, invoice.customer_name_ar);
 
   let qrDataUrl = null;
   if (showQr && invoice.vat_qr_data) {
@@ -181,13 +180,16 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     metaRow(doc, y + 32, 16, 'Status', 'الحالة', `${status.en} / ${status.ar}`);
     y += metaH + 8;
 
-    const custH = customerAr ? 40 : 32;
+    const custH = (customerAr || invoice.customer_mobile) ? 40 : 32;
     strokeBox(doc, MARGIN, y, TW, custH);
-    cellLatin(doc, `Customer: ${customerEn}`, MARGIN + 8, y + 6, TW / 2 - 12, { size: 8, bold: true });
+    cellLatin(doc, 'Customer:', MARGIN + 8, y + 6, 58, { size: 8, bold: true });
+    if (customerEn) {
+      cellLatin(doc, customerEn, MARGIN + 66, y + 6, TW / 2 - 74, { size: 8, bold: true });
+    }
     cellArabic(doc, 'العميل:', MARGIN + TW / 2 + 8, y + 6, 52, { size: 8, bold: true, align: 'right' });
     if (customerAr) {
       cellArabic(doc, customerAr, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
-    } else {
+    } else if (customerEn) {
       cellLatin(doc, customerEn, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
     }
     if (invoice.customer_mobile) {

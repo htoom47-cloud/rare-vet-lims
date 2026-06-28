@@ -1,7 +1,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const { drawArBox, drawEn, registerPdfFonts, hasArabic } = require('./pdf-arabic');
+const { drawArBox, drawEn, registerPdfFonts, hasArabic, resolveBilingualCustomer } = require('./pdf-arabic');
 const { mergeInvoiceSettings } = require('./invoice-settings');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
@@ -116,8 +116,7 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
   fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, filename);
 
-  const customerAr = quote.customer_name_ar || (hasArabic(quote.customer_name) ? quote.customer_name : null);
-  const customerEn = quote.customer_name || '-';
+  const { customerEn, customerAr } = resolveBilingualCustomer(quote.customer_name, quote.customer_name_ar);
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
@@ -153,13 +152,16 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
     }
     y += metaH + 8;
 
-    const custH = customerAr ? 40 : 32;
+    const custH = (customerAr || quote.customer_mobile) ? 40 : 32;
     strokeBox(doc, MARGIN, y, TW, custH);
-    cellLatin(doc, `Customer: ${customerEn}`, MARGIN + 8, y + 6, TW / 2 - 12, { size: 8, bold: true });
+    cellLatin(doc, 'Customer:', MARGIN + 8, y + 6, 58, { size: 8, bold: true });
+    if (customerEn) {
+      cellLatin(doc, customerEn, MARGIN + 66, y + 6, TW / 2 - 74, { size: 8, bold: true });
+    }
     cellArabic(doc, 'العميل:', MARGIN + TW / 2 + 8, y + 6, 52, { size: 8, bold: true, align: 'right' });
     if (customerAr) {
       cellArabic(doc, customerAr, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
-    } else {
+    } else if (customerEn) {
       cellLatin(doc, customerEn, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
     }
     if (quote.customer_mobile) {

@@ -17,6 +17,15 @@ const ARABIC_RUN = /[\u0600-\u06FF\u0750-\u077F]+/g;
 
 const hasArabic = (t) => ARABIC_RE.test(String(t || ''));
 
+/** Split customer name for bilingual PDF rows — never pass Arabic through Latin font. */
+const resolveBilingualCustomer = (name, nameAr) => {
+  const raw = String(name || '').trim();
+  const arField = String(nameAr || '').trim();
+  const customerAr = arField || (hasArabic(raw) ? raw : null);
+  const customerEn = raw && !hasArabic(raw) ? raw : null;
+  return { customerEn, customerAr };
+};
+
 const registerPdfFonts = (doc) => {
   if (HAS_FONT) {
     doc.registerFont('Ar', FONT_PATH);
@@ -152,6 +161,6 @@ const drawArAtRight = (doc, text, rightX, y, opts = {}) => {
 const drawArRasterInBox = drawArAtRight;
 
 module.exports = {
-  HAS_FONT, hasArabic, registerPdfFonts, drawEn, drawAr, drawArBox, drawArCell,
+  HAS_FONT, hasArabic, resolveBilingualCustomer, registerPdfFonts, drawEn, drawAr, drawArBox, drawArCell,
   measureEn, measureAr, drawArAtRight, drawArRasterInBox, shapeVisual, arLine,
 };
