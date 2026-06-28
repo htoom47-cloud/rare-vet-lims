@@ -458,6 +458,7 @@ const resources = {
         individualTotal: 'Individual tests total',
         noTestsSelected: 'Select at least one test',
         discountPercent: 'Discount %',
+        duplicateCode: 'This test code is already in use — choose a different code',
       },
       reports: {
         title: 'Reports', subtitle: 'Professional laboratory reports',
@@ -1154,6 +1155,7 @@ const resources = {
         individualTotal: 'مجموع الفحوصات منفردة',
         noTestsSelected: 'اختر فحصاً واحداً على الأقل',
         discountPercent: 'نسبة الخصم',
+        duplicateCode: 'كود الفحص مستخدم مسبقاً — اختر كوداً آخر',
       },
       reports: {
         title: 'التقارير المخبرية', subtitle: 'تقارير مخبرية احترافية',

@@ -95,20 +95,46 @@ const getById = async (id) => {
 };
 
 const create = async (data) => {
+  const existing = await query('SELECT id, is_active FROM tests WHERE code = $1', [data.code]);
+  const row = existing.rows[0];
+
+  if (row?.is_active) {
+    throw new AppError('Test code already exists', 400, 'DUPLICATE_CODE');
+  }
+
+  const values = [
+    data.code, data.name, data.name_ar || null, data.category_id, data.description || null,
+    data.price, data.turnaround_hours, data.unit || null, data.method || null, data.label_copies ?? 1,
+  ];
+
+  if (row && !row.is_active) {
+    const result = await query(
+      `UPDATE tests SET code=$1, name=$2, name_ar=$3, category_id=$4, description=$5, price=$6,
+       turnaround_hours=$7, unit=$8, method=$9, label_copies=$10, is_active=true, updated_at=NOW()
+       WHERE id=$11 RETURNING *`,
+      [...values, row.id]
+    );
+    return result.rows[0];
+  }
+
   const result = await query(
     `INSERT INTO tests (code, name, name_ar, category_id, description, price, turnaround_hours, unit, method, label_copies)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-    [data.code, data.name, data.name_ar, data.category_id, data.description, data.price, data.turnaround_hours, data.unit, data.method, data.label_copies ?? 1]
+    values
   );
   return result.rows[0];
 };
 
 const update = async (id, data) => {
   await getById(id);
+  const dup = await query('SELECT id FROM tests WHERE code = $1 AND id != $2 AND is_active = true', [data.code, id]);
+  if (dup.rows[0]) {
+    throw new AppError('Test code already exists', 400, 'DUPLICATE_CODE');
+  }
   const result = await query(
     `UPDATE tests SET code=$1, name=$2, name_ar=$3, category_id=$4, description=$5, price=$6,
      turnaround_hours=$7, unit=$8, method=$9, label_copies=$10, updated_at=NOW() WHERE id=$11 RETURNING *`,
-    [data.code, data.name, data.name_ar, data.category_id, data.description, data.price, data.turnaround_hours, data.unit, data.method, data.label_copies ?? 1, id]
+    [data.code, data.name, data.name_ar || null, data.category_id, data.description || null, data.price, data.turnaround_hours, data.unit || null, data.method || null, data.label_copies ?? 1, id]
   );
   return result.rows[0];
 };

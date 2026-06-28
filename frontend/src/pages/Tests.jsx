@@ -150,6 +150,16 @@ export default function Tests() {
     await loadDetail(test.id);
   };
 
+  const apiErrorMessage = (err) => {
+    const code = err.response?.data?.error?.code;
+    if (code === 'DUPLICATE_CODE') return t('tests.duplicateCode');
+    if (code === 'VALIDATION_ERROR') {
+      const details = err.response?.data?.error?.details;
+      if (details?.length) return details.map((d) => d.message).join(' · ');
+    }
+    return err.response?.data?.error?.message || t('common.error');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
@@ -172,7 +182,7 @@ export default function Tests() {
       load();
       loadAllTests();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      toast.error(apiErrorMessage(err));
     }
   };
 

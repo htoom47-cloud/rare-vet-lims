@@ -11,8 +11,19 @@ class AppError extends Error {
 }
 
 const errorHandler = (err, req, res, _next) => {
-  const statusCode = err.statusCode || 500;
-  const code = err.code || 'INTERNAL_ERROR';
+  let error = err;
+
+  if (!error.isOperational && error.code === '23505') {
+    const field = error.detail?.match(/\(([^)]+)\)/)?.[1] || 'value';
+    error = new AppError(`Duplicate ${field} already exists`, 400, 'DUPLICATE', { field });
+  } else if (!error.isOperational && error.code === '23503') {
+    error = new AppError('Referenced record not found', 400, 'FOREIGN_KEY');
+  } else if (!error.isOperational && error.code === '42703') {
+    error = new AppError('Database schema is out of date — run migrations', 500, 'SCHEMA_OUTDATED');
+  }
+
+  const statusCode = error.statusCode || 500;
+  const code = error.code || 'INTERNAL_ERROR';
 
   logger.error('Request error', {
     message: err.message,
@@ -27,11 +38,11 @@ const errorHandler = (err, req, res, _next) => {
     success: false,
     error: {
       code,
-      message: err.isOperational
-        ? err.message
-        : (process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'),
-      ...(err.details && { details: err.details }),
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+      message: error.isOperational
+        ? error.message
+        : (process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'),
+      ...(error.details && { details: error.details }),
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     },
   });
 };
