@@ -9,7 +9,7 @@ import { samplesAPI } from '../services/api';
 export default function ReceptionHome() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasAnyPermission } = useAuth();
   const [customerId, setCustomerId] = useState('');
   const [recentSamples, setRecentSamples] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,10 +67,12 @@ export default function ReceptionHome() {
           <FlaskConical className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('reception.viewSamples')}</span>
         </button>
+        {hasAnyPermission('price_list.view', 'tests.view') && (
         <button onClick={() => navigate('/price-list')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
           <Tags className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('nav.priceList')}</span>
         </button>
+        )}
         <button onClick={() => navigate('/billing')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
           <CreditCard className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('reception.billing')}</span>

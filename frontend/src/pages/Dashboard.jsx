@@ -32,7 +32,7 @@ function DashboardSkeleton() {
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, hasAnyPermission } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +65,7 @@ export default function Dashboard() {
           </m.div>
         </m.div>
 
-        {hasPermission('tests.view') && (
+        {hasAnyPermission('price_list.view', 'tests.view') && (
           <m.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6"
             initial={{ opacity: 0, y: 8 }}
@@ -134,7 +134,7 @@ export default function Dashboard() {
         <m.div variants={staggerItem}><StatCard title={t('dashboard.activeTests')} value={stats?.top_tests?.length || 0} icon={TrendingUp} color="blue" /></m.div>
       </m.div>
 
-      {hasPermission('tests.view') && (
+      {hasAnyPermission('price_list.view', 'tests.view') && (
         <m.div
           className="mb-6"
           initial={{ opacity: 0, y: 8 }}

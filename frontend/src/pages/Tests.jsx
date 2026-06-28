@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3, Trash2, Package, FolderTree } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3, Trash2, Package, FolderTree, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -73,6 +73,8 @@ export default function Tests() {
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
   const catLabel = (cat) => (i18n.language === 'ar' && cat?.name_ar ? cat.name_ar : cat?.name);
   const activeCategories = categories.filter((c) => c.is_active !== false);
+  const testsCountForCategory = (categoryId) =>
+    allTests.filter((t) => Number(t.category_id) === Number(categoryId)).length;
 
   const load = () => {
     setLoading(true);
@@ -289,6 +291,7 @@ export default function Tests() {
       }
       setCategoryFormOpen(false);
       loadCategories();
+      load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
     }
@@ -448,14 +451,22 @@ export default function Tests() {
       key: 'name',
       label: t('common.name'),
       render: (r) => (
-        <div>
-          <p className="font-medium">{catLabel(r)}</p>
-          {r.name_ar && i18n.language !== 'ar' && <p className="text-xs text-gray-500">{r.name_ar}</p>}
+        <div className="flex items-center gap-2">
+          <span className="text-lg leading-none" aria-hidden="true">{getCategoryEmoji(r)}</span>
+          <div>
+            <p className="font-medium">{catLabel(r)}</p>
+            {r.name_ar && i18n.language !== 'ar' && <p className="text-xs text-gray-500">{r.name_ar}</p>}
+          </div>
         </div>
       ),
     },
     { key: 'department', label: t('tests.department'), render: (r) => r.department || '—' },
     { key: 'sort_order', label: t('tests.sortOrder') },
+    {
+      key: 'test_count',
+      label: t('tests.testsInCategory'),
+      render: (r) => testsCountForCategory(r.id),
+    },
     {
       key: 'actions',
       label: t('common.actions'),
@@ -558,6 +569,15 @@ export default function Tests() {
             ))}
           </select>
           {canManage && (
+            <button
+              type="button"
+              onClick={() => setPageTab('categories')}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Settings2 size={18} /> {t('tests.manageCategories')}
+            </button>
+          )}
+          {canManage && (
             <button onClick={openCreate} className="btn-primary flex items-center gap-2">
               <Plus size={18} /> {t('common.add')}
             </button>
@@ -575,16 +595,27 @@ export default function Tests() {
           <p className="font-semibold text-sm">{t('tests.allCategories')}</p>
         </button>
         {activeCategories.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => setCategoryFilter(String(cat.id))}
-            className={`card p-4 text-center transition border-2 ${categoryFilter === String(cat.id) ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:border-primary-300'}`}
-          >
-            <span className="text-2xl mb-1 leading-none" aria-hidden="true">{getCategoryEmoji(cat)}</span>
-            <p className="font-semibold text-sm">{catLabel(cat)}</p>
-            <p className="text-xs text-gray-500">{cat.department}</p>
-          </button>
+          <div key={cat.id} className="relative group">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter(String(cat.id))}
+              className={`card p-4 text-center transition border-2 w-full ${categoryFilter === String(cat.id) ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:border-primary-300'}`}
+            >
+              <span className="text-2xl mb-1 leading-none" aria-hidden="true">{getCategoryEmoji(cat)}</span>
+              <p className="font-semibold text-sm">{catLabel(cat)}</p>
+              <p className="text-xs text-gray-500">{cat.department}</p>
+            </button>
+            {canManage && (
+              <button
+                type="button"
+                title={t('tests.editCategory')}
+                onClick={(e) => { e.stopPropagation(); openEditCategory(cat); }}
+                className="absolute top-2 end-2 p-1.5 rounded-lg bg-white/90 dark:bg-gray-800/90 shadow opacity-0 group-hover:opacity-100 transition-opacity text-primary-600"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
         ))}
       </div>
 
@@ -594,17 +625,19 @@ export default function Tests() {
 
       {pageTab === 'categories' && (
         <>
-          <div className="flex justify-end mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <p className="text-sm text-gray-500">{t('tests.categoriesHint')}</p>
             {canManage && (
-              <button onClick={openCreateCategory} className="btn-primary flex items-center gap-2">
+              <button onClick={openCreateCategory} className="btn-primary flex items-center gap-2 shrink-0">
                 <Plus size={18} /> {t('tests.newCategory')}
               </button>
             )}
           </div>
           <DataTable
             columns={categoryColumns}
-            data={categories.filter((c) => c.is_active !== false)}
+            data={activeCategories}
             loading={false}
+            onRowClick={canManage ? openEditCategory : undefined}
           />
         </>
       )}
@@ -703,7 +736,7 @@ export default function Tests() {
       >
         <form onSubmit={handleCategorySubmit} className="space-y-4">
           {[
-            { key: 'code', label: t('tests.categoryCode'), required: true },
+            { key: 'code', label: t('tests.categoryCode'), required: true, disabled: !!editingCategoryId },
             { key: 'name', label: t('tests.nameEn'), required: true },
             { key: 'name_ar', label: t('tests.nameAr') },
             { key: 'department', label: t('tests.department') },
@@ -715,6 +748,7 @@ export default function Tests() {
                 onChange={(e) => setCategoryForm({ ...categoryForm, [f.key]: e.target.value })}
                 className="input-field"
                 required={f.required}
+                disabled={f.disabled}
               />
             </div>
           ))}

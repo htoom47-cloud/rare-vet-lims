@@ -68,7 +68,7 @@ export default function App() {
               <Route path="parasitology" element={<ProtectedRoute permissions={['results.enter', 'results.validate']}><Parasitology /></ProtectedRoute>} />
               <Route path="parasitology/upload" element={<ProtectedRoute permission="results.upload_images"><ParasitologyUpload /></ProtectedRoute>} />
               <Route path="vet-review" element={<ProtectedRoute permission="results.validate"><VetReview /></ProtectedRoute>} />
-              <Route path="price-list" element={<ProtectedRoute permission="tests.view"><PriceList /></ProtectedRoute>} />
+              <Route path="price-list" element={<ProtectedRoute permissions={['price_list.view', 'tests.view']}><PriceList /></ProtectedRoute>} />
               <Route path="tests" element={<ProtectedRoute permission="tests.view"><Tests /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute permission="reports.view"><Reports /></ProtectedRoute>} />
               <Route path="reports/:id/view" element={<ProtectedRoute permission="reports.view"><LaboratoryReport /></ProtectedRoute>} />

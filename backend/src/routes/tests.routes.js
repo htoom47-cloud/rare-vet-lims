@@ -8,7 +8,7 @@ const { PERMISSIONS } = require('../utils/permissions');
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/categories', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
+router.get('/categories', authorize(PERMISSIONS.TESTS_VIEW, PERMISSIONS.PRICE_LIST_VIEW), async (req, res, next) => {
   try {
     const data = await service.listCategories({ includeInactive: req.query.all === '1' });
     res.json({ success: true, data });
@@ -36,14 +36,14 @@ router.delete('/categories/:id', authorize(PERMISSIONS.TESTS_MANAGE), async (req
   } catch (err) { next(err); }
 });
 
-router.get('/packages', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
+router.get('/packages', authorize(PERMISSIONS.TESTS_VIEW, PERMISSIONS.PRICE_LIST_VIEW), async (req, res, next) => {
   try {
     const data = await service.listPackages({ includeInactive: req.query.all === '1' });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
-router.get('/packages/:id', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
+router.get('/packages/:id', authorize(PERMISSIONS.TESTS_VIEW, PERMISSIONS.PRICE_LIST_VIEW), async (req, res, next) => {
   try {
     const data = await service.getPackageById(req.params.id);
     res.json({ success: true, data });
@@ -71,7 +71,7 @@ router.delete('/packages/:id', authorize(PERMISSIONS.TESTS_MANAGE), async (req, 
   } catch (err) { next(err); }
 });
 
-router.get('/', authorize(PERMISSIONS.TESTS_VIEW), async (req, res, next) => {
+router.get('/', authorize(PERMISSIONS.TESTS_VIEW, PERMISSIONS.PRICE_LIST_VIEW), async (req, res, next) => {
   try {
     const data = await service.list(req.query);
     res.json({ success: true, ...data });

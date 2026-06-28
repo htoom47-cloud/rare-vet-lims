@@ -29,8 +29,9 @@ const newLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}
 
 export default function PriceList() {
   const { t, i18n } = useTranslation();
-  const { hasPermission } = useAuth();
-  const canViewPackages = hasPermission('billing.view');
+  const { hasPermission, hasAnyPermission } = useAuth();
+  const canViewPriceList = hasAnyPermission('price_list.view', 'tests.view');
+  const canViewPackages = canViewPriceList;
   const canCreateQuote = hasPermission('billing.create');
 
   const [activeTab, setActiveTab] = useState('prices');
@@ -65,7 +66,7 @@ export default function PriceList() {
     Promise.all([
       testsAPI.list({ limit: 500 }),
       testsAPI.categories(),
-      canViewPackages ? billingAPI.packages().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+      canViewPackages ? testsAPI.listPackages().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
     ])
       .then(([testsRes, catsRes, pkgRes]) => {
         setTests(testsRes.data.data || []);
