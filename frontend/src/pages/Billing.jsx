@@ -9,7 +9,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
-import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
+import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload, initDiscountFromInvoice, calcInvoiceTotals } from '../utils/discount';
 import { billingAPI, testsAPI } from '../services/api';
 
 function groupItemsByAnimal(items, t) {
@@ -60,6 +60,8 @@ export default function Billing() {
   const [paymentForm, setPaymentForm] = useState({
     amount: '', method: 'cash', reference_number: '', notes: '',
   });
+  const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
 
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -131,16 +133,21 @@ export default function Billing() {
   const recordPayment = async (e) => {
     e.preventDefault();
     try {
+      const subtotal = parseFloat(selectedInvoice.subtotal) || 0;
+      const discountFields = buildDiscountPayload(subtotal, paymentDiscountType, paymentDiscountValue);
       await billingAPI.recordPayment({
         invoice_id: selectedInvoice.id,
         amount: Number(paymentForm.amount),
         method: paymentForm.method,
         reference_number: paymentForm.reference_number,
         notes: paymentForm.notes,
+        ...discountFields,
       });
       toast.success('تم تسجيل الدفع');
       setPaymentModal(false);
       setPaymentForm({ amount: '', method: 'cash', reference_number: '', notes: '' });
+      setPaymentDiscountType(DISCOUNT_TYPES.NONE);
+      setPaymentDiscountValue('');
       load();
       if (detailInvoice?.id === selectedInvoice.id) openInvoiceDetail(selectedInvoice);
     } catch (err) {
@@ -150,7 +157,7 @@ export default function Billing() {
 
   const openPayment = async (invoice) => {
     let inv = invoice;
-    if (inv.balance_due === undefined) {
+    if (inv.balance_due === undefined || inv.subtotal === undefined) {
       try {
         const { data } = await billingAPI.getInvoice(invoice.id);
         inv = data.data;
@@ -159,10 +166,36 @@ export default function Billing() {
       }
     }
     setSelectedInvoice(inv);
-    const due = inv.balance_due ?? inv.total;
-    setPaymentForm({ amount: String(parseFloat(due).toFixed(2)), method: 'cash', reference_number: '', notes: '' });
+    const { type, value } = initDiscountFromInvoice(inv);
+    setPaymentDiscountType(type);
+    setPaymentDiscountValue(value);
+    const paid = parseFloat(inv.total_paid || 0);
+    const preview = calcInvoiceTotals(inv.subtotal, type, value, inv.tax_rate || 15, paid);
+    setPaymentForm({
+      amount: String(preview.balanceDue.toFixed(2)),
+      method: 'cash',
+      reference_number: '',
+      notes: '',
+    });
     setPaymentModal(true);
   };
+
+  const paymentPreview = useMemo(() => {
+    if (!selectedInvoice) return null;
+    const paid = parseFloat(selectedInvoice.total_paid || 0);
+    return calcInvoiceTotals(
+      selectedInvoice.subtotal,
+      paymentDiscountType,
+      paymentDiscountValue,
+      selectedInvoice.tax_rate || 15,
+      paid,
+    );
+  }, [selectedInvoice, paymentDiscountType, paymentDiscountValue]);
+
+  useEffect(() => {
+    if (!paymentModal || !paymentPreview) return;
+    setPaymentForm((prev) => ({ ...prev, amount: String(paymentPreview.balanceDue.toFixed(2)) }));
+  }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue]);
 
   const openInvoicePdf = async (invoiceId, regenerate = false) => {
     setPdfLoading(true);
@@ -437,9 +470,33 @@ export default function Billing() {
 
       <Modal isOpen={paymentModal} onClose={() => setPaymentModal(false)} title={`${t('billing.payment')} — ${selectedInvoice?.invoice_number}`}>
         <form onSubmit={recordPayment} className="space-y-4">
+          {paymentPreview && (
+            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-sm space-y-1">
+              <div className="flex justify-between"><span>{t('billing.subtotal')}</span><span>SAR {paymentPreview.subtotal.toFixed(2)}</span></div>
+              {paymentPreview.discountAmount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>{t('billing.discount')}</span><span>- SAR {paymentPreview.discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between"><span>{t('billing.tax')}</span><span>SAR {paymentPreview.taxAmount.toFixed(2)}</span></div>
+              <div className="flex justify-between font-semibold"><span>{t('billing.total')}</span><span>SAR {paymentPreview.total.toFixed(2)}</span></div>
+              <div className="flex justify-between text-primary-700 font-bold border-t pt-1 mt-1">
+                <span>{t('billing.balanceDue')}</span><span>SAR {paymentPreview.balanceDue.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
+          <DiscountField
+            subtotal={parseFloat(selectedInvoice?.subtotal) || 0}
+            type={paymentDiscountType}
+            value={paymentDiscountValue}
+            onTypeChange={setPaymentDiscountType}
+            onValueChange={setPaymentDiscountValue}
+          />
+
           <div>
-            <label className="block text-sm font-medium mb-1">المبلغ (SAR)</label>
-            <input type="number" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
+            <label className="block text-sm font-medium mb-1">{t('billing.amount')} (SAR)</label>
+            <input type="number" step="0.01" min="0" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('billing.paymentMethod')}</label>

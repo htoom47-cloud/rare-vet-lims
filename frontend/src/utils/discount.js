@@ -19,3 +19,30 @@ export function buildDiscountPayload(subtotal, type, value) {
   const discount_percent = type === DISCOUNT_TYPES.PERCENT ? (parseFloat(value) || 0) : 0;
   return { discount_amount, discount_percent };
 }
+
+/** Initialize discount field state from an existing invoice. */
+export function initDiscountFromInvoice(invoice) {
+  if (!invoice) return { type: DISCOUNT_TYPES.NONE, value: '' };
+  const pct = parseFloat(invoice.discount_percent) || 0;
+  const amt = parseFloat(invoice.discount_amount) || 0;
+  if (pct > 0) return { type: DISCOUNT_TYPES.PERCENT, value: String(pct) };
+  if (amt > 0) return { type: DISCOUNT_TYPES.AMOUNT, value: String(amt) };
+  return { type: DISCOUNT_TYPES.NONE, value: '' };
+}
+
+/** Preview invoice totals with discount before/at payment. */
+export function calcInvoiceTotals(subtotal, discountType, discountValue, taxRate = 15, alreadyPaid = 0) {
+  const sub = parseFloat(subtotal) || 0;
+  const discountAmount = resolveDiscountAmount(sub, discountType, discountValue);
+  const taxable = Math.max(0, sub - discountAmount);
+  const taxAmount = taxable * ((parseFloat(taxRate) || 15) / 100);
+  const total = taxable + taxAmount;
+  const paid = parseFloat(alreadyPaid) || 0;
+  return {
+    subtotal: sub,
+    discountAmount,
+    taxAmount,
+    total,
+    balanceDue: Math.max(0, total - paid),
+  };
+}

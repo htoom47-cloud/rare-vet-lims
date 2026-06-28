@@ -10,6 +10,10 @@ import { billingAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
+import DiscountField from '../components/billing/DiscountField';
+import {
+  DISCOUNT_TYPES, buildDiscountPayload, initDiscountFromInvoice, calcInvoiceTotals,
+} from '../utils/discount';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -65,6 +69,8 @@ export default function AccountingReports() {
   const [refundModal, setRefundModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', reference_number: '', notes: '' });
+  const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
   const [refundForm, setRefundForm] = useState({ amount: '', reason: '' });
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -172,25 +178,66 @@ export default function AccountingReports() {
     }
   };
 
-  const openPayment = (invoice) => {
-    setSelectedInvoice(invoice);
-    const due = invoice.balance_due ?? invoice.total;
-    setPaymentForm({ amount: String(parseFloat(due).toFixed(2)), method: 'cash', reference_number: '', notes: '' });
+  const openPayment = async (invoice) => {
+    let inv = invoice;
+    if (inv.balance_due === undefined || inv.subtotal === undefined) {
+      try {
+        const { data } = await billingAPI.getInvoice(invoice.id);
+        inv = data.data;
+      } catch {
+        inv = invoice;
+      }
+    }
+    setSelectedInvoice(inv);
+    const { type, value } = initDiscountFromInvoice(inv);
+    setPaymentDiscountType(type);
+    setPaymentDiscountValue(value);
+    const paid = parseFloat(inv.total_paid || 0);
+    const preview = calcInvoiceTotals(inv.subtotal, type, value, inv.tax_rate || 15, paid);
+    setPaymentForm({
+      amount: String(preview.balanceDue.toFixed(2)),
+      method: 'cash',
+      reference_number: '',
+      notes: '',
+    });
     setPaymentModal(true);
   };
+
+  const paymentPreview = useMemo(() => {
+    if (!selectedInvoice) return null;
+    const paid = parseFloat(selectedInvoice.total_paid || 0);
+    return calcInvoiceTotals(
+      selectedInvoice.subtotal,
+      paymentDiscountType,
+      paymentDiscountValue,
+      selectedInvoice.tax_rate || 15,
+      paid,
+    );
+  }, [selectedInvoice, paymentDiscountType, paymentDiscountValue]);
+
+  useEffect(() => {
+    if (!paymentModal || !paymentPreview) return;
+    setPaymentForm((prev) => ({ ...prev, amount: String(paymentPreview.balanceDue.toFixed(2)) }));
+  }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue]);
 
   const recordPayment = async (e) => {
     e.preventDefault();
     try {
+      const subtotal = parseFloat(selectedInvoice.subtotal) || 0;
+      const discountFields = buildDiscountPayload(subtotal, paymentDiscountType, paymentDiscountValue);
       await billingAPI.recordPayment({
         invoice_id: selectedInvoice.id,
         amount: Number(paymentForm.amount),
         method: paymentForm.method,
         reference_number: paymentForm.reference_number,
         notes: paymentForm.notes,
+        ...discountFields,
       });
       toast.success(t('accounting.paymentRecorded'));
       setPaymentModal(false);
+      setPaymentForm({ amount: '', method: 'cash', reference_number: '', notes: '' });
+      setPaymentDiscountType(DISCOUNT_TYPES.NONE);
+      setPaymentDiscountValue('');
       loadInvoices();
       loadDashboard();
       loadDayStatus();
@@ -717,9 +764,33 @@ export default function AccountingReports() {
 
       <Modal isOpen={paymentModal} onClose={() => setPaymentModal(false)} title={`${t('billing.payment')} — ${selectedInvoice?.invoice_number}`}>
         <form onSubmit={recordPayment} className="space-y-4">
+          {paymentPreview && (
+            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-sm space-y-1">
+              <div className="flex justify-between"><span>{t('billing.subtotal')}</span><span>{fmt(paymentPreview.subtotal)}</span></div>
+              {paymentPreview.discountAmount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>{t('billing.discount')}</span><span>- {fmt(paymentPreview.discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between"><span>{t('billing.tax')}</span><span>{fmt(paymentPreview.taxAmount)}</span></div>
+              <div className="flex justify-between font-semibold"><span>{t('billing.total')}</span><span>{fmt(paymentPreview.total)}</span></div>
+              <div className="flex justify-between text-primary-700 font-bold border-t pt-1 mt-1">
+                <span>{t('billing.balanceDue')}</span><span>{fmt(paymentPreview.balanceDue)}</span>
+              </div>
+            </div>
+          )}
+
+          <DiscountField
+            subtotal={parseFloat(selectedInvoice?.subtotal) || 0}
+            type={paymentDiscountType}
+            value={paymentDiscountValue}
+            onTypeChange={setPaymentDiscountType}
+            onValueChange={setPaymentDiscountValue}
+          />
+
           <div>
-            <label className="block text-sm font-medium mb-1">{t('billing.amount')}</label>
-            <input type="number" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
+            <label className="block text-sm font-medium mb-1">{t('billing.amount')} (SAR)</label>
+            <input type="number" step="0.01" min="0" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('billing.paymentMethod')}</label>

@@ -175,7 +175,7 @@ const recordPayment = async (data, userId, req = null) => {
     await client.query('BEGIN');
 
     const invoiceResult = await client.query('SELECT * FROM invoices WHERE id = $1', [data.invoice_id]);
-    const invoice = invoiceResult.rows[0];
+    let invoice = invoiceResult.rows[0];
     if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
     if (['cancelled', 'refunded'].includes(invoice.status)) {
       throw new AppError('Cannot pay cancelled or refunded invoice', 400, 'INVALID_STATUS');
@@ -188,7 +188,29 @@ const recordPayment = async (data, userId, req = null) => {
       [data.invoice_id]
     );
     const alreadyPaid = parseFloat(paidResult.rows[0].total_paid);
-    const balance = Math.max(0, parseFloat(invoice.total) - alreadyPaid);
+
+    const subtotal = parseFloat(invoice.subtotal);
+    const taxRate = parseFloat(invoice.tax_rate) || 15;
+    const discountPercent = parseFloat(data.discount_percent) || 0;
+    const discountAmount = resolveDiscount(subtotal, {
+      discount_amount: data.discount_amount,
+      discount_percent: discountPercent,
+    });
+    const taxable = Math.max(0, subtotal - discountAmount);
+    const taxAmount = taxable * (taxRate / 100);
+    const newTotal = taxable + taxAmount;
+
+    if (alreadyPaid > newTotal + 0.01) {
+      throw new AppError('Discount exceeds amount already paid', 400, 'INVALID_DISCOUNT');
+    }
+
+    await client.query(
+      `UPDATE invoices SET discount_amount = $1, discount_percent = $2, tax_amount = $3, total = $4, pdf_url = NULL, updated_at = NOW() WHERE id = $5`,
+      [discountAmount, discountPercent, taxAmount, newTotal, data.invoice_id]
+    );
+    invoice = { ...invoice, discount_amount: discountAmount, discount_percent: discountPercent, tax_amount: taxAmount, total: newTotal };
+
+    const balance = Math.max(0, newTotal - alreadyPaid);
     const amount = parseFloat(data.amount);
     if (amount <= 0) throw new AppError('Invalid payment amount', 400, 'INVALID_AMOUNT');
     if (amount > balance + 0.01) throw new AppError('Payment exceeds balance due', 400, 'OVERPAYMENT');
@@ -201,7 +223,7 @@ const recordPayment = async (data, userId, req = null) => {
 
     const totalPaid = alreadyPaid + amount;
     let status = 'partial';
-    if (totalPaid >= parseFloat(invoice.total)) status = 'paid';
+    if (totalPaid >= newTotal - 0.01) status = 'paid';
     await client.query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
 
     await client.query('COMMIT');
@@ -220,6 +242,9 @@ const recordPayment = async (data, userId, req = null) => {
         amount,
         method: data.method,
         status,
+        discount_amount: discountAmount,
+        discount_percent: discountPercent,
+        total: newTotal,
       },
       req,
     });

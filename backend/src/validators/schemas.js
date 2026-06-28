@@ -138,6 +138,8 @@ const paymentSchema = Joi.object({
   method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit').required(),
   reference_number: Joi.string().allow('', null),
   notes: Joi.string().allow('', null),
+  discount_amount: Joi.number().min(0).default(0),
+  discount_percent: Joi.number().min(0).max(100).default(0),
 });
 
 const inventorySchema = Joi.object({
