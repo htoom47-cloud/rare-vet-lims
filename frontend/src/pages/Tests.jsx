@@ -406,6 +406,53 @@ export default function Tests() {
 
   const rangesForParam = (paramId) => detail?.reference_ranges?.filter((r) => r.parameter_id === paramId) || [];
 
+  const renderCategoryCard = (cat, { editMode = false } = {}) => (
+    <div key={cat.id} className="relative">
+      <button
+        type="button"
+        onClick={() => (editMode && canManage ? openEditCategory(cat) : setCategoryFilter(String(cat.id)))}
+        className={`card p-4 text-center transition border-2 w-full ${
+          !editMode && categoryFilter === String(cat.id)
+            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+            : 'border-transparent hover:border-primary-300'
+        }`}
+      >
+        <span className="text-2xl mb-1 leading-none block" aria-hidden="true">{getCategoryEmoji(cat)}</span>
+        <p className="font-semibold text-sm">{catLabel(cat)}</p>
+        <p className="text-xs text-gray-500">{cat.department || '—'}</p>
+        {canManage && !editMode && (
+          <p className="text-[10px] text-primary-500 mt-1">{t('tests.clickToFilterCategory')}</p>
+        )}
+      </button>
+      {canManage && (
+        <div className={`flex items-center justify-center gap-1 mt-1.5 ${editMode ? '' : 'absolute top-2 end-2'}`}>
+          <button
+            type="button"
+            title={t('tests.editCategory')}
+            onClick={() => openEditCategory(cat)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+              editMode
+                ? 'btn-secondary flex-1 justify-center'
+                : 'bg-white/95 dark:bg-gray-800/95 shadow text-primary-600'
+            }`}
+          >
+            <Pencil size={12} /> {t('tests.clickToEditCategory')}
+          </button>
+          {editMode && (
+            <button
+              type="button"
+              title={t('common.delete')}
+              onClick={() => handleDeleteCategory(cat)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/20"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const columns = [
     { key: 'code', label: t('tests.code') },
     {
@@ -604,30 +651,11 @@ export default function Tests() {
           <FlaskConical size={20} className="mx-auto mb-1 text-primary-600" />
           <p className="font-semibold text-sm">{t('tests.allCategories')}</p>
         </button>
-        {activeCategories.map((cat) => (
-          <div key={cat.id} className="relative group">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter(String(cat.id))}
-              className={`card p-4 text-center transition border-2 w-full ${categoryFilter === String(cat.id) ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:border-primary-300'}`}
-            >
-              <span className="text-2xl mb-1 leading-none" aria-hidden="true">{getCategoryEmoji(cat)}</span>
-              <p className="font-semibold text-sm">{catLabel(cat)}</p>
-              <p className="text-xs text-gray-500">{cat.department}</p>
-            </button>
-            {canManage && (
-              <button
-                type="button"
-                title={t('tests.editCategory')}
-                onClick={(e) => { e.stopPropagation(); openEditCategory(cat); }}
-                className="absolute top-2 end-2 p-1.5 rounded-lg bg-white/90 dark:bg-gray-800/90 shadow opacity-0 group-hover:opacity-100 transition-opacity text-primary-600"
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-          </div>
-        ))}
+        {activeCategories.map((cat) => renderCategoryCard(cat))}
       </div>
+      {canManage && (
+        <p className="text-xs text-gray-500 -mt-4 mb-6">{t('tests.categoriesGridHint')}</p>
+      )}
 
       <DataTable columns={columns} data={tests} loading={loading} onRowClick={openDetail} />
       </>
@@ -643,12 +671,30 @@ export default function Tests() {
               </button>
             )}
           </div>
-          <DataTable
-            columns={categoryColumns}
-            data={activeCategories}
-            loading={false}
-            onRowClick={canManage ? openEditCategory : undefined}
-          />
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+            {canManage && (
+              <button
+                type="button"
+                onClick={openCreateCategory}
+                className="card p-4 text-center border-2 border-dashed border-primary-300 hover:border-primary-500 hover:bg-primary-50/50 dark:hover:bg-primary-900/20 transition min-h-[120px] flex flex-col items-center justify-center gap-2"
+              >
+                <Plus size={24} className="text-primary-600" />
+                <p className="font-semibold text-sm text-primary-700 dark:text-primary-300">{t('tests.newCategory')}</p>
+              </button>
+            )}
+            {activeCategories.map((cat) => renderCategoryCard(cat, { editMode: true }))}
+          </div>
+          <details className="mb-4">
+            <summary className="text-sm text-gray-500 cursor-pointer">{t('tests.testsInCategory')} — {t('common.view')}</summary>
+            <div className="mt-3">
+              <DataTable
+                columns={categoryColumns}
+                data={activeCategories}
+                loading={false}
+                onRowClick={canManage ? openEditCategory : undefined}
+              />
+            </div>
+          </details>
         </>
       )}
 
