@@ -214,8 +214,8 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
       { w: 24, en: '#', ar: '#' },
       { w: colDesc, en: 'Description', ar: 'الوصف' },
       { w: 52, en: 'Qty', ar: 'الكمية' },
-      { w: 58, en: 'Price', ar: 'السعر' },
-      { w: 58, en: 'Total', ar: 'الإجمالي' },
+      { w: 58, en: 'Unit excl.', ar: 'الوحدة (بدون ض.)' },
+      { w: 58, en: 'Total excl.', ar: 'الإجمالي (بدون ض.)' },
     ];
     y = drawTableHeader(doc, tableCols, y, 22);
 
@@ -243,15 +243,15 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
       cellArabic(doc, labelAr, totalsX + 52, y + 3, labelW, { size: 7, bold, align: 'right' });
       y += 16;
     };
-    totalLine('Subtotal', 'المجموع الفرعي', fmtMoney(invoice.subtotal));
+    totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(invoice.subtotal));
     if (parseFloat(invoice.discount_amount) > 0) {
       const pct = parseFloat(invoice.discount_percent) || 0;
       const discEn = pct > 0 ? `Discount (${pct}%)` : 'Discount';
       const discAr = pct > 0 ? `خصم (${pct}%)` : 'الخصم';
       totalLine(discEn, discAr, `- ${fmtMoney(invoice.discount_amount)}`);
     }
-    totalLine(`VAT ${invoice.tax_rate || 15}%`, `ضريبة ${invoice.tax_rate || 15}%`, fmtMoney(invoice.tax_amount));
-    totalLine('Total', 'الإجمالي', fmtMoney(invoice.total), true);
+    totalLine(`VAT ${invoice.tax_rate || 15}%`, `ضريبة القيمة المضافة ${invoice.tax_rate || 15}%`, fmtMoney(invoice.tax_amount));
+    totalLine('Total incl. VAT', 'الإجمالي شامل الضريبة', fmtMoney(invoice.total), true);
     if (totalPaid > 0) totalLine('Paid', 'المدفوع', fmtMoney(totalPaid));
     if (balanceDue > 0.009) totalLine('Balance Due', 'المتبقي', fmtMoney(balanceDue), true);
 

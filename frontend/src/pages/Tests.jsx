@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal';
 import { testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
+import { fmtIncl } from '../utils/vat';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -475,7 +476,7 @@ export default function Tests() {
         </span>
       ),
     },
-    { key: 'price', label: t('tests.price'), render: (r) => `${Number(r.price).toFixed(2)} SAR` },
+    { key: 'price', label: t('tests.price'), render: (r) => fmtIncl(r.price) },
     { key: 'turnaround_hours', label: t('tests.turnaround') },
     { key: 'label_copies', label: t('tests.labelCopies'), render: (r) => r.label_copies ?? 1 },
     { key: 'unit', label: t('tests.unit'), render: (r) => r.unit || '—' },
@@ -551,7 +552,7 @@ export default function Tests() {
         </div>
       ),
     },
-    { key: 'price', label: t('tests.price'), render: (r) => `${Number(r.price).toFixed(2)} SAR` },
+    { key: 'price', label: t('tests.price'), render: (r) => fmtIncl(r.price) },
     {
       key: 'test_names',
       label: t('tests.testsInPackage'),
@@ -757,7 +758,7 @@ export default function Tests() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR)</label>
+            <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR) — {t('priceList.priceExclVat')}</label>
             <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" required />
           </div>
           <div>
@@ -858,7 +859,7 @@ export default function Tests() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR)</label>
+              <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR) — {t('priceList.priceExclVat')}</label>
               <input
                 type="number"
                 min="0"

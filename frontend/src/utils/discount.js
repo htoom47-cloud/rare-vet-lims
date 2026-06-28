@@ -30,8 +30,10 @@ export function initDiscountFromInvoice(invoice) {
   return { type: DISCOUNT_TYPES.NONE, value: '' };
 }
 
+import { VAT_RATE } from './vat';
+
 /** Preview invoice totals with discount before/at payment. */
-export function calcInvoiceTotals(subtotal, discountType, discountValue, taxRate = 15, alreadyPaid = 0) {
+export function calcInvoiceTotals(subtotal, discountType, discountValue, taxRate = VAT_RATE, alreadyPaid = 0) {
   const sub = parseFloat(subtotal) || 0;
   const discountAmount = resolveDiscountAmount(sub, discountType, discountValue);
   const taxable = Math.max(0, sub - discountAmount);

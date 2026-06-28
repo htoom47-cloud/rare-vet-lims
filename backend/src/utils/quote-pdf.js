@@ -186,8 +186,8 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
       { w: 24, en: '#', ar: '#' },
       { w: colDesc, en: 'Description', ar: 'الوصف' },
       { w: 52, en: 'Qty', ar: 'الكمية' },
-      { w: 58, en: 'Price', ar: 'السعر' },
-      { w: 58, en: 'Total', ar: 'الإجمالي' },
+      { w: 58, en: 'Unit excl.', ar: 'الوحدة (بدون ض.)' },
+      { w: 58, en: 'Total excl.', ar: 'الإجمالي (بدون ض.)' },
     ];
     y = drawTableHeader(doc, tableCols, y, 22);
 
@@ -213,15 +213,15 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
       cellArabic(doc, labelAr, totalsX + 52, y + 3, labelW, { size: 7, bold, align: 'right' });
       y += 16;
     };
-    totalLine('Subtotal', 'المجموع الفرعي', fmtMoney(quote.subtotal));
+    totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(quote.subtotal));
     if (parseFloat(quote.discount_amount) > 0) {
       const pct = parseFloat(quote.discount_percent) || 0;
       const discEn = pct > 0 ? `Discount (${pct}%)` : 'Discount';
       const discAr = pct > 0 ? `خصم (${pct}%)` : 'الخصم';
       totalLine(discEn, discAr, `- ${fmtMoney(quote.discount_amount)}`);
     }
-    totalLine(`VAT ${quote.tax_rate || 15}%`, `ضريبة ${quote.tax_rate || 15}%`, fmtMoney(quote.tax_amount));
-    totalLine('Total', 'الإجمالي', fmtMoney(quote.total), true);
+    totalLine(`VAT ${quote.tax_rate || 15}%`, `ضريبة القيمة المضافة ${quote.tax_rate || 15}%`, fmtMoney(quote.tax_amount));
+    totalLine('Total incl. VAT', 'الإجمالي شامل الضريبة', fmtMoney(quote.total), true);
 
     if (quote.notes) {
       y += 10;

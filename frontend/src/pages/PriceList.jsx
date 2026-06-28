@@ -9,9 +9,10 @@ import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
+import { fmtIncl, fmtNet, fmtGross, grossToNet, netToGross, VAT_RATE } from '../utils/vat';
 import toast from 'react-hot-toast';
 
-const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
+const fmt = fmtIncl;
 
 const defaultValidUntil = () => {
   const d = new Date();
@@ -23,7 +24,7 @@ const calcTotals = (items, discountType, discountValue) => {
   const subtotal = items.reduce((s, i) => s + parseFloat(i.unit_price || 0) * (i.quantity || 1), 0);
   const disc = resolveDiscountAmount(subtotal, discountType, discountValue);
   const taxable = Math.max(0, subtotal - disc);
-  const taxAmount = taxable * 0.15;
+  const taxAmount = taxable * (VAT_RATE / 100);
   return { subtotal, discountAmount: disc, taxAmount, total: taxable + taxAmount };
 };
 
@@ -386,8 +387,8 @@ export default function PriceList() {
                     <tr className="bg-gray-50 border-b">
                       <th className="p-2 text-start">{t('tests.nameEn')}</th>
                       <th className="p-2 w-20">{t('priceList.quantity')}</th>
-                      <th className="p-2 w-28">{t('priceList.unitPrice')}</th>
-                      <th className="p-2 w-28 text-end">{t('priceList.lineTotal')}</th>
+                      <th className="p-2 w-28">{t('priceList.unitPriceIncl')}</th>
+                      <th className="p-2 w-28 text-end">{t('priceList.lineTotalIncl')}</th>
                       <th className="p-2 w-10" />
                     </tr>
                   </thead>
@@ -410,12 +411,12 @@ export default function PriceList() {
                             min="0"
                             step="0.01"
                             className="input-field py-1"
-                            value={item.unit_price}
-                            onChange={(e) => updateItem(item._key, 'unit_price', e.target.value)}
+                            value={netToGross(item.unit_price).toFixed(2)}
+                            onChange={(e) => updateItem(item._key, 'unit_price', grossToNet(e.target.value))}
                           />
                         </td>
                         <td className="p-2 text-end font-medium">
-                          {fmt((parseFloat(item.unit_price) || 0) * (parseInt(item.quantity, 10) || 1))}
+                          {fmtIncl((parseFloat(item.unit_price) || 0) * (parseInt(item.quantity, 10) || 1))}
                         </td>
                         <td className="p-2">
                           <button type="button" onClick={() => removeItem(item._key)} className="p-1 text-red-500 hover:bg-red-50 rounded">
@@ -449,12 +450,12 @@ export default function PriceList() {
             </div>
 
             <div className="bg-primary-50 rounded-lg p-4 space-y-1 text-sm max-w-xs ms-auto">
-              <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmt(totals.subtotal)}</span></div>
+              <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(totals.subtotal)}</span></div>
               {totals.discountAmount > 0 && (
-                <div className="flex justify-between text-red-600"><span>{t('priceList.discount')}</span><span>- {fmt(totals.discountAmount)}</span></div>
+                <div className="flex justify-between text-red-600"><span>{t('priceList.discount')}</span><span>- {fmtNet(totals.discountAmount)}</span></div>
               )}
-              <div className="flex justify-between"><span>{t('priceList.vat')}</span><span>{fmt(totals.taxAmount)}</span></div>
-              <div className="flex justify-between font-bold text-base border-t pt-1 mt-1"><span>{t('priceList.grandTotal')}</span><span>{fmt(totals.total)}</span></div>
+              <div className="flex justify-between"><span>{t('priceList.vat')}</span><span>{fmtNet(totals.taxAmount)}</span></div>
+              <div className="flex justify-between font-bold text-base border-t pt-1 mt-1"><span>{t('priceList.grandTotal')}</span><span>{fmtGross(totals.total)}</span></div>
             </div>
 
             <div className="flex gap-3">
