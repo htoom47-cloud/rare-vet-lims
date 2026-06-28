@@ -196,6 +196,18 @@ const updateStatus = async (id, status, extra = {}) => {
   return result.rows[0];
 };
 
+/** Tests still needing technician result entry (excludes paras + already-entered + tests without parameters). */
+const WORKBENCH_PENDING = `
+  st.sample_id = s.id
+  AND NOT (t.code = ANY($1::text[]))
+  AND EXISTS (SELECT 1 FROM test_parameters tp WHERE tp.test_id = t.id)
+  AND NOT EXISTS (
+    SELECT 1 FROM results r
+    JOIN result_values rv ON rv.result_id = r.id
+    WHERE r.sample_test_id = st.id
+  )
+`;
+
 const getQueue = async (technicianId) => {
   const params = [PARAS_TEST_CODES];
   let where = `WHERE s.status IN ('received', 'running')`;
@@ -207,10 +219,13 @@ const getQueue = async (technicianId) => {
 
   const result = await query(
     `SELECT s.*, c.full_name as customer_name, a.animal_code,
-            (SELECT COUNT(*) FROM sample_tests st
+            (SELECT COUNT(*)::int FROM sample_tests st
              JOIN tests t ON st.test_id = t.id
-             WHERE st.sample_id = s.id AND st.status != 'completed'
-               AND NOT (t.code = ANY($1::text[]))) as pending_tests
+             WHERE ${WORKBENCH_PENDING}) as pending_tests,
+            (SELECT COALESCE(array_agg(t.name ORDER BY t.name), ARRAY[]::text[])
+             FROM sample_tests st
+             JOIN tests t ON st.test_id = t.id
+             WHERE ${WORKBENCH_PENDING}) as pending_test_names
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
@@ -218,8 +233,7 @@ const getQueue = async (technicianId) => {
        AND EXISTS (
          SELECT 1 FROM sample_tests st
          JOIN tests t ON st.test_id = t.id
-         WHERE st.sample_id = s.id AND st.status != 'completed'
-           AND NOT (t.code = ANY($1::text[]))
+         WHERE ${WORKBENCH_PENDING}
        )
      ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`,
     params

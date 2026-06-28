@@ -135,7 +135,14 @@ export default function TechnicianWorkbench() {
             </div>
             <p className="text-sm text-gray-500">{sample.customer_name}</p>
             <p className="text-sm">{sample.animal_code}</p>
-            <p className="text-xs text-gray-400 mt-2">{sample.pending_tests} {t('workbench.testsPending')}</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">
+              {sample.pending_tests} {t('workbench.testsPending')}
+            </p>
+            {sample.pending_test_names?.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={sample.pending_test_names.join('، ')}>
+                {sample.pending_test_names.join('، ')}
+              </p>
+            )}
           </div>
         ))}
         {!queue.length && <p className="text-gray-500 col-span-full text-center py-8">{t('workbench.emptyQueue')}</p>}
