@@ -4,9 +4,10 @@ const invoiceSettingsService = require('../services/invoice-settings.service');
 const accounting = require('../services/accounting.service');
 const dailyClosing = require('../services/daily-closing.service');
 const ledger = require('../services/ledger.service');
+const quoteService = require('../services/quote.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { invoiceSchema, paymentSchema } = require('../validators/schemas');
+const { invoiceSchema, quoteSchema, paymentSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
@@ -156,6 +157,33 @@ router.get('/customers/:customerId/statement', authorize(PERMISSIONS.BILLING_VIE
   try {
     const data = await accounting.getCustomerStatement(req.params.customerId);
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/quotes', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await quoteService.listQuotes(req.query);
+    res.json({ success: true, ...data });
+  } catch (err) { next(err); }
+});
+
+router.post('/quotes', authorize(PERMISSIONS.BILLING_CREATE), validate(quoteSchema), async (req, res, next) => {
+  try {
+    const data = await quoteService.createQuote(req.body, req.user.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/quotes/:id', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await quoteService.getQuoteById(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/quotes/:id/pdf', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    await quoteService.serveQuotePdf(req.params.id, res, { regenerate: req.query.regenerate === '1' });
   } catch (err) { next(err); }
 });
 

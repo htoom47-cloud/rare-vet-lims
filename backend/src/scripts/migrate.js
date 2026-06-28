@@ -208,6 +208,42 @@ async function applyPatches() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS price_quotes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        quote_number VARCHAR(50) UNIQUE NOT NULL,
+        customer_id UUID REFERENCES customers(id),
+        customer_name VARCHAR(255) NOT NULL,
+        customer_name_ar VARCHAR(255),
+        customer_mobile VARCHAR(50),
+        subtotal DECIMAL(12,2) NOT NULL,
+        discount_amount DECIMAL(12,2) DEFAULT 0,
+        tax_rate DECIMAL(5,2) DEFAULT 15,
+        tax_amount DECIMAL(12,2) NOT NULL,
+        total DECIMAL(12,2) NOT NULL,
+        notes TEXT,
+        valid_until DATE,
+        status VARCHAR(20) DEFAULT 'sent',
+        pdf_url TEXT,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS price_quote_items (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        quote_id UUID NOT NULL REFERENCES price_quotes(id) ON DELETE CASCADE,
+        test_id UUID REFERENCES tests(id),
+        package_id UUID REFERENCES packages(id),
+        description VARCHAR(255) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        unit_price DECIMAL(12,2) NOT NULL,
+        total_price DECIMAL(12,2) NOT NULL
+      )
+    `);
+    await client.query('CREATE INDEX IF NOT EXISTS idx_price_quotes_created ON price_quotes(created_at DESC)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_price_quote_items_quote ON price_quote_items(quote_id)');
   } finally {
     client.release();
   }
