@@ -1,9 +1,11 @@
+export const PARAS_CATEGORY_CODE = 'MICRO';
+
 export const PARAS_BRU_ROSE = 'BRU-ROSE-BENGAL';
-export const PARAS_TEST_CODES = ['PARAS-BLOOD', 'PARAS-STOOL', PARAS_BRU_ROSE];
-export const PARAS_TEST_CODES_SET = new Set(PARAS_TEST_CODES);
+export const PARAS_BLOOD = 'PARAS-BLOOD';
+export const PARAS_STOOL = 'PARAS-STOOL';
 
 export const isParasitologyTest = (test) =>
-  PARAS_TEST_CODES_SET.has(test?.test_code || test?.code);
+  (test?.category_code || test?.categoryCode) === PARAS_CATEGORY_CODE;
 
 export const filterNonParasTests = (tests = []) =>
   tests.filter((t) => !isParasitologyTest(t));
@@ -11,7 +13,7 @@ export const filterNonParasTests = (tests = []) =>
 export const filterParasTests = (tests = []) =>
   tests.filter(isParasitologyTest);
 
-/** Routes for result entry — parasitology tests use /parasitology only. */
+/** Routes for result entry — MICRO category tests use /parasitology only. */
 export const getResultsEntryTargets = (sampleId, tests = []) => {
   const nonParas = filterNonParasTests(tests);
   const paras = filterParasTests(tests);

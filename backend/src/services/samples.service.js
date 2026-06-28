@@ -2,7 +2,7 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
-const { PARAS_TEST_CODES } = require('../utils/parasitologyTests');
+const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
 const autoInvoice = require('./auto-invoice.service');
 const { uuidv4 } = require('../utils/uuid');
 
@@ -196,10 +196,13 @@ const updateStatus = async (id, status, extra = {}) => {
   return result.rows[0];
 };
 
-/** Tests still needing technician result entry (excludes paras + already-entered + tests without parameters). */
+/** Tests still needing technician result entry (excludes MICRO + already-entered + tests without parameters). */
 const WORKBENCH_PENDING = `
   st.sample_id = s.id
-  AND NOT (t.code = ANY($1::text[]))
+  AND NOT EXISTS (
+    SELECT 1 FROM test_categories tc
+    WHERE tc.id = t.category_id AND tc.code = $1
+  )
   AND EXISTS (SELECT 1 FROM test_parameters tp WHERE tp.test_id = t.id)
   AND NOT EXISTS (
     SELECT 1 FROM results r
@@ -209,7 +212,7 @@ const WORKBENCH_PENDING = `
 `;
 
 const getQueue = async (technicianId) => {
-  const params = [PARAS_TEST_CODES];
+  const params = [PARAS_CATEGORY_CODE];
   let where = `WHERE s.status IN ('received', 'running')`;
 
   if (technicianId) {
@@ -241,17 +244,26 @@ const getQueue = async (technicianId) => {
   return result.rows;
 };
 
+const PARAS_PENDING = `
+  st.sample_id = s.id
+  AND EXISTS (
+    SELECT 1 FROM test_categories tc
+    WHERE tc.id = t.category_id AND tc.code = $1
+  )
+  AND EXISTS (SELECT 1 FROM test_parameters tp WHERE tp.test_id = t.id)
+  AND NOT EXISTS (
+    SELECT 1 FROM results r
+    JOIN result_values rv ON rv.result_id = r.id
+    WHERE r.sample_test_id = st.id
+  )
+`;
+
 const getParasitologyQueue = async () => {
   const result = await query(
     `SELECT s.*, c.full_name as customer_name, a.animal_code, a.animal_type,
             (SELECT COUNT(*) FROM sample_tests st
              JOIN tests t ON st.test_id = t.id
-             WHERE st.sample_id = s.id AND t.code = ANY($1::text[])
-               AND NOT EXISTS (
-                 SELECT 1 FROM results r
-                 JOIN result_values rv ON rv.result_id = r.id
-                 WHERE r.sample_test_id = st.id
-               )) as pending_tests
+             WHERE ${PARAS_PENDING}) as pending_tests
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
@@ -259,15 +271,10 @@ const getParasitologyQueue = async () => {
        AND EXISTS (
          SELECT 1 FROM sample_tests st
          JOIN tests t ON st.test_id = t.id
-         WHERE st.sample_id = s.id AND t.code = ANY($1::text[])
-           AND NOT EXISTS (
-             SELECT 1 FROM results r
-             JOIN result_values rv ON rv.result_id = r.id
-             WHERE r.sample_test_id = st.id
-           )
+         WHERE ${PARAS_PENDING}
        )
      ORDER BY CASE s.priority WHEN 'stat' THEN 1 WHEN 'urgent' THEN 2 ELSE 3 END, s.created_at ASC`,
-    [PARAS_TEST_CODES]
+    [PARAS_CATEGORY_CODE]
   );
   return result.rows;
 };

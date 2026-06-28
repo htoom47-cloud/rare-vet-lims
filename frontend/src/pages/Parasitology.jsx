@@ -1,16 +1,38 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2, Loader2, Shield } from 'lucide-react';
+import { Bug, Camera, Droplets, Trash2, Pencil, Plus, Settings2, Loader2, Shield, Microscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { isParasitologyTest, PARAS_BRU_ROSE } from '../utils/parasitologyTests';
+import {
+  isParasitologyTest,
+  PARAS_BLOOD,
+  PARAS_STOOL,
+  PARAS_BRU_ROSE,
+  PARAS_CATEGORY_CODE,
+} from '../utils/parasitologyTests';
 
-const PARAS_BLOOD = 'PARAS-BLOOD';
-const PARAS_STOOL = 'PARAS-STOOL';
+const KNOWN_PANEL_ORDER = { [PARAS_BLOOD]: 0, [PARAS_BRU_ROSE]: 1, [PARAS_STOOL]: 2 };
+
+const sortMicroTests = (tests = []) =>
+  [...tests].sort((a, b) => {
+    const ao = KNOWN_PANEL_ORDER[a.code] ?? 99;
+    const bo = KNOWN_PANEL_ORDER[b.code] ?? 99;
+    if (ao !== bo) return ao - bo;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+const panelPresentation = (testMeta, t, i18n) => {
+  const code = testMeta?.code;
+  if (code === PARAS_BLOOD) return { icon: Droplets, title: t('parasitology.bloodSection') };
+  if (code === PARAS_STOOL) return { icon: Bug, title: t('parasitology.stoolSection') };
+  if (code === PARAS_BRU_ROSE) return { icon: Shield, title: t('parasitology.brucellaSection') };
+  const name = i18n.language === 'ar' && testMeta?.name_ar ? testMeta.name_ar : testMeta?.name;
+  return { icon: Microscope, title: name || code };
+};
 const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
 
 /** Ensure mobile camera files have a recognizable name/type for the server. */
@@ -364,22 +386,11 @@ export default function Parasitology() {
   const [loading, setLoading] = useState(true);
   const [selectedSample, setSelectedSample] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  const [bloodFindings, setBloodFindings] = useState([]);
-  const [stoolFindings, setStoolFindings] = useState([]);
-  const [brucFindings, setBrucFindings] = useState([]);
-  const [bloodNotes, setBloodNotes] = useState('');
-  const [stoolNotes, setStoolNotes] = useState('');
-  const [brucNotes, setBrucNotes] = useState('');
-  const [bloodNotesParamId, setBloodNotesParamId] = useState(null);
-  const [stoolNotesParamId, setStoolNotesParamId] = useState(null);
-  const [brucNotesParamId, setBrucNotesParamId] = useState(null);
+  const [panels, setPanels] = useState({});
 
   const [typesOpen, setTypesOpen] = useState(false);
-  const [typesTab, setTypesTab] = useState('blood');
-  const [bloodMeta, setBloodMeta] = useState(null);
-  const [stoolMeta, setStoolMeta] = useState(null);
-  const [brucMeta, setBrucMeta] = useState(null);
+  const [typesTab, setTypesTab] = useState(null);
+  const [microCatalog, setMicroCatalog] = useState([]);
   const [paramFormOpen, setParamFormOpen] = useState(false);
   const [paramTargetTest, setParamTargetTest] = useState(null);
   const [editingParam, setEditingParam] = useState(null);
@@ -409,18 +420,14 @@ export default function Parasitology() {
 
   const loadParasTypes = useCallback(async () => {
     try {
-      const { data } = await testsAPI.list({ limit: 100 });
-      const blood = data.data.find((tst) => tst.code === PARAS_BLOOD);
-      const stool = data.data.find((tst) => tst.code === PARAS_STOOL);
-      const bruc = data.data.find((tst) => tst.code === PARAS_BRU_ROSE);
-      const [bloodDetail, stoolDetail, brucDetail] = await Promise.all([
-        blood ? testsAPI.get(blood.id) : null,
-        stool ? testsAPI.get(stool.id) : null,
-        bruc ? testsAPI.get(bruc.id) : null,
-      ]);
-      setBloodMeta(bloodDetail?.data?.data || null);
-      setStoolMeta(stoolDetail?.data?.data || null);
-      setBrucMeta(brucDetail?.data?.data || null);
+      const { data } = await testsAPI.list({ limit: 200 });
+      const microTests = sortMicroTests(
+        (data.data || []).filter((tst) => tst.category_code === PARAS_CATEGORY_CODE)
+      );
+      const details = await Promise.all(
+        microTests.map((tst) => testsAPI.get(tst.id).catch(() => null))
+      );
+      setMicroCatalog(details.map((d) => d?.data?.data).filter(Boolean));
     } catch {
       /* ignore */
     }
@@ -429,25 +436,17 @@ export default function Parasitology() {
   useEffect(() => { loadParasTypes(); }, [loadParasTypes]);
 
   const parasTests = (sample) => (sample?.tests || []).filter(isParasitologyTest);
+  const panelList = Object.values(panels);
+  const orderedPanelLabels = panelList.map((p) => panelPresentation(p.testMeta, t, i18n).title);
+  const panelCount = panelList.length;
 
-  const bloodTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BLOOD);
-  const stoolTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_STOOL);
-  const brucTest = parasTests(selectedSample).find((tst) => tst.test_code === PARAS_BRU_ROSE);
-  const hasBloodPanel = !!bloodTest;
-  const hasStoolPanel = !!stoolTest;
-  const hasBrucPanel = !!brucTest;
-  const panelCount = [hasBloodPanel, hasStoolPanel, hasBrucPanel].filter(Boolean).length;
+  const sectionLabel = (testMeta) => panelPresentation(testMeta, t, i18n).title;
 
-  const orderedPanelLabels = [
-    hasBloodPanel && t('parasitology.bloodSection'),
-    hasBrucPanel && t('parasitology.brucellaSection'),
-    hasStoolPanel && t('parasitology.stoolSection'),
-  ].filter(Boolean);
-
-  const sectionLabel = (testMeta) => {
-    if (testMeta?.code === PARAS_BLOOD) return t('parasitology.bloodSection');
-    if (testMeta?.code === PARAS_BRU_ROSE) return t('parasitology.brucellaSection');
-    return t('parasitology.stoolSection');
+  const updatePanel = (sampleTestId, patch) => {
+    setPanels((prev) => ({
+      ...prev,
+      [sampleTestId]: { ...prev[sampleTestId], ...patch },
+    }));
   };
 
   const openSample = async (sample) => {
@@ -455,34 +454,19 @@ export default function Parasitology() {
     setSelectedSample(data.data);
 
     const tests = parasTests(data.data);
-    const bt = tests.find((tst) => tst.test_code === PARAS_BLOOD);
-    const st = tests.find((tst) => tst.test_code === PARAS_STOOL);
-    const br = tests.find((tst) => tst.test_code === PARAS_BRU_ROSE);
-
-    const loadPanel = async (sampleTest) => {
-      if (!sampleTest) return { findings: [], notes: '', notesParamId: null };
+    const loaded = await Promise.all(tests.map(async (sampleTest) => {
       const testDetail = (await testsAPI.get(sampleTest.test_id)).data.data;
       let existing = null;
       try {
         existing = (await resultsAPI.get(sampleTest.id)).data.data;
       } catch { /* none */ }
-      return buildFindingsFromExisting(testDetail, existing);
-    };
+      const { findings, notes, notesParamId } = buildFindingsFromExisting(testDetail, existing);
+      return { sampleTest, testMeta: testDetail, findings, notes, notesParamId };
+    }));
 
-    const [bloodLoaded, stoolLoaded, brucLoaded] = await Promise.all([
-      loadPanel(bt),
-      loadPanel(st),
-      loadPanel(br),
-    ]);
-    setBloodFindings(bloodLoaded.findings);
-    setBloodNotes(bloodLoaded.notes);
-    setBloodNotesParamId(bloodLoaded.notesParamId);
-    setStoolFindings(stoolLoaded.findings);
-    setStoolNotes(stoolLoaded.notes);
-    setStoolNotesParamId(stoolLoaded.notesParamId);
-    setBrucFindings(brucLoaded.findings);
-    setBrucNotes(brucLoaded.notes);
-    setBrucNotesParamId(brucLoaded.notesParamId);
+    const nextPanels = {};
+    loaded.forEach((p) => { nextPanels[p.sampleTest.id] = p; });
+    setPanels(nextPanels);
   };
 
   useEffect(() => {
@@ -512,12 +496,9 @@ export default function Parasitology() {
     return values;
   };
 
-  const bloodValuesCount = buildValues(bloodFindings, bloodNotesParamId, bloodNotes).length;
-  const stoolValuesCount = buildValues(stoolFindings, stoolNotesParamId, stoolNotes).length;
-  const brucValuesCount = buildValues(brucFindings, brucNotesParamId, brucNotes).length;
-  const canSave = (hasBloodPanel && bloodValuesCount > 0)
-    || (hasStoolPanel && stoolValuesCount > 0)
-    || (hasBrucPanel && brucValuesCount > 0);
+  const canSave = panelList.some(
+    (p) => buildValues(p.findings, p.notesParamId, p.notes).length > 0
+  );
 
   const uploadOneImage = async (testId, finding, setFindings) => {
     if (!finding.pendingFile || !finding.parameter_id || !testId) return null;
@@ -611,43 +592,19 @@ export default function Parasitology() {
   const submitResults = async () => {
     if (!selectedSample) return;
 
-    const jobs = [];
-    if (bloodTest) {
-      const values = buildValues(bloodFindings, bloodNotesParamId, bloodNotes);
-      if (values.length) {
-        jobs.push({
-          test: bloodTest,
+    const jobs = panelList
+      .map((panel) => {
+        const values = buildValues(panel.findings, panel.notesParamId, panel.notes);
+        if (!values.length) return null;
+        return {
+          test: panel.sampleTest,
           values,
-          findings: bloodFindings,
-          setFindings: setBloodFindings,
-          notes: bloodNotes,
-        });
-      }
-    }
-    if (stoolTest) {
-      const values = buildValues(stoolFindings, stoolNotesParamId, stoolNotes);
-      if (values.length) {
-        jobs.push({
-          test: stoolTest,
-          values,
-          findings: stoolFindings,
-          setFindings: setStoolFindings,
-          notes: stoolNotes,
-        });
-      }
-    }
-    if (brucTest) {
-      const values = buildValues(brucFindings, brucNotesParamId, brucNotes);
-      if (values.length) {
-        jobs.push({
-          test: brucTest,
-          values,
-          findings: brucFindings,
-          setFindings: setBrucFindings,
-          notes: brucNotes,
-        });
-      }
-    }
+          findings: panel.findings,
+          sampleTestId: panel.sampleTest.id,
+          notes: panel.notes,
+        };
+      })
+      .filter(Boolean);
 
     if (!jobs.length) return toast.error(t('parasitology.enterOneValue'));
 
@@ -658,10 +615,13 @@ export default function Parasitology() {
     try {
       const sampleId = selectedSample.id;
 
-      // Upload any images not yet sent (parallel)
       const uploadFailures = [];
       for (const job of jobs) {
-        const failed = await uploadPendingImages(job.test.id, job.findings, job.setFindings);
+        const failed = await uploadPendingImages(
+          job.test.id,
+          job.findings,
+          (findings) => updatePanel(job.sampleTestId, { findings })
+        );
         uploadFailures.push(...failed);
       }
 
@@ -716,8 +676,8 @@ export default function Parasitology() {
   };
 
   const openEditParasite = (param) => {
-    const testMeta = bloodMeta?.parameters?.some((p) => p.id === param.id) ? bloodMeta : stoolMeta;
-    setParamTargetTest(testMeta);
+    const testMeta = microCatalog.find((m) => m.parameters?.some((p) => p.id === param.id));
+    setParamTargetTest(testMeta || null);
     setEditingParam(param);
     setParamForm({
       code: param.code || '',
@@ -783,7 +743,14 @@ export default function Parasitology() {
           <p className="text-sm text-gray-500 mt-1">{t('parasitology.subtitle')}</p>
         </div>
         {canManage && (
-          <button type="button" onClick={() => setTypesOpen(true)} className="btn-secondary text-sm flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setTypesTab(microCatalog[0]?.id || null);
+              setTypesOpen(true);
+            }}
+            className="btn-secondary text-sm flex items-center gap-2"
+          >
             <Settings2 size={16} />
             {t('parasitology.editTypes')}
           </button>
@@ -837,54 +804,36 @@ export default function Parasitology() {
               </div>
 
               <div className={`grid gap-4 ${panelCount > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-                {hasBloodPanel && (
-                <FindingPanel
-                  title={t('parasitology.bloodSection')}
-                  icon={Droplets}
-                  test={bloodTest}
-                  testMeta={bloodMeta}
-                  findings={bloodFindings}
-                  notes={bloodNotes}
-                  onFindingsChange={setBloodFindings}
-                  onNotesChange={setBloodNotes}
-                  labels={labels}
-                  displayName={displayName}
-                  onQueueImage={(finding, file) => uploadImageForFinding(bloodTest?.id, finding, file, setBloodFindings)}
-                  onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBloodFindings)}
-                />
-                )}
-                {hasBrucPanel && (
-                <FindingPanel
-                  title={t('parasitology.brucellaSection')}
-                  icon={Shield}
-                  test={brucTest}
-                  testMeta={brucMeta}
-                  findings={brucFindings}
-                  notes={brucNotes}
-                  onFindingsChange={setBrucFindings}
-                  onNotesChange={setBrucNotes}
-                  labels={labels}
-                  displayName={displayName}
-                  onQueueImage={(finding, file) => uploadImageForFinding(brucTest?.id, finding, file, setBrucFindings)}
-                  onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setBrucFindings)}
-                />
-                )}
-                {hasStoolPanel && (
-                <FindingPanel
-                  title={t('parasitology.stoolSection')}
-                  icon={Bug}
-                  test={stoolTest}
-                  testMeta={stoolMeta}
-                  findings={stoolFindings}
-                  notes={stoolNotes}
-                  onFindingsChange={setStoolFindings}
-                  onNotesChange={setStoolNotes}
-                  labels={labels}
-                  displayName={displayName}
-                  onQueueImage={(finding, file) => uploadImageForFinding(stoolTest?.id, finding, file, setStoolFindings)}
-                  onDeleteImage={(id, clientId) => handleDeleteImage(id, clientId, setStoolFindings)}
-                />
-                )}
+                {panelList.map((panel) => {
+                  const { icon: PanelIcon, title } = panelPresentation(panel.testMeta, t, i18n);
+                  const sampleTestId = panel.sampleTest.id;
+                  return (
+                    <FindingPanel
+                      key={sampleTestId}
+                      title={title}
+                      icon={PanelIcon}
+                      test={panel.sampleTest}
+                      testMeta={panel.testMeta}
+                      findings={panel.findings}
+                      notes={panel.notes}
+                      onFindingsChange={(findings) => updatePanel(sampleTestId, { findings })}
+                      onNotesChange={(notes) => updatePanel(sampleTestId, { notes })}
+                      labels={labels}
+                      displayName={displayName}
+                      onQueueImage={(finding, file) => uploadImageForFinding(
+                        panel.sampleTest.id,
+                        finding,
+                        file,
+                        (findings) => updatePanel(sampleTestId, { findings })
+                      )}
+                      onDeleteImage={(id, clientId) => handleDeleteImage(
+                        id,
+                        clientId,
+                        (findings) => updatePanel(sampleTestId, { findings })
+                      )}
+                    />
+                  );
+                })}
               </div>
 
               <p className="text-xs text-gray-500 text-center">{t('parasitology.approveHint')}</p>
@@ -903,72 +852,42 @@ export default function Parasitology() {
       </div>
 
       <Modal isOpen={typesOpen} onClose={() => setTypesOpen(false)} title={t('parasitology.editTypes')} size="lg">
-        <div className="flex gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setTypesTab('blood')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === 'blood' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-          >
-            <Droplets size={16} />
-            {t('parasitology.bloodSection')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTypesTab('stool')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === 'stool' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-          >
-            <Bug size={16} />
-            {t('parasitology.stoolSection')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTypesTab('brucella')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === 'brucella' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-          >
-            <Shield size={16} />
-            {t('parasitology.brucellaSection')}
-          </button>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {microCatalog.map((testMeta) => {
+            const { icon: TabIcon, title } = panelPresentation(testMeta, t, i18n);
+            return (
+              <button
+                key={testMeta.id}
+                type="button"
+                onClick={() => setTypesTab(testMeta.id)}
+                className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition ${typesTab === testMeta.id ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+              >
+                <TabIcon size={16} />
+                {title}
+              </button>
+            );
+          })}
         </div>
-        {typesTab === 'blood' ? (
-          <ParasiteTypeList
-            title={t('parasitology.bloodSection')}
-            icon={Droplets}
-            testMeta={bloodMeta}
-            params={(bloodMeta?.parameters || []).filter((p) => p.unit === 'qual')}
-            canManage={canManage}
-            onAdd={openAddParasite}
-            onEdit={openEditParasite}
-            onDelete={handleDeleteParasite}
-            displayName={displayName}
-            addLabel={t('parasitology.addParasite')}
-          />
-        ) : typesTab === 'stool' ? (
-          <ParasiteTypeList
-            title={t('parasitology.stoolSection')}
-            icon={Bug}
-            testMeta={stoolMeta}
-            params={(stoolMeta?.parameters || []).filter((p) => p.unit === 'qual')}
-            canManage={canManage}
-            onAdd={openAddParasite}
-            onEdit={openEditParasite}
-            onDelete={handleDeleteParasite}
-            displayName={displayName}
-            addLabel={t('parasitology.addParasite')}
-          />
-        ) : (
-          <ParasiteTypeList
-            title={t('parasitology.brucellaSection')}
-            icon={Shield}
-            testMeta={brucMeta}
-            params={(brucMeta?.parameters || []).filter((p) => p.unit === 'qual')}
-            canManage={canManage}
-            onAdd={openAddParasite}
-            onEdit={openEditParasite}
-            onDelete={handleDeleteParasite}
-            displayName={displayName}
-            addLabel={t('parasitology.addParasite')}
-          />
-        )}
+        {microCatalog
+          .filter((testMeta) => testMeta.id === typesTab)
+          .map((testMeta) => {
+            const { icon: TabIcon, title } = panelPresentation(testMeta, t, i18n);
+            return (
+              <ParasiteTypeList
+                key={testMeta.id}
+                title={title}
+                icon={TabIcon}
+                testMeta={testMeta}
+                params={(testMeta.parameters || []).filter((p) => p.unit === 'qual')}
+                canManage={canManage}
+                onAdd={openAddParasite}
+                onEdit={openEditParasite}
+                onDelete={handleDeleteParasite}
+                displayName={displayName}
+                addLabel={t('parasitology.addParasite')}
+              />
+            );
+          })}
       </Modal>
 
       <Modal
