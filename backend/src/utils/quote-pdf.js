@@ -125,18 +125,28 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
     doc.pipe(stream);
 
     let y = MARGIN;
-    const headerTextW = TW - 50;
-    const half = headerTextW / 2;
+    const LOGO_SIZE = 46;
 
     if (showLogo) {
-      try { doc.image(LOGO_PATH, PAGE_W - MARGIN - 42, y, { width: 42, height: 42 }); } catch { /* */ }
+      const logoX = (PAGE_W - LOGO_SIZE) / 2;
+      const leftW = logoX - MARGIN - 8;
+      const rightX = logoX + LOGO_SIZE + 8;
+      const rightW = PAGE_W - MARGIN - rightX;
+      try { doc.image(LOGO_PATH, logoX, y, { width: LOGO_SIZE, height: LOGO_SIZE }); } catch { /* */ }
+      cellLatin(doc, lab.name, MARGIN, y + 8, leftW, { size: 9, bold: true });
+      cellArabic(doc, lab.name_ar, rightX, y + 8, rightW, { size: 11, bold: true, align: 'right' });
+      cellLatin(doc, lab.subtitle, MARGIN, y + 24, leftW, { size: 7, color: activeBrand.muted });
+      cellArabic(doc, lab.subtitle_ar || '', rightX, y + 24, rightW, { size: 7, color: activeBrand.muted, align: 'right' });
+      y += LOGO_SIZE + 6;
+    } else {
+      const half = TW / 2;
+      cellLatin(doc, lab.name, MARGIN, y + 4, half, { size: 9, bold: true });
+      cellArabic(doc, lab.name_ar, MARGIN + half, y + 4, half, { size: 11, bold: true, align: 'right' });
+      y += 18;
+      cellLatin(doc, lab.subtitle, MARGIN, y, half, { size: 7, color: activeBrand.muted });
+      cellArabic(doc, lab.subtitle_ar || '', MARGIN + half, y, half, { size: 7, color: activeBrand.muted, align: 'right' });
+      y += 16;
     }
-    cellLatin(doc, lab.name, MARGIN, y + 4, half, { size: 9, bold: true });
-    cellArabic(doc, lab.name_ar, MARGIN + half, y + 4, half, { size: 11, bold: true, align: 'right' });
-    y += 18;
-    cellLatin(doc, lab.subtitle, MARGIN, y, half, { size: 7, color: activeBrand.muted });
-    cellArabic(doc, lab.subtitle_ar || '', MARGIN + half, y, half, { size: 7, color: activeBrand.muted, align: 'right' });
-    y += 16;
 
     doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).lineWidth(1.5).strokeColor(activeBrand.gold).stroke();
     y += 8;
