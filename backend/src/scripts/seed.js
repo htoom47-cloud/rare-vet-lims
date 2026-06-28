@@ -336,9 +336,9 @@ async function seed() {
     [JSON.stringify({
       name: 'Rare Animals Veterinary Care Center',
       name_ar: 'مركز رعاية النوادر البيطري',
-      phone: '+966539779328',
+      phone: '0115007257',
       email: 'alnwader.10hz@gmail.com',
-      vat: '300000000000003',
+      vat: '311042487300003',
     })]
   );
 

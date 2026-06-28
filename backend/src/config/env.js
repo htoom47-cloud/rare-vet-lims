@@ -77,9 +77,9 @@ const env = {
     subtitle: process.env.LAB_SUBTITLE || 'Veterinary Medical & Research Laboratory',
     subtitleAr: process.env.LAB_SUBTITLE_AR || 'للتحاليل البيطرية والبحثية',
     address: process.env.LAB_ADDRESS || 'Kingdom of Saudi Arabia',
-    phone: process.env.LAB_PHONE || '+966539779328',
+    phone: process.env.LAB_PHONE || '0115007257',
     email: process.env.LAB_EMAIL || 'alnwader.10hz@gmail.com',
-    vatNumber: process.env.VAT_NUMBER || '300000000000003',
+    vatNumber: process.env.VAT_NUMBER || '311042487300003',
   },
   portal: {
     staticOtp: resolvePortalStaticOtp(),

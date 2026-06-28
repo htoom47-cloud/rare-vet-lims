@@ -7,6 +7,59 @@ const { ensureAdmin } = require('./ensure-admin');
 const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ROLE_PERMISSIONS, PERMISSIONS } = require('../utils/permissions');
 
+async function syncLabContactInfo(client) {
+  const LEGACY_PHONES = new Set(['+966539779328', '966539779328', '0539779328']);
+  const NEW_PHONE = '0115007257';
+  const LEGACY_VAT = '300000000000003';
+  const NEW_VAT = '311042487300003';
+
+  const patchContact = (obj) => {
+    if (!obj || typeof obj !== 'object') return false;
+    let changed = false;
+    const phone = String(obj.phone || '').replace(/\s/g, '');
+    if (!phone || LEGACY_PHONES.has(phone)) {
+      obj.phone = NEW_PHONE;
+      changed = true;
+    }
+    if (!obj.vat_number || obj.vat_number === LEGACY_VAT) {
+      obj.vat_number = NEW_VAT;
+      changed = true;
+    }
+    if (!obj.vat || obj.vat === LEGACY_VAT) {
+      obj.vat = NEW_VAT;
+      changed = true;
+    }
+    return changed;
+  };
+
+  for (const key of ['invoice_template', 'lab_info']) {
+    const row = await client.query('SELECT value FROM settings WHERE key = $1', [key]);
+    if (!row.rows[0]?.value) continue;
+    const value = row.rows[0].value;
+    const parsed = typeof value === 'object' ? { ...value } : JSON.parse(value);
+    let changed = false;
+    if (key === 'invoice_template') {
+      parsed.lab = { ...(parsed.lab || {}) };
+      changed = patchContact(parsed.lab);
+    } else {
+      changed = patchContact(parsed);
+    }
+    if (changed) {
+      await client.query(
+        'UPDATE settings SET value = $1, updated_at = NOW() WHERE key = $2',
+        [JSON.stringify(parsed), key]
+      );
+      logger.info(`Lab contact info updated in settings:${key}`);
+    }
+  }
+
+  await client.query(
+    `UPDATE invoices SET pdf_url = NULL
+     WHERE pdf_url IS NOT NULL
+       AND created_at >= NOW() - INTERVAL '90 days'`
+  );
+}
+
 async function syncPermissionsCatalog(client) {
   for (const [key, code] of Object.entries(PERMISSIONS)) {
     const module = code.split('.')[0];
@@ -253,6 +306,7 @@ async function applyPatches() {
     await client.query(`
       ALTER TABLE price_quotes ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) DEFAULT 0
     `);
+    await syncLabContactInfo(client);
   } finally {
     client.release();
   }

@@ -30,7 +30,7 @@ export const DEMO_REPORT = {
     subtitle: 'Veterinary Medical & Research Laboratory',
     subtitleAr: 'للتحاليل الطبية والبحثية البيطرية',
     address: 'المملكة العربية السعودية',
-    phone: '+966539779328',
+    phone: '0115007257',
     email: 'alnwader.10hz@gmail.com',
   },
   customer: {

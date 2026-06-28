@@ -50,9 +50,11 @@ services:
       - key: LAB_SUBTITLE_AR
         value: للتحاليل البيطرية والبحثية
       - key: LAB_PHONE
-        value: +966539779328
+        value: "0115007257"
       - key: LAB_EMAIL
         value: alnwader.10hz@gmail.com
+      - key: VAT_NUMBER
+        value: "311042487300003"
       - key: DATABASE_URL
         fromDatabase:
           name: rare-vet-db
