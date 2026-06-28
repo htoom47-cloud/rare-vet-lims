@@ -62,6 +62,12 @@ const mergeInvoiceSettings = (stored) => {
     merged.options.auto_invoice_trigger = defaults.options.auto_invoice_trigger;
   }
 
+  // Contact/tax always follow deployment env (LAB_PHONE, VAT_NUMBER) — not stale DB overrides.
+  merged.lab.phone = defaults.lab.phone;
+  merged.lab.email = defaults.lab.email;
+  merged.lab.vat_number = defaults.lab.vat_number;
+  merged.lab.address = defaults.lab.address;
+
   return merged;
 };
 

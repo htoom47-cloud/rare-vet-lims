@@ -8,27 +8,17 @@ const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ROLE_PERMISSIONS, PERMISSIONS } = require('../utils/permissions');
 
 async function syncLabContactInfo(client) {
-  const LEGACY_PHONES = new Set(['+966539779328', '966539779328', '0539779328']);
-  const NEW_PHONE = '0115007257';
-  const LEGACY_VAT = '300000000000003';
-  const NEW_VAT = '311042487300003';
+  const NEW_PHONE = process.env.LAB_PHONE || '0115007257';
+  const NEW_VAT = process.env.VAT_NUMBER || '311042487300003';
+  const NEW_EMAIL = process.env.LAB_EMAIL || 'alnwader.10hz@gmail.com';
 
-  const patchContact = (obj) => {
+  const applyContact = (obj) => {
     if (!obj || typeof obj !== 'object') return false;
     let changed = false;
-    const phone = String(obj.phone || '').replace(/\s/g, '');
-    if (!phone || LEGACY_PHONES.has(phone)) {
-      obj.phone = NEW_PHONE;
-      changed = true;
-    }
-    if (!obj.vat_number || obj.vat_number === LEGACY_VAT) {
-      obj.vat_number = NEW_VAT;
-      changed = true;
-    }
-    if (!obj.vat || obj.vat === LEGACY_VAT) {
-      obj.vat = NEW_VAT;
-      changed = true;
-    }
+    if (obj.phone !== NEW_PHONE) { obj.phone = NEW_PHONE; changed = true; }
+    if (obj.vat_number !== NEW_VAT) { obj.vat_number = NEW_VAT; changed = true; }
+    if (obj.vat !== NEW_VAT) { obj.vat = NEW_VAT; changed = true; }
+    if (obj.email !== NEW_EMAIL) { obj.email = NEW_EMAIL; changed = true; }
     return changed;
   };
 
@@ -36,13 +26,13 @@ async function syncLabContactInfo(client) {
     const row = await client.query('SELECT value FROM settings WHERE key = $1', [key]);
     if (!row.rows[0]?.value) continue;
     const value = row.rows[0].value;
-    const parsed = typeof value === 'object' ? { ...value } : JSON.parse(value);
+    const parsed = typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : JSON.parse(value);
     let changed = false;
     if (key === 'invoice_template') {
       parsed.lab = { ...(parsed.lab || {}) };
-      changed = patchContact(parsed.lab);
+      changed = applyContact(parsed.lab);
     } else {
-      changed = patchContact(parsed);
+      changed = applyContact(parsed);
     }
     if (changed) {
       await client.query(
@@ -53,11 +43,9 @@ async function syncLabContactInfo(client) {
     }
   }
 
-  await client.query(
-    `UPDATE invoices SET pdf_url = NULL
-     WHERE pdf_url IS NOT NULL
-       AND created_at >= NOW() - INTERVAL '90 days'`
-  );
+  await client.query('UPDATE invoices SET pdf_url = NULL WHERE pdf_url IS NOT NULL');
+  await client.query('UPDATE price_quotes SET pdf_url = NULL WHERE pdf_url IS NOT NULL');
+  logger.info('Invoice and quote PDF cache cleared for lab contact refresh');
 }
 
 async function syncPermissionsCatalog(client) {

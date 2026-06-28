@@ -355,6 +355,13 @@ const invoicePdfDir = () => path.join(env.storage.path, 'invoices');
 
 const ensureInvoicePdf = async (id) => {
   const invoice = await getInvoiceById(id);
+  const freshQr = generateVatQR(invoice);
+  if (invoice.vat_qr_data !== freshQr) {
+    await query('UPDATE invoices SET vat_qr_data = $1, pdf_url = NULL WHERE id = $2', [freshQr, id]);
+    invoice.vat_qr_data = freshQr;
+    invoice.pdf_url = null;
+  }
+
   const existingName = invoice.pdf_url?.split('/').pop();
   if (existingName) {
     const filePath = path.join(invoicePdfDir(), existingName);
