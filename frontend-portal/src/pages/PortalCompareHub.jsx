@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { GitCompare, PawPrint } from 'lucide-react';
+import { GitCompare } from 'lucide-react';
+import AnimalsNavIcon from '../components/portal/AnimalsNavIcon';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import { Card, CardContent } from '../components/ui/card';
@@ -44,7 +45,7 @@ export default function PortalCompareHub() {
             <CardContent className="p-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <PawPrint size={18} className="text-primary" />
+                  <AnimalsNavIcon size={18} className="text-primary" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-base font-bold text-foreground leading-tight truncate">

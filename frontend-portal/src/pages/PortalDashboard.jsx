@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  PawPrint, FileText, Bell, AlertTriangle, ChevronLeft, ChevronRight,
+  FileText, Bell, AlertTriangle, ChevronLeft, ChevronRight,
   CheckCircle2, Receipt,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -12,6 +12,7 @@ import StatusBadge from '../components/portal/StatusBadge';
 import { portalDashboardAPI } from '../services/portalApi';
 import { animalLabel } from '../utils/animalTypes';
 import { cn } from '../lib/utils';
+import AnimalsNavIcon from '../components/portal/AnimalsNavIcon';
 
 export default function PortalDashboard() {
   const { t, i18n } = useTranslation();
@@ -50,7 +51,7 @@ export default function PortalDashboard() {
 
   const quickActions = [
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
-    { to: '/animals', icon: PawPrint, label: t('portal.navAnimals') },
+    { to: '/animals', icon: AnimalsNavIcon, label: t('portal.navAnimals') },
     { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
   ];
 
@@ -100,7 +101,7 @@ export default function PortalDashboard() {
             )}
 
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              <KpiCard compact icon={PawPrint} label={t('portal.statAnimals')} value={data.stats.animalCount} accent="purple" />
+              <KpiCard compact icon={AnimalsNavIcon} label={t('portal.statAnimals')} value={data.stats.animalCount} accent="purple" />
               <KpiCard compact icon={FileText} label={t('portal.statReports')} value={data.stats.reportCount} accent="blue" />
               <KpiCard
                 compact

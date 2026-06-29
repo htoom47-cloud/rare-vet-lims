@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  LayoutDashboard, FileText, PawPrint, GitCompare, FolderOpen, LogOut,
+  LayoutDashboard, FileText, GitCompare, FolderOpen, LogOut,
   Globe, Sun, Moon, Menu, Search, Receipt,
 } from 'lucide-react';
 import { usePortal } from '../../context/PortalContext';
 import { useTheme } from '../../context/ThemeContext';
 import LabBrandLockup from './LabBrandLockup';
+import AnimalsNavIcon from './AnimalsNavIcon';
 import PortalNotifications from './PortalNotifications';
 import { Button } from '../ui/button';
 import PwaInstallBanner from './PwaInstallBanner';
@@ -48,7 +49,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: t('portal.navDashboard'), end: true },
-    { to: '/animals', icon: PawPrint, label: t('portal.navAnimals') },
+    { to: '/animals', icon: AnimalsNavIcon, label: t('portal.navAnimals') },
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
     { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
     { to: '/compare', icon: GitCompare, label: t('portal.navCompare') },

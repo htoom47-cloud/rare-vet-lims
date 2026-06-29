@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { PawPrint, GitCompare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { GitCompare, ChevronLeft, ChevronRight } from 'lucide-react';
+import AnimalsNavIcon from '../components/portal/AnimalsNavIcon';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import { Card, CardContent } from '../components/ui/card';
@@ -40,7 +41,7 @@ export default function PortalAnimals() {
       {!loading && animals.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
-            <PawPrint size={40} className="mx-auto text-muted-foreground/50 mb-3" />
+            <AnimalsNavIcon size={40} className="mx-auto text-muted-foreground/50 mb-3" />
             <p className="text-muted-foreground">{t('portal.noAnimals')}</p>
           </CardContent>
         </Card>

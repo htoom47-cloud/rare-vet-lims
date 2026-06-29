@@ -84,4 +84,4 @@ export default function AnimalTypeIcon({ type, size = 24, className }) {
   return <Icon size={size} className={className} strokeWidth={type === 'bird' || type === 'cat' || type === 'dog' ? 2 : undefined} />;
 }
 
-export { TYPE_ICONS };
+export { TYPE_ICONS, CamelIcon, HorseIcon, SheepIcon, GoatIcon };
