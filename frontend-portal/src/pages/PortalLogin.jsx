@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Globe, Smartphone, ShieldCheck } from 'lucide-react';
+import { Sun, Moon, Globe, Smartphone, ShieldCheck, ArrowRight } from 'lucide-react';
 import { m } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { usePortal } from '../context/PortalContext';
@@ -16,14 +16,18 @@ import PwaInstallBanner from '../components/portal/PwaInstallBanner';
 import WhatsAppContact from '../components/portal/WhatsAppContact';
 
 export default function PortalLogin() {
-  const { t } = useTranslation();
-  const { requestOtp, verifyOtp } = usePortal();
+  const { t, i18n } = useTranslation();
+  const { requestOtp, verifyOtp, customer, loading: authLoading } = usePortal();
   const { toggleLanguage, theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState('mobile');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && customer) navigate('/dashboard', { replace: true });
+  }, [authLoading, customer, navigate]);
 
   const handleRequestOtp = async (e) => {
     e.preventDefault();
@@ -56,7 +60,7 @@ export default function PortalLogin() {
     try {
       await verifyOtp(mobile, otp);
       toast.success(t('portal.loginSuccess'));
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('portal.invalidOtp'));
     } finally {
@@ -72,6 +76,15 @@ export default function PortalLogin() {
         animate={{ scale: [1, 1.05, 1], opacity: [0.5, 0.7, 0.5] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
       />
+
+      <div className="absolute top-4 start-4 z-10">
+        <Button type="button" variant="secondary" size="sm" asChild className="bg-card/80 backdrop-blur gap-1.5">
+          <Link to="/">
+            <ArrowRight size={16} className={i18n.language === 'ar' ? '' : 'rotate-180'} />
+            {t('home.backToSite')}
+          </Link>
+        </Button>
+      </div>
 
       <div className="absolute top-4 end-4 flex gap-2 z-10">
         <Button type="button" variant="secondary" size="icon" onClick={toggleLanguage} className="bg-card/80 backdrop-blur">

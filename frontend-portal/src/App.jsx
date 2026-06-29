@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { PortalProvider } from './context/PortalContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedPortalRoute from './components/portal/ProtectedPortalRoute';
+import LabHome from './pages/LabHome';
 import PortalLogin from './pages/PortalLogin';
 import PortalDashboard from './pages/PortalDashboard';
 import PortalReports from './pages/PortalReports';
@@ -37,8 +38,9 @@ export default function App() {
             }}
           />
           <Routes>
+            <Route path="/" element={<LabHome />} />
             <Route path="/login" element={<PortalLogin />} />
-            <Route path="/" element={<ProtectedPortalRoute><PortalDashboard /></ProtectedPortalRoute>} />
+            <Route path="/dashboard" element={<ProtectedPortalRoute><PortalDashboard /></ProtectedPortalRoute>} />
             <Route path="/reports" element={<ProtectedPortalRoute><PortalReports /></ProtectedPortalRoute>} />
             <Route path="/animals" element={<ProtectedPortalRoute><PortalAnimals /></ProtectedPortalRoute>} />
             <Route path="/animals/:animalId" element={<ProtectedPortalRoute><PortalAnimalDetail /></ProtectedPortalRoute>} />

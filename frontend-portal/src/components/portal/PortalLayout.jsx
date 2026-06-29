@@ -42,14 +42,14 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
 
   const pageHeader = useMemo(() => {
     if (title) return { h: title, sub: subtitle };
-    if (pathname === '/') {
+    if (pathname === '/dashboard') {
       return { h: t('portal.dashboard'), sub: displayName || undefined };
     }
     return { h: null, sub: null };
   }, [title, subtitle, pathname, t, displayName]);
 
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: t('portal.navDashboard'), end: true },
+    { to: '/dashboard', icon: LayoutDashboard, label: t('portal.navDashboard'), end: true },
     { to: '/animals', icon: AnimalsNavIcon, label: t('portal.navAnimals') },
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
     { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
@@ -88,7 +88,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const searchBox = (

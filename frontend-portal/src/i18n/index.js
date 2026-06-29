@@ -4,6 +4,29 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   en: {
     translation: {
+      home: {
+        heroTagline: 'Veterinary medical & research laboratory — accurate results and dedicated care for your animals',
+        aboutTitle: 'About us',
+        aboutP1: 'Rare Animals Veterinary Care Center is a specialized veterinary laboratory offering clinical diagnostics and research services for camels, horses, livestock, and companion animals.',
+        aboutP2: 'We combine modern analyzers, experienced specialists, and a digital client portal so owners and veterinarians can access reports quickly and securely.',
+        servicesTitle: 'Our services',
+        servicesHint: 'Comprehensive laboratory solutions for veterinary clinics and animal owners',
+        tapToLogin: 'Tap to sign in',
+        portalLogin: 'Client portal',
+        backToSite: 'Back to home',
+        contactTitle: 'Contact us',
+        phone: 'Phone',
+        email: 'Email',
+        location: 'Location',
+        address: 'Al Muzahimiyah, Riyadh Region, Kingdom of Saudi Arabia',
+        services: {
+          cbc: { title: 'CBC & hematology', desc: 'Complete blood counts and red/white cell indices with reference ranges by species.' },
+          chemistry: { title: 'Clinical chemistry', desc: 'Liver, kidney, electrolytes, proteins, and metabolic panels for accurate assessment.' },
+          parasitology: { title: 'Parasitology', desc: 'Blood and stool parasite detection with microscope imaging and specialist review.' },
+          hormones: { title: 'Hormones & serology', desc: 'Endocrine and infectious disease testing with validated methods.' },
+          portal: { title: 'Client portal', desc: 'View reports, invoices, and animal health history — sign in with your registered mobile.' },
+        },
+      },
       portal: {
         title: 'Client Portal',
         labName: 'Rare Veterinary Care Center',
@@ -152,6 +175,29 @@ const resources = {
   },
   ar: {
     translation: {
+      home: {
+        heroTagline: 'مختبر طبي وبحثي بيطري — نتائج دقيقة ورعاية متخصصة لحيواناتكم',
+        aboutTitle: 'نبذة عنا',
+        aboutP1: 'مركز رعاية النوادر البيطري مختبر بيطري متخصص يقدّم التحاليل السريرية والخدمات البحثية للإبل والخيول والماشية والحيوانات الأليفة.',
+        aboutP2: 'نجمع بين أجهزة تحليل حديثة وكوادر متخصصة وبوابة عميل إلكترونية ليتمكن الملاك والأطباء البيطريون من الاطلاع على التقارير بسرعة وأمان.',
+        servicesTitle: 'خدماتنا',
+        servicesHint: 'حلول مخبرية شاملة للعيادات البيطرية وملاك الحيوانات',
+        tapToLogin: 'اضغط لتسجيل الدخول',
+        portalLogin: 'بوابة العميل',
+        backToSite: 'العودة للرئيسية',
+        contactTitle: 'تواصل معنا',
+        phone: 'الهاتف',
+        email: 'البريد الإلكتروني',
+        location: 'الموقع',
+        address: 'المزاحمية، منطقة الرياض، المملكة العربية السعودية',
+        services: {
+          cbc: { title: 'تعداد الدم الكامل', desc: 'فحوصات الدم الشاملة ومؤشرات الكريات مع نطاقات مرجعية حسب نوع الحيوان.' },
+          chemistry: { title: 'الكيمياء السريرية', desc: 'وظائف الكبد والكلى والأملاح والبروتينات واللوائح الأيضية.' },
+          parasitology: { title: 'الطفيليات', desc: 'كشف طفيليات الدم والبراز مع تصوير مجهري ومراجعة متخصص.' },
+          hormones: { title: 'الهرمونات والأمصال', desc: 'فحوصات الغدد الصماء والأمراض المعدية بأساليب معتمدة.' },
+          portal: { title: 'بوابة العميل', desc: 'اطّلع على التقارير والفواتير وسجل صحة حيواناتك — الدخول برقم جوالك المسجل.' },
+        },
+      },
       portal: {
         title: 'بوابة العميل',
         labName: 'مركز رعاية النوادر البيطري',
