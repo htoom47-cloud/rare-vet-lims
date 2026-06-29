@@ -1,7 +1,7 @@
 const { query } = require('../config/database');
 
 const listPublicCatalog = async () => {
-  const [categories, tests, packages] = await Promise.all([
+  const [categories, tests, packages, statsRows] = await Promise.all([
     query(
       `SELECT id, code, name, name_ar, department, sort_order
        FROM test_categories WHERE is_active = true ORDER BY sort_order, name`,
@@ -20,7 +20,16 @@ const listPublicCatalog = async () => {
       `SELECT id, name, name_ar, description, price, discount_percent
        FROM packages WHERE is_active = true ORDER BY name`,
     ),
+    query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM customers) AS customer_count,
+         (SELECT COUNT(*)::int FROM reports WHERE is_final = true) AS report_count,
+         (SELECT COUNT(*)::int FROM sample_tests WHERE status = 'completed') AS analysis_count,
+         (SELECT COUNT(*)::int FROM samples) AS sample_count`,
+    ),
   ]);
+
+  const s = statsRows.rows[0] || {};
 
   return {
     categories: categories.rows,
@@ -34,6 +43,10 @@ const listPublicCatalog = async () => {
       test_count: tests.rows.length,
       category_count: categories.rows.length,
       package_count: packages.rows.length,
+      customer_count: Number(s.customer_count) || 0,
+      report_count: Number(s.report_count) || 0,
+      analysis_count: Number(s.analysis_count) || 0,
+      sample_count: Number(s.sample_count) || 0,
     },
   };
 };

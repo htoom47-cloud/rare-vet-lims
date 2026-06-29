@@ -1,22 +1,18 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ChevronRight, Target, Clock, PawPrint } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
 import PageMeta from '../../components/public/PageMeta';
 import { Section, SectionHeader, FadeUp } from '../../components/public/Section';
 import usePublicCatalog from '../../hooks/usePublicCatalog';
+import { testsForDept } from '../../utils/catalogHelpers';
 import { SERVICE_DEPARTMENTS, COLOR_RING } from '../../data/siteStructure';
 import { Button } from '../../components/ui/button';
-import { ChevronRight } from 'lucide-react';
 
 export default function ServicesPage() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const { tests, loading } = usePublicCatalog();
-
-  const testsForDept = (dept) => {
-    if (!dept.categories?.length) return [];
-    return tests.filter((test) => dept.categories.includes(test.category_code));
-  };
 
   return (
     <PublicLayout>
@@ -27,50 +23,90 @@ export default function ServicesPage() {
       </div>
 
       <Section className="!pt-0">
-        <div className="site-container space-y-8">
-          {SERVICE_DEPARTMENTS.map(({ id, icon: Icon, color, categories }, i) => {
-            const deptTests = testsForDept({ categories });
-            const sampleTests = deptTests.slice(0, 8);
+        <div className="site-container space-y-16 lg:space-y-24">
+          {SERVICE_DEPARTMENTS.map(({ id, icon: Icon, color, image, categories }, i) => {
+            const deptTests = testsForDept(tests, id);
+            const reverse = i % 2 === 1;
             return (
-              <FadeUp key={id} delay={i * 0.03}>
-                <article className="site-card p-6 sm:p-8">
-                  <div className="flex flex-col sm:flex-row gap-5 sm:items-start">
-                    <div className={`shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center ring-1 ${COLOR_RING[color]}`}>
-                      <Icon size={28} strokeWidth={1.5} />
+              <FadeUp key={id} delay={0.03}>
+                <article id={id} className={`site-service-detail ${reverse ? 'site-service-detail--reverse' : ''}`}>
+                  <div className="site-service-detail__media order-first">
+                    <img src={image || '/images/lab/interior.jpg'} alt={t(`site.departments.${id}.title`)} loading="lazy" />
+                  </div>
+                  <div className="space-y-5">
+                    <div className="flex items-start gap-4">
+                      <div className={`shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center ring-1 ${COLOR_RING[color]}`}>
+                        <Icon size={28} strokeWidth={1.5} />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">{t(`site.departments.${id}.title`)}</h2>
+                        <p className="text-muted-foreground mt-2 leading-relaxed text-base">{t(`site.departments.${id}.desc`)}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="text-xl sm:text-2xl font-bold text-foreground">{t(`site.departments.${id}.title`)}</h2>
-                      <p className="text-muted-foreground mt-2 leading-relaxed max-w-3xl">{t(`site.departments.${id}.desc`)}</p>
-                      <p className="text-sm text-muted-foreground/80 mt-3">
-                        <span className="font-medium text-foreground">{isAr ? 'أهم الفحوصات: ' : 'Key tests: '}</span>
-                        {t(`site.departments.${id}.tests`)}
-                      </p>
 
-                      {!loading && sampleTests.length > 0 && (
-                        <ul className="mt-5 flex flex-wrap gap-2">
-                          {sampleTests.map((test) => (
-                            <li key={test.id}>
-                              <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-muted text-foreground">
-                                {isAr && test.name_ar ? test.name_ar : test.name}
-                              </span>
-                            </li>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div className="site-service-detail__panel">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+                          <Target size={16} className="text-primary-600" />
+                          {t('site.servicesPage.benefit')}
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{t(`site.departments.${id}.benefit`)}</p>
+                      </div>
+                      <div className="site-service-detail__panel">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+                          <Clock size={16} className="text-primary-600" />
+                          {t('site.servicesPage.when')}
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{t(`site.departments.${id}.when`)}</p>
+                      </div>
+                    </div>
+
+                    <div className="site-service-detail__panel">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+                        <PawPrint size={16} className="text-primary-600" />
+                        {t('site.servicesPage.animals')}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{t(`site.departments.${id}.animals`)}</p>
+                    </div>
+
+                    {!loading && deptTests.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                          {t(`site.departments.${id}.tests`)}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {deptTests.slice(0, 10).map((test) => (
+                            <Link
+                              key={test.id}
+                              to={`/tests?dept=${id}`}
+                              className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-muted hover:bg-primary-100 dark:hover:bg-primary-900/30 text-foreground transition-colors"
+                            >
+                              {isAr && test.name_ar ? test.name_ar : test.name}
+                            </Link>
                           ))}
-                          {deptTests.length > 8 && (
-                            <li className="text-xs text-muted-foreground self-center">
-                              +{deptTests.length - 8}
-                            </li>
+                          {deptTests.length > 10 && (
+                            <span className="text-xs text-muted-foreground self-center">+{deptTests.length - 10}</span>
                           )}
-                        </ul>
-                      )}
+                        </div>
+                      </div>
+                    )}
 
-                      {categories.length > 0 && (
-                        <Button asChild variant="link" className="mt-4 px-0 gap-1 h-auto">
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      {categories.length > 0 || id === 'parasitology' ? (
+                        <Button asChild size="lg" className="gap-1.5">
                           <Link to={`/tests?dept=${id}`}>
-                            {isAr ? 'عرض جميع الفحوصات' : 'View all tests'}
-                            <ChevronRight size={14} className={isAr ? 'rotate-180' : ''} />
+                            {t('site.servicesPage.viewTests')}
+                            <ChevronRight size={16} className={isAr ? 'rotate-180' : ''} />
                           </Link>
                         </Button>
+                      ) : (
+                        <Button size="lg" className="gap-1.5" asChild>
+                          <Link to="/contact">{t('site.common.bookField')}</Link>
+                        </Button>
                       )}
+                      <Button asChild variant="outline" size="lg">
+                        <Link to="/contact">{t('site.hero.ctaContact')}</Link>
+                      </Button>
                     </div>
                   </div>
                 </article>

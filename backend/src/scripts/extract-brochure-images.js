@@ -56,10 +56,28 @@ async function main() {
     { file: 'lab-hero-bg.jpg', buf: page1, extract: { left: 0, top: 0, width: w, height: Math.round(h * 0.82) } },
     { file: 'animals/horse.jpg', buf: page1, extract: { left: Math.round(w * 0.72), top: Math.round(h * 0.1), width: Math.round(w * 0.27), height: Math.round(h * 0.82) } },
     { file: 'animals/camel.jpg', buf: page1, extract: { left: Math.round(w * 0.47), top: Math.round(h * 0.17), width: Math.round(w * 0.24), height: Math.round(h * 0.76) } },
-    // Page 2 has no sheep photo — use the desert caravan (livestock/herd) from the brochure.
     { file: 'animals/sheep.jpg', buf: page2, extract: { left: Math.round(w * 0.52), top: Math.round(h * 0.74), width: Math.round(w * 0.44), height: Math.round(h * 0.22) } },
     { file: 'lab-bg-texture.jpg', buf: page1, extract: { left: 0, top: 0, width: w, height: Math.round(h * 0.55) } },
+    // Lab & service imagery from brochure pages (real photos, not AI).
+    { file: 'lab/interior.jpg', buf: page1, extract: { left: 0, top: Math.round(h * 0.08), width: Math.round(w * 0.45), height: Math.round(h * 0.75) } },
+    { file: 'lab/operations.jpg', buf: page2, extract: { left: 0, top: 0, width: w, height: Math.round(h * 0.72) } },
+    { file: 'lab/field-service.jpg', buf: page2, extract: { left: Math.round(w * 0.48), top: Math.round(h * 0.68), width: Math.round(w * 0.5), height: Math.round(h * 0.28) } },
+    { file: 'services/biochemistry.jpg', buf: page1, extract: { left: Math.round(w * 0.02), top: Math.round(h * 0.12), width: Math.round(w * 0.42), height: Math.round(h * 0.55) } },
+    { file: 'services/hematology.jpg', buf: page1, extract: { left: Math.round(w * 0.05), top: Math.round(h * 0.2), width: Math.round(w * 0.38), height: Math.round(h * 0.5) } },
+    { file: 'services/microbiology.jpg', buf: page2, extract: { left: 0, top: Math.round(h * 0.15), width: Math.round(w * 0.48), height: Math.round(h * 0.55) } },
+    { file: 'services/pcr.jpg', buf: page2, extract: { left: Math.round(w * 0.5), top: Math.round(h * 0.1), width: Math.round(w * 0.48), height: Math.round(h * 0.5) } },
+    { file: 'equipment/hematology.jpg', buf: page1, extract: { left: 0, top: Math.round(h * 0.05), width: Math.round(w * 0.35), height: Math.round(h * 0.6) } },
+    { file: 'equipment/chemistry.jpg', buf: page1, extract: { left: Math.round(w * 0.08), top: Math.round(h * 0.15), width: Math.round(w * 0.32), height: Math.round(h * 0.45) } },
+    { file: 'equipment/microscope.jpg', buf: page2, extract: { left: Math.round(w * 0.05), top: Math.round(h * 0.2), width: Math.round(w * 0.4), height: Math.round(h * 0.45) } },
+    { file: 'equipment/elisa.jpg', buf: page2, extract: { left: Math.round(w * 0.45), top: Math.round(h * 0.18), width: Math.round(w * 0.5), height: Math.round(h * 0.42) } },
   ];
+
+  const labDir = path.join(outDir, 'lab');
+  const servicesDir = path.join(outDir, 'services');
+  const equipmentDir = path.join(outDir, 'equipment');
+  fs.mkdirSync(labDir, { recursive: true });
+  fs.mkdirSync(servicesDir, { recursive: true });
+  fs.mkdirSync(equipmentDir, { recursive: true });
 
   for (const { file, buf, extract } of crops) {
     const out = path.join(outDir, file);

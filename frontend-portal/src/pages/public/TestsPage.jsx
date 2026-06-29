@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, Clock, FlaskConical, Filter } from 'lucide-react';
+import { Search, Clock, FlaskConical, Filter, Layers } from 'lucide-react';
 import PublicLayout from '../../components/public/PublicLayout';
 import PageMeta from '../../components/public/PageMeta';
-import { Section, SectionHeader, FadeUp } from '../../components/public/Section';
+import { Section, FadeUp } from '../../components/public/Section';
 import usePublicCatalog from '../../hooks/usePublicCatalog';
-import { SERVICE_DEPARTMENTS } from '../../data/siteStructure';
+import { deptIdForCategory, categoriesForAnimal, categoriesForDept, testsForDept } from '../../utils/catalogHelpers';
+import { SERVICE_DEPARTMENTS, ANIMAL_FILTERS } from '../../data/siteStructure';
 import { Input } from '../../components/ui/input';
 import { Skeleton } from '../../components/ui/skeleton';
 
@@ -20,72 +21,109 @@ function formatTat(hours, isAr) {
 export default function TestsPage() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
-  const [searchParams] = useSearchParams();
-  const deptFilter = searchParams.get('dept');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deptFilter = searchParams.get('dept') || 'all';
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('all');
-  const { tests, categories, loading, error } = usePublicCatalog();
+  const [animalId, setAnimalId] = useState('all');
+  const { tests, categories, loading, error, stats } = usePublicCatalog();
 
-  const deptCategories = useMemo(() => {
-    if (!deptFilter) return null;
-    const dept = SERVICE_DEPARTMENTS.find((d) => d.id === deptFilter);
-    return dept?.categories ?? [];
+  useEffect(() => {
+    if (deptFilter !== 'all') setCategoryId('all');
   }, [deptFilter]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tests.filter((test) => {
+    const animalCats = categoriesForAnimal(animalId);
+    const deptCats = deptFilter !== 'all' ? categoriesForDept(deptFilter) : null;
+
+    let pool = tests;
+    if (deptFilter !== 'all') {
+      pool = testsForDept(tests, deptFilter);
+    }
+
+    return pool.filter((test) => {
       if (categoryId !== 'all' && String(test.category_id) !== categoryId) return false;
-      if (deptCategories?.length && !deptCategories.includes(test.category_code)) return false;
+      if (animalCats?.length && !animalCats.includes(test.category_code)) return false;
+      if (deptCats?.length && deptFilter !== 'all' && !deptCats.includes(test.category_code) && deptFilter !== 'parasitology' && deptFilter !== 'microbiology') return false;
       if (!q) return true;
-      const hay = [test.name, test.name_ar, test.code, test.description].filter(Boolean).join(' ').toLowerCase();
+      const hay = [test.name, test.name_ar, test.code, test.description, test.category_name, test.category_name_ar].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [tests, query, categoryId, deptCategories]);
+  }, [tests, query, categoryId, animalId, deptFilter]);
 
-  const grouped = useMemo(() => {
-    const map = new Map();
-    filtered.forEach((test) => {
-      const key = test.category_id ?? 'other';
-      if (!map.has(key)) {
-        map.set(key, {
-          name: isAr && test.category_name_ar ? test.category_name_ar : (test.category_name || (isAr ? 'أخرى' : 'Other')),
-          tests: [],
-        });
-      }
-      map.get(key).tests.push(test);
-    });
-    return [...map.values()];
-  }, [filtered, isAr]);
+  const setDept = (id) => {
+    const next = new URLSearchParams(searchParams);
+    if (id === 'all') next.delete('dept');
+    else next.set('dept', id);
+    setSearchParams(next, { replace: true });
+  };
 
   return (
     <PublicLayout>
       <PageMeta titleKey="site.meta.testsTitle" descKey="site.meta.testsDesc" path="/tests" />
 
-      <div className="site-page-hero site-container">
-        <SectionHeader eyebrow={t('site.nav.tests')} title={t('site.meta.testsTitle')} subtitle={t('site.meta.testsDesc')} />
+      <div className="site-page-hero site-container pb-8">
+        <p className="site-eyebrow mb-3">{t('site.nav.tests')}</p>
+        <h1 className="site-heading max-w-2xl">{t('site.testsPage.heroTitle')}</h1>
+        <p className="site-subheading mt-4 max-w-2xl">{t('site.testsPage.heroDesc')}</p>
+        {stats?.test_count > 0 && (
+          <p className="text-sm text-muted-foreground mt-3">
+            {t('site.common.resultsCount', { count: filtered.length })}
+            {' / '}
+            {stats.test_count}
+          </p>
+        )}
       </div>
 
       <Section className="!pt-0">
         <div className="site-container">
           <FadeUp>
-            <div className="flex flex-col lg:flex-row gap-3 mb-8">
-              <div className="relative flex-1">
-                <Search size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t('site.testsPage.search')}
-                  className="ps-10 h-11"
-                  aria-label={t('site.testsPage.search')}
-                />
+            <div className="site-tests-toolbar">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                <Filter size={14} />
+                {t('site.testsPage.filterTitle')}
+              </p>
+              <div className="grid gap-3 lg:grid-cols-4">
+                <div className="relative lg:col-span-2">
+                  <Search size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t('site.testsPage.search')}
+                    className="ps-10 h-11"
+                    aria-label={t('site.testsPage.search')}
+                  />
+                </div>
+                <select
+                  value={animalId}
+                  onChange={(e) => setAnimalId(e.target.value)}
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={t('site.testsPage.allAnimals')}
+                >
+                  {ANIMAL_FILTERS.map(({ id }) => (
+                    <option key={id} value={id}>
+                      {id === 'all' ? t('site.testsPage.allAnimals') : t(`site.audiences.${id}.title`)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={deptFilter}
+                  onChange={(e) => setDept(e.target.value)}
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={t('site.testsPage.allDepts')}
+                >
+                  <option value="all">{t('site.testsPage.allDepts')}</option>
+                  {SERVICE_DEPARTMENTS.filter((d) => d.categories.length > 0 || d.id === 'parasitology').map(({ id }) => (
+                    <option key={id} value={id}>{t(`site.departments.${id}.title`)}</option>
+                  ))}
+                </select>
               </div>
-              <div className="relative lg:w-64">
-                <Filter size={16} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground pointer-events-none" />
+              <div className="mt-3">
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="flex h-11 w-full rounded-md border border-input bg-background ps-9 pe-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-10 w-full sm:w-auto min-w-[12rem] rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={t('site.testsPage.allCategories')}
                 >
                   <option value="all">{t('site.testsPage.allCategories')}</option>
@@ -101,7 +139,7 @@ export default function TestsPage() {
 
           {loading && (
             <div className="space-y-3">
-              {[1, 2, 3, 4].map((n) => <Skeleton key={n} className="h-24 w-full rounded-xl" />)}
+              {[1, 2, 3, 4, 5].map((n) => <Skeleton key={n} className="h-28 w-full rounded-xl" />)}
             </div>
           )}
 
@@ -111,62 +149,72 @@ export default function TestsPage() {
             </p>
           )}
 
-          {!loading && grouped.length === 0 && (
-            <p className="text-center text-muted-foreground py-16">{t('site.testsPage.noResults')}</p>
+          {!loading && filtered.length === 0 && (
+            <p className="text-center text-muted-foreground py-20">{t('site.testsPage.noResults')}</p>
           )}
 
-          <div className="space-y-10">
-            {grouped.map((group) => (
-              <div key={group.name}>
-                <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                  <FlaskConical size={18} className="text-primary-600" />
-                  {group.name}
-                  <span className="text-sm font-normal text-muted-foreground">({group.tests.length})</span>
-                </h2>
-                <div className="space-y-2">
-                  {group.tests.map((test, i) => (
-                    <FadeUp key={test.id} delay={Math.min(i * 0.02, 0.2)}>
-                      <article className="site-test-row">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-semibold text-foreground">
-                                {isAr && test.name_ar ? test.name_ar : test.name}
-                              </h3>
-                              <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded" dir="ltr">
-                                {test.code}
-                              </span>
-                            </div>
-                            {test.description && (
-                              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed line-clamp-2">{test.description}</p>
-                            )}
-                          </div>
-                          <dl className="flex flex-wrap gap-x-5 gap-y-1 text-xs shrink-0">
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Clock size={13} />
-                              <dt className="sr-only">{t('site.testsPage.tat')}</dt>
-                              <dd><span className="font-medium text-foreground">{t('site.testsPage.tat')}:</span> {formatTat(test.turnaround_hours, isAr)}</dd>
-                            </div>
-                            {test.requires_specimen && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <FlaskConical size={13} />
-                                <dt className="sr-only">{t('site.testsPage.sample')}</dt>
-                                <dd><span className="font-medium text-foreground">{t('site.testsPage.sample')}:</span> {test.requires_specimen}</dd>
-                              </div>
-                            )}
-                            {test.method && (
-                              <div className="text-muted-foreground">
-                                <span className="font-medium text-foreground">{t('site.testsPage.method')}:</span> {test.method}
-                              </div>
-                            )}
-                          </dl>
+          <div className="space-y-3">
+            {filtered.map((test, i) => {
+              const deptId = deptIdForCategory(test.category_code);
+              const deptLabel = deptId ? t(`site.departments.${deptId}.title`) : (isAr && test.category_name_ar ? test.category_name_ar : test.category_name);
+              return (
+                <FadeUp key={test.id} delay={Math.min(i * 0.015, 0.15)}>
+                  <article className="site-test-card">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-lg font-bold text-foreground">
+                            {isAr && test.name_ar ? test.name_ar : test.name}
+                          </h2>
+                          <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md" dir="ltr">
+                            {test.code}
+                          </span>
                         </div>
-                      </article>
-                    </FadeUp>
-                  ))}
-                </div>
-              </div>
-            ))}
+                        {test.description ? (
+                          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{test.description}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mt-2 italic opacity-70">
+                            {isAr ? 'فحص مخبري معتمد — تواصل معنا لتفاصيل العينة.' : 'Validated laboratory test — contact us for sample details.'}
+                          </p>
+                        )}
+                        <div className="site-test-card__meta">
+                          <span className="site-test-card__tag">
+                            <Layers size={12} />
+                            {t('site.testsPage.department')}: {isAr && test.category_name_ar ? test.category_name_ar : test.category_name}
+                          </span>
+                          {deptId && (
+                            <Link to={`/services#${deptId}`} className="site-test-card__tag site-test-card__tag--link">
+                              {t('site.testsPage.service')}: {deptLabel}
+                            </Link>
+                          )}
+                          <span className="site-test-card__tag">
+                            <Clock size={12} />
+                            {t('site.testsPage.tat')}: {formatTat(test.turnaround_hours, isAr)}
+                          </span>
+                          {test.requires_specimen && (
+                            <span className="site-test-card__tag">
+                              <FlaskConical size={12} />
+                              {t('site.testsPage.sample')}: {test.requires_specimen}
+                            </span>
+                          )}
+                          {test.method && (
+                            <span className="site-test-card__tag">{t('site.testsPage.method')}: {test.method}</span>
+                          )}
+                        </div>
+                      </div>
+                      {deptId && (
+                        <Link
+                          to={`/tests?dept=${deptId}`}
+                          className="text-sm font-medium text-primary-700 hover:text-primary-900 shrink-0"
+                        >
+                          {t('site.common.viewTests')} →
+                        </Link>
+                      )}
+                    </div>
+                  </article>
+                </FadeUp>
+              );
+            })}
           </div>
         </div>
       </Section>

@@ -1,20 +1,71 @@
 import {
   FlaskConical, Droplets, Microscope, Dna, TestTubes, HeartPulse,
-  Bug, Truck, MapPin, Building2, Stethoscope, Tractor,
+  Bug, Truck, MapPin, Stethoscope, Tractor,
 } from 'lucide-react';
 
-/** Service departments mapped to DB category codes + marketing copy keys */
+/** Service departments mapped to DB category codes + marketing metadata */
 export const SERVICE_DEPARTMENTS = [
-  { id: 'biochemistry', icon: FlaskConical, categories: ['CHEM'], color: 'amber' },
-  { id: 'hematology', icon: Droplets, categories: ['CBC'], color: 'rose' },
-  { id: 'microbiology', icon: Microscope, categories: ['MICRO'], color: 'emerald' },
-  { id: 'bacterialCulture', icon: TestTubes, categories: ['CULT'], color: 'teal' },
-  { id: 'elisa', icon: TestTubes, categories: ['ELISA', 'SERO'], color: 'sky' },
-  { id: 'pcr', icon: Dna, categories: ['PCR'], color: 'violet' },
-  { id: 'hormones', icon: HeartPulse, categories: ['HORM'], color: 'pink' },
-  { id: 'parasitology', icon: Bug, categories: ['MICRO'], color: 'lime' },
-  { id: 'fieldCollection', icon: Truck, categories: [], color: 'orange' },
-  { id: 'fieldServices', icon: MapPin, categories: [], color: 'primary' },
+  {
+    id: 'biochemistry', icon: FlaskConical, categories: ['CHEM'], color: 'amber',
+    image: '/images/services/biochemistry.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics', 'farms'],
+  },
+  {
+    id: 'hematology', icon: Droplets, categories: ['CBC'], color: 'rose',
+    image: '/images/services/hematology.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics', 'farms'],
+  },
+  {
+    id: 'microbiology', icon: Microscope, categories: ['MICRO'], color: 'emerald',
+    image: '/images/services/microbiology.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics', 'farms'],
+  },
+  {
+    id: 'bacterialCulture', icon: TestTubes, categories: ['CULT'], color: 'teal',
+    image: '/images/lab/operations.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics', 'farms'],
+  },
+  {
+    id: 'elisa', icon: TestTubes, categories: ['ELISA', 'SERO'], color: 'sky',
+    image: '/images/equipment/elisa.jpg',
+    animals: ['camels', 'cattle', 'sheep', 'goats', 'farms'],
+  },
+  {
+    id: 'pcr', icon: Dna, categories: ['PCR'], color: 'violet',
+    image: '/images/services/pcr.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics', 'farms'],
+  },
+  {
+    id: 'hormones', icon: HeartPulse, categories: ['HORM'], color: 'pink',
+    image: '/images/lab/interior.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics'],
+  },
+  {
+    id: 'parasitology', icon: Bug, categories: [], color: 'lime',
+    image: '/images/equipment/microscope.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'farms'],
+  },
+  {
+    id: 'fieldCollection', icon: Truck, categories: [], color: 'orange',
+    image: '/images/lab/field-service.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'farms'],
+  },
+  {
+    id: 'fieldServices', icon: MapPin, categories: [], color: 'primary',
+    image: '/images/lab/field-service.jpg',
+    animals: ['camels', 'horses', 'cattle', 'sheep', 'goats', 'clinics', 'farms'],
+  },
+];
+
+export const ANIMAL_FILTERS = [
+  { id: 'all' },
+  { id: 'camels' },
+  { id: 'horses' },
+  { id: 'cattle' },
+  { id: 'sheep' },
+  { id: 'goats' },
+  { id: 'clinics' },
+  { id: 'farms' },
 ];
 
 export const AUDIENCES = [
@@ -27,17 +78,25 @@ export const AUDIENCES = [
   { id: 'farms', icon: Tractor },
 ];
 
-export const WORKFLOW_STEPS = ['book', 'collect', 'analyze', 'review', 'approve', 'deliver'];
+export const WORKFLOW_STEPS = ['book', 'collect', 'analyze', 'approve', 'deliver', 'archive'];
 
-export const WHY_US = ['equipment', 'accuracy', 'speed', 'reports', 'field', 'portal', 'compare', 'support'];
+export const WHY_US = ['equipment', 'speed', 'field', 'reports', 'compare', 'team', 'qualityLab'];
+
+export const HERO_BADGES = ['field', 'digital', 'equipment', 'portal', 'reports'];
 
 export const EQUIPMENT = [
-  { id: 'hematology', image: '/images/lab-hero-bg.jpg' },
-  { id: 'chemistry', image: '/images/lab-bg-texture.jpg' },
-  { id: 'microscope', image: '/images/animals/horse.jpg' },
-  { id: 'elisa', image: '/images/lab-hero-bg.jpg' },
-  { id: 'pcr', image: '/images/lab-bg-texture.jpg' },
-  { id: 'coldChain', image: '/images/animals/camel.jpg' },
+  { id: 'hematology', image: '/images/equipment/hematology.jpg' },
+  { id: 'chemistry', image: '/images/equipment/chemistry.jpg' },
+  { id: 'microscope', image: '/images/equipment/microscope.jpg' },
+  { id: 'elisa', image: '/images/equipment/elisa.jpg' },
+  { id: 'pcr', image: '/images/services/pcr.jpg' },
+  { id: 'coldChain', image: '/images/lab/field-service.jpg' },
+];
+
+export const CREDIBILITY = [
+  { id: 'interior', image: '/images/lab/interior.jpg' },
+  { id: 'operations', image: '/images/lab/operations.jpg' },
+  { id: 'field', image: '/images/lab/field-service.jpg' },
 ];
 
 export const PORTAL_FEATURES = ['results', 'pdf', 'compare', 'archive', 'share'];
