@@ -60,8 +60,11 @@ const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     portalExpiresIn: process.env.PORTAL_JWT_EXPIRES_IN || '48h',
   },
-  storage: {
-    type: process.env.STORAGE_TYPE || 'local',
+  storage: (() => {
+    const s3Ready = !!(process.env.S3_BUCKET && process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY);
+    const type = process.env.STORAGE_TYPE === 's3' || s3Ready ? 's3' : (process.env.STORAGE_TYPE || 'local');
+    return {
+    type,
     path: process.env.STORAGE_PATH || './uploads',
     s3: {
       bucket: process.env.S3_BUCKET,
@@ -70,7 +73,8 @@ const env = {
       secretKey: process.env.S3_SECRET_KEY,
       endpoint: process.env.S3_ENDPOINT,
     },
-  },
+  };
+  })(),
   lab: {
     name: process.env.LAB_NAME || 'Rare Animals Veterinary Care Center',
     nameAr: process.env.LAB_NAME_AR || 'مركز رعاية النوادر البيطري',

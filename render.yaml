@@ -17,6 +17,10 @@ services:
     buildCommand: npm run build:cloud
     startCommand: npm run start:cloud
     healthCheckPath: /api/health
+    disk:
+      name: lims-uploads
+      mountPath: /var/data
+      sizeGB: 5
     domains:
       - lims.rarevetcare.com
       - portal.rarevetcare.com
@@ -40,7 +44,17 @@ services:
       - key: STORAGE_TYPE
         value: local
       - key: STORAGE_PATH
-        value: ./uploads
+        value: /var/data/uploads
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
       - key: LAB_NAME
         value: Rare Animals Veterinary Care Center
       - key: LAB_NAME_AR
@@ -83,3 +97,37 @@ services:
         value: 48h
       - key: PORTAL_OTP_STATIC
         value: "1234"
+
+  - type: cron
+    name: rare-vet-db-backup
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.backup
+    dockerContext: ./backend
+    plan: starter
+    region: frankfurt
+    repo: https://github.com/htoom47-cloud/rare-vet-lims
+    branch: main
+    schedule: "0 3 * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BACKUP_DIR
+        value: /tmp/backups
+      - key: BACKUP_RETENTION_DAYS
+        value: "7"
+      - key: BACKUP_S3_PREFIX
+        value: backups/db
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rare-vet-db
+          property: connectionString
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false

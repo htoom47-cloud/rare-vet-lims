@@ -3,6 +3,8 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const logger = require('../config/logger');
+const env = require('../config/env');
+const { isS3Storage, ensureUploadDir } = require('../config/storage');
 
 const backendRoot = path.join(__dirname, '../..');
 
@@ -33,6 +35,22 @@ if (!fs.existsSync(portalIndex)) {
   logger.error('frontend-portal/dist not found — portal.rarevetcare.com will show staff app or blank until build:cloud includes portal');
 } else {
   logger.info('Client portal build ready', { path: portalDistPath });
+}
+
+const uploadPath = path.isAbsolute(env.storage.path)
+  ? env.storage.path
+  : path.resolve(backendRoot, env.storage.path.replace(/^\.\//, ''));
+ensureUploadDir();
+logger.info('Storage ready', {
+  type: isS3Storage() ? 's3' : 'local',
+  path: uploadPath,
+  bucket: isS3Storage() ? env.storage.s3.bucket : undefined,
+});
+if (!isS3Storage() && process.env.RENDER && !uploadPath.startsWith('/var/data')) {
+  logger.warn(
+    'Local storage without persistent disk — uploads may be lost on redeploy. '
+    + 'Mount a disk at /var/data or set S3_BUCKET + S3_ACCESS_KEY + S3_SECRET_KEY.',
+  );
 }
 
 // Start HTTP immediately so Render health checks pass during background boot tasks.

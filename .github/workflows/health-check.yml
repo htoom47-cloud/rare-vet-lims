@@ -1,0 +1,18 @@
+name: Production Health Check
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check LIMS API health
+        run: |
+          URL="https://lims.rarevetcare.com/api/health"
+          body=$(curl -fsS --max-time 30 "$URL") || { echo "Health endpoint unreachable"; exit 1; }
+          echo "$body"
+          echo "$body" | grep -q '"database":"ok"' || { echo "Database check failed"; exit 1; }
+          echo "$body" | grep -q '"status":"healthy"' || { echo "Service degraded"; exit 1; }

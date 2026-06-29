@@ -143,7 +143,9 @@ Fastest way to go online with one URL for frontend + API.
 
 ### Notes
 
-- **Uploads**: Cloud disks are ephemeral on free tiers. For production files use S3 (`STORAGE_TYPE=s3`).
+- **Uploads**: Persistent disk at `/var/data/uploads` (5 GB) — survives redeploys. Optional S3/R2 for off-site copies.
+- **Backups**: Render cron `rare-vet-db-backup` daily at 03:00 UTC; GitHub Action `Database Backup` as fallback.
+- **Monitoring**: GitHub Action `Production Health Check` every 30 minutes; Render uses `/api/health` (includes DB ping).
 - **Cold start**: Free Render plan sleeps after inactivity; first visit may take ~30s.
 - **HTTPS**: Provided automatically by Render/Railway.
 
@@ -249,6 +251,47 @@ Add to crontab:
 ```bash
 gunzip -c /backups/lims_20260101_020000.sql.gz | docker exec -i rare-vet-lims-db psql -U lims_user rare_vet_lims
 ```
+
+---
+
+## Production operations (activated)
+
+### 1. Persistent uploads (Render disk)
+
+`render.yaml` mounts a 5 GB disk at `/var/data` with `STORAGE_PATH=/var/data/uploads`. After deploy, PDFs and images persist across restarts.
+
+### 2. S3 / Cloudflare R2 (optional, recommended)
+
+When `S3_BUCKET`, `S3_ACCESS_KEY`, and `S3_SECRET_KEY` are set in Render → **Environment**, storage auto-switches to S3 (no code change). Set `STORAGE_TYPE=s3` explicitly if you prefer.
+
+| Variable | Notes |
+|----------|-------|
+| `S3_BUCKET` | Bucket name |
+| `S3_REGION` | AWS region or `auto` for R2 |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | API credentials |
+| `S3_ENDPOINT` | Required for R2/MinIO only |
+
+Use the **same** S3 variables on the `rare-vet-db-backup` cron job so nightly dumps upload to `backups/db/`.
+
+### 3. Database backups
+
+| Method | Schedule | Where files go |
+|--------|----------|----------------|
+| Render cron `rare-vet-db-backup` | Daily 03:00 UTC | S3 if configured, else ephemeral `/tmp` on cron |
+| GitHub `Database Backup` workflow | Daily 04:00 UTC | Local artifact + S3 if secrets set |
+| Render Dashboard → rare-vet-db → Backups | Paid DB plans | Render-managed |
+
+**GitHub Secrets** (Settings → Secrets → Actions):
+
+- `DATABASE_URL` — External Database URL from Render (`rare-vet-db` → Connect)
+- `S3_*` — same as production (optional, for off-site backup copies)
+
+### 4. Uptime monitoring
+
+- **Automated**: `.github/workflows/health-check.yml` pings `https://lims.rarevetcare.com/api/health` every 30 minutes.
+- **Optional**: [UptimeRobot](https://uptimerobot.com) → monitor URL `https://lims.rarevetcare.com/api/health`, keyword `healthy`.
+
+Health response includes `database`, `storage.type`, and frontend build flags.
 
 ---
 

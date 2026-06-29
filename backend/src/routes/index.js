@@ -39,13 +39,38 @@ router.use('/devices', devicesRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/portal', portalRoutes);
 
-router.get('/health', (_req, res) => {
+router.get('/health', async (_req, res) => {
   const staffDist = path.join(__dirname, '../../../frontend/dist/index.html');
   const portalDist = path.join(__dirname, '../../../frontend-portal/dist/index.html');
-  res.json({
-    success: true,
-    status: 'healthy',
+
+  let database = 'ok';
+  try {
+    const { pool } = require('../config/database');
+    await pool.query('SELECT 1');
+  } catch {
+    database = 'down';
+  }
+
+  const { isS3Storage, ensureUploadDir } = require('../config/storage');
+  let storageWritable = false;
+  try {
+    const uploadPath = ensureUploadDir();
+    fs.accessSync(uploadPath, fs.constants.W_OK);
+    storageWritable = true;
+  } catch {
+    storageWritable = false;
+  }
+
+  const healthy = database === 'ok';
+  res.status(healthy ? 200 : 503).json({
+    success: healthy,
+    status: healthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
+    database,
+    storage: {
+      type: isS3Storage() ? 's3' : 'local',
+      writable: storageWritable || isS3Storage(),
+    },
     frontend: {
       staff: fs.existsSync(staffDist),
       portal: fs.existsSync(portalDist),
