@@ -102,15 +102,9 @@ const requestOtp = async (mobile) => {
   );
 
   const message = [
-    `${env.lab.nameAr}`,
-    `رمز الدخول إلى بوابة العميل: ${otp}`,
-    `الرابط: ${env.portalAppUrl}`,
-    `صالح لمدة ${OTP_TTL_MINUTES} دقائق.`,
-    '',
-    `${env.lab.name}`,
-    `Your client portal code: ${otp}`,
-    `URL: ${env.portalAppUrl}`,
-    `Valid for ${OTP_TTL_MINUTES} minutes.`,
+    env.lab.nameAr,
+    `رمز الدخول: ${otp}`,
+    `صالح ${OTP_TTL_MINUTES} دقائق`,
   ].join('\n');
 
   const e164 = formatToE164(customer.mobile);
