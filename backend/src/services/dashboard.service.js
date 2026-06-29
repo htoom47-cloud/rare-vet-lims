@@ -1,4 +1,5 @@
 const { query } = require('../config/database');
+const { reconcileSampleStatuses } = require('./samples.service');
 
 /** Lab calendar day (Saudi Arabia) for dashboard “today” metrics. */
 const LAB_TZ = 'Asia/Riyadh';
@@ -8,6 +9,8 @@ const monthMatch = (column) =>
   `(${column} AT TIME ZONE '${LAB_TZ}')::date >= ((NOW() AT TIME ZONE '${LAB_TZ}')::date - INTERVAL '30 days')`;
 
 const getStats = async () => {
+  await reconcileSampleStatuses();
+
   const sampleDayCol = 'COALESCE(s.received_date, s.collection_date, s.created_at)';
 
   const [
@@ -34,7 +37,7 @@ const getStats = async () => {
     ),
     query(
       `SELECT COUNT(*)::int AS count FROM samples
-       WHERE status IN ('pending', 'received', 'running')`
+       WHERE status IN ('received', 'running')`
     ),
     query(
       `SELECT COALESCE(SUM(p.amount), 0)::numeric AS total FROM payments p
@@ -122,7 +125,7 @@ const getTechnicianDashboard = async (userId) => {
   const [queue, running, critical] = await Promise.all([
     query(
       `SELECT COUNT(*)::int AS count FROM samples
-       WHERE status IN ('received', 'pending')
+       WHERE status = 'received'
          AND (assigned_technician = $1 OR assigned_technician IS NULL)`,
       [userId]
     ),

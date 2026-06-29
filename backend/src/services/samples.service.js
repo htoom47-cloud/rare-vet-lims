@@ -196,6 +196,38 @@ const updateStatus = async (id, status, extra = {}) => {
   return result.rows[0];
 };
 
+/** Close samples still marked in-lab when all tests/results/reports are finished. */
+const reconcileSampleStatuses = async () => {
+  await query(`
+    UPDATE samples s SET
+      status = 'completed',
+      completed_date = COALESCE(s.completed_date, NOW()),
+      updated_at = NOW()
+    WHERE s.status IN ('received', 'running')
+      AND (
+        EXISTS (SELECT 1 FROM reports rep WHERE rep.sample_id = s.id)
+        OR (
+          EXISTS (SELECT 1 FROM sample_tests st WHERE st.sample_id = s.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM sample_tests st
+            WHERE st.sample_id = s.id AND st.status != 'completed'
+          )
+        )
+        OR (
+          EXISTS (SELECT 1 FROM sample_tests st WHERE st.sample_id = s.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM sample_tests st
+            WHERE st.sample_id = s.id
+              AND NOT EXISTS (
+                SELECT 1 FROM results r
+                WHERE r.sample_test_id = st.id AND r.is_validated = true
+              )
+          )
+        )
+      )
+  `);
+};
+
 /** Tests still needing technician result entry (excludes MICRO + already-entered + tests without parameters). */
 const WORKBENCH_PENDING = `
   st.sample_id = s.id
@@ -291,4 +323,4 @@ const getBarcode = async (id, format = 'code128') => {
   return { barcode: sample.barcode, sample_code: sample.sample_code, image: barcodeImage };
 };
 
-module.exports = { list, getById, getByBarcode, create, updateStatus, getQueue, getParasitologyQueue, getBarcode };
+module.exports = { list, getById, getByBarcode, create, updateStatus, reconcileSampleStatuses, getQueue, getParasitologyQueue, getBarcode };
