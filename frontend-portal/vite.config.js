@@ -27,12 +27,23 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
         globPatterns: ['**/*.{js,mjs,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
             urlPattern: /\/api\//,
             handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/lab-profile\.pdf$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'lab-profile',
+              expiration: { maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
           },
         ],
       },
