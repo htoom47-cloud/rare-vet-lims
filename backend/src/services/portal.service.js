@@ -18,11 +18,12 @@ const {
   flagSeverity,
 } = require('../utils/portal-analytics');
 
+const OTP_LENGTH = 4;
 const OTP_TTL_MINUTES = 10;
 const OTP_COOLDOWN_SECONDS = 60;
 const OTP_MAX_ATTEMPTS = 5;
 
-const generateOtp = () => env.portal.staticOtp || String(Math.floor(100000 + Math.random() * 900000));
+const generateOtp = () => env.portal.staticOtp || String(Math.floor(10 ** (OTP_LENGTH - 1) + Math.random() * 9 * 10 ** (OTP_LENGTH - 1)));
 
 const issuePortalToken = (customer) => {
   const accessToken = jwt.sign(

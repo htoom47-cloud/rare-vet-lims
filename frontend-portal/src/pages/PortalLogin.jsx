@@ -150,17 +150,17 @@ export default function PortalLogin() {
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      maxLength={6}
+                      maxLength={4}
                       dir="ltr"
                       className="text-center text-2xl tracking-[0.5em] font-mono"
                       placeholder="1234"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       required
                       autoFocus
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || otp.length < 4}>
+                  <Button type="submit" className="w-full" disabled={loading || otp.length !== 4}>
                     {loading ? t('common.loading') : t('portal.verifyAndLogin')}
                   </Button>
                   <Button

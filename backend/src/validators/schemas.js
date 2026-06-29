@@ -163,7 +163,7 @@ const portalOtpRequestSchema = Joi.object({
 
 const portalOtpVerifySchema = Joi.object({
   mobile: Joi.string().min(9).max(20).required(),
-  otp: Joi.string().min(4).max(6).pattern(/^\d+$/).required(),
+  otp: Joi.string().length(4).pattern(/^\d{4}$/).required(),
 });
 
 module.exports = {
