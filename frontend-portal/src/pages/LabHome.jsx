@@ -22,6 +22,12 @@ import { LAB_WHATSAPP_PHONE, openWhatsApp } from '../utils/whatsapp';
 const LAB_PHONE = '0115007257';
 const LAB_EMAIL = 'alnwader.10hz@gmail.com';
 
+const ANIMAL_PHOTOS = {
+  camel: '/images/animals/camel.jpg',
+  horse: '/images/animals/horse.jpg',
+  sheep: '/images/animals/sheep.jpg',
+};
+
 const sectionAnim = {
   initial: { opacity: 0, y: 14 },
   whileInView: { opacity: 1, y: 0 },
@@ -90,9 +96,9 @@ export default function LabHome() {
   ];
 
   const animals = [
-    { key: 'camel', emoji: '🐪' },
-    { key: 'horse', emoji: '🐎' },
-    { key: 'sheep', emoji: '🐑' },
+    { key: 'camel' },
+    { key: 'horse' },
+    { key: 'sheep' },
   ];
 
   const services = [
@@ -137,10 +143,14 @@ export default function LabHome() {
   };
 
   return (
-    <div className="min-h-screen bg-[#ebe6df] dark:bg-background relative overflow-x-hidden" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="absolute inset-0 bg-app-mesh pointer-events-none opacity-60" />
+    <div className="lab-home-page min-h-screen relative overflow-x-hidden" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="lab-home-bg" aria-hidden>
+        <img src="/images/lab-bg-texture.jpg" alt="" className="lab-home-bg__texture" />
+        <img src="/images/lab-hero-bg.jpg" alt="" className="lab-home-bg__hero" />
+        <div className="lab-home-bg__overlay" />
+      </div>
 
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-card/95 backdrop-blur-md shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-border/40 bg-card/85 backdrop-blur-lg shadow-sm">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2">
           <LabBrandLockup compact embedded noDivider className="!w-auto max-w-[11rem] sm:max-w-[14rem]" />
           <div className="flex items-center gap-1 shrink-0">
@@ -182,15 +192,23 @@ export default function LabHome() {
 
       <main className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 pb-20">
         {/* Hero */}
-        <section className="pt-10 sm:pt-14 pb-12 text-center">
-          <FadeIn>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-600/10 text-primary-800 dark:text-primary-200 text-xs font-semibold mb-6">
+        <section className="relative pt-6 sm:pt-10 pb-12 text-center rounded-3xl overflow-hidden mb-4">
+          <div className="absolute inset-0 -z-10" aria-hidden>
+            <img
+              src="/images/lab-hero-bg.jpg"
+              alt=""
+              className="w-full h-full object-cover scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/70 dark:from-black/70 dark:via-black/60 dark:to-background/90" />
+          </div>
+          <FadeIn className="relative px-4 sm:px-8 py-10 sm:py-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold mb-6 backdrop-blur-sm border border-white/20">
               {t('portal.labTagline')}
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground leading-tight max-w-3xl mx-auto">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight max-w-3xl mx-auto drop-shadow-md">
               {t('home.heroTitle')}
             </h1>
-            <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            <p className="mt-5 text-base sm:text-lg text-white/90 max-w-2xl mx-auto leading-relaxed">
               {t('home.heroSubtitle')}
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -262,12 +280,24 @@ export default function LabHome() {
           <m.div {...sectionAnim}>
             <SectionHeading title={t('home.animalsTitle')} hint={t('home.animalsHint')} />
             <div className="grid sm:grid-cols-3 gap-4">
-              {animals.map(({ key, emoji }) => (
-                <Card key={key} className="border-border/80 bg-card/95 overflow-hidden group hover:shadow-md transition-shadow">
-                  <CardContent className="p-6 text-center">
-                    <span className="text-4xl" role="img" aria-hidden>{emoji}</span>
-                    <h3 className="font-bold text-lg text-foreground mt-4">{t(`home.animals.${key}.title`)}</h3>
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{t(`home.animals.${key}.desc`)}</p>
+              {animals.map(({ key }) => (
+                <Card key={key} className="border-border/80 bg-card/95 overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-0.5">
+                  <div className="aspect-[4/3] relative overflow-hidden">
+                    <img
+                      src={ANIMAL_PHOTOS[key]}
+                      alt={t(`home.animals.${key}.title`)}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                    <h3 className="absolute bottom-3 inset-x-4 font-bold text-lg text-white drop-shadow">
+                      {t(`home.animals.${key}.title`)}
+                    </h3>
+                  </div>
+                  <CardContent className="p-4 sm:p-5">
+                    <p className="text-sm text-muted-foreground leading-relaxed text-start">
+                      {t(`home.animals.${key}.desc`)}
+                    </p>
                   </CardContent>
                 </Card>
               ))}

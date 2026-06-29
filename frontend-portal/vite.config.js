@@ -31,7 +31,7 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
-        globPatterns: ['**/*.{js,mjs,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,mjs,css,html,ico,png,jpg,jpeg,svg,woff2}'],
         runtimeCaching: [
           {
             urlPattern: /\/api\//,

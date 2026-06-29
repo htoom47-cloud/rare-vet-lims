@@ -1260,3 +1260,61 @@ body.lab-pdf-capture-active #_rht_toaster {
   display: none !important;
   visibility: hidden !important;
 }
+
+/* Lab homepage — desert photo background */
+.lab-home-page {
+  background-color: #ebe6df;
+}
+
+.dark .lab-home-page {
+  background-color: hsl(var(--background));
+}
+
+.lab-home-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lab-home-bg__texture,
+.lab-home-bg__hero {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lab-home-bg__texture {
+  opacity: 0.35;
+  filter: saturate(0.85);
+}
+
+.dark .lab-home-bg__texture {
+  opacity: 0.12;
+}
+
+.lab-home-bg__hero {
+  opacity: 0.22;
+  object-position: center 30%;
+}
+
+.dark .lab-home-bg__hero {
+  opacity: 0.08;
+}
+
+.lab-home-bg__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(197, 160, 89, 0.18), transparent 55%),
+    linear-gradient(180deg, rgba(253, 250, 243, 0.72) 0%, rgba(235, 230, 223, 0.88) 45%, rgba(235, 230, 223, 0.94) 100%);
+}
+
+.dark .lab-home-bg__overlay {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(197, 160, 89, 0.1), transparent 50%),
+    linear-gradient(180deg, hsl(var(--background) / 0.82) 0%, hsl(var(--background) / 0.94) 100%);
+}
