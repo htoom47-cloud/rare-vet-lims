@@ -18,8 +18,11 @@ const notificationsRoutes = require('./notifications.routes');
 const devicesRoutes = require('./devices.routes');
 const settingsRoutes = require('./settings.routes');
 const portalRoutes = require('./portal.routes');
+const publicRoutes = require('./public.routes');
 
 const router = express.Router();
+
+router.use('/public', publicRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/customers', customersRoutes);

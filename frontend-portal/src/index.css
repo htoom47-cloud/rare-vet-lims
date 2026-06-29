@@ -1318,3 +1318,180 @@ body.lab-pdf-capture-active #_rht_toaster {
     radial-gradient(ellipse 80% 50% at 50% 0%, rgba(197, 160, 89, 0.1), transparent 50%),
     linear-gradient(180deg, hsl(var(--background) / 0.82) 0%, hsl(var(--background) / 0.94) 100%);
 }
+
+/* Public marketing site design system */
+.site-container {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 1.5rem);
+}
+
+.site-section {
+  padding-block: clamp(3rem, 8vw, 5.5rem);
+}
+
+.site-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--primary) / 0.85);
+}
+
+.site-heading {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: hsl(var(--foreground));
+}
+
+.site-subheading {
+  font-size: clamp(1rem, 2vw, 1.125rem);
+  line-height: 1.65;
+  color: hsl(var(--muted-foreground));
+}
+
+.site-hero {
+  position: relative;
+  min-height: clamp(28rem, 70vh, 38rem);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 0 0 1.75rem 1.75rem;
+}
+
+.site-hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.site-hero__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+}
+
+.site-hero__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(105deg, rgba(48, 36, 25, 0.88) 0%, rgba(48, 36, 25, 0.55) 45%, rgba(48, 36, 25, 0.35) 100%),
+    linear-gradient(180deg, transparent 60%, rgba(235, 230, 223, 0.95) 100%);
+}
+
+.dark .site-hero__shade {
+  background:
+    linear-gradient(105deg, rgba(20, 15, 10, 0.92) 0%, rgba(20, 15, 10, 0.65) 50%, rgba(20, 15, 10, 0.45) 100%),
+    linear-gradient(180deg, transparent 55%, hsl(var(--background) / 0.98) 100%);
+}
+
+.site-hero__content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding-block: clamp(3rem, 10vw, 5rem);
+}
+
+.site-card {
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border) / 0.65);
+  background: hsl(var(--card) / 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 2px rgba(48, 36, 25, 0.04), 0 8px 24px rgba(48, 36, 25, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.site-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(48, 36, 25, 0.1);
+  border-color: hsl(var(--primary) / 0.25);
+}
+
+.site-stat {
+  padding: 1.25rem 1.5rem;
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border) / 0.6);
+  background: hsl(var(--card) / 0.9);
+  text-align: center;
+}
+
+.site-stat__value {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  color: hsl(var(--primary));
+  line-height: 1.1;
+}
+
+.site-stat__label {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.site-icon-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  ring: 1px;
+}
+
+.site-workflow-step {
+  position: relative;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--card) / 0.85);
+}
+
+.site-workflow-step::before {
+  content: attr(data-step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.site-page-hero {
+  padding-block: clamp(2.5rem, 6vw, 4rem);
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+
+.site-test-row {
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--card) / 0.88);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.site-test-row:hover {
+  border-color: hsl(var(--primary) / 0.3);
+  background: hsl(var(--card));
+}
+
+.site-prose {
+  max-width: 42rem;
+  line-height: 1.75;
+  color: hsl(var(--muted-foreground));
+}
+
+.site-prose h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin-bottom: 1rem;
+}

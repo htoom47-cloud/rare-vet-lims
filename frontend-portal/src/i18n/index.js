@@ -1,5 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { siteEn, siteAr } from './site.js';
 
 const resources = {
   en: {
@@ -217,6 +218,7 @@ const resources = {
         downloadDone: 'PDF downloaded', downloadFailed: 'Download failed',
         interpretation: 'Clinical interpretation', recommendations: 'Recommendations',
       },
+      site: siteEn,
     },
   },
   ar: {
@@ -434,6 +436,7 @@ const resources = {
         downloadDone: 'تم التحميل', downloadFailed: 'فشل التحميل',
         interpretation: 'التفسير السريري', recommendations: 'التوصيات',
       },
+      site: siteAr,
     },
   },
 };
