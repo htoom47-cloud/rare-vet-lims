@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -10,6 +11,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const BROCHURE_URL = '/lab-profile.pdf';
 
 export default function LabBrochureViewer() {
+  const { t } = useTranslation();
   const containerRef = useRef(null);
   const [numPages, setNumPages] = useState(0);
   const [pageWidth, setPageWidth] = useState(720);
@@ -33,11 +35,17 @@ export default function LabBrochureViewer() {
   return (
     <div ref={containerRef} className="w-full max-w-[52rem] mx-auto">
       {error ? (
-        <iframe
-          title="lab-profile"
-          src={BROCHURE_URL}
-          className="w-full min-h-[80vh] rounded-xl border border-border/80 bg-white shadow-sm"
-        />
+        <div className="py-16 px-3 text-center space-y-4">
+          <p className="text-sm text-muted-foreground">{t('home.pdfLoadError')}</p>
+          <a
+            href={BROCHURE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary inline-flex"
+          >
+            {t('home.openPdf')}
+          </a>
+        </div>
       ) : (
         <Document
           file={BROCHURE_URL}
