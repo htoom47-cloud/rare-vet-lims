@@ -12,6 +12,7 @@ import AnimalsNavIcon from './AnimalsNavIcon';
 import PortalNotifications from './PortalNotifications';
 import { Button } from '../ui/button';
 import PwaInstallBanner from './PwaInstallBanner';
+import WhatsAppContact from './WhatsAppContact';
 import { portalSearchAPI } from '../../services/portalApi';
 import { cn } from '../../lib/utils';
 
@@ -180,6 +181,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
         </div>
+        <WhatsAppContact variant="sidebar" />
         <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={handleLogout}>
           <LogOut size={18} /> {t('portal.logout')}
         </Button>
@@ -288,6 +290,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
       </div>
 
       <PwaInstallBanner />
+      <WhatsAppContact />
     </div>
   );
 }

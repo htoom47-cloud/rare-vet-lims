@@ -13,6 +13,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { FadeIn } from '../components/motion/AnimatedPage';
 import PwaInstallBanner from '../components/portal/PwaInstallBanner';
+import WhatsAppContact from '../components/portal/WhatsAppContact';
 
 export default function PortalLogin() {
   const { t } = useTranslation();
@@ -164,6 +165,7 @@ export default function PortalLogin() {
         </m.div>
       </div>
       <PwaInstallBanner />
+      <WhatsAppContact />
     </div>
   );
 }
