@@ -422,7 +422,7 @@ const resources = {
         statuses: { pending: 'Pending', received: 'Received', running: 'Running', completed: 'Completed', rejected: 'Rejected', archived: 'Archived' },
       },
       tests: {
-        title: 'Test Management', category: 'Category', price: 'Price', parameters: 'Parameters',
+        title: 'Test Management', category: 'Category', price: 'Price (incl. VAT)', parameters: 'Parameters',
         referenceRanges: 'Reference Ranges', code: 'Test Code', nameEn: 'Name (EN)', nameAr: 'Name (AR)',
         unit: 'Unit', method: 'Method', description: 'Description', turnaround: 'Turnaround (hours)',
         allCategories: 'All Categories', newTest: 'New Test', editTest: 'Edit Test', testDetails: 'Test Details',
@@ -1136,7 +1136,7 @@ const resources = {
         statuses: { pending: 'معلق', received: 'مستلم', running: 'قيد التشغيل', completed: 'مكتمل', rejected: 'مرفوض', archived: 'مؤرشف' },
       },
       tests: {
-        title: 'إدارة الفحوصات', category: 'الفئة', price: 'السعر', parameters: 'المعامل',
+        title: 'إدارة الفحوصات', category: 'الفئة', price: 'السعر (شامل الضريبة)', parameters: 'المعامل',
         referenceRanges: 'المدى المرجعي', code: 'كود الفحص', nameEn: 'اسم الفحص (إنجليزي)', nameAr: 'اسم الفحص (عربي)',
         unit: 'الوحدة', method: 'الطريقة', description: 'الوصف', turnaround: 'مدة التسليم (ساعة)',
         allCategories: 'كل الفئات', newTest: 'فحص جديد', editTest: 'تعديل الفحص', testDetails: 'تفاصيل الفحص',

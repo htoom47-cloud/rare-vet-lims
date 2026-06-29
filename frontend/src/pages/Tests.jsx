@@ -7,7 +7,7 @@ import Modal from '../components/ui/Modal';
 import { testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
-import { fmtIncl } from '../utils/vat';
+import { fmtIncl, grossToNet, netToGross } from '../utils/vat';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -136,7 +136,7 @@ export default function Tests() {
       name_ar: test.name_ar || '',
       category_id: String(test.category_id || ''),
       description: test.description || '',
-      price: test.price ?? 0,
+      price: netToGross(test.price ?? 0).toFixed(2),
       turnaround_hours: test.turnaround_hours ?? 24,
       unit: test.unit || '',
       method: test.method || '',
@@ -166,7 +166,7 @@ export default function Tests() {
     const payload = {
       ...form,
       category_id: Number(form.category_id),
-      price: Number(form.price),
+      price: grossToNet(Number(form.price)),
       turnaround_hours: Number(form.turnaround_hours),
       label_copies: Number(form.label_copies) || 1,
     };
@@ -334,7 +334,7 @@ export default function Tests() {
       name: pkg.name || '',
       name_ar: pkg.name_ar || '',
       description: pkg.description || '',
-      price: pkg.price ?? 0,
+      price: netToGross(pkg.price ?? 0).toFixed(2),
       discount_percent: pkg.discount_percent ?? 0,
       test_ids: Array.isArray(pkg.test_ids) ? pkg.test_ids : [],
     });
@@ -353,7 +353,7 @@ export default function Tests() {
 
   const packageIndividualTotal = packageForm.test_ids.reduce((sum, id) => {
     const test = allTests.find((x) => x.id === id);
-    return sum + (test ? Number(test.price) || 0 : 0);
+    return sum + (test ? netToGross(test.price) : 0);
   }, 0);
 
   const handlePackageSubmit = async (e) => {
@@ -364,7 +364,7 @@ export default function Tests() {
     }
     const payload = {
       ...packageForm,
-      price: Number(packageForm.price),
+      price: grossToNet(Number(packageForm.price)),
       discount_percent: Number(packageForm.discount_percent) || 0,
     };
     try {
@@ -758,7 +758,7 @@ export default function Tests() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR) — {t('priceList.priceExclVat')}</label>
+            <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR) — {t('priceList.priceIncl')}</label>
             <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" required />
           </div>
           <div>
@@ -859,7 +859,7 @@ export default function Tests() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR) — {t('priceList.priceExclVat')}</label>
+              <label className="block text-sm font-medium mb-1">{t('tests.price')} (SAR) — {t('priceList.priceIncl')}</label>
               <input
                 type="number"
                 min="0"
@@ -885,7 +885,7 @@ export default function Tests() {
           </div>
           {packageForm.test_ids.length > 0 && (
             <p className="text-sm text-gray-500">
-              {t('tests.individualTotal')}: {packageIndividualTotal.toFixed(2)} SAR
+              {t('tests.individualTotal')}: {packageIndividualTotal.toFixed(2)} SAR ({t('priceList.priceIncl')})
             </p>
           )}
           <div>
