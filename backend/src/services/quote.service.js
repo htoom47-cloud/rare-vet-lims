@@ -8,6 +8,7 @@ const fs = require('fs');
 const { generateQuotePDF } = require('../utils/quote-pdf');
 const invoiceSettingsService = require('./invoice-settings.service');
 const { resolveDiscount } = require('../utils/discount');
+const { prepareCatalogItems } = require('../utils/vat');
 
 const quotePdfDir = () => path.join(env.storage.path, 'quotes');
 
@@ -94,7 +95,8 @@ const createQuote = async (data, userId) => {
 
     if (!customerName) throw new AppError('Customer name is required', 400, 'VALIDATION_ERROR');
 
-    const subtotal = data.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+    const catalogItems = prepareCatalogItems(data.items);
+    const subtotal = catalogItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     const discount = resolveDiscount(subtotal, data);
     const discountPercent = parseFloat(data.discount_percent) || 0;
     const taxable = Math.max(0, subtotal - discount);
@@ -117,13 +119,13 @@ const createQuote = async (data, userId) => {
       ]
     );
 
-    for (const item of data.items) {
+    for (const item of catalogItems) {
       await client.query(
         `INSERT INTO price_quote_items (id, quote_id, test_id, package_id, description, quantity, unit_price, total_price)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [
           uuidv4(), quoteId, item.test_id || null, item.package_id || null,
-          item.description, item.quantity, item.unit_price, item.unit_price * item.quantity,
+          item.description, item.quantity, item.unit_price, item.total_price,
         ]
       );
     }

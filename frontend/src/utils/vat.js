@@ -11,8 +11,11 @@ export const grossToNet = (gross, rate = VAT_RATE) => {
   return g / (1 + r / 100);
 };
 
-/** Format catalog/list price — VAT inclusive for customer display. */
-export const fmtIncl = (net, rate = VAT_RATE) => `SAR ${netToGross(net, rate).toFixed(2)}`;
+/** Catalog / price list — stored price is already VAT-inclusive. */
+export const fmtCatalog = (gross) => `SAR ${(parseFloat(gross) || 0).toFixed(2)}`;
+
+/** @deprecated Use fmtCatalog — catalog prices are gross, not net. */
+export const fmtIncl = fmtCatalog;
 
 /** Format net amount (excl. VAT). */
 export const fmtNet = (net) => `SAR ${(parseFloat(net) || 0).toFixed(2)}`;
@@ -26,3 +29,15 @@ export const splitVat = (net, rate = VAT_RATE) => {
   const taxAmount = subtotal * (r / 100);
   return { subtotal, taxRate: r, taxAmount, total: subtotal + taxAmount };
 };
+
+/** Sum catalog line items (unit_price × qty) — prices are VAT-inclusive. */
+export const catalogLinesGrossTotal = (items) => (items || []).reduce(
+  (s, i) => s + (parseFloat(i.unit_price) || 0) * (parseInt(i.quantity, 10) || 1),
+  0,
+);
+
+/** Net subtotal for invoices/quotes from catalog gross line prices. */
+export const catalogLinesNetSubtotal = (items, rate = VAT_RATE) => (items || []).reduce(
+  (s, i) => s + grossToNet(parseFloat(i.unit_price) || 0, rate) * (parseInt(i.quantity, 10) || 1),
+  0,
+);

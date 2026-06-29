@@ -23,7 +23,7 @@ import CustomerSearch from '../components/customers/CustomerSearch';
 
 import { samplesAPI, animalsAPI, testsAPI, billingAPI, notificationsAPI } from '../services/api';
 import { getResultsEntryTargets } from '../utils/parasitologyTests';
-import { fmtIncl } from '../utils/vat';
+import { fmtCatalog } from '../utils/vat';
 
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -424,7 +424,7 @@ export default function Samples() {
 
                   />
 
-                  {test.name} ({fmtIncl(test.price)})
+                  {test.name} ({fmtCatalog(test.price)})
 
                 </label>
 
@@ -496,7 +496,7 @@ export default function Samples() {
 
                   <span>{test.test_name}</span>
 
-                  <span>{fmtIncl(test.price)} — <StatusBadge status={test.status} /></span>
+                  <span>{fmtCatalog(test.price)} — <StatusBadge status={test.status} /></span>
 
                 </div>
 

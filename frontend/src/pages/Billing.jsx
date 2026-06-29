@@ -10,7 +10,7 @@ import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload, initDiscountFromInvoice, calcInvoiceTotals } from '../utils/discount';
-import { fmtIncl, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
+import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
 import { billingAPI, testsAPI } from '../services/api';
 
 function groupItemsByAnimal(items, t) {
@@ -117,7 +117,7 @@ export default function Billing() {
     e.preventDefault();
     if (!invoiceForm.customer_id || !invoiceForm.items.length) return toast.error('اختر العميل وأضف بنود الفاتورة');
     try {
-      const subtotal = invoiceForm.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+      const subtotal = catalogLinesNetSubtotal(invoiceForm.items);
       const discountFields = buildDiscountPayload(subtotal, discountType, discountValue);
       await billingAPI.createInvoice({ ...invoiceForm, ...discountFields });
       toast.success('تم إنشاء الفاتورة');
@@ -236,7 +236,7 @@ export default function Billing() {
     )},
   ];
 
-  const subtotal = invoiceForm.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+  const subtotal = catalogLinesNetSubtotal(invoiceForm.items);
   const discountAmount = resolveDiscountAmount(subtotal, discountType, discountValue);
   const afterDiscount = subtotal - discountAmount;
   const tax = afterDiscount * (VAT_RATE / 100);
@@ -285,7 +285,7 @@ export default function Billing() {
           {packages.map((pkg) => (
             <div key={pkg.id} className="card">
               <h3 className="font-semibold">{pkg.name}</h3>
-              <p className="text-2xl font-bold text-primary-600 mt-2">{fmtIncl(pkg.price)}</p>
+              <p className="text-2xl font-bold text-primary-600 mt-2">{fmtCatalog(pkg.price)}</p>
               {pkg.test_names?.filter(Boolean).length > 0 && (
                 <p className="text-sm text-gray-500 mt-2">{pkg.test_names.join(', ')}</p>
               )}
@@ -431,7 +431,7 @@ export default function Billing() {
                 setNewItem({ ...newItem, test_id: e.target.value, description: test?.name || '', unit_price: test?.price || 0 });
               }} className="input-field">
                 <option value="">فحص (اختياري)</option>
-                {tests.map((t) => <option key={t.id} value={t.id}>{t.name} - {fmtIncl(t.price)}</option>)}
+                {tests.map((t) => <option key={t.id} value={t.id}>{t.name} - {fmtCatalog(t.price)}</option>)}
               </select>
               <input placeholder="الوصف" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} className="input-field" />
               <input type="number" min="1" placeholder="الكمية" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} className="input-field" />

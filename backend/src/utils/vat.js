@@ -18,4 +18,18 @@ const splitVat = (net, rate = VAT_RATE) => {
   return { subtotal, taxRate: r, taxAmount, total: subtotal + taxAmount };
 };
 
-module.exports = { VAT_RATE, netToGross, grossToNet, splitVat };
+/** Catalog prices in tests/packages are VAT-inclusive; convert lines to net for invoicing. */
+const prepareCatalogItems = (items, rate = VAT_RATE) => (items || []).map((item) => {
+  const qty = parseInt(item.quantity, 10) || 1;
+  const netUnit = grossToNet(parseFloat(item.unit_price) || 0, rate);
+  return {
+    ...item,
+    quantity: qty,
+    unit_price: netUnit,
+    total_price: netUnit * qty,
+  };
+});
+
+module.exports = {
+  VAT_RATE, netToGross, grossToNet, splitVat, prepareCatalogItems,
+};

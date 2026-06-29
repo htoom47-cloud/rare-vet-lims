@@ -9,10 +9,10 @@ import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
-import { fmtIncl, fmtNet, fmtGross, grossToNet, netToGross, VAT_RATE } from '../utils/vat';
+import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
 import toast from 'react-hot-toast';
 
-const fmt = fmtIncl;
+const fmt = fmtCatalog;
 
 const defaultValidUntil = () => {
   const d = new Date();
@@ -21,7 +21,7 @@ const defaultValidUntil = () => {
 };
 
 const calcTotals = (items, discountType, discountValue) => {
-  const subtotal = items.reduce((s, i) => s + parseFloat(i.unit_price || 0) * (i.quantity || 1), 0);
+  const subtotal = catalogLinesNetSubtotal(items);
   const disc = resolveDiscountAmount(subtotal, discountType, discountValue);
   const taxable = Math.max(0, subtotal - disc);
   const taxAmount = taxable * (VAT_RATE / 100);
@@ -203,7 +203,7 @@ export default function PriceList() {
     }
     setSubmitting(true);
     try {
-      const subtotal = lineItems.reduce((s, i) => s + (parseFloat(i.unit_price) || 0) * (parseInt(i.quantity, 10) || 1), 0);
+      const subtotal = catalogLinesNetSubtotal(lineItems);
       const discountFields = buildDiscountPayload(subtotal, discountType, discountValue);
       const payload = {
         customer_id: customerId || null,
@@ -411,12 +411,12 @@ export default function PriceList() {
                             min="0"
                             step="0.01"
                             className="input-field py-1"
-                            value={netToGross(item.unit_price).toFixed(2)}
-                            onChange={(e) => updateItem(item._key, 'unit_price', grossToNet(e.target.value))}
+                            value={parseFloat(item.unit_price || 0).toFixed(2)}
+                            onChange={(e) => updateItem(item._key, 'unit_price', e.target.value)}
                           />
                         </td>
                         <td className="p-2 text-end font-medium">
-                          {fmtIncl((parseFloat(item.unit_price) || 0) * (parseInt(item.quantity, 10) || 1))}
+                          {fmtCatalog((parseFloat(item.unit_price) || 0) * (parseInt(item.quantity, 10) || 1))}
                         </td>
                         <td className="p-2">
                           <button type="button" onClick={() => removeItem(item._key)} className="p-1 text-red-500 hover:bg-red-50 rounded">

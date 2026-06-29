@@ -11,7 +11,7 @@ import { printSampleLabel, autoPrintSampleLabels, printAllThermalLabels } from '
 import { totalLabelCountForSample } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
-import { fmtIncl } from '../utils/vat';
+import { fmtCatalog } from '../utils/vat';
 import {
   customersAPI, animalsAPI, testsAPI, billingAPI, samplesAPI,
 } from '../services/api';
@@ -458,7 +458,7 @@ export default function WorkflowCase() {
                                         </span>
                                       )}
                                     </span>
-                                    <span className="text-primary-600 font-medium">{fmtIncl(test.price)}</span>
+                                    <span className="text-primary-600 font-medium">{fmtCatalog(test.price)}</span>
                                   </label>
                                 ))}
                               </div>

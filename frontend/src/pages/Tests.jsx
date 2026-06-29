@@ -7,7 +7,7 @@ import Modal from '../components/ui/Modal';
 import { testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
-import { fmtIncl, grossToNet, netToGross } from '../utils/vat';
+import { fmtCatalog } from '../utils/vat';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -136,7 +136,7 @@ export default function Tests() {
       name_ar: test.name_ar || '',
       category_id: String(test.category_id || ''),
       description: test.description || '',
-      price: netToGross(test.price ?? 0).toFixed(2),
+      price: test.price ?? 0,
       turnaround_hours: test.turnaround_hours ?? 24,
       unit: test.unit || '',
       method: test.method || '',
@@ -166,7 +166,7 @@ export default function Tests() {
     const payload = {
       ...form,
       category_id: Number(form.category_id),
-      price: grossToNet(Number(form.price)),
+      price: Number(form.price),
       turnaround_hours: Number(form.turnaround_hours),
       label_copies: Number(form.label_copies) || 1,
     };
@@ -334,7 +334,7 @@ export default function Tests() {
       name: pkg.name || '',
       name_ar: pkg.name_ar || '',
       description: pkg.description || '',
-      price: netToGross(pkg.price ?? 0).toFixed(2),
+      price: pkg.price ?? 0,
       discount_percent: pkg.discount_percent ?? 0,
       test_ids: Array.isArray(pkg.test_ids) ? pkg.test_ids : [],
     });
@@ -353,7 +353,7 @@ export default function Tests() {
 
   const packageIndividualTotal = packageForm.test_ids.reduce((sum, id) => {
     const test = allTests.find((x) => x.id === id);
-    return sum + (test ? netToGross(test.price) : 0);
+    return sum + (test ? Number(test.price) || 0 : 0);
   }, 0);
 
   const handlePackageSubmit = async (e) => {
@@ -364,7 +364,7 @@ export default function Tests() {
     }
     const payload = {
       ...packageForm,
-      price: grossToNet(Number(packageForm.price)),
+      price: Number(packageForm.price),
       discount_percent: Number(packageForm.discount_percent) || 0,
     };
     try {
@@ -476,7 +476,7 @@ export default function Tests() {
         </span>
       ),
     },
-    { key: 'price', label: t('tests.price'), render: (r) => fmtIncl(r.price) },
+    { key: 'price', label: t('tests.price'), render: (r) => fmtCatalog(r.price) },
     { key: 'turnaround_hours', label: t('tests.turnaround') },
     { key: 'label_copies', label: t('tests.labelCopies'), render: (r) => r.label_copies ?? 1 },
     { key: 'unit', label: t('tests.unit'), render: (r) => r.unit || '—' },
@@ -552,7 +552,7 @@ export default function Tests() {
         </div>
       ),
     },
-    { key: 'price', label: t('tests.price'), render: (r) => fmtIncl(r.price) },
+    { key: 'price', label: t('tests.price'), render: (r) => fmtCatalog(r.price) },
     {
       key: 'test_names',
       label: t('tests.testsInPackage'),

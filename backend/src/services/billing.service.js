@@ -12,6 +12,7 @@ const ledger = require('./ledger.service');
 const { assertDayOpen } = require('./daily-closing.service');
 const { logBillingAudit } = require('../utils/billing-audit');
 const { resolveDiscount } = require('../utils/discount');
+const { prepareCatalogItems } = require('../utils/vat');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -121,7 +122,8 @@ const createInvoice = async (data, userId) => {
     await client.query('BEGIN');
 
     const invoiceNumber = generateCode('INV');
-    const subtotal = data.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+    const catalogItems = prepareCatalogItems(data.items);
+    const subtotal = catalogItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     const discount = resolveDiscount(subtotal, data);
     const discountPercent = parseFloat(data.discount_percent) || 0;
     const taxable = subtotal - discount;
@@ -138,11 +140,11 @@ const createInvoice = async (data, userId) => {
 
     const invoice = invoiceResult.rows[0];
 
-    for (const item of data.items) {
+    for (const item of catalogItems) {
       await client.query(
         `INSERT INTO invoice_items (id, invoice_id, test_id, package_id, animal_id, description, quantity, unit_price, total_price)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [uuidv4(), invoice.id, item.test_id, item.package_id, item.animal_id || null, item.description, item.quantity, item.unit_price, item.unit_price * item.quantity]
+        [uuidv4(), invoice.id, item.test_id, item.package_id, item.animal_id || null, item.description, item.quantity, item.unit_price, item.total_price]
       );
     }
 
