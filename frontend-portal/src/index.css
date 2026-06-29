@@ -247,6 +247,35 @@
     display: none;
   }
 
+  .portal-quick-action {
+    @apply flex flex-col items-center justify-center gap-2 rounded-xl border border-border/70 bg-card px-2 py-3.5 text-center transition-all;
+    @apply hover:border-primary-300 hover:bg-accent/40 active:scale-[0.98];
+  }
+
+  .portal-quick-action__icon {
+    @apply flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300;
+  }
+
+  .portal-alert-banner--critical {
+    @apply bg-rose-50 border-rose-200 text-rose-900;
+  }
+
+  .dark .portal-alert-banner--critical {
+    background: rgba(127, 29, 29, 0.22);
+    border-color: rgba(248, 113, 113, 0.35);
+    color: #fecaca;
+  }
+
+  .portal-alert-banner--warning {
+    @apply bg-amber-50 border-amber-200 text-amber-900;
+  }
+
+  .dark .portal-alert-banner--warning {
+    background: rgba(120, 53, 15, 0.22);
+    border-color: rgba(251, 191, 36, 0.35);
+    color: #fde68a;
+  }
+
   .premium-card {
     @apply bg-card text-card-foreground rounded-2xl shadow-card border border-border/60;
     transition: transform 0.22s ease, box-shadow 0.22s ease;
@@ -281,7 +310,7 @@
   }
 
   .med-kpi-card {
-    @apply premium-card premium-card-interactive bg-card;
+    @apply premium-card bg-card;
     border-top-width: 3px;
     border-top-style: solid;
   }
@@ -356,7 +385,12 @@
   }
 
   .med-animal-tile {
-    @apply premium-card premium-card-interactive;
+    @apply premium-card transition-all;
+  }
+
+  .med-animal-tile:hover {
+    @apply shadow-card-hover border-ring/30;
+    transform: translateY(-1px);
   }
 
   .med-spark-card {

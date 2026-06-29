@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   PawPrint, FileText, Bell, AlertTriangle, ChevronLeft, ChevronRight,
-  Activity, CheckCircle2, Receipt,
+  CheckCircle2, Receipt,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
@@ -11,6 +11,7 @@ import KpiCard from '../components/portal/KpiCard';
 import StatusBadge from '../components/portal/StatusBadge';
 import { portalDashboardAPI } from '../services/portalApi';
 import { animalLabel } from '../utils/animalTypes';
+import { cn } from '../lib/utils';
 
 export default function PortalDashboard() {
   const { t, i18n } = useTranslation();
@@ -34,88 +35,134 @@ export default function PortalDashboard() {
     return '';
   };
 
+  const topAlert = useMemo(() => {
+    if (!data?.alerts?.length) return null;
+    const priority = { critical: 0, warning: 1, info: 2 };
+    return [...data.alerts].sort((a, b) => (priority[a.severity] ?? 9) - (priority[b.severity] ?? 9))[0];
+  }, [data]);
+
   const formatDate = (iso) => {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString(isAr ? 'ar-SA' : 'en-GB', {
-      day: '2-digit', month: 'short',
+      day: '2-digit', month: 'short', year: 'numeric',
     });
   };
 
-  const customerName = isAr
-    ? (data?.customer?.full_name_ar || data?.customer?.full_name)
-    : data?.customer?.full_name;
+  const quickActions = [
+    { to: '/reports', icon: FileText, label: t('portal.navReports') },
+    { to: '/animals', icon: PawPrint, label: t('portal.navAnimals') },
+    { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
+  ];
+
+  const needsAttention = (data?.stats?.animalsNeedingFollowUp ?? 0) + (data?.stats?.abnormalResults ?? 0);
 
   return (
     <PortalLayout compact wide>
-      <div className="med-page space-y-3">
-        <div className="med-hero premium-card px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {t('portal.dashboard')}
-          </p>
-          <h1 className="text-xl font-bold text-foreground mt-0.5">
-            {customerName ? `${t('portal.welcomeBack')}, ${customerName}` : t('portal.dashboard')}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('portal.dashboardHint')}</p>
-          <button
-            type="button"
-            onClick={() => navigate('/invoices')}
-            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 hover:underline"
-          >
-            <Receipt size={14} /> {t('portal.myInvoices')}
-          </button>
-        </div>
-
+      <div className="med-page space-y-4">
         {loading && (
           <div className="text-center py-10 med-loading text-sm">{t('common.loading')}</div>
         )}
 
         {!loading && data && (
           <>
-            {data.alerts?.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {data.alerts.map((alert) => (
-                  <div
-                    key={alert.type}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border ${
-                      alert.severity === 'critical'
-                        ? 'bg-rose-50 border-rose-200 text-rose-800'
-                        : 'bg-amber-50 border-amber-200 text-amber-800'
-                    }`}
-                  >
-                    {alert.severity === 'critical' ? <AlertTriangle size={14} /> : <Bell size={14} />}
-                    {alertText(alert)}
-                  </div>
-                ))}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {quickActions.map(({ to, icon: Icon, label }) => (
+                <button
+                  key={to}
+                  type="button"
+                  onClick={() => navigate(to)}
+                  className="portal-quick-action"
+                >
+                  <span className="portal-quick-action__icon">
+                    <Icon size={20} strokeWidth={2} />
+                  </span>
+                  <span className="text-xs sm:text-sm font-semibold text-foreground leading-tight">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            {topAlert && (
+              <div
+                className={cn(
+                  'portal-alert-banner flex items-start gap-3 px-4 py-3 rounded-xl border text-sm',
+                  topAlert.severity === 'critical'
+                    ? 'portal-alert-banner--critical'
+                    : 'portal-alert-banner--warning'
+                )}
+              >
+                {topAlert.severity === 'critical' ? (
+                  <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                ) : (
+                  <Bell size={18} className="shrink-0 mt-0.5" />
+                )}
+                <p className="font-medium leading-relaxed">{alertText(topAlert)}</p>
               </div>
             )}
 
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <KpiCard compact icon={PawPrint} label={t('portal.statAnimals')} value={data.stats.animalCount} accent="purple" />
               <KpiCard compact icon={FileText} label={t('portal.statReports')} value={data.stats.reportCount} accent="blue" />
-              <KpiCard compact icon={Bell} label={t('portal.statNew')} value={data.stats.newReports7d} accent="green" />
               <KpiCard
                 compact
                 icon={AlertTriangle}
-                label={t('portal.kpiAbnormal')}
-                value={data.stats.abnormalResults ?? 0}
-                accent={(data.stats.abnormalResults ?? 0) > 0 ? 'red' : 'neutral'}
-              />
-              <KpiCard
-                compact
-                icon={Activity}
                 label={t('portal.kpiFollowUp')}
-                value={data.stats.animalsNeedingFollowUp ?? 0}
-                accent={(data.stats.animalsNeedingFollowUp ?? 0) > 0 ? 'orange' : 'neutral'}
+                value={needsAttention}
+                accent={needsAttention > 0 ? 'orange' : 'neutral'}
               />
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-3">
-              <section className="xl:col-span-3 med-section-card">
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100">
-                  <h2 className="med-section-title mb-0">{t('portal.myAnimals')}</h2>
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+              <section className="xl:col-span-2 xl:order-2 med-section-card order-1">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+                  <h2 className="text-sm font-bold text-foreground">{t('portal.recentReports')}</h2>
                   <button
                     type="button"
-                    className="text-xs text-primary-600 font-semibold flex items-center gap-0.5 hover:underline"
+                    className="text-xs text-primary-600 dark:text-primary-400 font-semibold flex items-center gap-0.5 hover:underline"
+                    onClick={() => navigate('/reports')}
+                  >
+                    {t('portal.viewAll')} <Chevron size={14} />
+                  </button>
+                </div>
+                <div className="divide-y divide-border/60">
+                  {(data.recentReports || []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-10">{t('portal.noReports')}</p>
+                  ) : (
+                    data.recentReports.map((report) => (
+                      <button
+                        key={report.id}
+                        type="button"
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-accent/50 text-start transition-colors"
+                        onClick={() => navigate(`/reports/${report.id}`)}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center shrink-0">
+                          <FileText size={18} className="text-primary-600 dark:text-primary-300" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-base text-foreground truncate">
+                            {report.animal_name || report.report_number}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {[animalLabel(report.animal_type, isAr), report.report_number, formatDate(report.created_at)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        </div>
+                        <CheckCircle2
+                          size={16}
+                          className={report.is_final ? 'text-emerald-500 shrink-0' : 'text-amber-500 shrink-0'}
+                        />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className="xl:col-span-3 xl:order-1 med-section-card order-2">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+                  <h2 className="text-sm font-bold text-foreground">{t('portal.myAnimals')}</h2>
+                  <button
+                    type="button"
+                    className="text-xs text-primary-600 dark:text-primary-400 font-semibold flex items-center gap-0.5 hover:underline"
                     onClick={() => navigate('/animals')}
                   >
                     {t('portal.viewAll')} <Chevron size={14} />
@@ -123,122 +170,39 @@ export default function PortalDashboard() {
                 </div>
 
                 {data.animals.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-8">{t('portal.noAnimals')}</p>
+                  <p className="text-sm text-muted-foreground text-center py-10">{t('portal.noAnimals')}</p>
                 ) : (
-                  <div className="p-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {data.animals.map((animal) => (
                       <button
                         key={animal.id}
                         type="button"
-                        className="med-animal-tile text-start rounded-xl p-3"
+                        className="med-animal-tile text-start rounded-xl p-4"
                         onClick={() => navigate(`/animals/${animal.id}`)}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="min-w-0">
-                            <p className="font-bold text-sm text-foreground truncate">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-base font-bold text-foreground truncate leading-tight">
                               {animal.name || animalLabel(animal.type, isAr)}
                             </p>
-                            {animal.name && (
-                              <p className="text-[11px] text-muted-foreground truncate">
-                                {animalLabel(animal.type, isAr)}
-                              </p>
-                            )}
-                            <p className="text-[11px] font-mono text-muted-foreground truncate">
-                              {animal.code}
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              {animal.name ? animalLabel(animal.type, isAr) : animal.code}
+                              {animal.name && animal.code ? ` · ${animal.code}` : ''}
                             </p>
                           </div>
                           <StatusBadge
                             status={animal.overallStatus === 'unknown' ? 'none' : (animal.overallStatus || 'none')}
-                            className="scale-90 origin-top-end"
+                            className="shrink-0"
                           />
                         </div>
-                        <div className="flex flex-wrap gap-1">
-                          {(animal.panels || []).filter((p) => p.status !== 'none').slice(0, 4).map((panel) => (
-                            <span
-                              key={panel.key}
-                              className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium border ${
-                                panel.status === 'normal' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                panel.status === 'attention' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                'bg-rose-50 text-rose-700 border-rose-100'
-                              }`}
-                            >
-                              {t(`portal.panels.${panel.key}`)}
-                              {panel.abnormal > 0 ? ` (${panel.abnormal})` : ''}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
-                          <span className="text-[10px] text-slate-400">
-                            {t('portal.reportCount', { count: animal.reportCount })}
-                          </span>
-                          {animal.abnormalCount > 0 && (
-                            <span className="text-[10px] font-semibold text-rose-600">
-                              {animal.abnormalCount} {t('portal.outOfRangeShort')}
-                            </span>
-                          )}
-                          {animal.latestReportAt && (
-                            <span className="text-[10px] text-slate-400">{formatDate(animal.latestReportAt)}</span>
-                          )}
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
+                          <span>{t('portal.reportCount', { count: animal.reportCount })}</span>
+                          {animal.latestReportAt && <span>{formatDate(animal.latestReportAt)}</span>}
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
-              </section>
-
-              <section className="xl:col-span-2 med-section-card">
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100">
-                  <h2 className="med-section-title mb-0">{t('portal.recentReports')}</h2>
-                  <button
-                    type="button"
-                    className="text-xs text-primary-600 font-semibold hover:underline"
-                    onClick={() => navigate('/reports')}
-                  >
-                    {t('portal.viewAll')}
-                  </button>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {(data.recentReports || []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">{t('portal.noReports')}</p>
-                  ) : (
-                    data.recentReports.map((report) => (
-                      <button
-                        key={report.id}
-                        type="button"
-                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent/50 text-start"
-                        onClick={() => navigate(`/reports/${report.id}`)}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center shrink-0">
-                          <FileText size={14} className="text-primary-600 dark:text-primary-300" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`font-bold text-foreground truncate ${report.animal_name ? 'text-sm' : 'text-xs font-mono'}`}>
-                            {report.animal_name || report.animal_code || report.report_number}
-                          </p>
-                          {report.animal_name && report.animal_type && (
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {animalLabel(report.animal_type, isAr)}
-                            </p>
-                          )}
-                          {report.animal_code && report.animal_name && (
-                            <p className="text-[10px] font-mono text-muted-foreground truncate">
-                              {report.animal_code}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-muted-foreground truncate">
-                            {report.report_number}
-                            {' · '}
-                            {formatDate(report.created_at)}
-                          </p>
-                        </div>
-                        <CheckCircle2
-                          size={14}
-                          className={report.is_final ? 'text-emerald-500 shrink-0' : 'text-amber-500 shrink-0'}
-                        />
-                      </button>
-                    ))
-                  )}
-                </div>
               </section>
             </div>
           </>

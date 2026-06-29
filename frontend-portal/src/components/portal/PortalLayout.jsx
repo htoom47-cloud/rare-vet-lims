@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, FileText, PawPrint, GitCompare, FolderOpen, LogOut,
@@ -36,6 +36,15 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
 
   const isAr = i18n.language === 'ar';
   const displayName = isAr ? (customer?.full_name_ar || customer?.full_name) : customer?.full_name;
+  const { pathname } = useLocation();
+
+  const pageHeader = useMemo(() => {
+    if (title) return { h: title, sub: subtitle };
+    if (pathname === '/') {
+      return { h: t('portal.dashboard'), sub: displayName || undefined };
+    }
+    return { h: null, sub: null };
+  }, [title, subtitle, pathname, t, displayName]);
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: t('portal.navDashboard'), end: true },
@@ -146,9 +155,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
         </div>
       </div>
 
-      <div className="p-3 hidden lg:block">{searchBox}</div>
-
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
@@ -163,14 +170,15 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
         ))}
       </nav>
 
-      <div className="p-3 border-t border-primary-200/80 dark:border-primary-700 space-y-1">
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70" onClick={toggleLanguage}>
-          <Globe size={18} /> {isAr ? 'English' : 'العربية'}
-        </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-800/70" onClick={toggleTheme}>
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          {theme === 'dark' ? t('portal.lightMode') : t('portal.darkMode')}
-        </Button>
+      <div className="p-3 border-t border-primary-200/80 dark:border-primary-700 space-y-2">
+        <div className="flex items-center gap-1">
+          <Button type="button" variant="ghost" size="icon" className="text-primary-700 dark:text-primary-300" onClick={toggleLanguage} title={isAr ? 'English' : 'العربية'}>
+            <Globe size={18} />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="text-primary-700 dark:text-primary-300" onClick={toggleTheme} title={theme === 'dark' ? t('portal.lightMode') : t('portal.darkMode')}>
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </Button>
+        </div>
         <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={handleLogout}>
           <LogOut size={18} /> {t('portal.logout')}
         </Button>
@@ -200,58 +208,43 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
               <Menu size={20} />
             </Button>
             <div className="min-w-0 flex-1 lg:hidden">
-              {isAr && !title && (
-                <LabBrandLockup compact embedded className="!w-auto max-w-[13.5rem] ms-auto rounded-lg overflow-hidden" />
-              )}
-              {isAr && title && (
-                <div className="text-end min-w-0">
-                  <p className="font-semibold text-sm truncate text-foreground">{title}</p>
-                  {subtitle && (
-                    <p className="text-[10px] font-mono text-muted-foreground truncate">{subtitle}</p>
-                  )}
-                </div>
-              )}
-              {!isAr && (
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm truncate text-foreground">{title || t('portal.title')}</p>
-                  {subtitle && (
+              {pageHeader.h ? (
+                <div className={cn('min-w-0', isAr && 'text-end')}>
+                  <p className="font-semibold text-sm truncate text-foreground">{pageHeader.h}</p>
+                  {pageHeader.sub && (
                     <p className={cn(
-                      'text-[10px] truncate',
-                      isMonoSubtitle(subtitle) ? 'font-mono text-muted-foreground' : 'text-muted-foreground'
+                      'text-xs truncate text-muted-foreground mt-0.5',
+                      isMonoSubtitle(pageHeader.sub) && 'font-mono text-[11px]'
                     )}
                     >
-                      {subtitle}
+                      {pageHeader.sub}
                     </p>
                   )}
                 </div>
+              ) : isAr ? (
+                <LabBrandLockup compact embedded noDivider className="!w-auto max-w-[13.5rem] ms-auto" />
+              ) : (
+                <p className="font-semibold text-sm truncate text-foreground">{t('portal.title')}</p>
               )}
             </div>
             <div className="hidden lg:flex items-center gap-4 flex-1 min-w-0">
               <div className="min-w-0 flex-1">
-                {title && (
+                {pageHeader.h && (
                   <h1 className="text-lg font-bold truncate text-foreground leading-tight">
-                    {title}
+                    {pageHeader.h}
                   </h1>
                 )}
-                {subtitle && (
+                {pageHeader.sub && (
                   <p className={cn(
-                    'text-xs truncate mt-0.5',
-                    isMonoSubtitle(subtitle) ? 'font-mono text-muted-foreground' : 'text-muted-foreground'
+                    'text-sm truncate mt-0.5 text-muted-foreground',
+                    isMonoSubtitle(pageHeader.sub) && 'font-mono text-xs'
                   )}
                   >
-                    {subtitle}
+                    {pageHeader.sub}
                   </p>
                 )}
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                {!isAr && (
-                  <LabBrandLockup
-                    compact
-                    embedded
-                    noDivider
-                    className="!w-auto max-w-[15rem] shrink-0 hidden xl:block"
-                  />
-                )}
                 {searchBox}
                 <PortalNotifications />
               </div>
@@ -264,7 +257,7 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
         </header>
 
         <main className={`flex-1 w-full mx-auto px-3 sm:px-4 ${compact ? 'py-3 pb-20 lg:py-4 lg:pb-6' : 'py-6 pb-24 lg:pb-8'} ${wide ? 'max-w-[90rem]' : 'max-w-5xl'}`}>
-          {(title || subtitle) && !compact && (
+          {(title || subtitle) && !compact && pageHeader.h !== title && (
             <div className="hidden lg:block mb-6">
               {!title && <h1 className="text-2xl font-bold text-foreground">{t('portal.title')}</h1>}
             </div>
@@ -280,8 +273,8 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-[9px] font-medium min-w-[3.5rem] ${
-                    isActive ? 'text-primary-600' : 'text-muted-foreground'
+                  `flex flex-col items-center gap-1 px-2 py-2 rounded-xl text-[10px] font-medium min-w-[3.75rem] ${
+                    isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-100/80 dark:bg-primary-900/40' : 'text-muted-foreground'
                   }`
                 }
               >
