@@ -1,7 +1,18 @@
 const env = require('../../config/env');
 const twilio = require('./twilio.provider');
+const msegat = require('./msegat.provider');
 
-const providers = { twilio };
+const providers = { twilio, msegat };
+
+const send = async (payload) => {
+  if (payload.channel === 'whatsapp') {
+    return twilio.send(payload);
+  }
+  if (payload.channel === 'sms' && env.notifications.provider === 'msegat') {
+    return msegat.send(payload);
+  }
+  return getProvider().send(payload);
+};
 
 const getProvider = () => {
   const name = env.notifications.provider;
@@ -9,7 +20,5 @@ const getProvider = () => {
   if (!provider) throw new Error(`Unknown notification provider: ${name}`);
   return provider;
 };
-
-const send = async (payload) => getProvider().send(payload);
 
 module.exports = { send, getProvider };

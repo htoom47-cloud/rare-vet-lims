@@ -305,23 +305,40 @@ Use a load balancer in front of multiple API instances. All instances share the 
 
 ## Future Integrations
 
-### SMS & WhatsApp Notifications (Twilio)
+### SMS Notifications (Msegat — مسجاتي)
 
-1. Create a [Twilio](https://www.twilio.com) account and buy an SMS-capable number (Saudi +966 or international).
-2. In Render → **Environment**, add:
+Recommended for Saudi Arabia.
+
+1. Register at [msegat.com](https://www.msegat.com) and activate a **Sender Name** (اسم المرسل).
+2. From the dashboard: **API Key** → create key; **Balance → Account Information** → copy **Username**.
+3. In Render → **Environment**, add:
+
+| Variable | Description |
+|----------|-------------|
+| `SMS_ENABLED` | `true` |
+| `NOTIFICATION_PROVIDER` | `msegat` |
+| `NOTIFICATION_DEFAULT_CHANNEL` | `sms` |
+| `MSEGAT_USERNAME` | Account username from Msegat |
+| `MSEGAT_API_KEY` | API key from Msegat dashboard |
+| `MSEGAT_SENDER` | Activated sender name (max 11 chars) |
+| `PORTAL_OTP_STATIC` | `off` (disables test OTP `1234` when SMS is on) |
+
+4. Redeploy. **Send SMS** appears on Reports and Sample detail.
+5. Portal customers receive OTP via SMS for login.
+
+**Note:** Add your server IP in Msegat **Safety Center** if API sends are blocked.
+
+### WhatsApp (optional — Twilio)
+
+1. Create a [Twilio](https://www.twilio.com) account for WhatsApp Business.
+2. Set `WHATSAPP_ENABLED=true`, `TWILIO_*` credentials, and keep `NOTIFICATION_PROVIDER=msegat` for SMS.
 
 | Variable | Example |
 |----------|---------|
-| `SMS_ENABLED` | `true` |
-| `WHATSAPP_ENABLED` | `false` (or `true` after WhatsApp Business setup) |
-| `NOTIFICATION_DEFAULT_CHANNEL` | `sms` |
+| `WHATSAPP_ENABLED` | `true` |
 | `TWILIO_ACCOUNT_SID` | From Twilio console |
 | `TWILIO_AUTH_TOKEN` | From Twilio console |
-| `TWILIO_SMS_FROM` | `+9665XXXXXXXX` |
-| `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` (sandbox) or your approved sender |
-
-3. Redeploy. The **Send SMS** / **Send WhatsApp** buttons appear on Reports and Sample detail when the channel is enabled.
-4. Messages include sample code, report number, verification code, and lab phone.
+| `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` (sandbox) |
 
 **WhatsApp:** Use Twilio WhatsApp Sandbox for testing, or complete Meta Business verification for production.
 

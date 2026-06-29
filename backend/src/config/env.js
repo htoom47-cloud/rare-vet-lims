@@ -85,11 +85,18 @@ const env = {
     staticOtp: resolvePortalStaticOtp(),
   },
   notifications: {
-    provider: process.env.NOTIFICATION_PROVIDER || 'twilio',
+    provider: process.env.NOTIFICATION_PROVIDER || 'msegat',
     defaultChannel: process.env.NOTIFICATION_DEFAULT_CHANNEL || 'sms',
     whatsapp: process.env.WHATSAPP_ENABLED === 'true',
     sms: process.env.SMS_ENABLED === 'true',
     email: process.env.EMAIL_ENABLED === 'true',
+    msegat: {
+      username: process.env.MSEGAT_USERNAME || '',
+      apiKey: process.env.MSEGAT_API_KEY || '',
+      sender: process.env.MSEGAT_SENDER || '',
+      msgEncoding: process.env.MSEGAT_MSG_ENCODING || 'UTF8',
+      apiUrl: process.env.MSEGAT_API_URL || 'https://www.msegat.com/gw/sendsms.php',
+    },
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID || '',
       authToken: process.env.TWILIO_AUTH_TOKEN || '',
