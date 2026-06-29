@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Camera, Loader2, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { samplesAPI, resultsAPI } from '../services/api';
-import { isParasitologyTest } from '../utils/parasitologyTests';
+import {
+  isParasitologyTest,
+  sortParasSampleTests,
+  panelI18nKey,
+} from '../utils/parasitologyTests';
 
-const PARAS_BLOOD = 'PARAS-BLOOD';
-const PARAS_STOOL = 'PARAS-STOOL';
 const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
 
 const mediaUrl = (url) => {
@@ -25,21 +27,27 @@ const normalizeUploadFile = (file) => {
   return new File([file], `${base}${ext}`, { type, lastModified: file.lastModified });
 };
 
+const panelLabel = (testRow, t, i18n) => {
+  const key = panelI18nKey(testRow.test_code);
+  if (key) return t(key);
+  return i18n.language === 'ar' && testRow.test_name_ar
+    ? testRow.test_name_ar
+    : (testRow.test_name || testRow.test_code);
+};
+
 export default function ParasitologyUpload() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const barcodeRef = useRef(null);
   const fileRef = useRef(null);
   const [barcode, setBarcode] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [sample, setSample] = useState(null);
-  const [panel, setPanel] = useState('blood');
+  const [panelCode, setPanelCode] = useState(null);
   const [attachments, setAttachments] = useState([]);
 
-  const parasTests = (sample?.tests || []).filter(isParasitologyTest);
-  const bloodTest = parasTests.find((tst) => tst.test_code === PARAS_BLOOD);
-  const stoolTest = parasTests.find((tst) => tst.test_code === PARAS_STOOL);
-  const activeTest = panel === 'stool' ? stoolTest : bloodTest;
+  const parasTests = sortParasSampleTests(sample?.tests || []);
+  const activeTest = parasTests.find((tst) => tst.test_code === panelCode) || parasTests[0] || null;
 
   useEffect(() => {
     fetch(`${API_ORIGIN}/api/health`).catch(() => {});
@@ -47,9 +55,19 @@ export default function ParasitologyUpload() {
   }, []);
 
   useEffect(() => {
-    if (bloodTest && !stoolTest) setPanel('blood');
-    else if (stoolTest && !bloodTest) setPanel('stool');
-  }, [bloodTest, stoolTest, sample?.id]);
+    if (!sample) {
+      setPanelCode(null);
+      return;
+    }
+    const tests = sortParasSampleTests(sample.tests || []);
+    if (!tests.length) {
+      setPanelCode(null);
+      return;
+    }
+    setPanelCode((current) => (
+      current && tests.some((tst) => tst.test_code === current) ? current : tests[0].test_code
+    ));
+  }, [sample?.id, sample?.tests]);
 
   const loadAttachments = useCallback(async (testRow) => {
     if (!testRow?.id) {
@@ -63,6 +81,10 @@ export default function ParasitologyUpload() {
       setAttachments([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTest?.id) loadAttachments(activeTest);
+  }, [activeTest?.id, loadAttachments]);
 
   const loadSample = async (code) => {
     const trimmed = code.trim();
@@ -82,18 +104,15 @@ export default function ParasitologyUpload() {
       }
       const { data } = await samplesAPI.get(sampleId);
       const s = data.data;
-      const paras = (s.tests || []).filter(isParasitologyTest);
+      const paras = sortParasSampleTests(s.tests || []);
       if (!paras.length) {
         toast.error(t('parasitology.noParasTests'));
         setSample(null);
         return;
       }
       setSample(s);
-      const bt = paras.find((tst) => tst.test_code === PARAS_BLOOD);
-      const st = paras.find((tst) => tst.test_code === PARAS_STOOL);
-      const usePanel = bt ? 'blood' : 'stool';
-      setPanel(usePanel);
-      await loadAttachments(usePanel === 'blood' ? bt : st);
+      setPanelCode(paras[0].test_code);
+      await loadAttachments(paras[0]);
       toast.success(t('parasitologyUpload.ready'));
       fileRef.current?.click();
     } catch {
@@ -112,9 +131,10 @@ export default function ParasitologyUpload() {
     }
   };
 
-  const onPanelChange = async (next) => {
-    setPanel(next);
-    await loadAttachments(next === 'blood' ? bloodTest : stoolTest);
+  const onPanelChange = async (testCode) => {
+    setPanelCode(testCode);
+    const testRow = parasTests.find((tst) => tst.test_code === testCode);
+    await loadAttachments(testRow);
   };
 
   const onFilePick = async (e) => {
@@ -182,27 +202,29 @@ export default function ParasitologyUpload() {
             <p className="text-sm text-gray-600">{sample.animal_code || sample.animal?.name || '—'}</p>
           </div>
 
-          {bloodTest && stoolTest && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => onPanelChange('blood')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
-                  panel === 'blood' ? 'bg-primary-700 text-white border-primary-700' : 'border-primary-200'
-                }`}
-              >
-                {t('parasitology.bloodSection')}
-              </button>
-              <button
-                type="button"
-                onClick={() => onPanelChange('stool')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
-                  panel === 'stool' ? 'bg-primary-700 text-white border-primary-700' : 'border-primary-200'
-                }`}
-              >
-                {t('parasitology.stoolSection')}
-              </button>
+          {parasTests.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {parasTests.map((tst) => (
+                <button
+                  key={tst.test_code}
+                  type="button"
+                  onClick={() => onPanelChange(tst.test_code)}
+                  className={`flex-1 min-w-[100px] py-2 px-2 rounded-lg text-sm font-medium border ${
+                    panelCode === tst.test_code
+                      ? 'bg-primary-700 text-white border-primary-700'
+                      : 'border-primary-200'
+                  }`}
+                >
+                  {panelLabel(tst, t, i18n)}
+                </button>
+              ))}
             </div>
+          )}
+
+          {parasTests.length === 1 && activeTest && (
+            <p className="text-sm text-center text-primary-700 dark:text-primary-300 font-medium">
+              {panelLabel(activeTest, t, i18n)}
+            </p>
           )}
 
           <input

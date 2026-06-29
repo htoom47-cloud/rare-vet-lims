@@ -92,6 +92,12 @@ const login = async () => {
   return state.token;
 };
 
+const PANEL_TEST_CODES = {
+  blood: 'PARAS-BLOOD',
+  stool: 'PARAS-STOOL',
+  brucella: 'BRU-ROSE-BENGAL',
+};
+
 const resolveSampleTestId = async (barcode, panel) => {
   const token = await login();
   const headers = { Authorization: `Bearer ${token}` };
@@ -116,7 +122,7 @@ const resolveSampleTestId = async (barcode, panel) => {
   const detData = await det.json();
   if (!det.ok) throw new Error(detData?.error?.message || 'Sample load failed');
 
-  const code = panel === 'stool' ? 'PARAS-STOOL' : 'PARAS-BLOOD';
+  const code = PANEL_TEST_CODES[panel] || PANEL_TEST_CODES.blood;
   const st = (detData.data?.tests || []).find((t) => t.test_code === code);
   if (!st) throw new Error(`No ${code} test on this sample`);
   return { sampleTestId: st.id, sampleCode: detData.data.sample_code, testCode: st.test_code };
@@ -206,13 +212,14 @@ const htmlPage = () => `<!DOCTYPE html>
     <label>نوع الفحص</label>
     <select name="panel">
       <option value="blood" ${state.panel === 'blood' ? 'selected' : ''}>طفيليات الدم</option>
+      <option value="brucella" ${state.panel === 'brucella' ? 'selected' : ''}>المالطية روز بنغال</option>
       <option value="stool" ${state.panel === 'stool' ? 'selected' : ''}>طفيليات البراز</option>
     </select>
     <button type="submit">حفظ — جاهز لاستقبال الصور</button>
   </form>
   <div class="box">
     <p><b>مجلد المراقبة:</b><br/><span class="muted">${config.watchDir}</span></p>
-    <p class="ok">${state.sampleBarcode ? `العينة الحالية: ${state.sampleBarcode} (${state.panel === 'stool' ? 'براز' : 'دم'})` : 'لم تُحدد عينة بعد'}</p>
+    <p class="ok">${state.sampleBarcode ? `العينة الحالية: ${state.sampleBarcode} (${state.panel === 'stool' ? 'براز' : state.panel === 'brucella' ? 'مالطية' : 'دم'})` : 'لم تُحدد عينة بعد'}</p>
   </div>
   <div class="box">
     <b>آخر الأحداث</b>
@@ -236,7 +243,7 @@ const startUi = () => {
         const body = Buffer.concat(chunks).toString();
         const params = new URLSearchParams(body);
         state.sampleBarcode = (params.get('barcode') || '').trim();
-        state.panel = params.get('panel') === 'stool' ? 'stool' : 'blood';
+        state.panel = ['stool', 'brucella'].includes(params.get('panel')) ? params.get('panel') : 'blood';
         saveJson(STATE_PATH, state);
         log(`عينة محددة: ${state.sampleBarcode || '(فارغ)'} — ${state.panel}`);
         res.writeHead(302, { Location: '/' });

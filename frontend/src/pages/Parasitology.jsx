@@ -13,14 +13,13 @@ import {
   PARAS_STOOL,
   PARAS_BRU_ROSE,
   PARAS_CATEGORY_CODE,
+  MICRO_PANEL_ORDER,
 } from '../utils/parasitologyTests';
-
-const KNOWN_PANEL_ORDER = { [PARAS_BLOOD]: 0, [PARAS_BRU_ROSE]: 1, [PARAS_STOOL]: 2 };
 
 const sortMicroTests = (tests = []) =>
   [...tests].sort((a, b) => {
-    const ao = KNOWN_PANEL_ORDER[a.code] ?? 99;
-    const bo = KNOWN_PANEL_ORDER[b.code] ?? 99;
+    const ao = MICRO_PANEL_ORDER[a.code] ?? 99;
+    const bo = MICRO_PANEL_ORDER[b.code] ?? 99;
     if (ao !== bo) return ao - bo;
     return (a.name || '').localeCompare(b.name || '');
   });
@@ -263,7 +262,7 @@ function FindingPanel({
                   />
                   <button
                     type="button"
-                    disabled={!finding.parameter_id || !finding.value || finding.uploadingImage}
+                    disabled={!finding.parameter_id || finding.uploadingImage}
                     onClick={() => {
                       if (!finding.parameter_id) {
                         toast.error(t('parasitology.selectParasiteFirst'));
@@ -373,7 +372,25 @@ function buildFindingsFromExisting(testDetail, existing) {
     });
 
   const notes = existing?.values?.find((v) => v.parameter_id === notesParam?.id)?.value || '';
-  return { findings, notes, notesParamId: notesParam?.id };
+  return { findings: ensureDefaultFindings(testDetail, findings), notes, notesParamId: notesParam?.id };
+}
+
+function ensureDefaultFindings(testDetail, findings) {
+  if (findings.length > 0) return findings;
+  const qualParams = (testDetail?.parameters || []).filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
+  if (!qualParams.length) return findings;
+  const primary = qualParams.length === 1
+    ? qualParams[0]
+    : qualParams.find((p) => p.code === 'RESULT') || qualParams[0];
+  return [{
+    clientId: `${primary.id}-default`,
+    parameter_id: primary.id,
+    value: '',
+    pendingFile: null,
+    attachment: null,
+    uploadingImage: false,
+    previewUrl: null,
+  }];
 }
 
 export default function Parasitology() {
@@ -546,10 +563,6 @@ export default function Parasitology() {
     }
     if (!finding.parameter_id) {
       toast.error(t('parasitology.selectParasiteFirst'));
-      return;
-    }
-    if (!finding.value) {
-      toast.error(t('parasitology.selectResultFirst'));
       return;
     }
     if (!testId) return;
