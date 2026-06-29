@@ -14,6 +14,9 @@ export const grossToNet = (gross, rate = VAT_RATE) => {
 /** Format catalog/list price — VAT inclusive for customer display. */
 export const fmtIncl = (net, rate = VAT_RATE) => `SAR ${netToGross(net, rate).toFixed(2)}`;
 
+/** Format net amount (excl. VAT). */
+export const fmtNet = (net) => `SAR ${(parseFloat(net) || 0).toFixed(2)}`;
+
 /** Format gross/total amount (already includes VAT). */
 export const fmtGross = (gross) => `SAR ${(parseFloat(gross) || 0).toFixed(2)}`;
 

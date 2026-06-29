@@ -1,3 +1,5 @@
+import { VAT_RATE } from './vat';
+
 export const DISCOUNT_TYPES = {
   NONE: 'none',
   PERCENT: 'percent',
@@ -29,8 +31,6 @@ export function initDiscountFromInvoice(invoice) {
   if (amt > 0) return { type: DISCOUNT_TYPES.AMOUNT, value: String(amt) };
   return { type: DISCOUNT_TYPES.NONE, value: '' };
 }
-
-import { VAT_RATE } from './vat';
 
 /** Preview invoice totals with discount before/at payment. */
 export function calcInvoiceTotals(subtotal, discountType, discountValue, taxRate = VAT_RATE, alreadyPaid = 0) {
