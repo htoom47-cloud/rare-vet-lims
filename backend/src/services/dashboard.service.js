@@ -4,14 +4,20 @@ const { query } = require('../config/database');
 const LAB_TZ = 'Asia/Riyadh';
 const todayMatch = (column) =>
   `(${column} AT TIME ZONE '${LAB_TZ}')::date = (NOW() AT TIME ZONE '${LAB_TZ}')::date`;
+const monthMatch = (column) =>
+  `(${column} AT TIME ZONE '${LAB_TZ}')::date >= ((NOW() AT TIME ZONE '${LAB_TZ}')::date - INTERVAL '30 days')`;
 
 const getStats = async () => {
   const sampleDayCol = 'COALESCE(s.received_date, s.collection_date, s.created_at)';
 
   const [
     dailySamples,
+    monthSamples,
+    pendingSamples,
     collections,
+    monthCollections,
     invoiced,
+    monthInvoiced,
     topTests,
     rejected,
     activeTests,
@@ -23,8 +29,20 @@ const getStats = async () => {
        WHERE ${todayMatch(sampleDayCol)}`
     ),
     query(
+      `SELECT COUNT(*)::int AS count FROM samples s
+       WHERE ${monthMatch(sampleDayCol)}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS count FROM samples
+       WHERE status IN ('pending', 'received', 'running')`
+    ),
+    query(
       `SELECT COALESCE(SUM(p.amount), 0)::numeric AS total FROM payments p
        WHERE ${todayMatch('p.created_at')}`
+    ),
+    query(
+      `SELECT COALESCE(SUM(p.amount), 0)::numeric AS total FROM payments p
+       WHERE ${monthMatch('p.created_at')}`
     ),
     query(
       `SELECT COALESCE(SUM(i.total), 0)::numeric AS total FROM invoices i
@@ -32,9 +50,16 @@ const getStats = async () => {
          AND i.status NOT IN ('cancelled', 'refunded')`
     ),
     query(
+      `SELECT COALESCE(SUM(i.total), 0)::numeric AS total FROM invoices i
+       WHERE ${monthMatch('i.created_at')}
+         AND i.status NOT IN ('cancelled', 'refunded')`
+    ),
+    query(
       `SELECT t.name, t.name_ar, COUNT(st.id)::int AS count
-       FROM sample_tests st JOIN tests t ON st.test_id = t.id
-       WHERE st.created_at >= (NOW() AT TIME ZONE '${LAB_TZ}')::date - INTERVAL '30 days'
+       FROM sample_tests st
+       JOIN tests t ON st.test_id = t.id
+       JOIN samples s ON s.id = st.sample_id
+       WHERE ${monthMatch('COALESCE(s.received_date, s.collection_date, s.created_at)')}
        GROUP BY t.id ORDER BY count DESC LIMIT 10`
     ),
     query(
@@ -66,17 +91,21 @@ const getStats = async () => {
   ]);
 
   const monthlyRevenue = await query(
-    `SELECT DATE_TRUNC('day', p.created_at AT TIME ZONE '${LAB_TZ}') AS date,
+    `SELECT DATE_TRUNC('day', p.created_at AT TIME ZONE '${LAB_TZ}')::date AS date,
             SUM(p.amount)::numeric AS revenue
      FROM payments p
-     WHERE p.created_at >= (NOW() AT TIME ZONE '${LAB_TZ}')::date - INTERVAL '30 days'
-     GROUP BY date ORDER BY date`
+     WHERE ${monthMatch('p.created_at')}
+     GROUP BY 1 ORDER BY 1`
   );
 
   return {
     daily_samples: dailySamples.rows[0]?.count || 0,
+    month_samples: monthSamples.rows[0]?.count || 0,
+    pending_samples: pendingSamples.rows[0]?.count || 0,
     daily_revenue: parseFloat(collections.rows[0]?.total || 0),
+    month_revenue: parseFloat(monthCollections.rows[0]?.total || 0),
     daily_invoiced: parseFloat(invoiced.rows[0]?.total || 0),
+    month_invoiced: parseFloat(monthInvoiced.rows[0]?.total || 0),
     top_tests: topTests.rows,
     rejected_samples: rejected.rows[0]?.count || 0,
     active_tests: activeTests.rows[0]?.count || 0,

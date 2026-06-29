@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { m } from 'framer-motion';
-import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import toast from 'react-hot-toast';
 import StatCard from '../components/ui/StatCard';
 import PageHeader from '../components/ui/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -37,12 +38,22 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    dashboardAPI.stats().then(({ data }) => setStats(data.data)).finally(() => setLoading(false));
-  }, []);
+    dashboardAPI.stats()
+      .then(({ data }) => setStats(data.data))
+      .catch(() => toast.error(t('common.error')))
+      .finally(() => setLoading(false));
+  }, [t]);
 
   if (loading) return <DashboardSkeleton />;
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+  const isAdmin = stats?.mode === 'admin' || hasPermission('dashboard.admin');
+
+  const topTestsData = (stats?.top_tests || []).map((row) => ({ ...row, count: Number(row.count) || 0 }));
+  const revenueChartData = (stats?.monthly_revenue || []).map((row) => ({
+    ...row,
+    revenue: Number(row.revenue) || 0,
+    label: row.date ? new Date(row.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-GB', { day: 'numeric', month: 'short' }) : '',
+  }));
 
   const statusChartData = (stats?.status_breakdown || []).map((row) => ({
     ...row,
@@ -143,18 +154,41 @@ export default function Dashboard() {
         initial="hidden"
         animate="show"
       >
-        <m.div variants={staggerItem}><StatCard title={t('dashboard.dailySamples')} value={stats?.daily_samples || 0} icon={FlaskConical} color="primary" /></m.div>
+        <m.div variants={staggerItem}>
+          <StatCard
+            title={t('dashboard.dailySamples')}
+            value={stats?.daily_samples || 0}
+            subtitle={t('dashboard.monthSamples', { count: stats?.month_samples || 0 })}
+            icon={FlaskConical}
+            color="primary"
+          />
+        </m.div>
         <m.div variants={staggerItem}>
           <StatCard
             title={t('dashboard.revenue')}
             value={`SAR ${formatMoney(stats?.daily_revenue)}`}
-            subtitle={stats?.daily_invoiced > 0 ? t('dashboard.invoicedToday', { amount: formatMoney(stats.daily_invoiced) }) : undefined}
+            subtitle={t('dashboard.monthRevenue', { amount: formatMoney(stats?.month_revenue) })}
             icon={DollarSign}
             color="green"
           />
         </m.div>
-        <m.div variants={staggerItem}><StatCard title={t('dashboard.rejected')} value={stats?.rejected_samples || 0} icon={AlertTriangle} color="red" /></m.div>
-        <m.div variants={staggerItem}><StatCard title={t('dashboard.activeTests')} value={stats?.active_tests || 0} icon={TrendingUp} color="blue" /></m.div>
+        <m.div variants={staggerItem}>
+          <StatCard
+            title={t('dashboard.pendingSamples')}
+            value={stats?.pending_samples || 0}
+            subtitle={stats?.rejected_samples > 0 ? `${t('dashboard.rejected')}: ${stats.rejected_samples}` : undefined}
+            icon={Layers}
+            color="orange"
+          />
+        </m.div>
+        <m.div variants={staggerItem}>
+          <StatCard
+            title={t('dashboard.activeTests')}
+            value={stats?.active_tests || 0}
+            icon={TrendingUp}
+            color="blue"
+          />
+        </m.div>
       </m.div>
 
       {hasAnyPermission('price_list.view', 'tests.view') && (
@@ -226,6 +260,56 @@ export default function Dashboard() {
       )}
 
       <m.div
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.12 }}
+      >
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{t('dashboard.monthlyRevenue')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {revenueChartData.length ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={revenueChartData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} stroke="#4A3728" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#A88644' }} />
+                  <YAxis tick={{ fill: '#A88644' }} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #EDE0C8' }} />
+                  <Line type="monotone" dataKey="revenue" stroke="#C5A059" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-16">{t('dashboard.noChartData')}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{t('dashboard.sampleStatus')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statusChartData.some((r) => r.count > 0) ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie data={statusChartData} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={80} label>
+                    {statusChartData.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #EDE0C8' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-16">{t('dashboard.noChartData')}</p>
+            )}
+          </CardContent>
+        </Card>
+      </m.div>
+
+      <m.div
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -236,68 +320,52 @@ export default function Dashboard() {
             <CardTitle className="text-base">{t('dashboard.topTests')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={(stats?.top_tests || []).map((row) => ({ ...row, count: Number(row.count) || 0 }))}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} stroke="#4A3728" />
-                <XAxis dataKey={i18n.language === 'ar' ? 'name_ar' : 'name'} tick={{ fontSize: 11, fill: '#A88644' }} />
-                <YAxis tick={{ fill: '#A88644' }} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #EDE0C8' }} />
-                <Bar dataKey="count" fill="#4A3728" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {topTestsData.length ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={topTestsData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} stroke="#4A3728" />
+                  <XAxis dataKey={i18n.language === 'ar' ? 'name_ar' : 'name'} tick={{ fontSize: 11, fill: '#A88644' }} />
+                  <YAxis tick={{ fill: '#A88644' }} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #EDE0C8' }} />
+                  <Bar dataKey="count" fill="#4A3728" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-16">{t('dashboard.noChartData')}</p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('dashboard.sampleStatus')}</CardTitle>
+            <CardTitle className="text-base">{t('dashboard.techPerformance')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie data={statusChartData} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={80} label>
-                  {statusChartData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #EDE0C8' }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {stats?.technician_performance?.length > 0 ? (
+              <div className="space-y-3 py-2">
+                {stats.technician_performance.map((tech, i) => (
+                  <div key={i} className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-foreground truncate">{tech.full_name}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+                        <m.div
+                          className="h-full bg-primary-500 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(100, tech.completed_tests * 10)}%` }}
+                          transition={{ duration: 0.5, delay: 0.3 + i * 0.05 }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold w-8 text-primary tabular-nums">{tech.completed_tests}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-16">{t('dashboard.noChartData')}</p>
+            )}
           </CardContent>
         </Card>
       </m.div>
-
-      {stats?.technician_performance?.length > 0 && (
-        <m.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.25 }}
-        >
-          <Card className="mt-6">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{t('dashboard.techPerformance')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {stats.technician_performance.map((tech, i) => (
-                <div key={i} className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-foreground truncate">{tech.full_name}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                      <m.div
-                        className="h-full bg-primary-500 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, tech.completed_tests * 10)}%` }}
-                        transition={{ duration: 0.5, delay: 0.3 + i * 0.05 }}
-                      />
-                    </div>
-                    <span className="text-sm font-semibold w-8 text-primary tabular-nums">{tech.completed_tests}</span>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </m.div>
-      )}
     </div>
   );
 }
