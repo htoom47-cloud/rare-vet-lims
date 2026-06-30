@@ -4,7 +4,7 @@
  */
 require('dotenv').config();
 const { query, pool } = require('../config/database');
-const { NORMA_CBC_PANEL } = require('../utils/norma-cbc-panel');
+const { NORMA_CBC_PANEL, NORMA_CBC_PANEL_CODES } = require('../utils/norma-cbc-panel');
 const logger = require('../config/logger');
 
 async function main() {
@@ -24,7 +24,7 @@ async function main() {
     );
     if (existing.rows[0]) {
       await query(
-        `UPDATE test_parameters SET sort_order = $1, name = $2, name_ar = $3, unit = $4 WHERE id = $5`,
+        `UPDATE test_parameters SET sort_order = $1, name = $2, name_ar = $3, unit = $4, is_active = true WHERE id = $5`,
         [p.displayOrder, p.symbol, p.name_ar, p.unit, existing.rows[0].id]
       );
       updated += 1;
@@ -38,7 +38,19 @@ async function main() {
     }
   }
 
-  logger.info(`Norma CBC panel synced: ${added} added, ${updated} updated (${NORMA_CBC_PANEL.length} parameters)`);
+  const allParams = await query(
+    'SELECT id, code FROM test_parameters WHERE test_id = $1',
+    [testId]
+  );
+  let deactivated = 0;
+  for (const row of allParams.rows) {
+    if (!NORMA_CBC_PANEL_CODES.has(row.code)) {
+      await query('UPDATE test_parameters SET is_active = false WHERE id = $1', [row.id]);
+      deactivated += 1;
+    }
+  }
+
+  logger.info(`Norma CBC panel synced: ${added} added, ${updated} updated (${NORMA_CBC_PANEL.length} parameters), ${deactivated} deactivated`);
   logger.info('Run: npm run sync-norma-refs — to sync reference ranges');
   await pool.end();
 }

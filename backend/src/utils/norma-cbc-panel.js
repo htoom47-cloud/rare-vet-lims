@@ -48,11 +48,65 @@ const NORMA_SECTION_BY_CODE = Object.fromEntries(NORMA_CBC_PANEL.map((p) => [p.c
 
 const getNormaPanelRow = (code) => NORMA_CBC_PANEL.find((p) => p.code === code) || null;
 
+/** Norma device screen rows — WBC (+5 diff), RBC (+7), PLT (+6). Percentages are inline, not separate rows. */
+const NORMA_CBC_SCREEN_ORDER = [
+  'WBC', 'LYM', 'MON', 'NEU', 'EOS', 'BAS',
+  'RBC', 'HGB', 'MCV', 'HCT', 'MCH', 'MCHC', 'RDW-SD', 'RDW-CV',
+  'PLT', 'MPV', 'PCT', 'PDW-SD', 'PDW-CV', 'PLC-R', 'PLC-C',
+];
+
+const NORMA_CBC_PCT_BY_ABS = {
+  LYM: 'LYM_PCT',
+  MON: 'MON_PCT',
+  NEU: 'NEU_PCT',
+  EOS: 'EOS_PCT',
+  BAS: 'BAS_PCT',
+};
+
+const NORMA_CBC_UI_HIDDEN = new Set(Object.values(NORMA_CBC_PCT_BY_ABS));
+
+const NORMA_CBC_PANEL_CODES = new Set(NORMA_CBC_PANEL.map((p) => p.code));
+
+/** Build fixed 21-row display list; pct params attach to their abs row. */
+function buildCbcDisplayParameters(dbParams = []) {
+  const byCode = Object.fromEntries(dbParams.map((p) => [p.code, p]));
+
+  return NORMA_CBC_SCREEN_ORDER.map((code) => {
+    const row = getNormaPanelRow(code);
+    const p = byCode[code];
+    const pctCode = NORMA_CBC_PCT_BY_ABS[code];
+    const pct = pctCode ? byCode[pctCode] : null;
+
+    return {
+      ...(p || {
+        id: null,
+        code,
+        name: row?.symbol || code,
+        name_ar: row?.name_ar || null,
+        unit: row?.unit || null,
+        sort_order: row?.displayOrder ?? 0,
+        is_active: true,
+      }),
+      norma_symbol: row?.symbol || code,
+      norma_section: row?.section || null,
+      pct_code: pctCode || null,
+      pct_parameter_id: pct?.id || null,
+      ui_hidden: false,
+      missing_in_db: !p,
+    };
+  });
+}
+
 module.exports = {
   NORMA_CBC_PANEL,
   NORMA_IVET_HL7_INDEX,
   NORMA_CBC_ORDER,
+  NORMA_CBC_SCREEN_ORDER,
+  NORMA_CBC_PCT_BY_ABS,
+  NORMA_CBC_UI_HIDDEN,
+  NORMA_CBC_PANEL_CODES,
   NORMA_SYMBOL_BY_CODE,
   NORMA_SECTION_BY_CODE,
   getNormaPanelRow,
+  buildCbcDisplayParameters,
 };

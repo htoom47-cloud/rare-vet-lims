@@ -1,7 +1,7 @@
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
-const { enrichCbcParameters, DEFAULT_CBC_TEST_CODE, normaSortIndex } = require('../utils/norma-cbc-map');
+const { buildCbcDisplayParameters, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
 
 const listCategories = async ({ includeInactive } = {}) => {
   const where = includeInactive ? '' : 'WHERE is_active = true';
@@ -95,8 +95,7 @@ const getById = async (id) => {
   const test = result.rows[0];
   let params = parameters.rows;
   if (test.code === DEFAULT_CBC_TEST_CODE) {
-    params = enrichCbcParameters(params)
-      .sort((a, b) => normaSortIndex(a.code) - normaSortIndex(b.code));
+    params = buildCbcDisplayParameters(params);
   }
 
   return { ...test, parameters: params, reference_ranges: ranges.rows };

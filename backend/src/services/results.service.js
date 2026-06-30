@@ -1,7 +1,13 @@
 const path = require('path');
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const { compareByNormaOrder, getNormaPanelRow } = require('../utils/norma-cbc-map');
+const {
+  compareByNormaOrder,
+  getNormaPanelRow,
+  DEFAULT_CBC_TEST_CODE,
+  NORMA_CBC_PCT_BY_ABS,
+  NORMA_CBC_SCREEN_ORDER,
+} = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
@@ -30,16 +36,42 @@ const getAttachments = async (resultId) => {
   return result.rows;
 };
 
+const formatCbcResultValues = (rawValues) => {
+  const byCode = Object.fromEntries(rawValues.map((v) => [v.parameter_code, v]));
+
+  return NORMA_CBC_SCREEN_ORDER.map((code) => {
+    const v = byCode[code];
+    const panelRow = getNormaPanelRow(code);
+    const pctCode = NORMA_CBC_PCT_BY_ABS[code];
+    const pct = pctCode ? byCode[pctCode] : null;
+
+    return {
+      parameter_id: v?.parameter_id || null,
+      parameter_name: panelRow?.symbol || code,
+      parameter_code: code,
+      norma_section: panelRow?.section || null,
+      value: v?.value ?? '',
+      numeric_value: v?.numeric_value ?? null,
+      unit: v?.unit || panelRow?.unit || null,
+      flag: v?.flag || null,
+      is_critical: v?.is_critical || false,
+      reference: v?.reference ?? null,
+      pct_value: pct?.value ?? '',
+    };
+  });
+};
+
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
     `SELECT r.id AS result_id, r.sample_test_id, r.is_validated, r.doctor_notes, r.technician_notes, r.has_critical,
             rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical,
             tp.name AS parameter_name, tp.code AS parameter_code, tp.unit, tp.sort_order,
-            tr.min_value, tr.max_value
+            tr.min_value, tr.max_value, t.code AS test_code
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
      LEFT JOIN test_parameters tp ON rv.parameter_id = tp.id
      LEFT JOIN sample_tests st ON r.sample_test_id = st.id
+     JOIN tests t ON st.test_id = t.id
      LEFT JOIN samples s ON st.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
      LEFT JOIN LATERAL (
@@ -78,6 +110,11 @@ const getBySampleTest = async (sampleTestId) => {
     });
   }
 
+  const isCbc = head.test_code === DEFAULT_CBC_TEST_CODE;
+  const sortedValues = isCbc
+    ? formatCbcResultValues(values)
+    : values.sort(compareByNormaOrder);
+
   return {
     id: head.result_id,
     sample_test_id: sampleTestId,
@@ -85,7 +122,7 @@ const getBySampleTest = async (sampleTestId) => {
     doctor_notes: head.doctor_notes,
     technician_notes: head.technician_notes,
     has_critical: head.has_critical,
-    values: values.sort(compareByNormaOrder),
+    values: sortedValues,
     attachments: await getAttachments(head.result_id),
   };
 };

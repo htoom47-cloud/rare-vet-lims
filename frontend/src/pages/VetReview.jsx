@@ -87,7 +87,10 @@ export default function VetReview() {
   const renderValueRows = (test, values) => {
     const rows = (items) => items.map((v) => (
       <tr key={v.parameter_id} className="border-t">
-        <td className="py-1">{v.parameter_name}</td>
+        <td className="py-1">
+          {v.parameter_name}
+          {v.pct_value && <span className="text-gray-500 text-xs ms-1">*{v.pct_value}%</span>}
+        </td>
         <td>{v.value} {v.unit}</td>
         <td className="text-gray-500">{v.reference || '—'}</td>
         <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || t('vetReview.normal')} /></td>

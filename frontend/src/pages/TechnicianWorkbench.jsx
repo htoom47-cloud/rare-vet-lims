@@ -6,7 +6,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { filterNonParasTests } from '../utils/parasitologyTests';
-import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest } from '../constants/normaCbcPanel';
+import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest, buildCbcResultFields } from '../constants/normaCbcPanel';
 
 export default function TechnicianWorkbench() {
   const { t } = useTranslation();
@@ -60,24 +60,26 @@ export default function TechnicianWorkbench() {
     const form = {};
     for (const test of labTests) {
       const testDetail = await testsAPI.get(test.test_id);
+      const isCbc = testDetail.data.data.code === 'CBC-FULL' || test.test_code === 'CBC-FULL';
       let existing = null;
       try {
         const res = await resultsAPI.get(test.id);
         existing = res.data.data;
       } catch { /* no results yet */ }
-      form[test.id] = (testDetail.data.data.parameters || []).map((p) => {
-        const val = existing?.values?.find((v) => v.parameter_id === p.id);
-        return {
-          parameter_id: p.id,
-          code: p.code,
-          name: p.norma_symbol || p.name,
-          unit: p.unit,
-          norma_section: p.norma_section,
-          value: val?.value || '',
-          flag: val?.flag,
-          reference: val?.reference || '',
-        };
-      });
+      form[test.id] = isCbc
+        ? buildCbcResultFields(testDetail.data.data.parameters || [], existing)
+        : (testDetail.data.data.parameters || []).map((p) => {
+          const val = existing?.values?.find((v) => v.parameter_id === p.id);
+          return {
+            parameter_id: p.id,
+            code: p.code,
+            name: p.name,
+            unit: p.unit,
+            value: val?.value || '',
+            flag: val?.flag,
+            reference: val?.reference || '',
+          };
+        });
     }
     setResultForm(form);
   };
@@ -88,7 +90,8 @@ export default function TechnicianWorkbench() {
     const payloads = selectedSample.tests
       .map((test) => {
         const fields = resultForm[test.id] || [];
-        const values = fields.filter((v) => String(v.value ?? '').trim() !== '');
+        const values = fields
+          .filter((v) => v.parameter_id && String(v.value ?? '').trim() !== '');
         if (!values.length) return null;
         return {
           sample_test_id: test.id,
@@ -136,7 +139,14 @@ export default function TechnicianWorkbench() {
   const renderParamField = (test, param, idx) => (
     <div key={param.parameter_id}>
       <label className="text-sm font-medium">
-        {param.name} {param.unit && param.unit !== 'qual' && `(${param.unit})`}
+        {param.name}
+        {param.pct_value && (
+          <span className="text-xs text-gray-500 ms-1">*{param.pct_value}%</span>
+        )}
+        {param.unit && param.unit !== 'qual' && ` (${param.unit})`}
+        {param.missing_in_db && (
+          <span className="text-xs text-amber-600 ms-1">({t('workbench.paramMissing', { defaultValue: 'not synced' })})</span>
+        )}
         {param.reference && (
           <span className="text-xs font-normal text-gray-500 ms-2">
             {t('workbench.ref', { defaultValue: 'Ref' })}: {param.reference}

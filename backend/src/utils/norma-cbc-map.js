@@ -3,9 +3,14 @@ const {
   NORMA_CBC_PANEL,
   NORMA_IVET_HL7_INDEX,
   NORMA_CBC_ORDER,
+  NORMA_CBC_SCREEN_ORDER,
+  NORMA_CBC_PCT_BY_ABS,
+  NORMA_CBC_UI_HIDDEN,
+  NORMA_CBC_PANEL_CODES,
   NORMA_SYMBOL_BY_CODE,
   NORMA_SECTION_BY_CODE,
   getNormaPanelRow,
+  buildCbcDisplayParameters,
 } = require('./norma-cbc-panel');
 
 const NORMA_CBC_MAP = {
@@ -89,6 +94,10 @@ module.exports = {
   NORMA_CBC_MAP,
   NORMA_CBC_PANEL,
   NORMA_CBC_ORDER,
+  NORMA_CBC_SCREEN_ORDER,
+  NORMA_CBC_PCT_BY_ABS,
+  NORMA_CBC_UI_HIDDEN,
+  NORMA_CBC_PANEL_CODES,
   NORMA_IVET_HL7_INDEX,
   NORMA_SYMBOL_BY_CODE,
   NORMA_SECTION_BY_CODE,
@@ -99,4 +108,5 @@ module.exports = {
   compareByNormaOrder,
   enrichCbcParameters,
   getNormaPanelRow,
+  buildCbcDisplayParameters,
 };

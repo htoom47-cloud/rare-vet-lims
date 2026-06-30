@@ -113,6 +113,7 @@ const resources = {
         normaSectionWbc: 'WBC — White Blood Cells',
         normaSectionRbc: 'RBC — Red Blood Cells',
         normaSectionPlt: 'PLT — Platelets',
+        paramMissing: 'not synced — run sync-cbc',
       },
       parasitology: {
         title: 'Parasitology',
@@ -909,6 +910,7 @@ const resources = {
         normaSectionWbc: 'WBC — كريات الدم البيضاء',
         normaSectionRbc: 'RBC — كريات الدم الحمراء',
         normaSectionPlt: 'PLT — الصفائح الدموية',
+        paramMissing: 'غير متزامن — شغّل sync-cbc',
       },
       parasitology: {
         title: 'قسم الطفيليات',
