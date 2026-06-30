@@ -4,7 +4,7 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   en: {
     translation: {
-      app: { name: 'Al-Nawadir Veterinary Care Center', subtitle: 'Veterinary Medical & Research Laboratory', tagline: 'Secure laboratory information management' },
+      app: { name: 'AL NAWADER VETERINARY CARE CENTER', subtitle: 'Veterinary Medical & Research Laboratory', tagline: 'Secure laboratory information management' },
       nav: {
         sections: { main: 'Main', lab: 'Laboratory', admin: 'Administration', reception: 'Reception' },
         collapseSidebar: 'Collapse sidebar',

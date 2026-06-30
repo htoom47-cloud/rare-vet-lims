@@ -2,7 +2,7 @@
   "name": "rare-vet-lims",
   "version": "1.0.0",
   "private": true,
-  "description": "Rare Veterinary Care LIMS — cloud deployment",
+  "description": "AL NAWADER VETERINARY CARE CENTER LIMS — cloud deployment",
   "scripts": {
     "dev:staff": "cd frontend && npm run dev",
     "dev:portal": "cd frontend-portal && npm run dev",

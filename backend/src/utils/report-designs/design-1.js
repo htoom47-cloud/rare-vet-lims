@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('../../config/env');
+const { LAB_NAME_EN, LAB_NAME_AR } = require('../../constants/brand');
 const { generateQR } = require('../barcode');
 const { readImageBuffer } = require('../../config/storage');
 
@@ -154,8 +155,8 @@ const drawHeader = (doc, reportData) => {
   const textX = TX + 42;
   const textW = PAGE_W - textX - MARGIN - 40;
   const half = textW / 2;
-  const labAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
-  const labEn = env.lab.name || 'Rare Animals Veterinary Care Center';
+  const labAr = env.lab.nameAr || LAB_NAME_AR;
+  const labEn = env.lab.name || LAB_NAME_EN;
 
   cellLatin(doc, labEn, textX, top + 4, half - 6, 14, { size: 9.5, bold: true, align: 'left' });
   cellArabic(doc, labAr, textX + half, top + 4, half - 4, 14, { size: 9.5, bold: true, align: 'right' });
@@ -191,7 +192,7 @@ const drawTitleBanner = (doc, reportData = {}) => {
 const drawContinuationHeader = (doc, reportData) => {
   const y = MARGIN;
   doc.rect(TX, y, TW, 13).fill(BRAND.headerBg).stroke(BRAND.border);
-  cellLatin(doc, env.lab.name || 'Rare Animals Veterinary Care Center', TX + 4, y + 2, TW / 2 - 8, 10, {
+  cellLatin(doc, env.lab.name || LAB_NAME_EN, TX + 4, y + 2, TW / 2 - 8, 10, {
     size: 6.5, bold: true, color: BRAND.brownMid,
   });
   cellLatin(doc, reportData.reportNumber || '', TX + TW / 2, y + 2, TW / 2 - 4, 10, {
@@ -507,8 +508,8 @@ const drawFooter = async (doc, reportData) => {
   cellArabic(doc, 'امسح للتحقق من صحة التقرير', TX + 40, y + 12, 100, 7, { size: 5, color: BRAND.muted, align: 'right' });
   cellLatin(doc, reportData.verificationCode, TX + 40, y + 19, 100, 7, { size: 5, color: '#9ca3af' });
 
-  const labEn = env.lab.name || 'Rare Animals Veterinary Care Center';
-  const labAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
+  const labEn = env.lab.name || LAB_NAME_EN;
+  const labAr = env.lab.nameAr || LAB_NAME_AR;
   cellLatin(doc, `Issued by ${labEn}`, TX + TW / 2 + 4, y + 8, TW / 2 - 8, 7, { size: 5, color: '#9ca3af', align: 'left' });
   cellArabic(doc, `صادر من ${labAr}`, TX + TW / 2 + 4, y + 16, TW / 2 - 8, 7, { size: 5, color: '#9ca3af', align: 'left' });
   cellLatin(doc, 'Confidential — For veterinary use only', TX + TW / 2 + 4, y + 24, TW / 2 - 8, 7, { size: 4.5, color: '#b8a088', align: 'left' });

@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const env = require('../../config/env');
+const { LAB_NAME_EN, LAB_NAME_AR } = require('../../constants/brand');
 const { generateQR } = require('../barcode');
 const { drawArBox, registerPdfFonts } = require('../pdf-arabic');
 const { isAbnormalFlag } = require('./layout-mode');
@@ -98,8 +99,8 @@ const drawHeader = (doc, reportData, qrBuffer) => {
 
   const textX = TX + 32;
   const textW = TW - 78;
-  const labEn = env.lab.name || 'Rare Animals Veterinary Care Center';
-  const labAr = env.lab.nameAr || 'مركز رعاية النوادر البيطري';
+  const labEn = env.lab.name || LAB_NAME_EN;
+  const labAr = env.lab.nameAr || LAB_NAME_AR;
 
   cellEn(doc, labEn, textX, 5, textW / 2 - 4, { size: 8.5, bold: true });
   cellAr(doc, labAr, textX + textW / 2, 5, textW / 2 - 4, { size: 8.5, bold: true, align: 'right' });

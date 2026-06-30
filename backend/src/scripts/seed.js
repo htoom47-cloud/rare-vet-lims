@@ -4,6 +4,7 @@ const { pool, query } = require('../config/database');
 const { PERMISSIONS, ROLE_PERMISSIONS } = require('../utils/permissions');
 const logger = require('../config/logger');
 const { NORMA_CBC_REFERENCES } = require('../utils/norma-cbc-references');
+const { LAB_NAME_EN, LAB_NAME_AR } = require('../constants/brand');
 
 const ROLES = [
   { name: 'admin', name_ar: 'مدير النظام', description: 'Full system access' },
@@ -334,8 +335,8 @@ async function seed() {
   await query(
     `INSERT INTO settings (key, value) VALUES ('lab_info', $1) ON CONFLICT (key) DO NOTHING`,
     [JSON.stringify({
-      name: 'Rare Animals Veterinary Care Center',
-      name_ar: 'مركز رعاية النوادر البيطري',
+      name: LAB_NAME_EN,
+      name_ar: LAB_NAME_AR,
       phone: '0115007257',
       email: 'alnwader.10hz@gmail.com',
       vat: '311042487300003',

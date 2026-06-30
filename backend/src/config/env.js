@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { LAB_NAME_EN, LAB_NAME_AR } = require('../constants/brand');
 
 const parseOrigins = (raw) => (raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []);
 
@@ -58,7 +59,7 @@ const env = {
     secret: process.env.JWT_SECRET || 'dev-secret-change-me',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-    portalExpiresIn: process.env.PORTAL_JWT_EXPIRES_IN || '48h',
+    portalExpiresIn: process.env.PORTAL_JWT_EXPIRES_IN || '7d',
   },
   storage: (() => {
     const s3Ready = !!(process.env.S3_BUCKET && process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY);
@@ -76,8 +77,8 @@ const env = {
   };
   })(),
   lab: {
-    name: process.env.LAB_NAME || 'Rare Animals Veterinary Care Center',
-    nameAr: process.env.LAB_NAME_AR || 'مركز رعاية النوادر البيطري',
+    name: process.env.LAB_NAME || LAB_NAME_EN,
+    nameAr: process.env.LAB_NAME_AR || LAB_NAME_AR,
     subtitle: process.env.LAB_SUBTITLE || 'Veterinary Medical & Research Laboratory',
     subtitleAr: process.env.LAB_SUBTITLE_AR || 'للتحاليل البيطرية والبحثية',
     address: process.env.LAB_ADDRESS || 'Kingdom of Saudi Arabia',

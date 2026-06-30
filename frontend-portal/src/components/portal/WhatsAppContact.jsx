@@ -10,7 +10,7 @@ export default function WhatsAppContact({ variant = 'float', className }) {
 
   const message = isAr
     ? 'مرحباً، أتواصل معكم من بوابة العميل — مركز رعاية النوادر البيطري'
-    : 'Hello, I am contacting you from the client portal — Rare Veterinary Care Center';
+    : 'Hello, I am contacting you from the client portal — AL NAWADER VETERINARY CARE CENTER';
 
   const handleClick = () => openWhatsApp(LAB_WHATSAPP_PHONE, message);
 

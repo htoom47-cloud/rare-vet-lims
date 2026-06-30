@@ -25,7 +25,7 @@ export const DEMO_REPORT = {
   verificationCode: 'DEMO-VERIFY-0042',
   verifyUrl: '/verify/DEMO-VERIFY-0042',
   lab: {
-    name: 'Rare Animals Veterinary Care Center',
+    name: 'AL NAWADER VETERINARY CARE CENTER',
     nameAr: 'مركز رعاية النوادر البيطري',
     subtitle: 'Veterinary Medical & Research Laboratory',
     subtitleAr: 'للتحاليل الطبية والبحثية البيطرية',

@@ -19,7 +19,7 @@ export const siteEn = {
   },
   meta: {
     homeTitle: 'Veterinary diagnostic laboratory',
-    homeDesc: 'Rare Veterinary Care Center — precision hematology, chemistry, PCR, ELISA, and field services for camels, horses, and livestock in Al Muzahimiyah.',
+    homeDesc: 'AL NAWADER VETERINARY CARE CENTER — precision hematology, chemistry, PCR, ELISA, and field services for camels, horses, and livestock in Al Muzahimiyah.',
     servicesTitle: 'Laboratory services',
     servicesDesc: 'Integrated veterinary diagnostics: biochemistry, hematology, microbiology, PCR, ELISA, hormones, parasitology, and field collection.',
     testsTitle: 'Veterinary test catalog',
@@ -27,7 +27,7 @@ export const siteEn = {
     equipmentTitle: 'Laboratory equipment',
     equipmentDesc: 'Modern analyzers and diagnostic platforms supporting accurate veterinary results.',
     qualityTitle: 'Quality & accreditation',
-    qualityDesc: 'Biosafety, quality standards, and laboratory procedures at Rare Veterinary Care Center.',
+    qualityDesc: 'Biosafety, quality standards, and laboratory procedures at AL NAWADER VETERINARY CARE CENTER.',
     faqTitle: 'Frequently asked questions',
     faqDesc: 'Answers about sample submission, turnaround, portal access, and field services.',
     contactTitle: 'Contact us',
@@ -41,7 +41,7 @@ export const siteEn = {
     resultsCount: '{{count}} results',
   },
   hero: {
-    eyebrow: 'Rare Veterinary Care Center Laboratory',
+    eyebrow: 'AL NAWADER VETERINARY CARE CENTER',
     title: 'Veterinary diagnostics you can trust — from sample to signed report',
     subtitle: 'Accurate CBC, chemistry, PCR, and serology for camels, horses, and livestock — with field collection and instant digital reports.',
     line1: 'Accurate CBC, chemistry, PCR, and serology for camels, horses, and livestock.',
@@ -62,7 +62,7 @@ export const siteEn = {
   about: {
     eyebrow: 'About the laboratory',
     title: 'Where scientific rigor meets desert heritage',
-    p1: 'Rare Veterinary Care Center Laboratory is a dedicated veterinary diagnostics facility serving owners of camels, horses, cattle, sheep, goats, and companion animals — plus veterinary clinics, farms, and commercial herds.',
+    p1: 'AL NAWADER VETERINARY CARE CENTER is a dedicated veterinary diagnostics facility serving owners of camels, horses, cattle, sheep, goats, and companion animals — plus veterinary clinics, farms, and commercial herds.',
     p2: 'We invest in calibrated analyzers, validated methods, specialist review, and a secure client portal so every result supports confident clinical decisions.',
     visionTitle: 'Our commitment',
     vision: 'Scientific accuracy first — reliable laboratory diagnoses that protect animal wealth, including rare breeds, across the Kingdom.',

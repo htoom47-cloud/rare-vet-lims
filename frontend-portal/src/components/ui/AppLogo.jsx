@@ -67,7 +67,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
       >
         <img
           src="/logo.png"
-          alt="Rare Vet Care"
+          alt="AL NAWADER VETERINARY CARE CENTER"
           className={cn(s.img, 'object-contain portal-logo-mark__img')}
           onError={() => setFailed(true)}
         />
@@ -89,7 +89,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
       >
         <img
           src="/logo.png"
-          alt="Rare Vet Care"
+          alt="AL NAWADER VETERINARY CARE CENTER"
           className={cn(s.img, 'object-contain')}
           onError={() => setFailed(true)}
         />
@@ -118,7 +118,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
         >
           <img
             src="/logo.png"
-            alt="Rare Vet Care"
+            alt="AL NAWADER VETERINARY CARE CENTER"
             className={cn(s.img, 'object-contain')}
             onError={() => setFailed(true)}
           />
@@ -130,7 +130,7 @@ export default function AppLogo({ size = 'md', variant = 'default', className = 
   return (
     <img
       src="/logo.png"
-      alt="Rare Vet Care"
+      alt="AL NAWADER VETERINARY CARE CENTER"
       className={cn(s.frame, 'object-contain', className)}
       onError={() => setFailed(true)}
     />

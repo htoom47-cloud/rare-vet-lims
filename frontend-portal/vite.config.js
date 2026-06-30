@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['logo.png'],
       manifest: {
-        name: 'مركز رعاية النوادر البيطري',
-        short_name: 'رعاية النوادر',
+        name: 'AL NAWADER VETERINARY CARE CENTER',
+        short_name: 'AL NAWADER',
         description: 'مختبر بيطري طبي وبحثي — بوابة العميل والخدمات',
         theme_color: '#302419',
         background_color: '#FDFAF3',

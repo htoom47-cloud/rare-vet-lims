@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { siteEn, siteAr } from './site.js';
+import { LAB_NAME_EN, LAB_NAME_AR } from '../constants/brand.js';
 
 const resources = {
   en: {
@@ -16,7 +17,7 @@ const resources = {
         navContact: 'Contact',
         aboutTitle: 'About us',
         aboutHint: 'A specialized veterinary diagnostic facility dedicated to the highest standards of animal healthcare',
-        aboutP1: 'Rare Animals Veterinary Care Center is a specialized veterinary laboratory offering clinical diagnostics and research services for camels, horses, livestock, and companion animals.',
+        aboutP1: `${LAB_NAME_EN} is a specialized veterinary laboratory offering clinical diagnostics and research services for camels, horses, livestock, and companion animals.`,
         aboutP2: 'We combine modern analyzers, experienced specialists, and a digital client portal so owners and veterinarians can access reports quickly and securely.',
         visionTitle: 'Our vision',
         visionText: 'We place scientific accuracy at the forefront of our priorities to deliver reliable laboratory diagnoses that protect livestock — including rare breeds — across the Kingdom.',
@@ -76,7 +77,7 @@ const resources = {
       },
       portal: {
         title: 'Client Portal',
-        labName: 'Rare Veterinary Care Center',
+        labName: LAB_NAME_EN,
         labTagline: 'Veterinary Medical & Research Laboratory',
         subtitle: 'View your laboratory reports',
         signIn: 'Sign in with mobile',
@@ -234,7 +235,7 @@ const resources = {
         navContact: 'تواصل',
         aboutTitle: 'نبذة عنا',
         aboutHint: 'منشأة طبية تشخيصية بيطرية متخصصة نكرس جهودنا لأعلى مستويات الرعاية الصحية للحيوانات',
-        aboutP1: 'مركز رعاية النوادر البيطري مختبر بيطري متخصص يقدّم التحاليل السريرية والخدمات البحثية للإبل والخيول والماشية والحيوانات الأليفة.',
+        aboutP1: `${LAB_NAME_AR} مختبر بيطري متخصص يقدّم التحاليل السريرية والخدمات البحثية للإبل والخيول والماشية والحيوانات الأليفة.`,
         aboutP2: 'نجمع بين أجهزة تحليل حديثة وكوادر متخصصة وبوابة عميل إلكترونية ليتمكن الملاك والأطباء البيطريون من الاطلاع على التقارير بسرعة وأمان.',
         visionTitle: 'رؤيتنا',
         visionText: 'نضع الدقة العلمية في مقدمة أولوياتنا لضمان تقديم تشخيص مخبري موثوق يساهم في حماية الثروة الحيوانية بكل سلالاتها النادرة.',
@@ -294,7 +295,7 @@ const resources = {
       },
       portal: {
         title: 'بوابة العميل',
-        labName: 'مركز رعاية النوادر البيطري',
+        labName: LAB_NAME_AR,
         labTagline: 'للتحاليل الطبية والبحثية البيطرية',
         subtitle: 'اطّلع على تقاريرك المخبرية',
         signIn: 'الدخول برقم الجوال',

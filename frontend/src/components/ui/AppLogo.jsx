@@ -22,7 +22,7 @@ export default function AppLogo({ size = 'md', className = '' }) {
   return (
     <img
       src="/logo.png"
-      alt="Rare Vet LIMS"
+      alt="AL NAWADER VETERINARY CARE CENTER"
       className={`${sizes[size] || sizes.md} object-contain ${className}`}
       onError={() => setFailed(true)}
     />

@@ -1,7 +1,7 @@
 {
   "name": "rare-vet-lims-backend",
   "version": "1.0.0",
-  "description": "Rare Veterinary Care - Cloud LIMS API",
+  "description": "AL NAWADER VETERINARY CARE CENTER — Cloud LIMS API",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

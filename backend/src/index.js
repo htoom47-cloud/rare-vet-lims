@@ -1,5 +1,6 @@
 const app = require('./app');
 const env = require('./config/env');
+const { LAB_NAME_EN } = require('./constants/brand');
 const logger = require('./config/logger');
 const { pool } = require('./config/database');
 const notificationsService = require('./services/notifications.service');
@@ -23,7 +24,7 @@ const start = async () => {
     if (connected) logger.info('Database connected');
 
     app.listen(env.port, '0.0.0.0', () => {
-      logger.info(`Rare Vet LIMS API running on port ${env.port}`);
+      logger.info(`${LAB_NAME_EN} LIMS API running on port ${env.port}`);
       if (env.serveFrontend) logger.info('Serving frontend from /frontend/dist');
 
       if (env.notifications.sms || env.notifications.whatsapp || env.notifications.email) {

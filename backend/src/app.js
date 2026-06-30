@@ -8,6 +8,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const path = require('path');
 const env = require('./config/env');
+const { LAB_NAME_EN } = require('./constants/brand');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { ensureUploadDir, serveUploads } = require('./config/storage');
@@ -48,10 +49,10 @@ const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Rare Veterinary Care LIMS API',
+      title: `${LAB_NAME_EN} LIMS API`,
       version: '1.0.0',
       description: 'Cloud-based Veterinary Laboratory Information Management System API',
-      contact: { name: 'Rare Veterinary Care', email: env.lab.email },
+      contact: { name: LAB_NAME_EN, email: env.lab.email },
     },
     servers: [{ url: `http://localhost:${env.port}/api`, description: 'Development' }],
     components: {
@@ -84,7 +85,7 @@ const swaggerSpec = swaggerJsdoc({
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'Rare Vet LIMS API Docs',
+  customSiteTitle: `${LAB_NAME_EN} LIMS API Docs`,
 }));
 
 app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
