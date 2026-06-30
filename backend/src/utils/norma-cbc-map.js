@@ -38,6 +38,10 @@ const NORMA_CBC_MAP = {
   PDW: 'PDW-CV', 'PDW-CV': 'PDW-CV', 'PDWcv': 'PDW-CV',
   'PDW-SD': 'PDW-SD', 'PDWsd': 'PDW-SD',
   'PLC-R': 'PLC-R', 'PLC-C': 'PLC-C',
+  'P-LCR': 'PLC-R', 'P-LCC': 'PLC-C',
+  PLCR: 'PLC-R', PLCC: 'PLC-C',
+  'Platelet Large Cell Ratio': 'PLC-R',
+  'Platelet Large Cell Count': 'PLC-C',
 };
 
 const DEFAULT_CBC_TEST_CODE = 'CBC-FULL';

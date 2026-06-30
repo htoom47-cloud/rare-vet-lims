@@ -31,6 +31,25 @@ const enrichDiffAbsFromPct = async (results, values, testCode) => {
   return values;
 };
 
+/** PLC-C (#) = PLT × PLC-R (%) / 100 when Norma sends ratio only. */
+const enrichPlcFromPlt = async (results, values, testCode) => {
+  const byCode = Object.fromEntries(results.map((r) => [resultLimsCode(r), r]));
+  const plt = parseFloat(byCode.PLT?.value);
+  const plcr = parseFloat(byCode['PLC-R']?.value);
+  if (Number.isNaN(plt) || Number.isNaN(plcr)) return values;
+
+  const filled = new Set(
+    values.filter((v) => String(v.value ?? '').trim() !== '').map((v) => v.parameter_id)
+  );
+
+  const plcCParam = await resolveParameter(testCode, 'PLC-C');
+  if (!plcCParam || filled.has(plcCParam.id)) return values;
+
+  const computed = Math.round((plt * plcr / 100) * 100) / 100;
+  values.push({ parameter_id: plcCParam.id, value: String(computed) });
+  return values;
+};
+
 const findSampleByBarcode = async (barcode) => {
   const id = String(barcode || '').trim();
   if (!id) return null;
@@ -96,6 +115,7 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
   }
 
   await enrichDiffAbsFromPct(results, values, testCode);
+  await enrichPlcFromPlt(results, values, testCode);
 
   if (!values.length) {
     const codes = (results || []).map((r) => r.code).join(', ') || 'none';
