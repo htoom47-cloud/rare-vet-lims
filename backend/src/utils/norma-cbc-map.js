@@ -42,9 +42,18 @@ const NORMA_CBC_SORT_INDEX = Object.fromEntries(
   NORMA_CBC_ORDER.map((code, index) => [code, index])
 );
 
+function mapNormaIndex(index) {
+  if (!Number.isInteger(index) || index < 0) return null;
+  const code = NORMA_CBC_ORDER[index];
+  return code && code !== 'RDW' ? code : null;
+}
+
 function mapNormaCode(deviceCode) {
-  if (!deviceCode) return null;
-  const raw = deviceCode.trim();
+  if (deviceCode == null || deviceCode === '') return null;
+  const raw = String(deviceCode).trim();
+  if (/^\d+$/.test(raw)) {
+    return mapNormaIndex(Number(raw));
+  }
   const normalized = raw.toUpperCase();
   return NORMA_CBC_MAP[normalized] || NORMA_CBC_MAP[raw] || normalized;
 }
@@ -71,6 +80,7 @@ module.exports = {
   NORMA_CBC_ORDER,
   DEFAULT_CBC_TEST_CODE,
   mapNormaCode,
+  mapNormaIndex,
   normaSortIndex,
   compareByNormaOrder,
 };

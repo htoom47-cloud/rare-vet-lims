@@ -1,5 +1,5 @@
 const { parseReferenceRange } = require('./reference-range');
-const { mapNormaCode } = require('./norma-cbc-map');
+const { mapNormaCode, mapNormaIndex } = require('./norma-cbc-map');
 
 function splitSegments(raw) {
   return raw
@@ -45,20 +45,53 @@ const firstId = (...candidates) => {
   return null;
 };
 
+const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
+
 const extractObxCode = (fields) => {
-  const parts = [fields[3], fields[4], fields[2]]
+  const parts = [fields[3], fields[4]]
     .flatMap((f) => String(f || '').split('^'))
     .map((s) => s.trim())
     .filter(Boolean);
 
   for (const part of parts) {
+    if (/^\d+$/.test(part)) continue;
+    if (HL7_VALUE_TYPES.has(part.toUpperCase())) continue;
     if (mapNormaCode(part)) return part;
   }
 
-  return parts.find((c) => /^[A-Z][A-Z0-9%#.-]{1,12}$/i.test(c))
-    || parts.find((c) => !/^\d+$/.test(c) && c.length <= 24)
-    || parts[0]
-    || null;
+  for (const part of parts) {
+    if (/^\d+$/.test(part)) continue;
+    if (HL7_VALUE_TYPES.has(part.toUpperCase())) continue;
+    if (/^[A-Z][A-Z0-9%#.-]{1,12}$/i.test(part)) return part;
+  }
+
+  for (const part of parts) {
+    if (/^\d+$/.test(part)) {
+      const mapped = mapNormaIndex(Number(part));
+      if (mapped) return mapped;
+    }
+  }
+
+  const setId = String(fields[1] || '').trim();
+  if (/^\d+$/.test(setId)) {
+    const mapped = mapNormaIndex(Number(setId) - 1);
+    if (mapped) return mapped;
+  }
+
+  return null;
+};
+
+/** Norma iVet often reports HGB/MCHC in g/L — LIMS stores g/dL. */
+const normalizeNormaValue = (code, rawValue, unit) => {
+  const n = parseFloat(String(rawValue).replace(',', '.'));
+  if (Number.isNaN(n)) return { value: rawValue, unit };
+
+  const u = String(unit || '').toLowerCase().replace(/\s/g, '');
+  const perLiter = /g\/l/i.test(u);
+  if (perLiter && (code === 'HGB' || code === 'MCHC') && n > 30) {
+    return { value: String(n / 10), unit: 'g/dL' };
+  }
+  return { value: String(n), unit };
 };
 
 function parseHl7(raw) {
@@ -112,19 +145,22 @@ function parseHl7(raw) {
     }
 
     if (type === 'OBX') {
-      const code = extractObxCode(fields);
+      const codeRaw = extractObxCode(fields);
+      const limsCode = codeRaw ? mapNormaCode(codeRaw) : null;
 
       const rawValue = (fields[5] ?? fields[4] ?? '').trim().replace(',', '.');
       const numeric = parseFloat(rawValue);
       const unit = (fields[6] || '').trim();
       const refRaw = (fields[7] || '').trim();
       const ref = parseReferenceRange(refRaw);
+      const normalized = limsCode ? normalizeNormaValue(limsCode, rawValue, unit) : { value: rawValue, unit };
 
-      if (code && rawValue !== '' && !Number.isNaN(numeric)) {
+      if (limsCode && rawValue !== '' && !Number.isNaN(numeric)) {
         results.push({
-          code,
-          value: String(numeric),
-          unit,
+          code: codeRaw,
+          limsCode,
+          value: normalized.value,
+          unit: normalized.unit || unit,
           reference: refRaw || null,
           referenceMin: ref?.min ?? null,
           referenceMax: ref?.max ?? null,
