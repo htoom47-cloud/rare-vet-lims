@@ -13,6 +13,8 @@ const NORMA_CBC_MAP = {
   EOS: 'EOS', 'EOS#': 'EOS', 'EOS%': 'EOS_PCT',
   BAS: 'BAS', 'BAS#': 'BAS', 'BAS%': 'BAS_PCT',
   RBC: 'RBC', 'RBC#': 'RBC',
+  'RDWSD': 'RDW-SD', 'RDWCV': 'RDW-CV',
+  'PDWSD': 'PDW-SD', 'PDWCV': 'PDW-CV',
   HGB: 'HGB', HGB: 'HGB', HB: 'HGB',
   HCT: 'HCT', HCT: 'HCT', HCT_PCT: 'HCT',
   MCV: 'MCV',
@@ -30,12 +32,21 @@ const NORMA_CBC_MAP = {
 
 const DEFAULT_CBC_TEST_CODE = 'CBC-FULL';
 
-// Norma iVet screen: WBC → RBC → PLT (incl. % differentials and PLT indices)
+// Norma iVet-5 HL7 wire order (OBX-3 numeric index → parameter). Matches manufacturer panel order:
+// WBC, LYM, MON, NEU, EOS, BAS, LYM%, MON%, NEU%, BAS%, RBC, HGB, HCT, MCV, RDWsd, RDWcv, MCH, MCHC, PLT, MPV, PCT, PDWsd, PDWcv, PLC-R, PLC-C
+const NORMA_IVET_HL7_INDEX = [
+  'WBC', 'LYM', 'MON', 'NEU', 'EOS', 'BAS',
+  'LYM_PCT', 'MON_PCT', 'NEU_PCT', 'EOS_PCT', 'BAS_PCT',
+  'RBC', 'HGB', 'HCT', 'MCV', 'RDW-SD', 'RDW-CV', 'MCH', 'MCHC',
+  'PLT', 'MPV', 'PCT', 'PDW-SD', 'PDW-CV', 'PLC-R', 'PLC-C',
+];
+
+// UI / report sort order (grouped abs + % per cell line)
 const NORMA_CBC_ORDER = [
   'WBC', 'LYM', 'LYM_PCT', 'MON', 'MON_PCT', 'NEU', 'NEU_PCT', 'EOS', 'EOS_PCT', 'BAS', 'BAS_PCT',
   'RBC', 'HGB', 'MCV', 'HCT', 'MCH', 'MCHC', 'RDW-SD', 'RDW-CV',
   'PLT', 'MPV', 'PCT', 'PDW-SD', 'PDW-CV', 'PLC-R', 'PLC-C',
-  'RDW', // legacy parameter id in older samples
+  'RDW',
 ];
 
 const NORMA_CBC_SORT_INDEX = Object.fromEntries(
@@ -44,8 +55,7 @@ const NORMA_CBC_SORT_INDEX = Object.fromEntries(
 
 function mapNormaIndex(index) {
   if (!Number.isInteger(index) || index < 0) return null;
-  const code = NORMA_CBC_ORDER[index];
-  return code && code !== 'RDW' ? code : null;
+  return NORMA_IVET_HL7_INDEX[index] || null;
 }
 
 function mapNormaCode(deviceCode) {
@@ -78,6 +88,7 @@ function compareByNormaOrder(a, b) {
 module.exports = {
   NORMA_CBC_MAP,
   NORMA_CBC_ORDER,
+  NORMA_IVET_HL7_INDEX,
   DEFAULT_CBC_TEST_CODE,
   mapNormaCode,
   mapNormaIndex,

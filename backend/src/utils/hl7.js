@@ -48,34 +48,24 @@ const firstId = (...candidates) => {
 const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
 
 const extractObxCode = (fields) => {
-  const parts = [fields[3], fields[4]]
-    .flatMap((f) => String(f || '').split('^'))
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const obx3Parts = String(fields[3] || '').split('^').map((s) => s.trim()).filter(Boolean);
+  const extraParts = String(fields[4] || '').split('^').map((s) => s.trim()).filter(Boolean);
+  const parts = [...obx3Parts, ...extraParts];
 
+  // Prefer text name in OBX-3 (e.g. 12^HGB^Norma or ^HGB^)
   for (const part of parts) {
     if (/^\d+$/.test(part)) continue;
     if (HL7_VALUE_TYPES.has(part.toUpperCase())) continue;
-    if (mapNormaCode(part)) return part;
+    const mapped = mapNormaCode(part);
+    if (mapped && !/^\d+$/.test(part)) return part;
+    if (/^[A-Z][A-Z0-9%#.-]{1,16}$/i.test(part)) return part;
   }
 
-  for (const part of parts) {
-    if (/^\d+$/.test(part)) continue;
-    if (HL7_VALUE_TYPES.has(part.toUpperCase())) continue;
-    if (/^[A-Z][A-Z0-9%#.-]{1,12}$/i.test(part)) return part;
-  }
-
-  for (const part of parts) {
+  for (const part of obx3Parts) {
     if (/^\d+$/.test(part)) {
       const mapped = mapNormaIndex(Number(part));
       if (mapped) return mapped;
     }
-  }
-
-  const setId = String(fields[1] || '').trim();
-  if (/^\d+$/.test(setId)) {
-    const mapped = mapNormaIndex(Number(setId) - 1);
-    if (mapped) return mapped;
   }
 
   return null;
