@@ -1,3 +1,5 @@
+import { billingAPI } from '../services/api';
+
 export const FIELD_VISIT_CODE = 'FIELD-VISIT';
 
 export const DEFAULT_FIELD_VISIT = {
@@ -5,6 +7,7 @@ export const DEFAULT_FIELD_VISIT = {
   name_en: 'Field Visit',
   name_ar: 'زيارة ميدانية',
   base_price: 150,
+  included_km: 30,
   price_per_km: 4,
 };
 
@@ -15,9 +18,11 @@ const parseMoney = (v, fallback) => {
 
 export const calcFieldVisitPrice = (service, distanceKm) => {
   const km = Math.max(0, parseFloat(distanceKm) || 0);
-  const base = parseMoney(service?.base_price, DEFAULT_FIELD_VISIT.base_price);
+  const flat = parseMoney(service?.base_price, DEFAULT_FIELD_VISIT.base_price);
+  const includedKm = parseMoney(service?.included_km, DEFAULT_FIELD_VISIT.included_km);
   const perKm = parseMoney(service?.price_per_km, DEFAULT_FIELD_VISIT.price_per_km);
-  return Math.round((base + km * perKm) * 100) / 100;
+  if (km <= includedKm) return flat;
+  return Math.round((flat + (km - includedKm) * perKm) * 100) / 100;
 };
 
 export const fieldVisitLabel = (service, i18n) => (
@@ -64,4 +69,14 @@ export const refreshFieldVisitItem = (item, service, i18n) => {
     description: fieldVisitDescription(service, i18n, km),
     unit_price: calcFieldVisitPrice(service, km),
   };
+};
+
+export const loadCustomerFieldVisitDistance = async (customerId) => {
+  if (!customerId) return null;
+  try {
+    const { data } = await billingAPI.fieldVisitDistance(customerId);
+    return data?.data || null;
+  } catch {
+    return null;
+  }
 };

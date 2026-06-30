@@ -30,6 +30,7 @@ import {
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
   calcFieldVisitPrice,
+  loadCustomerFieldVisitDistance,
 } from '../utils/fieldVisitService';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
@@ -53,6 +54,7 @@ export default function WorkflowCase() {
   const [animalPackages, setAnimalPackages] = useState({});
   const [includeFieldVisit, setIncludeFieldVisit] = useState(false);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
+  const [fieldVisitKmSource, setFieldVisitKmSource] = useState(null);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -88,6 +90,30 @@ export default function WorkflowCase() {
       setAnimalPackages({});
     }
   }, [customerId]);
+
+  const fieldVisitFormulaParams = {
+    base: fmtCatalog(fieldVisit.base_price),
+    includedKm: fieldVisit.included_km ?? 30,
+    rate: fmtCatalog(fieldVisit.price_per_km),
+  };
+
+  const applyCustomerFieldVisitDistance = async (id) => {
+    if (!id) {
+      setFieldVisitKmSource(null);
+      return;
+    }
+    const info = await loadCustomerFieldVisitDistance(id);
+    setFieldVisitKmSource(info);
+    if (info?.resolved && info.distance_km != null) {
+      setFieldVisitKm(String(info.distance_km));
+    }
+  };
+
+  useEffect(() => {
+    if (includeFieldVisit && customerId) {
+      applyCustomerFieldVisitDistance(customerId);
+    }
+  }, [includeFieldVisit, customerId]);
 
   const context = {
     customerId,
@@ -184,7 +210,7 @@ export default function WorkflowCase() {
       }),
       0
     );
-    return services + (includeFieldVisit && fieldVisitKm
+    return services + (includeFieldVisit && fieldVisitKm !== ''
       ? calcFieldVisitPrice(fieldVisit, fieldVisitKm)
       : 0);
   };
@@ -266,7 +292,7 @@ export default function WorkflowCase() {
 
       if (includeFieldVisit) {
         const km = parseFloat(fieldVisitKm);
-        if (!Number.isFinite(km) || km <= 0) {
+        if (!Number.isFinite(km) || km < 0) {
           toast.error(t('priceList.invalidDistance'));
           setCreating(false);
           return;
@@ -394,6 +420,10 @@ export default function WorkflowCase() {
                 setSelectedAnimalIds([]);
                 setAnimalTests({});
                 setAnimalPackages({});
+                if (!id) {
+                  setFieldVisitKm('');
+                  setFieldVisitKmSource(null);
+                }
                 if (id && receptionMode) setStep(1);
               }}
               autoFocus
@@ -579,7 +609,10 @@ export default function WorkflowCase() {
                       checked={includeFieldVisit}
                       onChange={(e) => {
                         setIncludeFieldVisit(e.target.checked);
-                        if (!e.target.checked) setFieldVisitKm('');
+                        if (!e.target.checked) {
+                          setFieldVisitKm('');
+                          setFieldVisitKmSource(null);
+                        }
                       }}
                       className="w-4 h-4"
                     />
@@ -599,10 +632,21 @@ export default function WorkflowCase() {
                         className="input-field max-w-xs"
                       />
                       <p className="text-xs text-gray-500">
-                        {t('priceList.fieldVisitFormula', {
-                          base: fmtCatalog(fieldVisit.base_price),
-                          rate: fmtCatalog(fieldVisit.price_per_km),
-                        })}
+                        {t('priceList.fieldVisitFormula', fieldVisitFormulaParams)}
+                        {fieldVisitKmSource?.resolved && fieldVisitKmSource.city && (
+                          <span className="block mt-0.5">
+                            {t('priceList.fieldVisitFromCustomer', {
+                              city: fieldVisitKmSource.city,
+                              km: fieldVisitKmSource.distance_km,
+                            })}
+                          </span>
+                        )}
+                        {fieldVisitKmSource && !fieldVisitKmSource.resolved && customerId && (
+                          <span className="block mt-0.5 text-amber-700">{t('priceList.fieldVisitCityUnknown')}</span>
+                        )}
+                        {fieldVisitKm && Number(fieldVisitKm) > 0 && Number(fieldVisitKm) <= (fieldVisit.included_km ?? 30) && (
+                          <span className="block mt-0.5 text-primary-700">{t('priceList.fieldVisitFlatZone', { includedKm: fieldVisit.included_km ?? 30 })}</span>
+                        )}
                         {fieldVisitKm && Number(fieldVisitKm) > 0 && (
                           <span className="text-primary-700 font-medium ms-2">
                             = {fmtCatalog(calcFieldVisitPrice(fieldVisit, fieldVisitKm))}

@@ -18,6 +18,7 @@ import {
   buildFieldVisitInvoiceItem,
   calcFieldVisitPrice,
   fieldVisitLabel,
+  loadCustomerFieldVisitDistance,
 } from '../utils/fieldVisitService';
 
 function groupItemsByAnimal(items, t) {
@@ -75,6 +76,26 @@ export default function Billing() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
+  const [fieldVisitKmSource, setFieldVisitKmSource] = useState(null);
+
+  const fieldVisitFormulaParams = {
+    base: fmtCatalog(fieldVisit.base_price),
+    includedKm: fieldVisit.included_km ?? 30,
+    rate: fmtCatalog(fieldVisit.price_per_km),
+  };
+
+  useEffect(() => {
+    if (!invoiceForm.customer_id) {
+      setFieldVisitKmSource(null);
+      return;
+    }
+    loadCustomerFieldVisitDistance(invoiceForm.customer_id).then((info) => {
+      setFieldVisitKmSource(info);
+      if (info?.resolved && info.distance_km != null) {
+        setFieldVisitKm(String(info.distance_km));
+      }
+    });
+  }, [invoiceForm.customer_id]);
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
@@ -130,7 +151,7 @@ export default function Billing() {
 
   const addFieldVisitItem = () => {
     const km = parseFloat(fieldVisitKm);
-    if (!Number.isFinite(km) || km <= 0) {
+    if (!Number.isFinite(km) || km < 0) {
       toast.error(t('priceList.invalidDistance'));
       return;
     }
@@ -492,7 +513,7 @@ export default function Billing() {
                 <button
                   type="button"
                   onClick={addFieldVisitItem}
-                  disabled={!fieldVisitKm}
+                  disabled={fieldVisitKm === ''}
                   className="btn-secondary text-sm"
                 >
                   {t('priceList.addFieldVisit')}
@@ -504,10 +525,21 @@ export default function Billing() {
                 </button>
               </div>
               <p className="text-xs text-gray-500">
-                {t('priceList.fieldVisitFormula', {
-                  base: fmtCatalog(fieldVisit.base_price),
-                  rate: fmtCatalog(fieldVisit.price_per_km),
-                })}
+                {t('priceList.fieldVisitFormula', fieldVisitFormulaParams)}
+                {fieldVisitKmSource?.resolved && fieldVisitKmSource.city && (
+                  <span className="block mt-0.5">
+                    {t('priceList.fieldVisitFromCustomer', {
+                      city: fieldVisitKmSource.city,
+                      km: fieldVisitKmSource.distance_km,
+                    })}
+                  </span>
+                )}
+                {fieldVisitKmSource && !fieldVisitKmSource.resolved && invoiceForm.customer_id && (
+                  <span className="block mt-0.5 text-amber-700">{t('priceList.fieldVisitCityUnknown')}</span>
+                )}
+                {fieldVisitKm && Number(fieldVisitKm) > 0 && Number(fieldVisitKm) <= (fieldVisit.included_km ?? 30) && (
+                  <span className="block mt-0.5 text-primary-700">{t('priceList.fieldVisitFlatZone', { includedKm: fieldVisit.included_km ?? 30 })}</span>
+                )}
               </p>
             </div>
             {invoiceForm.items.length > 0 && (

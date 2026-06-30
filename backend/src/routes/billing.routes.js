@@ -10,6 +10,8 @@ const { validate } = require('../middleware/validate');
 const { invoiceSchema, quoteSchema, paymentSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 const { listExtraBillingServices } = require('../constants/fieldVisit');
+const customersService = require('../services/customers.service');
+const { resolveCustomerDistanceKm } = require('../utils/labDistance');
 
 const router = express.Router();
 router.use(authenticate);
@@ -228,6 +230,24 @@ router.get(
   async (req, res, next) => {
     try {
       res.json({ success: true, data: listExtraBillingServices() });
+    } catch (err) { next(err); }
+  }
+);
+
+router.get(
+  '/field-visit-distance',
+  authorize(PERMISSIONS.BILLING_VIEW, PERMISSIONS.BILLING_CREATE, PERMISSIONS.PRICE_LIST_VIEW),
+  async (req, res, next) => {
+    try {
+      const customerId = req.query.customer_id;
+      if (!customerId) {
+        return res.status(400).json({ success: false, message: 'customer_id required' });
+      }
+      const customer = await customersService.getById(customerId);
+      if (!customer) {
+        return res.status(404).json({ success: false, message: 'Customer not found' });
+      }
+      res.json({ success: true, data: resolveCustomerDistanceKm(customer) });
     } catch (err) { next(err); }
   }
 );

@@ -18,6 +18,7 @@ import {
   buildFieldVisitLineItem,
   calcFieldVisitPrice,
   refreshFieldVisitItem,
+  loadCustomerFieldVisitDistance,
 } from '../utils/fieldVisitService';
 
 const fmt = fmtCatalog;
@@ -71,6 +72,31 @@ export default function PriceList() {
   const [quotesLoading, setQuotesLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
+  const [fieldVisitKmSource, setFieldVisitKmSource] = useState(null);
+
+  const fieldVisitFormulaParams = {
+    base: fmt(fieldVisit.base_price),
+    includedKm: fieldVisit.included_km ?? 30,
+    rate: fmt(fieldVisit.price_per_km),
+  };
+
+  const applyCustomerFieldVisitDistance = async (id) => {
+    if (!id) {
+      setFieldVisitKmSource(null);
+      return;
+    }
+    const info = await loadCustomerFieldVisitDistance(id);
+    setFieldVisitKmSource(info);
+    if (info?.resolved && info.distance_km != null) {
+      const km = info.distance_km;
+      setFieldVisitKm(String(km));
+      setLineItems((prev) => prev.map((item) => (
+        isFieldVisitItem(item)
+          ? refreshFieldVisitItem({ ...item, distance_km: km }, fieldVisit, i18n)
+          : item
+      )));
+    }
+  };
 
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
   const catLabel = (cat) => (i18n.language === 'ar' && cat?.name_ar ? cat.name_ar : cat?.name);
@@ -145,6 +171,7 @@ export default function PriceList() {
       setCustomerNameAr(customer.full_name_ar || '');
       setCustomerMobile(customer.mobile || '');
     }
+    applyCustomerFieldVisitDistance(id);
   };
 
   const addTest = () => {
@@ -178,7 +205,7 @@ export default function PriceList() {
 
   const addFieldVisit = () => {
     const km = parseFloat(fieldVisitKm);
-    if (!Number.isFinite(km) || km <= 0) {
+    if (!Number.isFinite(km) || km < 0) {
       toast.error(t('priceList.invalidDistance'));
       return;
     }
@@ -429,10 +456,21 @@ export default function PriceList() {
                     disabled={lineItems.some(isFieldVisitItem)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {t('priceList.fieldVisitFormula', {
-                      base: fmt(fieldVisit.base_price),
-                      rate: fmt(fieldVisit.price_per_km),
-                    })}
+                    {t('priceList.fieldVisitFormula', fieldVisitFormulaParams)}
+                    {fieldVisitKmSource?.resolved && fieldVisitKmSource.city && (
+                      <span className="block mt-0.5">
+                        {t('priceList.fieldVisitFromCustomer', {
+                          city: fieldVisitKmSource.city,
+                          km: fieldVisitKmSource.distance_km,
+                        })}
+                      </span>
+                    )}
+                    {fieldVisitKmSource && !fieldVisitKmSource.resolved && customerId && (
+                      <span className="block mt-0.5 text-amber-700">{t('priceList.fieldVisitCityUnknown')}</span>
+                    )}
+                    {fieldVisitKm && Number(fieldVisitKm) > 0 && Number(fieldVisitKm) <= (fieldVisit.included_km ?? 30) && (
+                      <span className="block mt-0.5 text-primary-700">{t('priceList.fieldVisitFlatZone', { includedKm: fieldVisit.included_km ?? 30 })}</span>
+                    )}
                     {fieldVisitKm && Number(fieldVisitKm) > 0 && (
                       <span className="text-primary-700 font-medium ms-2">
                         = {fmt(calcFieldVisitPrice(fieldVisit, fieldVisitKm))}
@@ -443,7 +481,7 @@ export default function PriceList() {
                 <button
                   type="button"
                   onClick={addFieldVisit}
-                  disabled={lineItems.some(isFieldVisitItem) || !fieldVisitKm}
+                  disabled={lineItems.some(isFieldVisitItem) || fieldVisitKm === ''}
                   className="btn-secondary flex items-center gap-2 text-sm whitespace-nowrap"
                 >
                   <MapPin size={16} />
