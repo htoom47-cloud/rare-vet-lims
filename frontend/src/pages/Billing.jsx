@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { Plus, CreditCard, Download, Printer, BarChart3, Receipt } from 'lucide-react';
+import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -12,6 +12,11 @@ import DiscountField from '../components/billing/DiscountField';
 import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload, initDiscountFromInvoice, calcInvoiceTotals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
 import { billingAPI, testsAPI } from '../services/api';
+import {
+  FIELD_VISIT_CODE,
+  DEFAULT_FIELD_VISIT,
+  buildFieldVisitInvoiceItem,
+} from '../utils/fieldVisitService';
 
 function groupItemsByAnimal(items, t) {
   const groups = new Map();
@@ -40,7 +45,7 @@ function groupItemsByAnimal(items, t) {
 }
 
 export default function Billing() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canPay = hasPermission('billing.payment');
   const [invoices, setInvoices] = useState([]);
@@ -66,6 +71,7 @@ export default function Billing() {
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
 
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
@@ -78,6 +84,12 @@ export default function Billing() {
   useEffect(() => {
     load();
     testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
+    billingAPI.extraServices()
+      .then(({ data }) => {
+        const svc = (data.data || []).find((s) => s.code === FIELD_VISIT_CODE);
+        if (svc) setFieldVisit(svc);
+      })
+      .catch(() => {});
   }, []);
 
   const openInvoiceDetail = async (invoice) => {
@@ -111,6 +123,19 @@ export default function Billing() {
       }],
     });
     setNewItem({ test_id: '', description: '', quantity: 1, unit_price: 0 });
+  };
+
+  const addFieldVisitItem = () => {
+    if (invoiceForm.items.some((item) => item.service_code === FIELD_VISIT_CODE
+      || item.description === buildFieldVisitInvoiceItem(fieldVisit, i18n).description)) {
+      toast.error(t('priceList.fieldVisitAlreadyAdded'));
+      return;
+    }
+    setInvoiceForm({
+      ...invoiceForm,
+      items: [...invoiceForm.items, buildFieldVisitInvoiceItem(fieldVisit, i18n)],
+    });
+    toast.success(t('priceList.fieldVisitAdded'));
   };
 
   const createInvoice = async (e) => {
@@ -438,6 +463,15 @@ export default function Billing() {
               <input type="number" min="0" placeholder="السعر" value={newItem.unit_price} onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })} className="input-field" />
             </div>
             <button type="button" onClick={addItem} className="btn-secondary text-sm">+ إضافة بند</button>
+            <button
+              type="button"
+              onClick={addFieldVisitItem}
+              className="btn-secondary text-sm flex items-center gap-2 ms-2"
+            >
+              <MapPin size={16} />
+              {t('priceList.addFieldVisit')}
+              <span className="text-primary-600">({fmtCatalog(fieldVisit.price)})</span>
+            </button>
             {invoiceForm.items.length > 0 && (
               <div className="text-sm space-y-1 mt-2">
                 {invoiceForm.items.map((item, i) => (

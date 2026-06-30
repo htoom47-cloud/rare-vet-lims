@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus, Package, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
@@ -25,6 +25,11 @@ import {
   packageLabel,
   packageTestIds,
 } from '../utils/packageSelection';
+import {
+  FIELD_VISIT_CODE,
+  DEFAULT_FIELD_VISIT,
+  buildFieldVisitInvoiceItem,
+} from '../utils/fieldVisitService';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -45,6 +50,8 @@ export default function WorkflowCase() {
   const [selectedAnimalIds, setSelectedAnimalIds] = useState([]);
   const [animalTests, setAnimalTests] = useState({});
   const [animalPackages, setAnimalPackages] = useState({});
+  const [includeFieldVisit, setIncludeFieldVisit] = useState(false);
+  const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [samples, setSamples] = useState([]);
@@ -61,6 +68,12 @@ export default function WorkflowCase() {
   useEffect(() => {
     testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
     testsAPI.listPackages().then(({ data }) => setPackages(data.data || [])).catch(() => {});
+    billingAPI.extraServices()
+      .then(({ data }) => {
+        const svc = (data.data || []).find((s) => s.code === FIELD_VISIT_CODE);
+        if (svc) setFieldVisit(svc);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -162,12 +175,15 @@ export default function WorkflowCase() {
     });
   };
 
-  const invoiceTotal = () => selectedAnimalIds.reduce(
-    (sum, animalId) => sum + animalServiceTotal({
-      animalId, animalTests, animalPackages, tests, packages,
-    }),
-    0
-  );
+  const invoiceTotal = () => {
+    const services = selectedAnimalIds.reduce(
+      (sum, animalId) => sum + animalServiceTotal({
+        animalId, animalTests, animalPackages, tests, packages,
+      }),
+      0
+    );
+    return services + (includeFieldVisit ? (parseFloat(fieldVisit.price) || 0) : 0);
+  };
 
   const canNext = () => {
     if (step === 0) return !!customerId;
@@ -242,6 +258,10 @@ export default function WorkflowCase() {
             unit_price: parseFloat(test?.price) || 0,
           });
         }
+      }
+
+      if (includeFieldVisit) {
+        items.push(buildFieldVisitInvoiceItem(fieldVisit, i18n));
       }
 
       const { data } = await billingAPI.createInvoice({
@@ -339,6 +359,7 @@ export default function WorkflowCase() {
     setSelectedAnimalIds([]);
     setAnimalTests({});
     setAnimalPackages({});
+    setIncludeFieldVisit(false);
     setInvoiceId('');
     setInvoiceNumber('');
     setSamples([]);
@@ -540,6 +561,17 @@ export default function WorkflowCase() {
                     );
                   })}
                 </div>
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-primary-200 bg-white dark:bg-primary-900/10 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeFieldVisit}
+                    onChange={(e) => setIncludeFieldVisit(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <MapPin size={18} className="text-primary-600 shrink-0" />
+                  <span className="flex-1 text-sm font-medium">{t('priceList.includeFieldVisit')}</span>
+                  <span className="text-primary-600 font-medium">{fmtCatalog(fieldVisit.price)}</span>
+                </label>
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="font-bold text-primary-800">{t('workflow.total')}: {invoiceTotal().toFixed(0)} {t('reception.sar')}</span>
                   <button

@@ -9,6 +9,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { invoiceSchema, quoteSchema, paymentSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
+const { listExtraBillingServices } = require('../constants/fieldVisit');
 
 const router = express.Router();
 router.use(authenticate);
@@ -220,6 +221,16 @@ router.get('/packages', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, ne
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
+
+router.get(
+  '/extra-services',
+  authorize(PERMISSIONS.BILLING_VIEW, PERMISSIONS.BILLING_CREATE, PERMISSIONS.PRICE_LIST_VIEW),
+  async (req, res, next) => {
+    try {
+      res.json({ success: true, data: listExtraBillingServices() });
+    } catch (err) { next(err); }
+  }
+);
 
 router.post('/invoices', authorize(PERMISSIONS.BILLING_CREATE), validate(invoiceSchema), async (req, res, next) => {
   try {

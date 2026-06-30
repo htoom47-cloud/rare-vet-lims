@@ -244,6 +244,7 @@ export const billingAPI = {
   createInvoice: (data) => api.post('/billing/invoices', data),
   recordPayment: (data) => api.post('/billing/payments', data),
   packages: () => api.get('/billing/packages'),
+  extraServices: () => api.get('/billing/extra-services'),
   refund: (data) => api.post('/billing/refunds', data),
   cancelInvoice: (id, reason) => api.post(`/billing/invoices/${id}/cancel`, { reason }),
   dashboardSummary: (params) => api.get('/billing/dashboard-summary', { params }),

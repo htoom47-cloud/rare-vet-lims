@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Search, Printer, Package, FileText, Plus, Trash2, MessageCircle, Download,
+  Search, Printer, Package, FileText, Plus, Trash2, MessageCircle, Download, MapPin,
 } from 'lucide-react';
 import { testsAPI, billingAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,12 @@ import DiscountField from '../components/billing/DiscountField';
 import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
 import toast from 'react-hot-toast';
+import {
+  FIELD_VISIT_CODE,
+  DEFAULT_FIELD_VISIT,
+  isFieldVisitItem,
+  buildFieldVisitLineItem,
+} from '../utils/fieldVisitService';
 
 const fmt = fmtCatalog;
 
@@ -61,6 +67,7 @@ export default function PriceList() {
   const [lastQuote, setLastQuote] = useState(null);
   const [recentQuotes, setRecentQuotes] = useState([]);
   const [quotesLoading, setQuotesLoading] = useState(false);
+  const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
 
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
   const catLabel = (cat) => (i18n.language === 'ar' && cat?.name_ar ? cat.name_ar : cat?.name);
@@ -78,6 +85,12 @@ export default function PriceList() {
         setPackages(pkgRes.data.data || []);
       })
       .finally(() => setLoading(false));
+    billingAPI.extraServices()
+      .then(({ data }) => {
+        const svc = (data.data || []).find((s) => s.code === FIELD_VISIT_CODE);
+        if (svc) setFieldVisit(svc);
+      })
+      .catch(() => {});
   }, [canViewPackages]);
 
   const loadRecentQuotes = () => {
@@ -158,6 +171,15 @@ export default function PriceList() {
       _key: newLineId(), package_id: pkg.id, description: pkg.name, quantity: 1, unit_price: parseFloat(pkg.price) || 0,
     }]);
     setSelectedPackageId('');
+  };
+
+  const addFieldVisit = () => {
+    if (lineItems.some(isFieldVisitItem)) {
+      toast.error(t('priceList.fieldVisitAlreadyAdded'));
+      return;
+    }
+    setLineItems((prev) => [...prev, buildFieldVisitLineItem(fieldVisit, i18n, { withKey: true })]);
+    toast.success(t('priceList.fieldVisitAdded'));
   };
 
   const updateItem = (key, field, value) => {
@@ -377,6 +399,18 @@ export default function PriceList() {
                   </button>
                 </div>
               )}
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={addFieldVisit}
+                  disabled={lineItems.some(isFieldVisitItem)}
+                  className="btn-secondary flex items-center gap-2 text-sm"
+                >
+                  <MapPin size={16} />
+                  {t('priceList.addFieldVisit')}
+                  <span className="text-primary-600 font-medium">({fmt(fieldVisit.price)})</span>
+                </button>
+              </div>
             </div>
 
             {lineItems.length > 0 && (
