@@ -8,7 +8,7 @@ const path = require('path');
 const root = __dirname;
 const outDir = process.argv[2] || path.join(process.env.USERPROFILE || process.env.HOME || '.', 'Desktop', 'reception-display-usb');
 
-const files = ['index.html', 'اقرأني.txt'];
+const files = ['index.html', 'اقرأني.txt', 'pricing-banner.png'];
 const logoSrc = path.join(root, '../../backend/assets/logo.png');
 
 fs.mkdirSync(outDir, { recursive: true });

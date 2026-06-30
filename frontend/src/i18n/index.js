@@ -281,7 +281,9 @@ const resources = {
         usbDisplayHint: 'Offline copy for TV — no internet needed. Copy folder to USB and open index.html',
       },
       receptionDisplay: {
-        ticker: 'Welcome — accurate veterinary diagnostics with fast turnaround and digital reports',
+        ticker: '25% opening discount — accurate veterinary diagnostics & digital reports',
+        pricingTitle: 'Price List',
+        pricingPromo: '25% opening discount — limited time offer',
         welcomeTitle: 'Welcome',
         welcomeSubtitle: 'Specialized veterinary laboratory — clinical diagnostics and research for camels, horses, and livestock',
         defaultAddress: 'Al Muzahimiyah, Riyadh Region, Kingdom of Saudi Arabia',
@@ -320,7 +322,7 @@ const resources = {
         location: 'Location',
         hint: 'Click anywhere to advance — slides rotate automatically',
         fullscreen: 'Fullscreen',
-        slides: { welcome: 'Welcome', services: 'Services', workflow: 'Workflow', quality: 'Quality', portal: 'Portal', contact: 'Contact' },
+        slides: { welcome: 'Welcome', pricing: 'Prices', services: 'Services', workflow: 'Workflow', quality: 'Quality', portal: 'Portal', contact: 'Contact' },
       },
       resultValidation: {
         title: 'Results approval',
@@ -1087,7 +1089,9 @@ const resources = {
         usbDisplayHint: 'تعمل بدون إنترنت — انسخ المجلد للفلاش وافتح index.html على التلفزيون',
       },
       receptionDisplay: {
-        ticker: 'أهلاً بكم — تحاليل بيطرية دقيقة مع نتائج سريعة وتقارير رقمية',
+        ticker: 'خصم 25% بمناسبة الافتتاح — تحاليل بيطرية دقيقة وتقارير رقمية',
+        pricingTitle: 'قائمة الأسعار',
+        pricingPromo: 'خصم 25% بمناسبة الافتتاح — لفترة محدودة',
         welcomeTitle: 'أهلاً وسهلاً',
         welcomeSubtitle: 'مختبر بيطري متخصص — تشخيص سريري وبحثي للإبل والخيول والماشية',
         defaultAddress: 'المزاحمية، منطقة الرياض، المملكة العربية السعودية',
@@ -1126,7 +1130,7 @@ const resources = {
         location: 'الموقع',
         hint: 'انقر في أي مكان للتقديم — الشرائح تتبدّل تلقائياً',
         fullscreen: 'ملء الشاشة',
-        slides: { welcome: 'ترحيب', services: 'خدمات', workflow: 'خطوات', quality: 'جودة', portal: 'بوابة', contact: 'تواصل' },
+        slides: { welcome: 'ترحيب', pricing: 'الأسعار', services: 'خدمات', workflow: 'خطوات', quality: 'جودة', portal: 'بوابة', contact: 'تواصل' },
       },
       resultValidation: {
         title: 'اعتماد النتائج',
