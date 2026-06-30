@@ -199,20 +199,12 @@ export default function ReceptionDisplay() {
             )}
 
             {slideKey === 'pricing' && (
-              <div className="text-center flex flex-col items-center">
-                <div className="mb-4 flex flex-col items-center">
-                  <BiHeading ar={tAr('receptionDisplay.pricingTitle')} en={tEn('receptionDisplay.pricingTitle')} size="section" />
-                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-300 to-transparent mt-2" />
-                </div>
+              <div className="text-center flex flex-col items-center justify-center">
                 <img
                   src="/reception-display-usb/pricing-banner.png"
                   alt="Al-Nwadr Lab Pricing"
-                  className="max-w-full max-h-[calc(100vh-280px)] rounded-xl border-2 border-primary-400/35 shadow-2xl object-contain"
+                  className="max-w-full max-h-[calc(100vh-200px)] rounded-xl border-2 border-primary-400/35 shadow-2xl object-contain"
                 />
-                <div className="mt-4 px-5 py-2 rounded-full bg-gradient-to-r from-primary-300 to-primary-400 text-[#2B1B17] font-bold text-sm shadow-lg">
-                  {tAr('receptionDisplay.pricingPromo')}
-                </div>
-                <p className="text-xs text-primary-300/85 mt-2" dir="ltr">{tEn('receptionDisplay.pricingPromo')}</p>
               </div>
             )}
 

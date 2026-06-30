@@ -124,7 +124,7 @@
     .phone-num { font-size: 1.65rem; font-weight: 800; direction: ltr; letter-spacing: .04em; color: var(--accent-bright); }
     .pricing-slide { display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .pricing-banner {
-      max-width: min(100%, 980px); max-height: calc(100vh - 260px); width: auto; height: auto;
+      max-width: min(100%, 980px); max-height: calc(100vh - 200px); width: auto; height: auto;
       border-radius: 14px; box-shadow: var(--shadow-lg); border: 2px solid var(--border); object-fit: contain;
     }
     .promo-pill {
@@ -225,10 +225,7 @@
         id: 'pricing',
         html: `
           <div class="slide center pricing-slide">
-            ${sectionHead('قائمة الأسعار','Price List')}
             <img class="pricing-banner" src="pricing-banner.png" alt="Al-Nwadr Lab Pricing" />
-            <div class="promo-pill">خصم 25% بمناسبة الافتتاح — لفترة محدودة</div>
-            <div class="promo-pill-en">25% opening discount — limited time offer</div>
           </div>`
       },
       {
