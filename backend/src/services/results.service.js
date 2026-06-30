@@ -1,7 +1,7 @@
 const path = require('path');
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const { compareByNormaOrder } = require('../utils/norma-cbc-map');
+const { compareByNormaOrder, getNormaPanelRow } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
@@ -62,10 +62,12 @@ const getBySampleTest = async (sampleTestId) => {
   for (const row of result.rows) {
     if (!row.parameter_id || seen.has(row.parameter_id)) continue;
     seen.add(row.parameter_id);
+    const panelRow = getNormaPanelRow(row.parameter_code);
     values.push({
       parameter_id: row.parameter_id,
-      parameter_name: row.parameter_name,
+      parameter_name: panelRow?.symbol || row.parameter_name,
       parameter_code: row.parameter_code,
+      norma_section: panelRow?.section || null,
       value: row.value,
       numeric_value: row.numeric_value,
       unit: row.unit,

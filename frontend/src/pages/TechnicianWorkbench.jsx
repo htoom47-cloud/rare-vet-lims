@@ -6,6 +6,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { filterNonParasTests } from '../utils/parasitologyTests';
+import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest } from '../constants/normaCbcPanel';
 
 export default function TechnicianWorkbench() {
   const { t } = useTranslation();
@@ -68,8 +69,10 @@ export default function TechnicianWorkbench() {
         const val = existing?.values?.find((v) => v.parameter_id === p.id);
         return {
           parameter_id: p.id,
-          name: p.name,
+          code: p.code,
+          name: p.norma_symbol || p.name,
           unit: p.unit,
+          norma_section: p.norma_section,
           value: val?.value || '',
           flag: val?.flag,
           reference: val?.reference || '',
@@ -128,6 +131,80 @@ export default function TechnicianWorkbench() {
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'Error');
     }
+  };
+
+  const renderParamField = (test, param, idx) => (
+    <div key={param.parameter_id}>
+      <label className="text-sm font-medium">
+        {param.name} {param.unit && param.unit !== 'qual' && `(${param.unit})`}
+        {param.reference && (
+          <span className="text-xs font-normal text-gray-500 ms-2">
+            {t('workbench.ref', { defaultValue: 'Ref' })}: {param.reference}
+            {param.flag && param.flag !== 'NORMAL' && param.flag !== '' && (
+              <span className={`ms-1 font-semibold ${['HIGH', 'CRIT_HIGH', 'POS'].includes(param.flag) ? 'text-red-600' : 'text-blue-600'}`}>
+                {param.flag}
+              </span>
+            )}
+          </span>
+        )}
+      </label>
+      {param.unit === 'qual' ? (
+        <select
+          value={param.value}
+          onChange={(e) => {
+            const updated = [...resultForm[test.id]];
+            updated[idx] = { ...param, value: e.target.value };
+            setResultForm({ ...resultForm, [test.id]: updated });
+          }}
+          className="input-field mt-1"
+        >
+          <option value="">—</option>
+          <option value="Negative">{t('parasitology.negative', { defaultValue: 'Negative' })}</option>
+          <option value="Positive">{t('parasitology.positive', { defaultValue: 'Positive' })}</option>
+        </select>
+      ) : (
+        <input
+          value={param.value}
+          onChange={(e) => {
+            const updated = [...resultForm[test.id]];
+            updated[idx] = { ...param, value: e.target.value };
+            setResultForm({ ...resultForm, [test.id]: updated });
+          }}
+          className="input-field mt-1"
+        />
+      )}
+    </div>
+  );
+
+  const renderTestFields = (test, fields) => {
+    if (!isNormaCbcTest(test)) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {fields.map((param, idx) => renderParamField(test, param, idx))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {NORMA_CBC_SECTIONS.map((section) => {
+          const sectionRows = fields
+            .map((param, idx) => ({ param, idx }))
+            .filter(({ param }) => param.norma_section === section);
+          if (!sectionRows.length) return null;
+          return (
+            <div key={section}>
+              <h5 className="text-sm font-semibold text-primary-700 dark:text-primary-300 mb-2 border-b border-primary-100 dark:border-primary-800 pb-1">
+                {normaSectionLabel(section, t)}
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {sectionRows.map(({ param, idx }) => renderParamField(test, param, idx))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (loading) return <div className="text-center py-20">{t('common.loading')}</div>;
@@ -209,50 +286,7 @@ export default function TechnicianWorkbench() {
                   </Link>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {fields.map((param, idx) => (
-                    <div key={param.parameter_id}>
-                      <label className="text-sm font-medium">
-                        {param.name} {param.unit && param.unit !== 'qual' && `(${param.unit})`}
-                        {param.reference && (
-                          <span className="text-xs font-normal text-gray-500 ms-2">
-                            {t('workbench.ref', { defaultValue: 'Ref' })}: {param.reference}
-                            {param.flag && param.flag !== 'NORMAL' && param.flag !== '' && (
-                              <span className={`ms-1 font-semibold ${['HIGH', 'CRIT_HIGH', 'POS'].includes(param.flag) ? 'text-red-600' : 'text-blue-600'}`}>
-                                {param.flag}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </label>
-                      {param.unit === 'qual' ? (
-                        <select
-                          value={param.value}
-                          onChange={(e) => {
-                            const updated = [...resultForm[test.id]];
-                            updated[idx] = { ...param, value: e.target.value };
-                            setResultForm({ ...resultForm, [test.id]: updated });
-                          }}
-                          className="input-field mt-1"
-                        >
-                          <option value="">—</option>
-                          <option value="Negative">{t('parasitology.negative', { defaultValue: 'Negative' })}</option>
-                          <option value="Positive">{t('parasitology.positive', { defaultValue: 'Positive' })}</option>
-                        </select>
-                      ) : (
-                        <input
-                          value={param.value}
-                          onChange={(e) => {
-                            const updated = [...resultForm[test.id]];
-                            updated[idx] = { ...param, value: e.target.value };
-                            setResultForm({ ...resultForm, [test.id]: updated });
-                          }}
-                          className="input-field mt-1"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                renderTestFields(test, fields)
               )}
             </div>
           );

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI } from '../services/api';
+import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest } from '../constants/normaCbcPanel';
 
 export default function VetReview() {
   const { t } = useTranslation();
@@ -83,7 +84,31 @@ export default function VetReview() {
     }
   };
 
-  if (loading) return <div className="text-center py-20">{t('common.loading')}</div>;
+  const renderValueRows = (test, values) => {
+    const rows = (items) => items.map((v) => (
+      <tr key={v.parameter_id} className="border-t">
+        <td className="py-1">{v.parameter_name}</td>
+        <td>{v.value} {v.unit}</td>
+        <td className="text-gray-500">{v.reference || '—'}</td>
+        <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || t('vetReview.normal')} /></td>
+      </tr>
+    ));
+
+    if (!isNormaCbcTest(test)) return rows(values);
+
+    return NORMA_CBC_SECTIONS.flatMap((section) => {
+      const sectionValues = values.filter((v) => v.norma_section === section);
+      if (!sectionValues.length) return [];
+      return [
+        <tr key={`hdr-${section}`} className="bg-primary-50 dark:bg-primary-900/20">
+          <td colSpan={4} className="py-1.5 font-semibold text-primary-700 dark:text-primary-300 text-xs">
+            {normaSectionLabel(section, t)}
+          </td>
+        </tr>,
+        ...rows(sectionValues),
+      ];
+    });
+  };
 
   return (
     <div>
@@ -141,14 +166,7 @@ export default function VetReview() {
                     </tr>
                   </thead>
                   <tbody>
-                    {res.values.map((v) => (
-                      <tr key={v.parameter_id} className="border-t">
-                        <td className="py-1">{v.parameter_name}</td>
-                        <td>{v.value} {v.unit}</td>
-                        <td className="text-gray-500">{v.reference || '—'}</td>
-                        <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || t('vetReview.normal')} /></td>
-                      </tr>
-                    ))}
+                    {renderValueRows(test, res.values)}
                   </tbody>
                 </table>
               ) : (

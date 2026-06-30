@@ -71,16 +71,10 @@ const extractObxCode = (fields) => {
   return null;
 };
 
-/** Norma iVet often reports HGB/MCHC in g/L — LIMS stores g/dL. */
+/** Norma iVet reports HGB/MCHC in g/L — store as sent (matches Norma screen). */
 const normalizeNormaValue = (code, rawValue, unit) => {
   const n = parseFloat(String(rawValue).replace(',', '.'));
   if (Number.isNaN(n)) return { value: rawValue, unit };
-
-  const u = String(unit || '').toLowerCase().replace(/\s/g, '');
-  const perLiter = /g\/l/i.test(u);
-  if (perLiter && (code === 'HGB' || code === 'MCHC') && n > 30) {
-    return { value: String(n / 10), unit: 'g/dL' };
-  }
   return { value: String(n), unit };
 };
 
