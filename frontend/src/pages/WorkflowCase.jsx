@@ -29,6 +29,7 @@ import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
+  calcFieldVisitPrice,
 } from '../utils/fieldVisitService';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
@@ -51,6 +52,7 @@ export default function WorkflowCase() {
   const [animalTests, setAnimalTests] = useState({});
   const [animalPackages, setAnimalPackages] = useState({});
   const [includeFieldVisit, setIncludeFieldVisit] = useState(false);
+  const [fieldVisitKm, setFieldVisitKm] = useState('');
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -182,7 +184,9 @@ export default function WorkflowCase() {
       }),
       0
     );
-    return services + (includeFieldVisit ? (parseFloat(fieldVisit.price) || 0) : 0);
+    return services + (includeFieldVisit && fieldVisitKm
+      ? calcFieldVisitPrice(fieldVisit, fieldVisitKm)
+      : 0);
   };
 
   const canNext = () => {
@@ -261,7 +265,13 @@ export default function WorkflowCase() {
       }
 
       if (includeFieldVisit) {
-        items.push(buildFieldVisitInvoiceItem(fieldVisit, i18n));
+        const km = parseFloat(fieldVisitKm);
+        if (!Number.isFinite(km) || km <= 0) {
+          toast.error(t('priceList.invalidDistance'));
+          setCreating(false);
+          return;
+        }
+        items.push(buildFieldVisitInvoiceItem(fieldVisit, i18n, km));
       }
 
       const { data } = await billingAPI.createInvoice({
@@ -360,6 +370,7 @@ export default function WorkflowCase() {
     setAnimalTests({});
     setAnimalPackages({});
     setIncludeFieldVisit(false);
+    setFieldVisitKm('');
     setInvoiceId('');
     setInvoiceNumber('');
     setSamples([]);
@@ -561,17 +572,46 @@ export default function WorkflowCase() {
                     );
                   })}
                 </div>
-                <label className="flex items-center gap-3 p-3 rounded-lg border border-primary-200 bg-white dark:bg-primary-900/10 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeFieldVisit}
-                    onChange={(e) => setIncludeFieldVisit(e.target.checked)}
-                    className="w-4 h-4"
-                  />
-                  <MapPin size={18} className="text-primary-600 shrink-0" />
-                  <span className="flex-1 text-sm font-medium">{t('priceList.includeFieldVisit')}</span>
-                  <span className="text-primary-600 font-medium">{fmtCatalog(fieldVisit.price)}</span>
-                </label>
+                <div className="p-3 rounded-lg border border-primary-200 bg-white dark:bg-primary-900/10 space-y-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeFieldVisit}
+                      onChange={(e) => {
+                        setIncludeFieldVisit(e.target.checked);
+                        if (!e.target.checked) setFieldVisitKm('');
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <MapPin size={18} className="text-primary-600 shrink-0" />
+                    <span className="flex-1 text-sm font-medium">{t('priceList.includeFieldVisit')}</span>
+                  </label>
+                  {includeFieldVisit && (
+                    <div className="ps-9 space-y-1">
+                      <label className="text-xs text-gray-500">{t('priceList.distanceKm')}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={fieldVisitKm}
+                        onChange={(e) => setFieldVisitKm(e.target.value)}
+                        placeholder={t('priceList.enterDistanceKm')}
+                        className="input-field max-w-xs"
+                      />
+                      <p className="text-xs text-gray-500">
+                        {t('priceList.fieldVisitFormula', {
+                          base: fmtCatalog(fieldVisit.base_price),
+                          rate: fmtCatalog(fieldVisit.price_per_km),
+                        })}
+                        {fieldVisitKm && Number(fieldVisitKm) > 0 && (
+                          <span className="text-primary-700 font-medium ms-2">
+                            = {fmtCatalog(calcFieldVisitPrice(fieldVisit, fieldVisitKm))}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="font-bold text-primary-800">{t('workflow.total')}: {invoiceTotal().toFixed(0)} {t('reception.sar')}</span>
                   <button

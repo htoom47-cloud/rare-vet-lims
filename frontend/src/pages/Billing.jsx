@@ -16,6 +16,8 @@ import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
+  calcFieldVisitPrice,
+  fieldVisitLabel,
 } from '../utils/fieldVisitService';
 
 function groupItemsByAnimal(items, t) {
@@ -72,6 +74,7 @@ export default function Billing() {
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
+  const [fieldVisitKm, setFieldVisitKm] = useState('');
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
@@ -126,15 +129,20 @@ export default function Billing() {
   };
 
   const addFieldVisitItem = () => {
-    if (invoiceForm.items.some((item) => item.service_code === FIELD_VISIT_CODE
-      || item.description === buildFieldVisitInvoiceItem(fieldVisit, i18n).description)) {
+    const km = parseFloat(fieldVisitKm);
+    if (!Number.isFinite(km) || km <= 0) {
+      toast.error(t('priceList.invalidDistance'));
+      return;
+    }
+    if (invoiceForm.items.some((item) => item.description?.includes(fieldVisitLabel(fieldVisit, i18n)))) {
       toast.error(t('priceList.fieldVisitAlreadyAdded'));
       return;
     }
     setInvoiceForm({
       ...invoiceForm,
-      items: [...invoiceForm.items, buildFieldVisitInvoiceItem(fieldVisit, i18n)],
+      items: [...invoiceForm.items, buildFieldVisitInvoiceItem(fieldVisit, i18n, km)],
     });
+    setFieldVisitKm('');
     toast.success(t('priceList.fieldVisitAdded'));
   };
 
@@ -463,15 +471,45 @@ export default function Billing() {
               <input type="number" min="0" placeholder="السعر" value={newItem.unit_price} onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })} className="input-field" />
             </div>
             <button type="button" onClick={addItem} className="btn-secondary text-sm">+ إضافة بند</button>
-            <button
-              type="button"
-              onClick={addFieldVisitItem}
-              className="btn-secondary text-sm flex items-center gap-2 ms-2"
-            >
-              <MapPin size={16} />
-              {t('priceList.addFieldVisit')}
-              <span className="text-primary-600">({fmtCatalog(fieldVisit.price)})</span>
-            </button>
+            <div className="mt-3 p-3 border rounded-lg bg-primary-50/40 space-y-2">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <MapPin size={16} />
+                {t('priceList.addFieldVisit')}
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="text-xs text-gray-500">{t('priceList.distanceKm')}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={fieldVisitKm}
+                    onChange={(e) => setFieldVisitKm(e.target.value)}
+                    placeholder={t('priceList.enterDistanceKm')}
+                    className="input-field"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addFieldVisitItem}
+                  disabled={!fieldVisitKm}
+                  className="btn-secondary text-sm"
+                >
+                  {t('priceList.addFieldVisit')}
+                  {fieldVisitKm && Number(fieldVisitKm) > 0 && (
+                    <span className="text-primary-600 ms-1">
+                      ({fmtCatalog(calcFieldVisitPrice(fieldVisit, fieldVisitKm))})
+                    </span>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                {t('priceList.fieldVisitFormula', {
+                  base: fmtCatalog(fieldVisit.base_price),
+                  rate: fmtCatalog(fieldVisit.price_per_km),
+                })}
+              </p>
+            </div>
             {invoiceForm.items.length > 0 && (
               <div className="text-sm space-y-1 mt-2">
                 {invoiceForm.items.map((item, i) => (

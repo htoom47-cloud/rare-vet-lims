@@ -16,6 +16,8 @@ import {
   DEFAULT_FIELD_VISIT,
   isFieldVisitItem,
   buildFieldVisitLineItem,
+  calcFieldVisitPrice,
+  refreshFieldVisitItem,
 } from '../utils/fieldVisitService';
 
 const fmt = fmtCatalog;
@@ -68,6 +70,7 @@ export default function PriceList() {
   const [recentQuotes, setRecentQuotes] = useState([]);
   const [quotesLoading, setQuotesLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
+  const [fieldVisitKm, setFieldVisitKm] = useState('');
 
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
   const catLabel = (cat) => (i18n.language === 'ar' && cat?.name_ar ? cat.name_ar : cat?.name);
@@ -174,12 +177,25 @@ export default function PriceList() {
   };
 
   const addFieldVisit = () => {
+    const km = parseFloat(fieldVisitKm);
+    if (!Number.isFinite(km) || km <= 0) {
+      toast.error(t('priceList.invalidDistance'));
+      return;
+    }
     if (lineItems.some(isFieldVisitItem)) {
       toast.error(t('priceList.fieldVisitAlreadyAdded'));
       return;
     }
-    setLineItems((prev) => [...prev, buildFieldVisitLineItem(fieldVisit, i18n, { withKey: true })]);
+    setLineItems((prev) => [...prev, buildFieldVisitLineItem(fieldVisit, i18n, km, { withKey: true })]);
+    setFieldVisitKm('');
     toast.success(t('priceList.fieldVisitAdded'));
+  };
+
+  const updateFieldVisitDistance = (key, kmValue) => {
+    setLineItems((prev) => prev.map((item) => {
+      if (item._key !== key || !isFieldVisitItem(item)) return item;
+      return refreshFieldVisitItem({ ...item, distance_km: kmValue }, fieldVisit, i18n);
+    }));
   };
 
   const updateItem = (key, field, value) => {
@@ -399,16 +415,39 @@ export default function PriceList() {
                   </button>
                 </div>
               )}
-              <div className="mt-2">
+              <div className="mt-2 flex flex-col sm:flex-row sm:items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">{t('priceList.distanceKm')}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={fieldVisitKm}
+                    onChange={(e) => setFieldVisitKm(e.target.value)}
+                    placeholder={t('priceList.enterDistanceKm')}
+                    className="input-field"
+                    disabled={lineItems.some(isFieldVisitItem)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {t('priceList.fieldVisitFormula', {
+                      base: fmt(fieldVisit.base_price),
+                      rate: fmt(fieldVisit.price_per_km),
+                    })}
+                    {fieldVisitKm && Number(fieldVisitKm) > 0 && (
+                      <span className="text-primary-700 font-medium ms-2">
+                        = {fmt(calcFieldVisitPrice(fieldVisit, fieldVisitKm))}
+                      </span>
+                    )}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={addFieldVisit}
-                  disabled={lineItems.some(isFieldVisitItem)}
-                  className="btn-secondary flex items-center gap-2 text-sm"
+                  disabled={lineItems.some(isFieldVisitItem) || !fieldVisitKm}
+                  className="btn-secondary flex items-center gap-2 text-sm whitespace-nowrap"
                 >
                   <MapPin size={16} />
                   {t('priceList.addFieldVisit')}
-                  <span className="text-primary-600 font-medium">({fmt(fieldVisit.price)})</span>
                 </button>
               </div>
             </div>
@@ -429,7 +468,24 @@ export default function PriceList() {
                   <tbody>
                     {lineItems.map((item) => (
                       <tr key={item._key} className="border-b last:border-0">
-                        <td className="p-2">{item.description}</td>
+                        <td className="p-2">
+                          {isFieldVisitItem(item) ? (
+                            <div className="space-y-1">
+                              <span className="block text-xs text-gray-500">{item.description.split(' — ')[0]}</span>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  className="input-field py-1 w-24"
+                                  value={item.distance_km ?? ''}
+                                  onChange={(e) => updateFieldVisitDistance(item._key, e.target.value)}
+                                />
+                                <span className="text-xs text-gray-500">{t('priceList.distanceKm')}</span>
+                              </div>
+                            </div>
+                          ) : item.description}
+                        </td>
                         <td className="p-2">
                           <input
                             type="number"
