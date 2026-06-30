@@ -9,7 +9,8 @@
     "build:cloud": "node scripts/build-cloud.js",
     "build:portal": "cd frontend-portal && npm ci --include=dev && VITE_API_URL=/api npm run build",
     "start:cloud": "cd backend && node src/scripts/cloud-start.js",
-    "seed:cloud": "cd backend && node src/scripts/seed.js"
+    "seed:cloud": "cd backend && node src/scripts/seed.js",
+    "package:reception-usb": "node tools/reception-display-usb/package.js"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>شاشة الاستقبال | Reception Display</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, 'Tajawal', Arial, sans-serif; }
+    body {
+      background: linear-gradient(135deg, #302419 0%, #241a12 50%, #1a120c 100%);
+      color: #FDFAF3;
+      user-select: none;
+      cursor: pointer;
+    }
+    .bg-glow-a { position: fixed; top: -10%; right: -10%; width: 45vw; height: 45vw; background: rgba(197,160,89,.1); border-radius: 50%; filter: blur(80px); pointer-events: none; }
+    .bg-glow-b { position: fixed; bottom: -10%; left: -10%; width: 50vw; height: 50vw; background: rgba(74,55,40,.15); border-radius: 50%; filter: blur(80px); pointer-events: none; }
+    .layout { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1rem 2rem; border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .brand { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+    .brand img { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
+    .brand-fallback {
+      width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+      background: linear-gradient(135deg, #C5A059, #4A3728);
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+    }
+    .bi-ar { font-weight: 700; color: #F8F2E8; line-height: 1.3; }
+    .bi-en { font-size: .75rem; color: rgba(217,196,138,.75); font-weight: 500; margin-top: 2px; direction: ltr; text-align: start; }
+    .clock { text-align: end; flex-shrink: 0; direction: ltr; }
+    .clock-time { font-size: 2rem; font-weight: 700; font-family: Consolas, monospace; color: #D9C48A; }
+    .clock-date-ar { font-size: .75rem; color: rgba(217,196,138,.85); direction: rtl; }
+    .clock-date-en { font-size: .7rem; color: rgba(217,196,138,.55); }
+    .ticker {
+      text-align: center; padding: .6rem 2rem;
+      background: rgba(197,160,89,.18); border-bottom: 1px solid rgba(197,160,89,.3);
+      animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.85} }
+    main {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem 2rem; overflow: hidden;
+    }
+    .slide { display: none; width: 100%; max-width: 1100px; animation: fadeIn .5s ease; }
+    .slide.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    .center { text-align: center; }
+    .hero-logo { width: 96px; height: 96px; object-fit: contain; margin: 0 auto 1.5rem; display: block; }
+    .hero-title-ar { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; color: #FDFAF3; }
+    .hero-title-en { font-size: clamp(1rem, 2.5vw, 1.5rem); color: rgba(217,196,138,.9); margin-top: .5rem; direction: ltr; }
+    .hero-sub-ar { font-size: clamp(1rem, 2vw, 1.4rem); color: #D9C48A; margin-top: 1.25rem; line-height: 1.6; max-width: 42rem; margin-inline: auto; }
+    .hero-sub-en { font-size: clamp(.85rem, 1.5vw, 1.05rem); color: rgba(217,196,138,.7); margin-top: .5rem; line-height: 1.5; max-width: 42rem; margin-inline: auto; direction: ltr; }
+    .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: 2rem; }
+    .tag { padding: .5rem 1rem; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); }
+    .section-title-ar { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; text-align: center; color: #F8F2E8; margin-bottom: 1.5rem; }
+    .section-title-en { font-size: 1rem; text-align: center; color: rgba(217,196,138,.75); margin-top: .25rem; margin-bottom: 1.5rem; direction: ltr; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+    .card {
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 16px; padding: 1.1rem;
+    }
+    .card-title-ar { font-weight: 700; font-size: 1rem; color: #FDFAF3; }
+    .card-title-en { font-size: .75rem; color: rgba(217,196,138,.75); margin-top: 2px; direction: ltr; }
+    .card-desc-ar { font-size: .85rem; color: rgba(217,196,138,.9); margin-top: .5rem; line-height: 1.45; }
+    .card-desc-en { font-size: .75rem; color: rgba(217,196,138,.55); margin-top: .35rem; line-height: 1.4; direction: ltr; }
+    .workflow { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; align-items: stretch; }
+    .wf-step { flex: 1; min-width: 140px; max-width: 200px; text-align: center; }
+    .wf-num {
+      width: 40px; height: 40px; border-radius: 50%; background: #C5A059; color: #302419;
+      font-weight: 800; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; margin: 0 auto .5rem;
+    }
+    .contact-row {
+      display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.25rem;
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; margin-bottom: .75rem;
+    }
+    .contact-icon { font-size: 1.75rem; flex-shrink: 0; }
+    .phone-num { font-size: 1.75rem; font-weight: 800; direction: ltr; letter-spacing: .05em; }
+    footer {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: .75rem 2rem; border-top: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.2);
+    }
+    .dots { display: flex; gap: .4rem; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.3); border: none; cursor: pointer; padding: 0; }
+    .dot.active { width: 32px; background: #C5A059; }
+    .hint { font-size: .7rem; color: rgba(217,196,138,.65); text-align: center; }
+    .fs-btn {
+      background: none; border: none; color: rgba(217,196,138,.85); font-size: .75rem; cursor: pointer;
+      display: flex; align-items: center; gap: .35rem; flex-shrink: 0;
+    }
+    .fs-btn:hover { color: #FDFAF3; }
+    @media (max-width: 640px) {
+      header, footer { padding-inline: 1rem; }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow-a"></div>
+  <div class="bg-glow-b"></div>
+  <div class="layout">
+    <header>
+      <div class="brand">
+        <img src="logo.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+        <div class="brand-fallback" style="display:none">RV</div>
+        <div>
+          <div class="bi-ar">مركز رعاية النوادر البيطري</div>
+          <div class="bi-en">AL NAWADER VETERINARY CARE CENTER</div>
+        </div>
+      </div>
+      <div class="clock">
+        <div class="clock-time" id="clockTime">--:--:--</div>
+        <div class="clock-date-ar" id="clockDateAr"></div>
+        <div class="clock-date-en" id="clockDateEn"></div>
+      </div>
+    </header>
+
+    <div class="ticker">
+      <div class="bi-ar">أهلاً بكم — تحاليل بيطرية دقيقة مع نتائج سريعة وتقارير رقمية</div>
+      <div class="bi-en">Welcome — accurate veterinary diagnostics with fast turnaround and digital reports</div>
+    </div>
+
+    <main id="main"></main>
+
+    <footer>
+      <div class="dots" id="dots"></div>
+      <div class="hint">
+        <div>انقر في أي مكان للتقديم — الشرائح تتبدّل تلقائياً</div>
+        <div style="direction:ltr">Click anywhere to advance — slides rotate automatically</div>
+      </div>
+      <button type="button" class="fs-btn" id="fsBtn" title="Fullscreen">
+        ⛶ <span>ملء الشاشة / Fullscreen</span>
+      </button>
+    </footer>
+  </div>
+
+  <script>
+    const ROTATE_MS = 12000;
+    const SLIDES = [
+      {
+        id: 'welcome',
+        html: `
+          <div class="slide center">
+            <img class="hero-logo" src="logo.png" alt="" onerror="this.style.display='none'" />
+            <div class="hero-title-ar">أهلاً وسهلاً</div>
+            <div class="hero-title-en">Welcome</div>
+            <div class="hero-sub-ar">مختبر بيطري متخصص — تشخيص سريري وبحثي للإبل والخيول والماشية</div>
+            <div class="hero-sub-en">Specialized veterinary laboratory — clinical diagnostics and research for camels, horses, and livestock</div>
+            <div class="tags">
+              <div class="tag"><div class="card-title-ar">الإبل</div><div class="card-title-en">Camels</div></div>
+              <div class="tag"><div class="card-title-ar">الخيول</div><div class="card-title-en">Horses</div></div>
+              <div class="tag"><div class="card-title-ar">الأغنام والماشية</div><div class="card-title-en">Sheep &amp; livestock</div></div>
+            </div>
+          </div>`
+      },
+      {
+        id: 'services',
+        html: `
+          <div class="slide">
+            <div class="section-title-ar">خدمات المختبر</div>
+            <div class="section-title-en">Our laboratory services</div>
+            <div class="grid-3">
+              ${card('تعداد الدم والهيماتولوجيا','CBC & hematology','تعداد دم كامل مع نطاقات مرجعية حسب نوع الحيوان','Complete blood counts with species-specific reference ranges')}
+              ${card('الكيمياء السريرية','Clinical chemistry','وظائف الكبد والكلى والأملاح والبروتينات','Liver, kidney, metabolic and electrolyte panels')}
+              ${card('الطفيليات','Parasitology','كشف طفيليات الدم والبراز مع تصوير مجهري','Blood and stool parasite detection with microscope imaging')}
+              ${card('الأحياء الدقيقة','Microbiology','زراعة وحساسية وتحديد مسببات الأمراض','Culture, sensitivity, and pathogen identification')}
+              ${card('PCR والتشخيص الجزيئي','PCR & molecular','تشخيص متقدم للأمراض المعدية','Advanced molecular diagnostics for infectious diseases')}
+              ${card('الزيارات الميدانية','Field visits','جمع عينات في المزارع والعيادات داخل المملكة','On-site sample collection across the Kingdom')}
+            </div>
+          </div>`
+      },
+      {
+        id: 'workflow',
+        html: `
+          <div class="slide">
+            <div class="section-title-ar">خطوات العمل</div>
+            <div class="section-title-en">How it works</div>
+            <div class="workflow">
+              ${wf(1,'التسجيل','Register','تسجيل العميل والعينة','Customer & sample registration')}
+              ${wf(2,'العينة','Sample','باركود وتسليم للمعمل','Barcode & lab handoff')}
+              ${wf(3,'التحليل','Analysis','فحص على أجهزة حديثة','Testing on modern analyzers')}
+              ${wf(4,'المراجعة','Review','اعتماد النتائج','Specialist validation')}
+              ${wf(5,'التقرير','Report','تقرير رقمي أو طباعة','Digital report or print')}
+            </div>
+          </div>`
+      },
+      {
+        id: 'quality',
+        html: `
+          <div class="slide">
+            <div class="section-title-ar">لماذا نحن</div>
+            <div class="section-title-en">Why choose us</div>
+            <div class="grid-2">
+              ${card('أجهزة حديثة','Modern equipment','محللات معايرة وطرق معتمدة','Calibrated analyzers and validated methods')}
+              ${card('دقة علمية','Scientific accuracy','نتائج موثوقة مع مراجعة متخصصة','Reliable results with specialist review')}
+              ${card('تقارير ثنائية اللغة','Bilingual reports','تقارير واضحة بالعربية والإنجليزية','Clear Arabic & English laboratory reports')}
+              ${card('خدمة ميدانية','Field service','فريق جمع عينات للمزارع والعيادات','Mobile collection for farms and clinics')}
+            </div>
+          </div>`
+      },
+      {
+        id: 'portal',
+        html: `
+          <div class="slide center">
+            <div style="font-size:3rem;margin-bottom:1rem">📱</div>
+            <div class="section-title-ar">بوابة العملاء الرقمية</div>
+            <div class="section-title-en">Digital client portal</div>
+            <div class="hero-sub-ar">اطلع على تقاريرك وفواتيرك في أي وقت — سجّل دخولك برقم جوالك المسجّل</div>
+            <div class="hero-sub-en">View reports and invoices anytime — sign in with your registered mobile number</div>
+            <div class="grid-3" style="margin-top:1.5rem;text-align:center">
+              ${card('نتائج فورية','Instant results','','')}
+              ${card('تحميل PDF','PDF download','','')}
+              ${card('سجل صحي','Health history','','')}
+            </div>
+          </div>`
+      },
+      {
+        id: 'contact',
+        html: `
+          <div class="slide">
+            <div class="section-title-ar">تواصل معنا</div>
+            <div class="section-title-en">Contact us</div>
+            <div class="contact-row">
+              <div class="contact-icon">📞</div>
+              <div>
+                <div class="card-title-ar">الهاتف / Phone</div>
+                <div class="phone-num">0115007257</div>
+              </div>
+            </div>
+            <div class="contact-row">
+              <div class="contact-icon">🕐</div>
+              <div>
+                <div class="card-title-ar">ساعات العمل</div>
+                <div class="card-title-en">Working hours</div>
+                <div class="card-desc-ar" style="margin-top:.35rem">السبت – الخميس: 8:00 ص – 5:00 م</div>
+                <div class="card-desc-en">Sat – Thu: 8:00 AM – 5:00 PM</div>
+              </div>
+            </div>
+            <div class="contact-row">
+              <div class="contact-icon">📍</div>
+              <div>
+                <div class="card-title-ar">الموقع</div>
+                <div class="card-title-en">Location</div>
+                <div class="card-desc-ar" style="margin-top:.35rem">المزاحمية، منطقة الرياض، المملكة العربية السعودية</div>
+                <div class="card-desc-en">Al Muzahimiyah, Riyadh Region, Kingdom of Saudi Arabia</div>
+              </div>
+            </div>
+          </div>`
+      }
+    ];
+
+    function card(ar, en, descAr, descEn) {
+      return `<div class="card">
+        <div class="card-title-ar">${ar}</div>
+        <div class="card-title-en">${en}</div>
+        ${descAr ? `<div class="card-desc-ar">${descAr}</div><div class="card-desc-en">${descEn}</div>` : ''}
+      </div>`;
+    }
+
+    function wf(n, ar, en, descAr, descEn) {
+      return `<div class="wf-step card">
+        <div class="wf-num">${n}</div>
+        <div class="card-title-ar">${ar}</div>
+        <div class="card-title-en">${en}</div>
+        <div class="card-desc-ar">${descAr}</div>
+        <div class="card-desc-en">${descEn}</div>
+      </div>`;
+    }
+
+    const main = document.getElementById('main');
+    const dotsEl = document.getElementById('dots');
+    let current = 0;
+    let paused = false;
+    let timer;
+
+    SLIDES.forEach((s, i) => {
+      main.insertAdjacentHTML('beforeend', s.html);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dot' + (i === 0 ? ' active' : '');
+      btn.addEventListener('click', (e) => { e.stopPropagation(); go(i); });
+      dotsEl.appendChild(btn);
+    });
+
+    const slideEls = main.querySelectorAll('.slide');
+
+    function go(i) {
+      slideEls[current].classList.remove('active');
+      dotsEl.children[current].classList.remove('active');
+      current = i;
+      slideEls[current].classList.add('active');
+      dotsEl.children[current].classList.add('active');
+      resetTimer();
+    }
+
+    function next() { go((current + 1) % SLIDES.length); }
+
+    function resetTimer() {
+      clearInterval(timer);
+      if (!paused) timer = setInterval(next, ROTATE_MS);
+    }
+
+    slideEls[0].classList.add('active');
+    resetTimer();
+
+    document.body.addEventListener('click', next);
+    document.body.addEventListener('mouseenter', () => { paused = true; clearInterval(timer); });
+    document.body.addEventListener('mouseleave', () => { paused = false; resetTimer(); });
+
+    document.getElementById('fsBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const el = document.documentElement;
+      if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
+      else document.exitFullscreen?.();
+    });
+
+    function tick() {
+      const now = new Date();
+      document.getElementById('clockTime').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      document.getElementById('clockDateAr').textContent = now.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' });
+      document.getElementById('clockDateEn').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>

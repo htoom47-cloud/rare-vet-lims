@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, FlaskConical, CreditCard, Search, BarChart3, Tags, Monitor } from 'lucide-react';
+import { Plus, FlaskConical, CreditCard, Search, BarChart3, Tags, Monitor, Usb } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import { samplesAPI } from '../services/api';
@@ -74,6 +74,21 @@ export default function ReceptionHome() {
         <div>
           <p className="font-bold text-primary-800 dark:text-primary-100">{t('reception.openDisplay')}</p>
           <p className="text-sm text-primary-500">{t('reception.openDisplayHint')}</p>
+        </div>
+      </a>
+
+      <a
+        href="/reception-display-usb/index.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full card-interactive p-5 mb-6 flex items-center gap-4 text-start border border-dashed border-primary-300/80 dark:border-primary-600 no-underline"
+      >
+        <div className="w-12 h-12 rounded-xl bg-primary-500/15 text-primary-600 flex items-center justify-center shrink-0">
+          <Usb size={24} />
+        </div>
+        <div>
+          <p className="font-bold text-primary-800 dark:text-primary-100">{t('reception.usbDisplay')}</p>
+          <p className="text-sm text-primary-500">{t('reception.usbDisplayHint')}</p>
         </div>
       </a>
 

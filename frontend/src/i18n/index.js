@@ -267,6 +267,8 @@ const resources = {
         sar: 'SAR',
         openDisplay: 'Reception display screen',
         openDisplayHint: 'Open on the TV — bilingual Arabic & English welcome & services',
+        usbDisplay: 'USB flash drive version',
+        usbDisplayHint: 'Offline copy for TV — no internet needed. Copy folder to USB and open index.html',
       },
       receptionDisplay: {
         ticker: 'Welcome — accurate veterinary diagnostics with fast turnaround and digital reports',
@@ -1037,6 +1039,8 @@ const resources = {
         sar: 'ر.س',
         openDisplay: 'شاشة عرض الاستقبال',
         openDisplayHint: 'افتحها على التلفزيون — ترحيب وخدمات بالعربية والإنجليزية',
+        usbDisplay: 'نسخة الفلاش ميموري',
+        usbDisplayHint: 'تعمل بدون إنترنت — انسخ المجلد للفلاش وافتح index.html على التلفزيون',
       },
       receptionDisplay: {
         ticker: 'أهلاً بكم — تحاليل بيطرية دقيقة مع نتائج سريعة وتقارير رقمية',
