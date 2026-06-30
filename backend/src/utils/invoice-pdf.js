@@ -5,9 +5,9 @@ const QRCode = require('qrcode');
 const { drawArBox, drawEn, registerPdfFonts, hasArabic, resolveBilingualCustomer } = require('./pdf-arabic');
 const { mergeInvoiceSettings } = require('./invoice-settings');
 const { bilingualMetaRow, drawCustomerBlock, drawBilingualTableHeader } = require('./pdf-billing-layout');
+const { HAS_LOGO, DEFAULT_LOGO_SIZE, getBrandLogoBuffer, drawBillingHeaderLogo } = require('./pdf-logo');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
-const HAS_LOGO = fs.existsSync(LOGO_PATH);
 
 const MARGIN = 36;
 const PAGE_W = 595;
@@ -133,6 +133,9 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     } catch { /* skip QR */ }
   }
 
+  const logoBuf = showLogo ? await getBrandLogoBuffer(activeBrand.brown) : null;
+  const LOGO_SIZE = DEFAULT_LOGO_SIZE;
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
     registerPdfFonts(doc);
@@ -140,18 +143,26 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     doc.pipe(stream);
 
     let y = MARGIN;
-    const LOGO_SIZE = 46;
 
-    if (showLogo) {
+    if (showLogo && logoBuf) {
+      const layout = drawBillingHeaderLogo(doc, logoBuf, PAGE_W, MARGIN, y, LOGO_SIZE);
+      if (layout) {
+        cellLatin(doc, lab.name, MARGIN, y + 10, layout.leftW, { size: 9, bold: true });
+        cellArabic(doc, lab.name_ar, layout.rightX, y + 10, layout.rightW, { size: 11, bold: true, align: 'right' });
+        cellLatin(doc, lab.subtitle, MARGIN, y + 26, layout.leftW, { size: 7, color: activeBrand.muted });
+        cellArabic(doc, lab.subtitle_ar || '', layout.rightX, y + 26, layout.rightW, { size: 7, color: activeBrand.muted, align: 'right' });
+        y += layout.headerH;
+      }
+    } else if (showLogo) {
       const logoX = (PAGE_W - LOGO_SIZE) / 2;
       const leftW = logoX - MARGIN - 8;
       const rightX = logoX + LOGO_SIZE + 8;
       const rightW = PAGE_W - MARGIN - rightX;
       try { doc.image(LOGO_PATH, logoX, y, { width: LOGO_SIZE, height: LOGO_SIZE }); } catch { /* */ }
-      cellLatin(doc, lab.name, MARGIN, y + 8, leftW, { size: 9, bold: true });
-      cellArabic(doc, lab.name_ar, rightX, y + 8, rightW, { size: 11, bold: true, align: 'right' });
-      cellLatin(doc, lab.subtitle, MARGIN, y + 24, leftW, { size: 7, color: activeBrand.muted });
-      cellArabic(doc, lab.subtitle_ar || '', rightX, y + 24, rightW, { size: 7, color: activeBrand.muted, align: 'right' });
+      cellLatin(doc, lab.name, MARGIN, y + 10, leftW, { size: 9, bold: true });
+      cellArabic(doc, lab.name_ar, rightX, y + 10, rightW, { size: 11, bold: true, align: 'right' });
+      cellLatin(doc, lab.subtitle, MARGIN, y + 26, leftW, { size: 7, color: activeBrand.muted });
+      cellArabic(doc, lab.subtitle_ar || '', rightX, y + 26, rightW, { size: 7, color: activeBrand.muted, align: 'right' });
       y += LOGO_SIZE + 6;
     } else {
       const half = TW / 2;
