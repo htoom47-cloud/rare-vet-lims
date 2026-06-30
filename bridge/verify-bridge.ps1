@@ -10,7 +10,7 @@ $listen = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Silen
 if ($listen) {
   Write-Host "Port $Port listening: OK" -ForegroundColor Green
 } else {
-  Write-Host "Port $Port NOT listening — run: pm2 restart norma-bridge" -ForegroundColor Red
+  Write-Host "Port $Port NOT listening - run: pm2 restart norma-bridge" -ForegroundColor Red
 }
 
 try {
