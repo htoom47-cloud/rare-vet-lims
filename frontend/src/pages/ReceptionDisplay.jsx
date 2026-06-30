@@ -29,7 +29,7 @@ function useClock() {
   return now;
 }
 
-function BiText({ ar, en, arClass = '', enClass = 'text-primary-400/75 text-[0.85em] font-normal mt-0.5', className = '' }) {
+function BiText({ ar, en, arClass = '', enClass = 'text-primary-600/75 text-[0.85em] font-medium mt-0.5', className = '' }) {
   return (
     <div className={className}>
       <p className={arClass} dir="rtl" lang="ar">{ar}</p>
@@ -41,16 +41,16 @@ function BiText({ ar, en, arClass = '', enClass = 'text-primary-400/75 text-[0.8
 function BiHeading({ ar, en, size = 'hero' }) {
   const sizes = {
     hero: {
-      ar: 'text-4xl md:text-5xl font-bold text-primary-50 leading-tight',
-      en: 'text-xl md:text-2xl text-primary-300/90 font-medium mt-2',
+      ar: 'text-4xl md:text-5xl font-bold text-primary-800 leading-tight',
+      en: 'text-xl md:text-2xl text-primary-500 font-semibold mt-2',
     },
     section: {
-      ar: 'text-3xl md:text-4xl font-bold text-primary-100',
-      en: 'text-lg md:text-xl text-primary-400/80 font-medium mt-1',
+      ar: 'text-3xl md:text-4xl font-bold text-primary-800',
+      en: 'text-lg md:text-xl text-primary-500 font-semibold mt-1',
     },
     card: {
-      ar: 'text-lg font-bold text-primary-50',
-      en: 'text-sm text-primary-400/80 font-medium',
+      ar: 'text-lg font-bold text-primary-800',
+      en: 'text-sm text-primary-500 font-semibold uppercase tracking-wide',
     },
     label: {
       ar: 'text-sm text-primary-400',
@@ -112,24 +112,24 @@ export default function ReceptionDisplay() {
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden bg-primary-900 text-primary-50 select-none"
+      className="fixed inset-0 overflow-hidden bg-gradient-to-br from-primary-50 via-[#FAF7F0] to-primary-100 text-primary-800 select-none"
       dir="rtl"
       onClick={nextSlide}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-800 via-primary-900 to-[#1a120c] pointer-events-none" />
-      <div className="absolute top-0 end-0 w-[45vw] h-[45vw] bg-primary-400/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4 pointer-events-none" />
-      <div className="absolute bottom-0 start-0 w-[50vw] h-[50vw] bg-primary-600/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4 pointer-events-none" />
+      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-primary-300 via-primary-400 to-primary-300 pointer-events-none z-30" />
+      <div className="absolute top-0 end-0 w-[45vw] h-[45vw] bg-primary-300/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4 pointer-events-none" />
+      <div className="absolute bottom-0 start-0 w-[50vw] h-[50vw] bg-primary-200/40 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4 pointer-events-none" />
 
-      <header className="relative z-20 flex items-center justify-between px-8 py-4 border-b border-white/10 gap-6">
+      <header className="relative z-20 flex items-center justify-between px-8 py-4 border-b border-primary-200/80 bg-white/90 backdrop-blur-md shadow-sm gap-6">
         <div className="flex items-center gap-4 min-w-0">
           <AppLogo size="sm" className="drop-shadow-lg shrink-0" />
           <BiText
             ar={labNameAr}
             en={labNameEn}
-            arClass="text-base font-bold text-primary-100 leading-tight truncate"
-            enClass="text-xs text-primary-400/80 font-medium truncate"
+            arClass="text-base font-bold text-primary-800 leading-tight truncate"
+            enClass="text-xs text-primary-500 font-semibold truncate"
             className="min-w-0"
           />
         </div>
@@ -137,24 +137,23 @@ export default function ReceptionDisplay() {
           <BiText
             ar={labSubtitleAr}
             en={labSubtitleEn}
-            arClass="text-sm text-primary-300/90"
-            enClass="text-xs text-primary-500/70"
+            arClass="text-sm text-primary-700"
+            enClass="text-xs text-primary-500"
           />
         </div>
-        <div className="text-end shrink-0" dir="ltr">
-          <p className="text-3xl font-mono font-bold text-primary-300 tabular-nums">{timeStr}</p>
-          <p className="text-xs text-primary-400/90" dir="rtl">{now.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-          <p className="text-xs text-primary-500/70">{now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p>
+        <div className="text-end shrink-0 bg-primary-50 border border-primary-200 rounded-xl px-4 py-2" dir="ltr">
+          <p className="text-3xl font-mono font-bold text-primary-500 tabular-nums">{timeStr}</p>
+          <p className="text-xs text-primary-700" dir="rtl">{now.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <p className="text-xs text-primary-500">{now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p>
         </div>
       </header>
 
-      <div className="relative z-20 bg-primary-400/20 border-b border-primary-400/30 px-8 py-2.5">
+      <div className="relative z-20 bg-gradient-to-r from-primary-50 via-white to-primary-50 border-b border-primary-200/80 px-8 py-2.5">
         <BiText
           ar={tAr('receptionDisplay.ticker')}
           en={tEn('receptionDisplay.ticker')}
-          arClass="text-center text-base font-medium text-primary-100"
-          enClass="text-center text-sm text-primary-300/80 mt-0.5"
-          className="animate-pulse"
+          arClass="text-center text-base font-semibold text-primary-700"
+          enClass="text-center text-sm text-primary-500 mt-0.5"
         />
       </div>
 
@@ -179,18 +178,18 @@ export default function ReceptionDisplay() {
                 <BiText
                   ar={tAr('receptionDisplay.welcomeSubtitle')}
                   en={tEn('receptionDisplay.welcomeSubtitle')}
-                  arClass="text-xl md:text-2xl text-primary-300 max-w-3xl mx-auto leading-relaxed mt-5"
-                  enClass="text-base md:text-lg text-primary-400/75 max-w-3xl mx-auto leading-relaxed mt-2"
+                  arClass="text-xl md:text-2xl text-primary-700 max-w-3xl mx-auto leading-relaxed mt-5"
+                  enClass="text-base md:text-lg text-primary-500 max-w-3xl mx-auto leading-relaxed mt-2"
                   className="mt-5"
                 />
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   {['camels', 'horses', 'livestock'].map((key) => (
-                    <span key={key} className="px-4 py-2 rounded-full bg-white/10 border border-white/20">
+                    <span key={key} className="px-4 py-2 rounded-full bg-white border border-primary-200 shadow-sm">
                       <BiText
                         ar={tAr(`receptionDisplay.animals.${key}`)}
                         en={tEn(`receptionDisplay.animals.${key}`)}
-                        arClass="text-base font-semibold"
-                        enClass="text-xs text-primary-400/80"
+                        arClass="text-base font-semibold text-primary-800"
+                        enClass="text-xs text-primary-500"
                       />
                     </span>
                   ))}
@@ -200,28 +199,29 @@ export default function ReceptionDisplay() {
 
             {slideKey === 'services' && (
               <div>
-                <div className="mb-8">
+                <div className="mb-6 flex flex-col items-center">
                   <BiHeading ar={tAr('receptionDisplay.servicesTitle')} en={tEn('receptionDisplay.servicesTitle')} size="section" />
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-400 to-transparent mt-2" />
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   {services.map((key) => {
                     const Icon = SERVICE_ICONS[key];
                     return (
-                      <div key={key} className="rounded-2xl bg-white/8 border border-white/15 p-5 backdrop-blur-sm">
-                        <div className="w-12 h-12 rounded-xl bg-primary-400/25 flex items-center justify-center mb-3">
-                          <Icon size={24} className="text-primary-300" />
+                      <div key={key} className="rounded-2xl bg-white border border-primary-200/80 p-5 shadow-md shadow-primary-900/5 hover:shadow-lg transition-shadow">
+                        <div className="w-12 h-12 rounded-xl bg-primary-50 border border-primary-200 flex items-center justify-center mb-3">
+                          <Icon size={24} className="text-primary-500" />
                         </div>
                         <BiText
                           ar={tAr(`receptionDisplay.services.${key}.title`)}
                           en={tEn(`receptionDisplay.services.${key}.title`)}
-                          arClass="text-base font-bold text-primary-50"
-                          enClass="text-xs text-primary-400/80 font-medium"
+                          arClass="text-base font-bold text-primary-800"
+                          enClass="text-xs text-primary-500 font-semibold"
                         />
                         <BiText
                           ar={tAr(`receptionDisplay.services.${key}.desc`)}
                           en={tEn(`receptionDisplay.services.${key}.desc`)}
-                          arClass="text-sm text-primary-300/90 mt-2 leading-snug"
-                          enClass="text-xs text-primary-500/70 mt-1 leading-snug"
+                          arClass="text-sm text-primary-700 mt-2 leading-snug"
+                          enClass="text-xs text-primary-500/80 mt-1 leading-snug"
                           className="mt-2"
                         />
                       </div>
@@ -233,32 +233,33 @@ export default function ReceptionDisplay() {
 
             {slideKey === 'workflow' && (
               <div>
-                <div className="mb-8">
+                <div className="mb-6 flex flex-col items-center">
                   <BiHeading ar={tAr('receptionDisplay.workflowTitle')} en={tEn('receptionDisplay.workflowTitle')} size="section" />
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-400 to-transparent mt-2" />
                 </div>
                 <div className="flex flex-col lg:flex-row items-stretch justify-center gap-2 lg:gap-0">
                   {workflowSteps.map((key, i) => (
                     <div key={key} className="flex items-center gap-2 lg:flex-1">
-                      <div className="flex-1 rounded-2xl bg-white/8 border border-white/15 p-4 text-center">
-                        <div className="w-10 h-10 rounded-full bg-primary-400 text-primary-900 font-bold text-lg flex items-center justify-center mx-auto mb-2">
+                      <div className="flex-1 rounded-2xl bg-white border border-primary-200/80 p-4 text-center shadow-md shadow-primary-900/5">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-500 text-white font-bold text-lg flex items-center justify-center mx-auto mb-2 shadow-sm">
                           {i + 1}
                         </div>
                         <BiText
                           ar={tAr(`receptionDisplay.workflow.${key}.title`)}
                           en={tEn(`receptionDisplay.workflow.${key}.title`)}
-                          arClass="text-sm font-bold text-primary-50"
-                          enClass="text-xs text-primary-400/80"
+                          arClass="text-sm font-bold text-primary-800"
+                          enClass="text-xs text-primary-500"
                         />
                         <BiText
                           ar={tAr(`receptionDisplay.workflow.${key}.desc`)}
                           en={tEn(`receptionDisplay.workflow.${key}.desc`)}
-                          arClass="text-xs text-primary-300/90 mt-1"
-                          enClass="text-[10px] text-primary-500/70 mt-0.5"
+                          arClass="text-xs text-primary-700 mt-1"
+                          enClass="text-[10px] text-primary-500/80 mt-0.5"
                           className="mt-1"
                         />
                       </div>
                       {i < workflowSteps.length - 1 && (
-                        <ChevronRight size={22} className="text-primary-400/60 shrink-0 hidden lg:block rotate-180" />
+                        <ChevronRight size={22} className="text-primary-400 shrink-0 hidden lg:block rotate-180" />
                       )}
                     </div>
                   ))}
@@ -268,27 +269,28 @@ export default function ReceptionDisplay() {
 
             {slideKey === 'quality' && (
               <div className="max-w-4xl mx-auto">
-                <div className="mb-8">
+                <div className="mb-6 flex flex-col items-center">
                   <BiHeading ar={tAr('receptionDisplay.qualityTitle')} en={tEn('receptionDisplay.qualityTitle')} size="section" />
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-400 to-transparent mt-2" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {qualityPoints.map((key) => (
-                    <div key={key} className="flex items-start gap-3 rounded-2xl bg-white/8 border border-white/15 p-5">
-                      <div className="w-10 h-10 rounded-xl bg-primary-400/25 flex items-center justify-center shrink-0">
-                        <ShieldCheck size={20} className="text-primary-300" />
+                    <div key={key} className="flex items-start gap-3 rounded-2xl bg-white border border-primary-200/80 p-5 shadow-md shadow-primary-900/5">
+                      <div className="w-10 h-10 rounded-xl bg-primary-50 border border-primary-200 flex items-center justify-center shrink-0">
+                        <ShieldCheck size={20} className="text-primary-500" />
                       </div>
                       <div className="min-w-0">
                         <BiText
                           ar={tAr(`receptionDisplay.quality.${key}.title`)}
                           en={tEn(`receptionDisplay.quality.${key}.title`)}
-                          arClass="text-base font-bold text-primary-50"
-                          enClass="text-xs text-primary-400/80 font-medium"
+                          arClass="text-base font-bold text-primary-800"
+                          enClass="text-xs text-primary-500 font-semibold"
                         />
                         <BiText
                           ar={tAr(`receptionDisplay.quality.${key}.desc`)}
                           en={tEn(`receptionDisplay.quality.${key}.desc`)}
-                          arClass="text-sm text-primary-300/90 mt-1"
-                          enClass="text-xs text-primary-500/70 mt-0.5"
+                          arClass="text-sm text-primary-700 mt-1"
+                          enClass="text-xs text-primary-500/80 mt-0.5"
                           className="mt-1"
                         />
                       </div>
@@ -300,26 +302,26 @@ export default function ReceptionDisplay() {
 
             {slideKey === 'portal' && (
               <div className="text-center max-w-3xl mx-auto">
-                <div className="w-16 h-16 rounded-2xl bg-primary-400/25 flex items-center justify-center mx-auto mb-5">
-                  <Smartphone size={32} className="text-primary-300" />
+                <div className="w-16 h-16 rounded-2xl bg-primary-50 border border-primary-200 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                  <Smartphone size={32} className="text-primary-500" />
                 </div>
                 <BiHeading ar={tAr('receptionDisplay.portalTitle')} en={tEn('receptionDisplay.portalTitle')} size="section" />
                 <BiText
                   ar={tAr('receptionDisplay.portalDesc')}
                   en={tEn('receptionDisplay.portalDesc')}
-                  arClass="text-lg text-primary-300 mt-4 leading-relaxed"
-                  enClass="text-sm text-primary-400/75 mt-2 leading-relaxed"
+                  arClass="text-lg text-primary-700 mt-4 leading-relaxed"
+                  enClass="text-sm text-primary-500 mt-2 leading-relaxed"
                   className="mt-4"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
                   {['results', 'pdf', 'history'].map((key) => (
-                    <div key={key} className="rounded-xl bg-white/8 border border-white/15 p-4 text-center">
-                      <FileText size={20} className="text-primary-400 mb-2 mx-auto" />
+                    <div key={key} className="rounded-xl bg-white border border-primary-200/80 p-4 text-center shadow-sm">
+                      <FileText size={20} className="text-primary-500 mb-2 mx-auto" />
                       <BiText
                         ar={tAr(`receptionDisplay.portalFeatures.${key}`)}
                         en={tEn(`receptionDisplay.portalFeatures.${key}`)}
-                        arClass="text-sm font-semibold text-primary-100"
-                        enClass="text-xs text-primary-400/80"
+                        arClass="text-sm font-semibold text-primary-800"
+                        enClass="text-xs text-primary-500"
                       />
                     </div>
                   ))}
@@ -329,54 +331,55 @@ export default function ReceptionDisplay() {
 
             {slideKey === 'contact' && (
               <div className="max-w-3xl mx-auto">
-                <div className="mb-8">
+                <div className="mb-6 flex flex-col items-center">
                   <BiHeading ar={tAr('receptionDisplay.contactTitle')} en={tEn('receptionDisplay.contactTitle')} size="section" />
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-400 to-transparent mt-2" />
                 </div>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 rounded-2xl bg-white/8 border border-white/15 p-5">
-                    <Phone size={28} className="text-primary-400 shrink-0" />
+                  <div className="flex items-center gap-4 rounded-2xl bg-white border border-primary-200/80 p-5 shadow-md shadow-primary-900/5">
+                    <Phone size={28} className="text-primary-500 shrink-0" />
                     <div className="flex-1">
                       <BiText
                         ar={tAr('receptionDisplay.phone')}
                         en={tEn('receptionDisplay.phone')}
-                        arClass="text-sm text-primary-400"
-                        enClass="text-xs text-primary-500/70"
+                        arClass="text-sm text-primary-600"
+                        enClass="text-xs text-primary-500"
                       />
-                      <p className="text-2xl font-bold text-primary-50 tracking-wide mt-1" dir="ltr">{phone}</p>
+                      <p className="text-2xl font-bold text-primary-500 tracking-wide mt-1" dir="ltr">{phone}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 rounded-2xl bg-white/8 border border-white/15 p-5">
-                    <Clock size={28} className="text-primary-400 shrink-0" />
+                  <div className="flex items-center gap-4 rounded-2xl bg-white border border-primary-200/80 p-5 shadow-md shadow-primary-900/5">
+                    <Clock size={28} className="text-primary-500 shrink-0" />
                     <div className="flex-1">
                       <BiText
                         ar={tAr('receptionDisplay.hours')}
                         en={tEn('receptionDisplay.hours')}
-                        arClass="text-sm text-primary-400"
-                        enClass="text-xs text-primary-500/70"
+                        arClass="text-sm text-primary-600"
+                        enClass="text-xs text-primary-500"
                       />
                       <BiText
                         ar={tAr('receptionDisplay.hoursValue')}
                         en={tEn('receptionDisplay.hoursValue')}
-                        arClass="text-base font-semibold text-primary-50 mt-1"
-                        enClass="text-sm text-primary-300/80 mt-0.5"
+                        arClass="text-base font-semibold text-primary-800 mt-1"
+                        enClass="text-sm text-primary-600 mt-0.5"
                         className="mt-1"
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 rounded-2xl bg-white/8 border border-white/15 p-5">
-                    <MapPin size={28} className="text-primary-400 shrink-0" />
+                  <div className="flex items-center gap-4 rounded-2xl bg-white border border-primary-200/80 p-5 shadow-md shadow-primary-900/5">
+                    <MapPin size={28} className="text-primary-500 shrink-0" />
                     <div className="flex-1">
                       <BiText
                         ar={tAr('receptionDisplay.location')}
                         en={tEn('receptionDisplay.location')}
-                        arClass="text-sm text-primary-400"
-                        enClass="text-xs text-primary-500/70"
+                        arClass="text-sm text-primary-600"
+                        enClass="text-xs text-primary-500"
                       />
                       <BiText
                         ar={addressAr}
                         en={addressEn}
-                        arClass="text-base font-semibold text-primary-50 mt-1"
-                        enClass="text-sm text-primary-300/80 mt-0.5"
+                        arClass="text-base font-semibold text-primary-800 mt-1"
+                        enClass="text-sm text-primary-600 mt-0.5"
                         className="mt-1"
                       />
                     </div>
@@ -388,14 +391,14 @@ export default function ReceptionDisplay() {
         </AnimatePresence>
       </main>
 
-      <footer className="relative z-20 flex items-center justify-between px-8 py-3 border-t border-white/10 bg-black/20 backdrop-blur-sm gap-4">
+      <footer className="relative z-20 flex items-center justify-between px-8 py-3 border-t border-primary-200/80 bg-white/90 backdrop-blur-md gap-4 shadow-[0_-4px_20px_rgba(74,55,40,0.05)]">
         <div className="flex items-center gap-2">
           {SLIDE_KEYS.map((key, i) => (
             <button
               key={key}
               type="button"
               onClick={(e) => { e.stopPropagation(); setSlide(i); }}
-              className={`h-2 rounded-full transition-all ${i === slide ? 'w-8 bg-primary-400' : 'w-2 bg-white/30'}`}
+              className={`h-2 rounded-full transition-all ${i === slide ? 'w-8 bg-primary-400' : 'w-2 bg-primary-200'}`}
               aria-label={`${tAr(`receptionDisplay.slides.${key}`)} / ${tEn(`receptionDisplay.slides.${key}`)}`}
             />
           ))}
@@ -403,21 +406,21 @@ export default function ReceptionDisplay() {
         <BiText
           ar={tAr('receptionDisplay.hint')}
           en={tEn('receptionDisplay.hint')}
-          arClass="text-xs text-primary-400 hidden sm:block"
-          enClass="text-[10px] text-primary-500/70 hidden sm:block"
+          arClass="text-xs text-primary-600 hidden sm:block"
+          enClass="text-[10px] text-primary-500 hidden sm:block"
           className="hidden sm:block text-center"
         />
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); enterFullscreen(); }}
-          className="flex items-center gap-2 text-xs text-primary-300 hover:text-primary-100 transition-colors shrink-0"
+          className="flex items-center gap-2 text-xs text-primary-600 hover:text-primary-800 bg-primary-50 border border-primary-200 rounded-lg px-3 py-1.5 transition-colors shrink-0"
         >
           <Maximize2 size={14} />
           <BiText
             ar={tAr('receptionDisplay.fullscreen')}
             en={tEn('receptionDisplay.fullscreen')}
-            arClass="text-xs"
-            enClass="text-[10px] text-primary-500/70"
+            arClass="text-xs text-primary-700"
+            enClass="text-[10px] text-primary-500"
           />
         </button>
       </footer>
