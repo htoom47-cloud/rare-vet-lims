@@ -245,7 +245,6 @@ export const billingAPI = {
   recordPayment: (data) => api.post('/billing/payments', data),
   packages: () => api.get('/billing/packages'),
   extraServices: () => api.get('/billing/extra-services'),
-  fieldVisitDistance: (customerId) => api.get('/billing/field-visit-distance', { params: { customer_id: customerId } }),
   refund: (data) => api.post('/billing/refunds', data),
   cancelInvoice: (id, reason) => api.post(`/billing/invoices/${id}/cancel`, { reason }),
   dashboardSummary: (params) => api.get('/billing/dashboard-summary', { params }),

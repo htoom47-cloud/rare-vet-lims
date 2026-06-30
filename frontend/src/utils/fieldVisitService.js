@@ -1,14 +1,20 @@
-import { billingAPI } from '../services/api';
-
 export const FIELD_VISIT_CODE = 'FIELD-VISIT';
+
+export const DEFAULT_DISTANCE_TIERS = [
+  { max_km: 30, price: 150 },
+  { max_km: 60, price: 200 },
+  { max_km: 80, price: 250 },
+  { max_km: 100, price: 300 },
+  { max_km: 120, price: 350 },
+  { max_km: 150, price: 400 },
+  { max_km: 200, price: 450 },
+];
 
 export const DEFAULT_FIELD_VISIT = {
   code: FIELD_VISIT_CODE,
   name_en: 'Field Visit',
   name_ar: 'زيارة ميدانية',
-  base_price: 150,
-  included_km: 30,
-  price_per_km: 4,
+  distance_tiers: DEFAULT_DISTANCE_TIERS,
 };
 
 const parseMoney = (v, fallback) => {
@@ -16,13 +22,35 @@ const parseMoney = (v, fallback) => {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 };
 
+export const getDistanceTiers = (service) => {
+  const tiers = service?.distance_tiers;
+  if (Array.isArray(tiers) && tiers.length > 0) {
+    return [...tiers].sort((a, b) => a.max_km - b.max_km);
+  }
+  return DEFAULT_DISTANCE_TIERS;
+};
+
 export const calcFieldVisitPrice = (service, distanceKm) => {
   const km = Math.max(0, parseFloat(distanceKm) || 0);
-  const flat = parseMoney(service?.base_price, DEFAULT_FIELD_VISIT.base_price);
-  const includedKm = parseMoney(service?.included_km, DEFAULT_FIELD_VISIT.included_km);
-  const perKm = parseMoney(service?.price_per_km, DEFAULT_FIELD_VISIT.price_per_km);
-  if (km <= includedKm) return flat;
-  return Math.round((flat + (km - includedKm) * perKm) * 100) / 100;
+  const tiers = getDistanceTiers(service);
+  for (const tier of tiers) {
+    if (km <= tier.max_km) return tier.price;
+  }
+  const last = tiers[tiers.length - 1];
+  const extra = km - last.max_km;
+  const steps = Math.ceil(extra / 20);
+  return last.price + steps * 50;
+};
+
+export const fieldVisitTierRanges = (service) => {
+  const tiers = getDistanceTiers(service);
+  let prevMax = 0;
+  return tiers.map((tier) => {
+    const min_km = prevMax === 0 ? 0 : prevMax + 1;
+    const range = { min_km, max_km: tier.max_km, price: tier.price };
+    prevMax = tier.max_km;
+    return range;
+  });
 };
 
 export const fieldVisitLabel = (service, i18n) => (
@@ -34,8 +62,8 @@ export const fieldVisitLabel = (service, i18n) => (
 export const fieldVisitDescription = (service, i18n, distanceKm) => {
   const km = parseFloat(distanceKm);
   const label = fieldVisitLabel(service, i18n);
-  if (!Number.isFinite(km) || km <= 0) return label;
-  return i18n?.language === 'ar' ? `${label} — ${km} كم` : `${label} — ${km} km`;
+  if (!Number.isFinite(km) || km < 0) return label;
+  return i18n?.language === 'ar' ? `${label} — ${km} كم من المختبر` : `${label} — ${km} km from lab`;
 };
 
 export const isFieldVisitItem = (item) => item?.service_code === FIELD_VISIT_CODE;
@@ -69,14 +97,4 @@ export const refreshFieldVisitItem = (item, service, i18n) => {
     description: fieldVisitDescription(service, i18n, km),
     unit_price: calcFieldVisitPrice(service, km),
   };
-};
-
-export const loadCustomerFieldVisitDistance = async (customerId) => {
-  if (!customerId) return null;
-  try {
-    const { data } = await billingAPI.fieldVisitDistance(customerId);
-    return data?.data || null;
-  } catch {
-    return null;
-  }
 };

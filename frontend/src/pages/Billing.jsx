@@ -9,6 +9,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
+import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload, initDiscountFromInvoice, calcInvoiceTotals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
 import { billingAPI, testsAPI } from '../services/api';
@@ -16,9 +17,7 @@ import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
-  calcFieldVisitPrice,
   fieldVisitLabel,
-  loadCustomerFieldVisitDistance,
 } from '../utils/fieldVisitService';
 
 function groupItemsByAnimal(items, t) {
@@ -76,26 +75,6 @@ export default function Billing() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
-  const [fieldVisitKmSource, setFieldVisitKmSource] = useState(null);
-
-  const fieldVisitFormulaParams = {
-    base: fmtCatalog(fieldVisit.base_price),
-    includedKm: fieldVisit.included_km ?? 30,
-    rate: fmtCatalog(fieldVisit.price_per_km),
-  };
-
-  useEffect(() => {
-    if (!invoiceForm.customer_id) {
-      setFieldVisitKmSource(null);
-      return;
-    }
-    loadCustomerFieldVisitDistance(invoiceForm.customer_id).then((info) => {
-      setFieldVisitKmSource(info);
-      if (info?.resolved && info.distance_km != null) {
-        setFieldVisitKm(String(info.distance_km));
-      }
-    });
-  }, [invoiceForm.customer_id]);
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
@@ -498,16 +477,12 @@ export default function Billing() {
                 {t('priceList.addFieldVisit')}
               </p>
               <div className="flex flex-wrap items-end gap-2">
-                <div className="flex-1 min-w-[140px]">
-                  <label className="text-xs text-gray-500">{t('priceList.distanceKm')}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={fieldVisitKm}
-                    onChange={(e) => setFieldVisitKm(e.target.value)}
-                    placeholder={t('priceList.enterDistanceKm')}
-                    className="input-field"
+                <div className="flex-1 min-w-[200px]">
+                  <FieldVisitDistanceField
+                    fieldVisit={fieldVisit}
+                    km={fieldVisitKm}
+                    onKmChange={setFieldVisitKm}
+                    fmt={fmtCatalog}
                   />
                 </div>
                 <button
@@ -517,30 +492,8 @@ export default function Billing() {
                   className="btn-secondary text-sm"
                 >
                   {t('priceList.addFieldVisit')}
-                  {fieldVisitKm && Number(fieldVisitKm) > 0 && (
-                    <span className="text-primary-600 ms-1">
-                      ({fmtCatalog(calcFieldVisitPrice(fieldVisit, fieldVisitKm))})
-                    </span>
-                  )}
                 </button>
               </div>
-              <p className="text-xs text-gray-500">
-                {t('priceList.fieldVisitFormula', fieldVisitFormulaParams)}
-                {fieldVisitKmSource?.resolved && fieldVisitKmSource.city && (
-                  <span className="block mt-0.5">
-                    {t('priceList.fieldVisitFromCustomer', {
-                      city: fieldVisitKmSource.city,
-                      km: fieldVisitKmSource.distance_km,
-                    })}
-                  </span>
-                )}
-                {fieldVisitKmSource && !fieldVisitKmSource.resolved && invoiceForm.customer_id && (
-                  <span className="block mt-0.5 text-amber-700">{t('priceList.fieldVisitCityUnknown')}</span>
-                )}
-                {fieldVisitKm && Number(fieldVisitKm) > 0 && Number(fieldVisitKm) <= (fieldVisit.included_km ?? 30) && (
-                  <span className="block mt-0.5 text-primary-700">{t('priceList.fieldVisitFlatZone', { includedKm: fieldVisit.included_km ?? 30 })}</span>
-                )}
-              </p>
             </div>
             {invoiceForm.items.length > 0 && (
               <div className="text-sm space-y-1 mt-2">
