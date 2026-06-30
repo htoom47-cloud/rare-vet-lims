@@ -4,6 +4,7 @@ const path = require('path');
 const QRCode = require('qrcode');
 const { drawArBox, drawEn, registerPdfFonts, hasArabic, resolveBilingualCustomer } = require('./pdf-arabic');
 const { mergeInvoiceSettings } = require('./invoice-settings');
+const { bilingualMetaRow, drawCustomerBlock, drawBilingualTableHeader } = require('./pdf-billing-layout');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 const HAS_LOGO = fs.existsSync(LOGO_PATH);
@@ -84,31 +85,15 @@ const bilingualBar = (doc, x, y, w, h, textEn, textAr, bg, opts = {}) => {
   return y + h;
 };
 
-const metaRow = (doc, y, h, labelEn, labelAr, value) => {
-  const mid = MARGIN + TW / 2;
-  const half = TW / 2;
-  const val = String(value ?? '-');
-  cellLatin(doc, `${labelEn}: ${val}`, MARGIN + 8, y + 5, half - 16, h, { size: 8 });
-  const labelW = 68;
-  cellArabic(doc, `${labelAr}:`, mid + half - labelW - 8, y + 5, labelW, h, { size: 8, align: 'right' });
-  cellLatin(doc, val, mid + 8, y + 5, half - labelW - 20, h, { size: 8, align: 'left' });
+const metaRow = (doc, y, rowH, labelEn, labelAr, value) => {
+  bilingualMetaRow(doc, layoutCtx(doc), y, rowH, labelEn, labelAr, value);
 };
 
-const drawTableHeader = (doc, cols, y, h) => {
-  let x = MARGIN;
-  cols.forEach((col) => {
-    doc.rect(x, y, col.w, h).fill(activeBrand.brown);
-    doc.rect(x, y, col.w, h).lineWidth(0.4).strokeColor(activeBrand.border).stroke();
-    if (col.ar) {
-      cellArabic(doc, col.ar, x + 2, y + 3, col.w - 4, { size: 7, color: '#fff', bold: true, align: 'center' });
-    }
-    if (col.en) {
-      cellLatin(doc, col.en, x + 2, y + (col.ar ? 10 : 3), col.w - 4, { size: 6.5, color: '#fff', bold: true, align: 'center' });
-    }
-    x += col.w;
-  });
-  return y + h;
-};
+const layoutCtx = (doc) => ({
+  MARGIN, TW, activeBrand, strokeBox, cellLatin, cellArabic,
+});
+
+const drawTableHeader = (doc, cols, y) => drawBilingualTableHeader(doc, layoutCtx(doc), cols, y);
 
 const drawTableRow = (doc, cols, y, h, fill) => {
   let x = MARGIN;
@@ -190,24 +175,7 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     metaRow(doc, y + 32, 16, 'Status', 'الحالة', `${status.en} / ${status.ar}`);
     y += metaH + 8;
 
-    const custH = (customerAr || invoice.customer_mobile) ? 40 : 32;
-    strokeBox(doc, MARGIN, y, TW, custH);
-    cellLatin(doc, 'Customer:', MARGIN + 8, y + 6, 58, { size: 8, bold: true });
-    if (customerEn) {
-      cellLatin(doc, customerEn, MARGIN + 66, y + 6, TW / 2 - 74, { size: 8, bold: true });
-    }
-    cellArabic(doc, 'العميل:', MARGIN + TW / 2 + 8, y + 6, 52, { size: 8, bold: true, align: 'right' });
-    if (customerAr) {
-      cellArabic(doc, customerAr, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
-    } else if (customerEn) {
-      cellLatin(doc, customerEn, MARGIN + TW / 2 + 60, y + 6, TW / 2 - 68, { size: 8, bold: true, align: 'right' });
-    }
-    if (invoice.customer_mobile) {
-      cellLatin(doc, `Mobile: ${invoice.customer_mobile}`, MARGIN + 8, y + 22, TW / 2 - 12, { size: 7.5 });
-      cellArabic(doc, 'الجوال:', MARGIN + TW / 2 + 8, y + 22, 52, { size: 7.5, align: 'right' });
-      cellLatin(doc, invoice.customer_mobile, MARGIN + TW / 2 + 60, y + 22, TW / 2 - 68, { size: 7.5, align: 'right' });
-    }
-    y += custH + 8;
+    y = drawCustomerBlock(doc, layoutCtx(doc), y, customerEn, customerAr, invoice.customer_mobile) + 8;
 
     const colDesc = TW - 24 - 52 - 58 - 58;
     const tableCols = [
@@ -217,7 +185,7 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
       { w: 58, en: 'Unit excl.', ar: 'الوحدة (بدون ض.)' },
       { w: 58, en: 'Total excl.', ar: 'الإجمالي (بدون ض.)' },
     ];
-    y = drawTableHeader(doc, tableCols, y, 22);
+    y = drawTableHeader(doc, tableCols, y);
 
     (invoice.items || []).forEach((item, i) => {
       const desc = item.description || item.test_name || '-';
