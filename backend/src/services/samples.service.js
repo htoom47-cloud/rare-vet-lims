@@ -3,6 +3,7 @@ const { AppError } = require('../middleware/errorHandler');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
 const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
+const { resolveSampleTestIds } = require('../utils/packageTests');
 const autoInvoice = require('./auto-invoice.service');
 const { uuidv4 } = require('../utils/uuid');
 
@@ -122,7 +123,12 @@ const create = async (data, userId) => {
 
     const sample = sampleResult.rows[0];
 
-    for (const testId of data.test_ids) {
+    const resolvedTestIds = await resolveSampleTestIds(client, {
+      test_ids: data.test_ids,
+      package_ids: data.package_ids,
+    });
+
+    for (const testId of resolvedTestIds) {
       const testPrice = await client.query('SELECT price FROM tests WHERE id = $1', [testId]);
       await client.query(
         `INSERT INTO sample_tests (id, sample_id, test_id, price, status) VALUES ($1, $2, $3, $4, 'pending')`,

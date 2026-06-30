@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
@@ -18,6 +18,13 @@ import {
 import { WORKFLOW_STEPS } from '../utils/workflow';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import { getResultsEntryTargets } from '../utils/parasitologyTests';
+import {
+  isTestCoveredByPackages,
+  animalServiceTotal,
+  animalHasServices,
+  packageLabel,
+  packageTestIds,
+} from '../utils/packageSelection';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
 
@@ -32,10 +39,12 @@ export default function WorkflowCase() {
   const [step, setStep] = useState(0);
   const [animals, setAnimals] = useState([]);
   const [tests, setTests] = useState([]);
+  const [packages, setPackages] = useState([]);
 
   const [customerId, setCustomerId] = useState(prefillCustomer || '');
   const [selectedAnimalIds, setSelectedAnimalIds] = useState([]);
   const [animalTests, setAnimalTests] = useState({});
+  const [animalPackages, setAnimalPackages] = useState({});
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [samples, setSamples] = useState([]);
@@ -51,6 +60,7 @@ export default function WorkflowCase() {
 
   useEffect(() => {
     testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
+    testsAPI.listPackages().then(({ data }) => setPackages(data.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -60,6 +70,7 @@ export default function WorkflowCase() {
       setAnimals([]);
       setSelectedAnimalIds([]);
       setAnimalTests({});
+      setAnimalPackages({});
     }
   }, [customerId]);
 
@@ -116,10 +127,28 @@ export default function WorkflowCase() {
           delete copy[id];
           return copy;
         });
+        setAnimalPackages((ap) => {
+          const copy = { ...ap };
+          delete copy[id];
+          return copy;
+        });
         return next;
       }
       setAnimalTests((at) => ({ ...at, [id]: at[id] || [] }));
+      setAnimalPackages((ap) => ({ ...ap, [id]: ap[id] || [] }));
       return [...prev, id];
+    });
+  };
+
+  const toggleAnimalPackage = (animalId, packageId, checked) => {
+    setAnimalPackages((prev) => {
+      const current = prev[animalId] || [];
+      return {
+        ...prev,
+        [animalId]: checked
+          ? [...current, packageId]
+          : current.filter((id) => id !== packageId),
+      };
     });
   };
 
@@ -133,13 +162,12 @@ export default function WorkflowCase() {
     });
   };
 
-  const invoiceTotal = () => selectedAnimalIds.reduce((sum, animalId) => {
-    const ids = animalTests[animalId] || [];
-    return sum + ids.reduce((s, testId) => {
-      const test = tests.find((x) => x.id === testId);
-      return s + (parseFloat(test?.price) || 0);
-    }, 0);
-  }, 0);
+  const invoiceTotal = () => selectedAnimalIds.reduce(
+    (sum, animalId) => sum + animalServiceTotal({
+      animalId, animalTests, animalPackages, tests, packages,
+    }),
+    0
+  );
 
   const canNext = () => {
     if (step === 0) return !!customerId;
@@ -172,6 +200,7 @@ export default function WorkflowCase() {
       setAnimals((prev) => [data.data, ...prev]);
       setSelectedAnimalIds((prev) => [...prev, data.data.id]);
       setAnimalTests((prev) => ({ ...prev, [data.data.id]: [] }));
+      setAnimalPackages((prev) => ({ ...prev, [data.data.id]: [] }));
       setShowNewAnimal(false);
       setNewAnimal({ animal_type: 'camel', name_tag: '', gender: 'male' });
       toast.success(t('workflow.animalCreated'));
@@ -183,7 +212,7 @@ export default function WorkflowCase() {
   };
 
   const createInvoice = async () => {
-    const missing = selectedAnimalIds.filter((id) => !(animalTests[id]?.length));
+    const missing = selectedAnimalIds.filter((id) => !animalHasServices(id, animalTests, animalPackages));
     if (missing.length) return toast.error(t('workflow.eachAnimalNeedsTest'));
 
     setCreating(true);
@@ -191,7 +220,19 @@ export default function WorkflowCase() {
       const items = [];
       for (const animalId of selectedAnimalIds) {
         const animal = animals.find((a) => a.id === animalId);
+        for (const packageId of animalPackages[animalId] || []) {
+          const pkg = packages.find((p) => p.id === packageId);
+          if (!pkg) continue;
+          items.push({
+            package_id: packageId,
+            animal_id: animalId,
+            description: `${animal?.name_tag || animal?.animal_code} — ${packageLabel(pkg, i18n)}`,
+            quantity: 1,
+            unit_price: parseFloat(pkg.price) || 0,
+          });
+        }
         for (const testId of animalTests[animalId] || []) {
+          if (isTestCoveredByPackages(testId, animalPackages[animalId], packages)) continue;
           const test = tests.find((x) => x.id === testId);
           items.push({
             test_id: testId,
@@ -229,6 +270,7 @@ export default function WorkflowCase() {
           customer_id: customerId,
           animal_id: animalId,
           test_ids: animalTests[animalId] || [],
+          package_ids: animalPackages[animalId] || [],
           invoice_id: invoiceId,
           priority: 'normal',
         });
@@ -296,6 +338,7 @@ export default function WorkflowCase() {
     setCustomerId('');
     setSelectedAnimalIds([]);
     setAnimalTests({});
+    setAnimalPackages({});
     setInvoiceId('');
     setInvoiceNumber('');
     setSamples([]);
@@ -318,6 +361,7 @@ export default function WorkflowCase() {
                 setCustomerId(id);
                 setSelectedAnimalIds([]);
                 setAnimalTests({});
+                setAnimalPackages({});
                 if (id && receptionMode) setStep(1);
               }}
               autoFocus
@@ -434,6 +478,33 @@ export default function WorkflowCase() {
                     return (
                       <div key={animalId} className="border rounded-lg p-3 bg-primary-50/30">
                         <p className="font-semibold text-sm mb-2 text-primary-800">{animalLabel(animal)}</p>
+                        {packages.length > 0 && (
+                          <div className="mb-3 pb-3 border-b border-primary-200/80">
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-primary-700 dark:text-primary-300 mb-2 px-1">
+                              <Package size={14} />
+                              {t('samples.selectPackages')}
+                            </p>
+                            <div className="space-y-1">
+                              {packages.map((pkg) => (
+                                <label key={pkg.id} className="flex items-center gap-3 text-sm p-1.5 rounded hover:bg-white cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={(animalPackages[animalId] || []).includes(pkg.id)}
+                                    onChange={(e) => toggleAnimalPackage(animalId, pkg.id, e.target.checked)}
+                                    className="w-4 h-4"
+                                  />
+                                  <span className="flex-1">
+                                    {packageLabel(pkg, i18n)}
+                                    <span className="text-xs text-gray-500 ms-1">
+                                      ({t('samples.packageTestCount', { count: packageTestIds(pkg).length })})
+                                    </span>
+                                  </span>
+                                  <span className="text-primary-600 font-medium">{fmtCatalog(pkg.price)}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="space-y-2">
                           {testsByCategory.map((group) => (
                             <div key={group.key}>

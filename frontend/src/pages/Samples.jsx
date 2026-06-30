@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
-import { Plus, Search, Scan, Printer, Route } from 'lucide-react';
+import { Plus, Search, Scan, Printer, Route, Package } from 'lucide-react';
 
 import toast from 'react-hot-toast';
 
@@ -24,6 +24,7 @@ import CustomerSearch from '../components/customers/CustomerSearch';
 import { samplesAPI, animalsAPI, testsAPI, billingAPI, notificationsAPI } from '../services/api';
 import { getResultsEntryTargets } from '../utils/parasitologyTests';
 import { fmtCatalog } from '../utils/vat';
+import { packageLabel, packageTestIds } from '../utils/packageSelection';
 
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -31,7 +32,7 @@ import { useNavigate, Link } from 'react-router-dom';
 
 export default function Samples() {
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const navigate = useNavigate();
 
@@ -55,7 +56,11 @@ export default function Samples() {
 
   const [tests, setTests] = useState([]);
 
-  const [form, setForm] = useState({ customer_id: '', animal_id: '', test_ids: [], priority: 'normal', notes: '' });
+  const [packages, setPackages] = useState([]);
+
+  const [form, setForm] = useState({
+    customer_id: '', animal_id: '', test_ids: [], package_ids: [], priority: 'normal', notes: '',
+  });
 
   const [sending, setSending] = useState(false);
 
@@ -78,6 +83,8 @@ export default function Samples() {
   useEffect(() => {
 
     testsAPI.list({ limit: 100 }).then(({ data }) => setTests(data.data));
+
+    testsAPI.listPackages().then(({ data }) => setPackages(data.data || [])).catch(() => {});
 
   }, []);
 
@@ -340,7 +347,7 @@ export default function Samples() {
 
           <Link to="/workflow" className="btn-secondary flex items-center gap-2"><Route size={18} /> {t('nav.workflow')}</Link>
 
-          <button onClick={() => setModalOpen(true)} className="btn-primary flex items-center gap-2"><Plus size={18} /> {t('samples.register')}</button>
+          <button onClick={() => { setForm({ customer_id: '', animal_id: '', test_ids: [], package_ids: [], priority: 'normal', notes: '' }); setModalOpen(true); }} className="btn-primary flex items-center gap-2"><Plus size={18} /> {t('samples.register')}</button>
 
         </div>
 
@@ -394,6 +401,38 @@ export default function Samples() {
 
           </div>
 
+          {packages.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1 flex items-center gap-1.5">
+                <Package size={16} />
+                {t('samples.selectPackages')}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-lg p-2 mb-3">
+                {packages.map((pkg) => (
+                  <label key={pkg.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.package_ids.includes(pkg.id)}
+                      onChange={(e) => {
+                        const ids = e.target.checked
+                          ? [...form.package_ids, pkg.id]
+                          : form.package_ids.filter((id) => id !== pkg.id);
+                        setForm({ ...form, package_ids: ids });
+                      }}
+                    />
+                    <span className="flex-1">
+                      {packageLabel(pkg, i18n)}
+                      <span className="text-xs text-gray-500 ms-1">
+                        ({t('samples.packageTestCount', { count: packageTestIds(pkg).length })})
+                      </span>
+                    </span>
+                    <span className="text-primary-600">{fmtCatalog(pkg.price)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
 
             <label className="block text-sm font-medium mb-1">{t('samples.selectTests')}</label>
@@ -438,7 +477,7 @@ export default function Samples() {
 
             <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
 
-            <button type="submit" className="btn-primary" disabled={!form.test_ids.length}>{t('common.save')}</button>
+            <button type="submit" className="btn-primary" disabled={!form.test_ids.length && !form.package_ids.length}>{t('common.save')}</button>
 
           </div>
 

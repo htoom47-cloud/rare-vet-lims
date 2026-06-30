@@ -40,11 +40,19 @@ const animalSchema = Joi.object({
 const sampleSchema = Joi.object({
   customer_id: Joi.string().uuid().required(),
   animal_id: Joi.string().uuid().required(),
-  test_ids: Joi.array().items(Joi.string().uuid()).min(1).required(),
+  test_ids: Joi.array().items(Joi.string().uuid()).default([]),
+  package_ids: Joi.array().items(Joi.string().uuid()).default([]),
   invoice_id: Joi.string().uuid().allow(null),
   department: Joi.string().allow('', null),
   priority: Joi.string().valid('normal', 'urgent', 'stat').default('normal'),
   notes: Joi.string().allow('', null),
+}).custom((value, helpers) => {
+  const hasTests = (value.test_ids || []).length > 0;
+  const hasPackages = (value.package_ids || []).length > 0;
+  if (!hasTests && !hasPackages) {
+    return helpers.message('Select at least one test or package');
+  }
+  return value;
 });
 
 const testSchema = Joi.object({
