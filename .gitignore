@@ -4,6 +4,8 @@ build/
 .env
 .env.local
 bridge/bridge.env
+bridge/logs/
+bridge/watchdog.log
 *.log
 .DS_Store
 uploads/*

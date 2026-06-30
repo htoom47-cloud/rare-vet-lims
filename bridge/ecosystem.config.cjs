@@ -20,6 +20,7 @@ const loadEnvFile = (filename) => {
 };
 
 const bridgeEnv = loadEnvFile('bridge.env');
+const logDir = path.join(__dirname, 'logs');
 
 module.exports = {
   apps: [
@@ -28,8 +29,16 @@ module.exports = {
       script: 'norma-listener.js',
       cwd: __dirname,
       autorestart: true,
-      max_restarts: 20,
+      max_restarts: 100,
+      min_uptime: '10s',
       restart_delay: 5000,
+      exp_backoff_restart_delay: 2000,
+      max_memory_restart: '200M',
+      watch: false,
+      merge_logs: true,
+      error_file: path.join(logDir, 'norma-bridge-error.log'),
+      out_file: path.join(logDir, 'norma-bridge-out.log'),
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
       env: {
         NODE_ENV: 'production',
         LIMS_API_URL: bridgeEnv.LIMS_API_URL || 'https://lims.rarevetcare.com/api',

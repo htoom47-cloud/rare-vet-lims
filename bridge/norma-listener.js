@@ -6,7 +6,7 @@ const net = require('net');
 const https = require('https');
 const http = require('http');
 
-const API_URL = process.env.LIMS_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.LIMS_API_URL || 'https://lims.rarevetcare.com/api';
 const DEVICE_ID = process.env.DEVICE_ID;
 const DEVICE_API_KEY = process.env.DEVICE_API_KEY;
 const LISTEN_PORT = Number(process.env.LISTEN_PORT || 21110);
@@ -20,6 +20,7 @@ function forwardToLims(message) {
   const url = new URL(`${API_URL.replace(/\/$/, '')}/devices/ingest/${DEVICE_ID}`);
   const body = JSON.stringify({ message });
   const client = url.protocol === 'https:' ? https : http;
+  const timeoutMs = Number(process.env.LIMS_FORWARD_TIMEOUT_MS || 45000);
 
   return new Promise((resolve, reject) => {
     const req = client.request(
@@ -33,23 +34,48 @@ function forwardToLims(message) {
           'Content-Length': Buffer.byteLength(body),
           'X-Device-Key': DEVICE_API_KEY,
         },
+        timeout: timeoutMs,
       },
       (res) => {
         let data = '';
         res.on('data', (c) => { data += c; });
         res.on('end', () => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(JSON.parse(data || '{}'));
+            try {
+              resolve(JSON.parse(data || '{}'));
+            } catch {
+              resolve({ ok: true, raw: data });
+            }
           } else {
             reject(new Error(`LIMS ${res.statusCode}: ${data}`));
           }
         });
       }
     );
+    req.on('timeout', () => {
+      req.destroy(new Error('LIMS request timeout'));
+    });
     req.on('error', reject);
     req.write(body);
     req.end();
   });
+}
+
+async function forwardToLimsWithRetry(message, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await forwardToLims(message);
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        const wait = 2000 * (i + 1);
+        console.warn(`[Norma] Forward retry ${i + 2}/${attempts} in ${wait}ms: ${err.message}`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 function extractMessages(buffer) {
@@ -94,6 +120,16 @@ const server = net.createServer((socket) => {
   let buffer = Buffer.alloc(0);
   console.log(`[Norma] Connection from ${socket.remoteAddress}`);
 
+  socket.on('error', (err) => {
+    // Norma often closes the TCP session abruptly after receiving ACK — harmless
+    if (err.code === 'ECONNRESET' || err.code === 'EPIPE') return;
+    console.error('[Norma] Socket error:', err.message);
+  });
+
+  socket.on('close', () => {
+    /* expected after each HL7 message */
+  });
+
   socket.on('data', async (chunk) => {
     buffer = Buffer.concat([buffer, chunk]);
     const { messages, remainder } = extractMessages(buffer);
@@ -108,7 +144,7 @@ const server = net.createServer((socket) => {
       }
 
       try {
-        const result = await forwardToLims(msg);
+        const result = await forwardToLimsWithRetry(msg);
         const imported = result?.data?.imported;
         if (imported?.sample_code) {
           const skipped = result?.data?.imported?.skipped?.length;
@@ -125,7 +161,24 @@ const server = net.createServer((socket) => {
   });
 });
 
+server.on('error', (err) => {
+  console.error('[Norma] Server error:', err.message);
+});
+
 server.listen(LISTEN_PORT, '0.0.0.0', () => {
-  console.log(`[Norma] Listening on port ${LISTEN_PORT}`);
+  console.log(`[Norma] Bridge v2 listening on port ${LISTEN_PORT}`);
   console.log(`[Norma] Forwarding to ${API_URL}`);
+  console.log(`[Norma] Device ${DEVICE_ID.slice(0, 8)}…`);
+});
+
+// Heartbeat — confirms process alive in pm2 logs
+setInterval(() => {
+  console.log(`[Norma] Heartbeat ${new Date().toISOString()} port=${LISTEN_PORT}`);
+}, 30 * 60 * 1000);
+
+process.on('uncaughtException', (err) => {
+  console.error('[Norma] Uncaught exception:', err.message);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[Norma] Unhandled rejection:', err?.message || err);
 });
