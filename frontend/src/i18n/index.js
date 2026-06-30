@@ -344,6 +344,15 @@ const resources = {
         nothingToApprove: 'No tests ready for approval',
         notes: 'Reviewer notes',
         notesPlaceholder: 'Optional notes...',
+        flags: {
+          NORMAL: 'Normal',
+          HIGH: 'High',
+          LOW: 'Low',
+          CRIT_HIGH: 'Critically high',
+          CRIT_LOW: 'Critically low',
+          POS: 'Positive',
+          NEG: 'Negative',
+        },
       },
       auth: {
         login: 'Sign In', username: 'Username', email: 'Email', password: 'Password', forgotPassword: 'Forgot Password?',
@@ -1141,6 +1150,15 @@ const resources = {
         nothingToApprove: 'لا توجد فحوصات جاهزة للاعتماد',
         notes: 'ملاحظات المراجع',
         notesPlaceholder: 'ملاحظات اختيارية...',
+        flags: {
+          NORMAL: 'طبيعي',
+          HIGH: 'مرتفع',
+          LOW: 'منخفض',
+          CRIT_HIGH: 'مرتفع جداً',
+          CRIT_LOW: 'منخفض جداً',
+          POS: 'إيجابي',
+          NEG: 'سلبي',
+        },
       },
       auth: {
         login: 'تسجيل الدخول', username: 'اسم المستخدم', email: 'البريد الإلكتروني', password: 'كلمة المرور', forgotPassword: 'نسيت كلمة المرور؟',

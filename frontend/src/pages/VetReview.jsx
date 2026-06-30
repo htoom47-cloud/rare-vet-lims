@@ -52,15 +52,19 @@ export default function VetReview() {
     setDoctorNotes('');
   };
 
+  const hasFilledValues = (values) => (values || []).some(
+    (v) => String(v.value ?? '').trim() !== '' || String(v.pct_value ?? '').trim() !== ''
+  );
+
   const pendingTests = (sample) => (sample?.tests || []).filter((test) => {
     const res = results[test.id];
-    return res && !res.is_validated && res.values?.length > 0;
+    return res && !res.is_validated && hasFilledValues(res.values);
   });
 
   const validateTest = async (sampleTestId, closeAfter = true) => {
     await resultsAPI.validate(sampleTestId, doctorNotes);
     if (closeAfter) {
-      toast.success(t('vetReview.approved'));
+      toast.success(t('resultValidation.approved'));
       setSelected(null);
       load();
     }
@@ -68,13 +72,13 @@ export default function VetReview() {
 
   const validateAll = async () => {
     const tests = pendingTests(selected);
-    if (!tests.length) return toast.error(t('vetReview.nothingToApprove'));
+    if (!tests.length) return toast.error(t('resultValidation.nothingToApprove'));
     setValidating(true);
     try {
       for (const test of tests) {
         await validateTest(test.id, false);
       }
-      toast.success(t('vetReview.approvedAll'));
+      toast.success(t('resultValidation.approvedAll'));
       setSelected(null);
       load();
     } catch (err) {
@@ -84,16 +88,31 @@ export default function VetReview() {
     }
   };
 
+  const flagLabel = (flag) => t(`resultValidation.flags.${flag}`, { defaultValue: flag });
+
+  const renderFlagCell = (v) => {
+    const hasValue = String(v.value ?? '').trim() !== '' || String(v.pct_value ?? '').trim() !== '';
+    if (!hasValue) return <td className="text-gray-400">—</td>;
+    const flag = v.flag || 'NORMAL';
+    return (
+      <td>
+        <StatusBadge status={flag} label={flagLabel(flag)} />
+      </td>
+    );
+  };
+
   const renderValueRows = (test, values) => {
     const rows = (items) => items.map((v) => (
-      <tr key={v.parameter_id} className="border-t">
+      <tr key={v.parameter_code || v.parameter_id} className="border-t">
         <td className="py-1">
           {v.parameter_name}
           {v.pct_value && <span className="text-gray-500 text-xs ms-1">*{v.pct_value}%</span>}
         </td>
-        <td>{v.value} {v.unit}</td>
+        <td>
+          {String(v.value ?? '').trim() !== '' ? `${v.value} ${v.unit || ''}`.trim() : '—'}
+        </td>
         <td className="text-gray-500">{v.reference || '—'}</td>
-        <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || t('vetReview.normal')} /></td>
+        {renderFlagCell(v)}
       </tr>
     ));
 
@@ -158,7 +177,7 @@ export default function VetReview() {
                   </span>
                 )}
               </div>
-              {res?.values?.length > 0 ? (
+              {res?.values?.length > 0 && hasFilledValues(res.values) ? (
                 <table className="w-full text-sm mb-3">
                   <thead>
                     <tr className="text-gray-500">
@@ -175,7 +194,7 @@ export default function VetReview() {
               ) : (
                 <p className="text-gray-500 text-sm mb-3">{t('resultValidation.noResultsYet')}</p>
               )}
-              {res && !res.is_validated && res.values?.length > 0 && (
+              {res && !res.is_validated && hasFilledValues(res.values) && (
                 <button type="button" onClick={() => validateTest(test.id)} className="btn-secondary text-sm">
                   {t('resultValidation.approveTest')}
                 </button>
@@ -196,7 +215,7 @@ export default function VetReview() {
           </div>
           {pendingTests(selected).length > 0 && (
             <button type="button" onClick={validateAll} disabled={validating} className="btn-primary w-full py-3">
-              {validating ? t('common.loading') : t('vetReview.approveAll')}
+              {validating ? t('common.loading') : t('resultValidation.approveAll')}
             </button>
           )}
         </div>
