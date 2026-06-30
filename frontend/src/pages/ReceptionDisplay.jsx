@@ -125,7 +125,7 @@ export default function ReceptionDisplay() {
 
       <header className="relative z-20 flex items-center justify-between px-8 py-4 border-b border-primary-400/25 bg-[#2B1B17]/88 backdrop-blur-md shadow-lg gap-6">
         <div className="flex items-center gap-4 min-w-0">
-          <AppLogo size="sm" className="drop-shadow-lg shrink-0" />
+          <AppLogo size="sm" variant="gold" className="drop-shadow-[0_2px_8px_rgba(212,175,55,0.35)] shrink-0" />
           <BiText
             ar={labNameAr}
             en={labNameEn}
@@ -170,7 +170,7 @@ export default function ReceptionDisplay() {
           >
             {slideKey === 'welcome' && (
               <div className="text-center">
-                <AppLogo size="lg" className="mx-auto mb-6 drop-shadow-2xl" />
+                <AppLogo size="lg" variant="gold" className="mx-auto mb-6 drop-shadow-[0_4px_16px_rgba(212,175,55,0.4)]" />
                 <BiHeading
                   ar={tAr('receptionDisplay.welcomeTitle')}
                   en={tEn('receptionDisplay.welcomeTitle')}
