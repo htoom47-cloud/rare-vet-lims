@@ -71,9 +71,17 @@ const extractObxCode = (fields) => {
   return null;
 };
 
+/** Strip Norma display prefixes (*, <, >) before parsing numeric OBX values. */
+const sanitizeObxValue = (raw) => {
+  let s = String(raw ?? '').trim().replace(',', '.');
+  s = s.replace(/^[*<>\s]+/, '').replace(/\s+%\s*$/, '');
+  return s;
+};
+
 /** Norma iVet reports HGB/MCHC in g/L — store as sent (matches Norma screen). */
 const normalizeNormaValue = (code, rawValue, unit) => {
-  const n = parseFloat(String(rawValue).replace(',', '.'));
+  const cleaned = sanitizeObxValue(rawValue);
+  const n = parseFloat(cleaned);
   if (Number.isNaN(n)) return { value: rawValue, unit };
   return { value: String(n), unit };
 };
@@ -132,7 +140,7 @@ function parseHl7(raw) {
       const codeRaw = extractObxCode(fields);
       const limsCode = codeRaw ? mapNormaCode(codeRaw) : null;
 
-      const rawValue = (fields[5] ?? fields[4] ?? '').trim().replace(',', '.');
+      const rawValue = sanitizeObxValue(fields[5] ?? fields[4] ?? '');
       const numeric = parseFloat(rawValue);
       const unit = (fields[6] || '').trim();
       const refRaw = (fields[7] || '').trim();
@@ -162,4 +170,4 @@ function parseHl7(raw) {
   };
 }
 
-module.exports = { parseHl7, splitSegments, normalizeSampleId, extractFromRaw };
+module.exports = { parseHl7, splitSegments, normalizeSampleId, extractFromRaw, sanitizeObxValue };

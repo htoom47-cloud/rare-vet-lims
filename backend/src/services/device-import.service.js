@@ -2,7 +2,34 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const resultsService = require('./results.service');
 const referenceRangesService = require('./reference-ranges.service');
-const { mapNormaCode, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
+const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS } = require('../utils/norma-cbc-map');
+
+const resultLimsCode = (row) => row.limsCode || mapNormaCode(row.code) || row.code;
+
+/** When Norma sends WBC + diff % only, compute abs (#) = WBC × % / 100. */
+const enrichDiffAbsFromPct = async (results, values, testCode) => {
+  const byCode = Object.fromEntries(results.map((r) => [resultLimsCode(r), r]));
+  const wbc = parseFloat(byCode.WBC?.value);
+  if (Number.isNaN(wbc)) return values;
+
+  const filled = new Set(
+    values.filter((v) => String(v.value ?? '').trim() !== '').map((v) => v.parameter_id)
+  );
+
+  for (const [absCode, pctCode] of Object.entries(NORMA_CBC_PCT_BY_ABS)) {
+    const absParam = await resolveParameter(testCode, absCode);
+    if (!absParam || filled.has(absParam.id)) continue;
+
+    const pct = parseFloat(byCode[pctCode]?.value);
+    if (Number.isNaN(pct)) continue;
+
+    const computed = Math.round((wbc * pct / 100) * 100) / 100;
+    values.push({ parameter_id: absParam.id, value: String(computed) });
+    filled.add(absParam.id);
+  }
+
+  return values;
+};
 
 const findSampleByBarcode = async (barcode) => {
   const id = String(barcode || '').trim();
@@ -60,13 +87,15 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
   const skipped = [];
 
   for (const row of results) {
-    const param = await resolveParameter(testCode, row.code);
+    const param = await resolveParameter(testCode, resultLimsCode(row));
     if (!param) {
-      skipped.push(row.code);
+      skipped.push(row.code || row.limsCode);
       continue;
     }
     values.push({ parameter_id: param.id, value: String(row.value) });
   }
+
+  await enrichDiffAbsFromPct(results, values, testCode);
 
   if (!values.length) {
     const codes = (results || []).map((r) => r.code).join(', ') || 'none';
