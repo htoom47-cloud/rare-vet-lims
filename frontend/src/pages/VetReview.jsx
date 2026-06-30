@@ -132,6 +132,8 @@ export default function VetReview() {
     });
   };
 
+  if (loading) return <div className="text-center py-20">{t('common.loading')}</div>;
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2">{t('resultValidation.title')}</h1>
