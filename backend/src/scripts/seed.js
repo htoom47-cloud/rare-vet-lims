@@ -311,7 +311,7 @@ async function seed() {
   // Device integrations (inactive, ready for future)
   const devices = [
     { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp', host: '192.168.1.100', port: 5000 },
-    { name: 'Norma CBC', model: 'iVet-5', protocol: 'HL7', connection_type: 'tcp', host: '0.0.0.0', port: 2575 },
+    { name: 'Norma CBC', model: 'iVet-5', protocol: 'HL7', connection_type: 'tcp', host: '0.0.0.0', port: 21110 },
     { name: 'Mini Vidas', model: 'Mini Vidas', protocol: 'ASTM', connection_type: 'serial', serial_port: 'COM4' },
   ];
 

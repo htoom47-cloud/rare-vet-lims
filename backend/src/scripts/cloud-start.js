@@ -59,6 +59,8 @@ require('../index');
 const bootScripts = [
   'src/scripts/migrate.js',
   'src/scripts/sync-lab-contact.js',
+  'src/scripts/sync-cbc-params.js',
+  'src/scripts/sync-norma-references.js',
   'src/scripts/ensure-result-attachments.js',
   'src/scripts/ensure-parasitology.js',
 ];

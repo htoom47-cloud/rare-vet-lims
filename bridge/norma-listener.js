@@ -9,7 +9,7 @@ const http = require('http');
 const API_URL = process.env.LIMS_API_URL || 'http://localhost:5000/api';
 const DEVICE_ID = process.env.DEVICE_ID;
 const DEVICE_API_KEY = process.env.DEVICE_API_KEY;
-const LISTEN_PORT = Number(process.env.LISTEN_PORT || 2575);
+const LISTEN_PORT = Number(process.env.LISTEN_PORT || 21110);
 
 if (!DEVICE_ID || !DEVICE_API_KEY) {
   console.error('Set DEVICE_ID and DEVICE_API_KEY environment variables.');
@@ -111,7 +111,8 @@ const server = net.createServer((socket) => {
         const result = await forwardToLims(msg);
         const imported = result?.data?.imported;
         if (imported?.sample_code) {
-          console.log(`[Norma] Imported: ${imported.sample_code} (${imported.imported || 0} values)`);
+          const skipped = result?.data?.imported?.skipped?.length;
+          console.log(`[Norma] Imported: ${imported.sample_code} (${imported.imported || 0} values${skipped ? `, skipped: ${skipped}` : ''})`);
         } else if (result?.data?.warning) {
           console.log(`[Norma] Stored with warning: ${result.data.warning}`);
         } else {

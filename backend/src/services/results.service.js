@@ -372,6 +372,65 @@ const removeAttachment = async (attachmentId) => {
   return { deleted: true };
 };
 
+const clearSampleTestResults = async (sampleTestId) => {
+  const st = await query(
+    `SELECT st.id, st.sample_id, st.status, t.code AS test_code
+     FROM sample_tests st JOIN tests t ON st.test_id = t.id WHERE st.id = $1`,
+    [sampleTestId]
+  );
+  if (!st.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
+
+  const result = await query('SELECT id FROM results WHERE sample_test_id = $1', [sampleTestId]);
+  const resultId = result.rows[0]?.id;
+
+  if (resultId) {
+    const attachments = await query('SELECT id, file_url FROM result_attachments WHERE result_id = $1', [resultId]);
+    for (const att of attachments.rows) {
+      try { await deleteFile(att.file_url); } catch { /* ignore missing file */ }
+    }
+    await query('DELETE FROM results WHERE id = $1', [resultId]);
+  }
+
+  await query(
+    `UPDATE sample_tests SET status = 'pending', started_at = NULL, completed_at = NULL, technician_id = NULL
+     WHERE id = $1`,
+    [sampleTestId]
+  );
+
+  const running = await query(
+    `SELECT COUNT(*)::int AS n FROM sample_tests st
+     JOIN results r ON r.sample_test_id = st.id
+     WHERE st.sample_id = $1`,
+    [st.rows[0].sample_id]
+  );
+  if (running.rows[0].n === 0) {
+    await query(
+      `UPDATE samples SET status = 'received', updated_at = NOW()
+       WHERE id = $1 AND status = 'running'`,
+      [st.rows[0].sample_id]
+    );
+  }
+
+  return { sample_test_id: sampleTestId, test_code: st.rows[0].test_code, cleared: Boolean(resultId) };
+};
+
+const clearSampleResultsByCode = async (sampleCode, testCode = 'CBC-FULL') => {
+  const sample = await query(
+    `SELECT s.id FROM samples s WHERE s.sample_code = $1 OR s.barcode = $1 LIMIT 1`,
+    [sampleCode]
+  );
+  if (!sample.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');
+
+  const st = await query(
+    `SELECT st.id FROM sample_tests st JOIN tests t ON st.test_id = t.id
+     WHERE st.sample_id = $1 AND t.code = $2 LIMIT 1`,
+    [sample.rows[0].id, testCode]
+  );
+  if (!st.rows[0]) throw new AppError(`Test ${testCode} not on sample`, 404, 'NOT_FOUND');
+
+  return clearSampleTestResults(st.rows[0].id);
+};
+
 module.exports = {
   getBySampleTest,
   enterResults,
@@ -382,4 +441,6 @@ module.exports = {
   addAttachment,
   removeAttachment,
   getAttachments,
+  clearSampleTestResults,
+  clearSampleResultsByCode,
 };

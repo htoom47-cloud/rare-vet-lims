@@ -54,6 +54,7 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
     testCode,
     animalType: animalType || 'camel',
   });
+  await referenceRangesService.syncNormaProfileForAnimal(testCode, animalType || 'camel');
 
   const values = [];
   const skipped = [];
@@ -72,10 +73,26 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
     throw new AppError(`No matching CBC parameters found in message (received: ${codes})`, 400, 'NO_MAPPED_PARAMS');
   }
 
+  let mergedValues = values;
+  try {
+    const existing = await resultsService.getBySampleTest(sampleTest.id);
+    if (existing?.values?.length) {
+      const byParam = new Map(
+        existing.values
+          .filter((v) => v.value != null && String(v.value).trim() !== '')
+          .map((v) => [v.parameter_id, String(v.value)])
+      );
+      for (const v of values) byParam.set(v.parameter_id, v.value);
+      mergedValues = [...byParam.entries()].map(([parameter_id, value]) => ({ parameter_id, value }));
+    }
+  } catch {
+    /* first import */
+  }
+
   const saved = await resultsService.enterResults({
     sample_test_id: sampleTest.id,
     technician_notes: `Imported from ${deviceName || 'Norma CBC'} (${new Date().toISOString()})`,
-    values,
+    values: mergedValues,
   }, null);
 
   await query(
@@ -86,7 +103,8 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
   return {
     sample_test_id: sampleTest.id,
     test_code: testCode,
-    imported: values.length,
+    imported: mergedValues.length,
+    added: values.length,
     skipped,
     reference_ranges_synced: refSync.updated,
     result: saved,

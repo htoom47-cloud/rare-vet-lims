@@ -117,6 +117,7 @@ export const resultsAPI = {
   enter: (data) => api.post('/results/enter', data),
   approveBatch: (items) => api.post('/results/approve-batch', { items }, { timeout: 90000 }),
   validate: (sampleTestId, doctorNotes) => api.post(`/results/validate/${sampleTestId}`, { doctor_notes: doctorNotes }),
+  clear: (sampleTestId) => api.delete(`/results/sample-test/${sampleTestId}`),
   critical: () => api.get('/results/critical'),
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
   uploadAttachment: async (sampleTestId, file, opts = {}) => {

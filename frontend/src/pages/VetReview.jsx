@@ -136,6 +136,7 @@ export default function VetReview() {
                     <tr className="text-gray-500">
                       <th className="text-start py-1">{t('resultValidation.parameter')}</th>
                       <th className="text-start">{t('resultValidation.result')}</th>
+                      <th className="text-start">{t('resultValidation.reference', { defaultValue: 'Reference' })}</th>
                       <th className="text-start">{t('resultValidation.flag')}</th>
                     </tr>
                   </thead>
@@ -144,6 +145,7 @@ export default function VetReview() {
                       <tr key={v.parameter_id} className="border-t">
                         <td className="py-1">{v.parameter_name}</td>
                         <td>{v.value} {v.unit}</td>
+                        <td className="text-gray-500">{v.reference || '—'}</td>
                         <td><StatusBadge status={v.flag || 'NORMAL'} label={v.flag || t('vetReview.normal')} /></td>
                       </tr>
                     ))}

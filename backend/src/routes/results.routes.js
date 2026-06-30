@@ -124,6 +124,13 @@ router.post(
   }
 );
 
+router.delete('/sample-test/:id', authorize(PERMISSIONS.RESULTS_ENTER), async (req, res, next) => {
+  try {
+    const data = await service.clearSampleTestResults(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.delete('/attachments/:id', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
   try {
     const data = await service.removeAttachment(req.params.id);

@@ -1,4 +1,5 @@
 const { parseReferenceRange } = require('./reference-range');
+const { mapNormaCode } = require('./norma-cbc-map');
 
 function splitSegments(raw) {
   return raw
@@ -42,6 +43,22 @@ const firstId = (...candidates) => {
     if (id) return id;
   }
   return null;
+};
+
+const extractObxCode = (fields) => {
+  const parts = [fields[3], fields[4], fields[2]]
+    .flatMap((f) => String(f || '').split('^'))
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  for (const part of parts) {
+    if (mapNormaCode(part)) return part;
+  }
+
+  return parts.find((c) => /^[A-Z][A-Z0-9%#.-]{1,12}$/i.test(c))
+    || parts.find((c) => !/^\d+$/.test(c) && c.length <= 24)
+    || parts[0]
+    || null;
 };
 
 function parseHl7(raw) {
@@ -95,14 +112,7 @@ function parseHl7(raw) {
     }
 
     if (type === 'OBX') {
-      const components = `${fields[3] || ''}^${fields[4] || ''}`
-        .split('^')
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      const code = components.find((c) => /^[A-Z][A-Z0-9%#.-]{1,9}$/i.test(c))
-        || components.find((c) => !/^\d+$/.test(c) && c.length <= 12)
-        || components[0];
+      const code = extractObxCode(fields);
 
       const rawValue = (fields[5] ?? fields[4] ?? '').trim().replace(',', '.');
       const numeric = parseFloat(rawValue);

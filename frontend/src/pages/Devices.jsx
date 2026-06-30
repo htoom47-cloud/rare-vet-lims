@@ -4,6 +4,9 @@ import { Cpu, RefreshCw, Power, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { devicesAPI } from '../services/api';
 
+const BRIDGE_LISTEN_PORT = 21110;
+const bridgeApiUrl = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
+
 export default function Devices() {
   const { t } = useTranslation();
   const [configured, setConfigured] = useState([]);
@@ -35,7 +38,7 @@ export default function Devices() {
     const existing = configured.find((d) => d.name === 'Norma CBC');
     try {
       if (existing) {
-        const { data } = await devicesAPI.update(existing.id, { ...existing, is_active: true, protocol: 'HL7', connection_type: 'tcp', port: 2575 });
+        const { data } = await devicesAPI.update(existing.id, { ...existing, is_active: true, protocol: 'HL7', connection_type: 'tcp', port: BRIDGE_LISTEN_PORT });
         toast.success(t('devices.activated'));
         setSelected(data.data);
       } else {
@@ -45,7 +48,7 @@ export default function Devices() {
           protocol: 'HL7',
           connection_type: 'tcp',
           host: '0.0.0.0',
-          port: 2575,
+          port: BRIDGE_LISTEN_PORT,
           is_active: true,
           config: { test_code: 'CBC-FULL' },
         });
@@ -142,7 +145,7 @@ export default function Devices() {
                     <button onClick={regenerateKey} className="text-primary-600"><RefreshCw size={14} /></button>
                   </p>
                   <p><strong>{t('devices.protocol')}:</strong> HL7 (أو ASTM)</p>
-                  <p><strong>{t('devices.lisPort')}:</strong> 2575</p>
+                  <p><strong>{t('devices.lisPort')}:</strong> {BRIDGE_LISTEN_PORT}</p>
                 </div>
 
                 <div className="text-sm space-y-2">
@@ -158,10 +161,10 @@ export default function Devices() {
 
                 <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded-lg overflow-x-auto">
 {`cd bridge
-set LIMS_API_URL=https://rare-vet-lims.onrender.com/api
+set LIMS_API_URL=${bridgeApiUrl}
 set DEVICE_ID=${norma.id}
 set DEVICE_API_KEY=${norma.config?.api_key || 'YOUR_KEY'}
-set LISTEN_PORT=2575
+set LISTEN_PORT=${BRIDGE_LISTEN_PORT}
 npm start`}
                 </pre>
 

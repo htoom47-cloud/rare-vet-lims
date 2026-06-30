@@ -32,7 +32,7 @@ module.exports = {
       restart_delay: 5000,
       env: {
         NODE_ENV: 'production',
-        LIMS_API_URL: bridgeEnv.LIMS_API_URL || 'https://rare-vet-lims.onrender.com/api',
+        LIMS_API_URL: bridgeEnv.LIMS_API_URL || 'https://lims.rarevetcare.com/api',
         DEVICE_ID: bridgeEnv.DEVICE_ID || '',
         DEVICE_API_KEY: bridgeEnv.DEVICE_API_KEY || '',
         LISTEN_PORT: bridgeEnv.LISTEN_PORT || '21110',

@@ -10,6 +10,7 @@
     "seed": "node src/scripts/seed.js",
     "sync-cbc": "node src/scripts/sync-cbc-params.js",
     "sync-norma-refs": "node src/scripts/sync-norma-references.js",
+    "clear-sample-results": "node src/scripts/clear-sample-results.js",
     "reset-admin": "node src/scripts/reset-admin.js",
     "ensure-admin": "node src/scripts/ensure-admin.js",
     "purge-demo": "node src/scripts/purge-demo-users.js",

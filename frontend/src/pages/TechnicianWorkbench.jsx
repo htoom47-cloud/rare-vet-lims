@@ -12,6 +12,7 @@ export default function TechnicianWorkbench() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [queue, setQueue] = useState([]);
+  const [imported, setImported] = useState([]);
   const [critical, setCritical] = useState([]);
   const [selectedSample, setSelectedSample] = useState(null);
   const [resultForm, setResultForm] = useState({});
@@ -20,10 +21,15 @@ export default function TechnicianWorkbench() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([samplesAPI.getQueue(), resultsAPI.critical()])
-      .then(([queueRes, critRes]) => {
+    Promise.all([
+      samplesAPI.getQueue(),
+      resultsAPI.critical(),
+      samplesAPI.list({ awaiting_validation: true, limit: 50 }),
+    ])
+      .then(([queueRes, critRes, importedRes]) => {
         setQueue(queueRes.data.data);
         setCritical(critRes.data.data);
+        setImported(importedRes.data.data || []);
       })
       .finally(() => setLoading(false));
   };
@@ -66,6 +72,7 @@ export default function TechnicianWorkbench() {
           unit: p.unit,
           value: val?.value || '',
           flag: val?.flag,
+          reference: val?.reference || '',
         };
       });
     }
@@ -111,6 +118,18 @@ export default function TechnicianWorkbench() {
     (test) => (resultForm[test.id] || []).length > 0
   );
 
+  const clearTestResults = async (test) => {
+    if (!window.confirm(t('workbench.clearResultsConfirm'))) return;
+    try {
+      await resultsAPI.clear(test.id);
+      toast.success(t('workbench.resultsCleared'));
+      await openResultEntry(selectedSample);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Error');
+    }
+  };
+
   if (loading) return <div className="text-center py-20">{t('common.loading')}</div>;
 
   return (
@@ -126,6 +145,27 @@ export default function TechnicianWorkbench() {
         </div>
       )}
 
+      {imported.length > 0 && (
+        <div className="card mb-6 border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+          <h3 className="font-semibold text-green-800 dark:text-green-300 mb-2">{t('workbench.importedTitle')}</h3>
+          <p className="text-sm text-green-700 dark:text-green-400 mb-3">{t('workbench.importedHint')}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {imported.map((sample) => (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => openResultEntry(sample)}
+                className="text-start p-3 rounded-lg border border-green-200 dark:border-green-800 bg-white/80 dark:bg-gray-900/40 hover:border-green-500"
+              >
+                <span className="font-mono font-medium">{sample.sample_code}</span>
+                <p className="text-xs text-gray-500 mt-1">{sample.customer_name}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <h2 className="text-lg font-semibold mb-3">{t('workbench.awaitingEntry')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {queue.map((sample) => (
           <div key={sample.id} className="card hover:border-primary-500 transition cursor-pointer" onClick={() => openResultEntry(sample)}>
@@ -153,7 +193,14 @@ export default function TechnicianWorkbench() {
           const fields = resultForm[test.id] || [];
           return (
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
-              <h4 className="font-semibold mb-3">{test.test_name}</h4>
+              <div className="flex justify-between items-center mb-3 gap-2">
+                <h4 className="font-semibold">{test.test_name}</h4>
+                {(resultForm[test.id] || []).some((v) => String(v.value ?? '').trim() !== '') && (
+                  <button type="button" onClick={() => clearTestResults(test)} className="text-red-600 text-sm hover:underline">
+                    {t('workbench.clearResults')}
+                  </button>
+                )}
+              </div>
               {fields.length === 0 ? (
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm text-amber-800 dark:text-amber-300">
                   <p className="mb-2">{t('workbench.noParametersHint')}</p>
@@ -167,6 +214,16 @@ export default function TechnicianWorkbench() {
                     <div key={param.parameter_id}>
                       <label className="text-sm font-medium">
                         {param.name} {param.unit && param.unit !== 'qual' && `(${param.unit})`}
+                        {param.reference && (
+                          <span className="text-xs font-normal text-gray-500 ms-2">
+                            {t('workbench.ref', { defaultValue: 'Ref' })}: {param.reference}
+                            {param.flag && param.flag !== 'NORMAL' && param.flag !== '' && (
+                              <span className={`ms-1 font-semibold ${['HIGH', 'CRIT_HIGH', 'POS'].includes(param.flag) ? 'text-red-600' : 'text-blue-600'}`}>
+                                {param.flag}
+                              </span>
+                            )}
+                          </span>
+                        )}
                       </label>
                       {param.unit === 'qual' ? (
                         <select

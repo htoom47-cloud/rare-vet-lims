@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const { defaultCritical } = require('../utils/reference-range');
+const { getNormaReference } = require('../utils/norma-cbc-references');
 
 const upsertReferenceRange = async ({
   parameterId,
@@ -53,11 +54,23 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
   let skipped = 0;
 
   for (const row of results) {
-    if (row.referenceMin == null || row.referenceMax == null) {
+    const limsCode = mapNormaCode(row.code);
+    let refMin = row.referenceMin;
+    let refMax = row.referenceMax;
+
+    if (refMin == null || refMax == null) {
+      const profile = getNormaReference(animalType, limsCode);
+      if (profile) {
+        refMin = profile.min;
+        refMax = profile.max;
+      }
+    }
+
+    if (refMin == null || refMax == null) {
       skipped += 1;
       continue;
     }
-    const limsCode = mapNormaCode(row.code);
+
     const param = await query(
       `SELECT tp.id, tp.unit FROM test_parameters tp
        JOIN tests t ON tp.test_id = t.id
@@ -71,10 +84,12 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
     await upsertReferenceRange({
       parameterId: param.rows[0].id,
       animalType,
-      min: row.referenceMin,
-      max: row.referenceMax,
+      min: refMin,
+      max: refMax,
+      criticalLow: getNormaReference(animalType, limsCode)?.crit_low,
+      criticalHigh: getNormaReference(animalType, limsCode)?.crit_high,
       unit: row.unit || param.rows[0].unit,
-      source: 'norma-hl7',
+      source: row.referenceMin != null ? 'norma-hl7' : 'norma-profile',
     });
     updated += 1;
   }
@@ -82,4 +97,38 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
   return { updated, skipped };
 };
 
-module.exports = { upsertReferenceRange, syncFromParsedResults };
+/** Ensure all Norma profile reference ranges exist for a CBC test + animal type. */
+const syncNormaProfileForAnimal = async (testCode, animalType) => {
+  const { NORMA_CBC_REFERENCES } = require('../utils/norma-cbc-references');
+  const ranges = NORMA_CBC_REFERENCES[animalType];
+  if (!ranges) return { updated: 0 };
+
+  const test = await query('SELECT id FROM tests WHERE code = $1 LIMIT 1', [testCode]);
+  if (!test.rows[0]) return { updated: 0 };
+
+  const params = await query(
+    'SELECT id, code, unit FROM test_parameters WHERE test_id = $1',
+    [test.rows[0].id]
+  );
+  const byCode = Object.fromEntries(params.rows.map((p) => [p.code, p]));
+
+  let updated = 0;
+  for (const [code, ref] of Object.entries(ranges)) {
+    const param = byCode[code];
+    if (!param) continue;
+    await upsertReferenceRange({
+      parameterId: param.id,
+      animalType,
+      min: ref.min,
+      max: ref.max,
+      criticalLow: ref.crit_low,
+      criticalHigh: ref.crit_high,
+      unit: param.unit,
+      source: 'norma-profile',
+    });
+    updated += 1;
+  }
+  return { updated };
+};
+
+module.exports = { upsertReferenceRange, syncFromParsedResults, syncNormaProfileForAnimal };

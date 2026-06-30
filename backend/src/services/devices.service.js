@@ -7,7 +7,7 @@ const { parseAstm } = require('../utils/astm');
 const deviceImport = require('./device-import.service');
 
 const SUPPORTED_DEVICES = [
-  { name: 'Norma CBC', model: 'iVet-5 / Icon-5', protocol: 'HL7', connection_type: 'tcp', default_port: 2575 },
+  { name: 'Norma CBC', model: 'iVet-5 / Icon-5', protocol: 'HL7', connection_type: 'tcp', default_port: 21110 },
   { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp', default_port: 5000 },
   { name: 'Mini Vidas', model: 'Mini Vidas', protocol: 'ASTM', connection_type: 'serial' },
 ];
@@ -44,7 +44,7 @@ const create = async (data) => {
       data.protocol || 'HL7',
       data.connection_type || 'tcp',
       data.host,
-      data.port || 2575,
+      data.port || 21110,
       data.serial_port,
       JSON.stringify(config),
       data.is_active ?? false,
