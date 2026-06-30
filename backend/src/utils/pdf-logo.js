@@ -5,6 +5,8 @@ const sharp = require('sharp');
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 const HAS_LOGO = fs.existsSync(LOGO_PATH);
 const DEFAULT_LOGO_SIZE = 58;
+const REPORT_LOGO_SIZE = 44;
+const REPORT_LOGO_SIZE_COMPACT = 36;
 
 const cache = new Map();
 
@@ -72,6 +74,8 @@ module.exports = {
   LOGO_PATH,
   HAS_LOGO,
   DEFAULT_LOGO_SIZE,
+  REPORT_LOGO_SIZE,
+  REPORT_LOGO_SIZE_COMPACT,
   getBrandLogoBuffer,
   drawBillingHeaderLogo,
 };

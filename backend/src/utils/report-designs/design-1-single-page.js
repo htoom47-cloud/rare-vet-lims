@@ -11,11 +11,11 @@ const { LAB_NAME_EN, LAB_NAME_AR } = require('../../constants/brand');
 const { generateQR } = require('../barcode');
 const { drawArBox, registerPdfFonts } = require('../pdf-arabic');
 const { isAbnormalFlag } = require('./layout-mode');
+const { HAS_LOGO, REPORT_LOGO_SIZE_COMPACT, getBrandLogoBuffer } = require('../pdf-logo');
 
 const ARABIC_FONT_PATH = path.join(__dirname, '../../../assets/fonts/NotoSansArabic-Regular.ttf');
 const LOGO_PATH = path.join(__dirname, '../../../assets/logo.png');
 const HAS_ARABIC_FONT = fs.existsSync(ARABIC_FONT_PATH);
-const HAS_LOGO = fs.existsSync(LOGO_PATH);
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -90,14 +90,19 @@ const formatShortDate = (date) => {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
 
-const drawHeader = (doc, reportData, qrBuffer) => {
+const drawHeader = (doc, reportData, qrBuffer, logoBuf) => {
   const headerH = 40;
+  const logoSize = REPORT_LOGO_SIZE_COMPACT;
   doc.rect(0, 0, PAGE_W, 2).fill(BRAND.gold);
   doc.rect(0, 2, PAGE_W, headerH).fill(BRAND.headerBg);
 
-  if (HAS_LOGO) doc.image(LOGO_PATH, TX, 5, { width: 28, height: 28 });
+  if (logoBuf) {
+    try { doc.image(logoBuf, TX, 5, { width: logoSize, height: logoSize }); } catch { /* */ }
+  } else if (HAS_LOGO) {
+    try { doc.image(LOGO_PATH, TX, 5, { width: logoSize, height: logoSize }); } catch { /* */ }
+  }
 
-  const textX = TX + 32;
+  const textX = TX + logoSize + 6;
   const textW = TW - 78;
   const labEn = env.lab.name || LAB_NAME_EN;
   const labAr = env.lab.nameAr || LAB_NAME_AR;
@@ -301,6 +306,7 @@ const generateSinglePagePDF = async (reportData, outputDir, options = {}) => {
     verificationCode: reportData.verificationCode,
   });
   const qrBuffer = Buffer.from(qrData.replace(/^data:image\/png;base64,/, ''), 'base64');
+  const logoBuf = HAS_LOGO ? await getBrandLogoBuffer(BRAND.brownMid) : null;
 
   return new Promise((resolve, reject) => {
     try {
@@ -309,7 +315,7 @@ const generateSinglePagePDF = async (reportData, outputDir, options = {}) => {
       doc.pipe(stream);
       registerFonts(doc);
 
-      let y = drawHeader(doc, reportData, qrBuffer);
+      let y = drawHeader(doc, reportData, qrBuffer, logoBuf);
       y = drawPatientStrip(doc, {
         reportNumber: reportData.reportNumber,
         sampleCode: reportData.sampleCode,

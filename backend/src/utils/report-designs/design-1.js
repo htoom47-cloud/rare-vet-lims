@@ -6,11 +6,11 @@ const env = require('../../config/env');
 const { LAB_NAME_EN, LAB_NAME_AR } = require('../../constants/brand');
 const { generateQR } = require('../barcode');
 const { readImageBuffer } = require('../../config/storage');
+const { HAS_LOGO, REPORT_LOGO_SIZE, getBrandLogoBuffer } = require('../pdf-logo');
 
 const ARABIC_FONT_PATH = path.join(__dirname, '../../../assets/fonts/NotoSansArabic-Regular.ttf');
 const LOGO_PATH = path.join(__dirname, '../../../assets/logo.png');
 const HAS_ARABIC_FONT = fs.existsSync(ARABIC_FONT_PATH);
-const HAS_LOGO = fs.existsSync(LOGO_PATH);
 
 const MARGIN = 22;
 const PAGE_W = 595;
@@ -145,14 +145,19 @@ const flowArabic = (doc, text, width, opts = {}) => {
   }
 };
 
-const drawHeader = (doc, reportData) => {
+const drawHeader = (doc, reportData, logoBuf) => {
   const top = 6;
   const headerH = 58;
+  const logoSize = REPORT_LOGO_SIZE;
   doc.rect(0, 0, PAGE_W, 3).fill(BRAND.gold);
   doc.rect(0, 3, PAGE_W, headerH).fill(BRAND.headerBg);
-  if (HAS_LOGO) doc.image(LOGO_PATH, TX, top + 4, { width: 36, height: 36 });
+  if (logoBuf) {
+    try { doc.image(logoBuf, TX, top + 4, { width: logoSize, height: logoSize }); } catch { /* */ }
+  } else if (HAS_LOGO) {
+    try { doc.image(LOGO_PATH, TX, top + 4, { width: logoSize, height: logoSize }); } catch { /* */ }
+  }
 
-  const textX = TX + 42;
+  const textX = TX + logoSize + 8;
   const textW = PAGE_W - textX - MARGIN - 40;
   const half = textW / 2;
   const labAr = env.lab.nameAr || LAB_NAME_AR;
@@ -553,6 +558,7 @@ const generateStandardPDF = async (reportData, outputDir, options = {}) => {
   const filename = options.filename || `report-${reportData.reportNumber}-${uuidv4().slice(0, 8)}.pdf`;
   fs.mkdirSync(outputDir, { recursive: true });
   const filePath = path.join(outputDir, filename);
+  const logoBuf = HAS_LOGO ? await getBrandLogoBuffer(BRAND.brownMid) : null;
 
   return new Promise(async (resolve, reject) => {
     try {
@@ -562,7 +568,7 @@ const generateStandardPDF = async (reportData, outputDir, options = {}) => {
       registerFonts(doc);
       doc.y = MARGIN;
 
-      drawHeader(doc, reportData);
+      drawHeader(doc, reportData, logoBuf);
       drawTitleBanner(doc, reportData);
       drawPatientTable(doc, {
         reportNumber: reportData.reportNumber,
