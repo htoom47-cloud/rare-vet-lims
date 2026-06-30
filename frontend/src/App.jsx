@@ -30,6 +30,7 @@ import VetReview from './pages/VetReview';
 import WorkflowCase from './pages/WorkflowCase';
 import Parasitology from './pages/Parasitology';
 import ParasitologyUpload from './pages/ParasitologyUpload';
+import ReceptionDisplay from './pages/ReceptionDisplay';
 
 export default function App() {
   return (
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/report-demo" element={<ReportDemo />} />
             <Route path="/report-live/:id" element={<ReportLive />} />
             <Route path="/verify/:code" element={<VerifyReport />} />
+            <Route path="/reception-display" element={<ReceptionDisplay />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<RoleHome />} />
               <Route path="customers" element={<ProtectedRoute permission="customers.view"><Customers /></ProtectedRoute>} />
