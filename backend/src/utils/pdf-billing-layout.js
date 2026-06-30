@@ -16,7 +16,7 @@ const bilingualMetaRow = (doc, ctx, y, rowH, labelEn, labelAr, value) => {
 
   cellLatin(doc, `${labelEn}:`, MARGIN + 8, pad, labelEnW, { size: 8, bold: true });
   cellLatin(doc, val, MARGIN + 8 + labelEnW, pad, half - labelEnW - 16, { size: 8 });
-  cellArabic(doc, val, mid + 8, pad, half - labelArW - 16, { size: 8, align: 'right' });
+  cellLatin(doc, val, mid + 8, pad, half - labelArW - 16, { size: 8, align: 'right' });
   cellArabic(doc, `${labelAr}:`, mid + half - labelArW - 4, pad, labelArW, { size: 8, bold: true, align: 'right' });
 };
 

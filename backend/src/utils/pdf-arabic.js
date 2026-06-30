@@ -108,6 +108,10 @@ const drawArBox = (doc, text, x, y, w, opts = {}) => {
   const str = String(text ?? '').trim();
   if (!str) return 0;
 
+  if (!hasArabic(str)) {
+    return drawEn(doc, str, x, y, { size, color, bold, width: w, align, fromTop });
+  }
+
   const h = boxH(size);
   const imgY = fromTop ? y : y - h + 2;
 
