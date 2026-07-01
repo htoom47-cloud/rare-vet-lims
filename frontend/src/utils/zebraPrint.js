@@ -131,7 +131,10 @@ const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 const BAR_HEIGHT = 45;
 const BAR_MODULE = 1.5;
 const BAR_RATIO = 3;
-const BARCODE_Y = 25;
+const TEXT_LINE_H = 16;
+const AFTER_BAR_GAP = 8;
+const LINE_STEP = 16;
+const MIN_TOP_Y = 20;
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -175,17 +178,33 @@ const estimateCode128WidthDots = (barcode) => {
   return Math.ceil(modules * BAR_MODULE);
 };
 
-/** Horizontally centered Code128 barcode. */
-const code128Field = (barcode) => {
-  const widthDots = estimateCode128WidthDots(barcode);
-  const x = Math.max(8, Math.floor((LABEL_WIDTH - widthDots) / 2));
-  return `^FO${x},${BARCODE_Y}^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD>:${zplEscape(barcode)}^FS`;
+/** Vertically + horizontally centered layout for 50×25 mm label. */
+const computeLayout = ({ showBarcodeText, showPanel, showAnimal }) => {
+  const textLineCount = [showBarcodeText, showPanel, showAnimal].filter(Boolean).length;
+  const blockHeight = BAR_HEIGHT + AFTER_BAR_GAP + textLineCount * LINE_STEP;
+  const barcodeY = Math.max(MIN_TOP_Y, Math.floor((LABEL_HEIGHT - blockHeight) / 2));
+  const firstTextY = barcodeY + BAR_HEIGHT + AFTER_BAR_GAP;
+
+  let line = 0;
+  const nextTextY = () => {
+    const y = firstTextY + line * LINE_STEP;
+    line += 1;
+    return y;
+  };
+
+  return {
+    barcodeY,
+    barcodeTextY: showBarcodeText ? nextTextY() : null,
+    panelY: showPanel ? nextTextY() : null,
+    animalY: showAnimal ? nextTextY() : null,
+  };
 };
 
-const LAYOUT = {
-  barcodeTextY: 78,
-  panelY: 94,
-  animalY: 110,
+/** Horizontally centered Code128 barcode. */
+const code128Field = (barcode, barcodeY) => {
+  const widthDots = estimateCode128WidthDots(barcode);
+  const x = Math.max(8, Math.floor((LABEL_WIDTH - widthDots) / 2));
+  return `^FO${x},${barcodeY}^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD>:${zplEscape(barcode)}^FS`;
 };
 
 /** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
@@ -196,22 +215,26 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   });
 
   const panelZpl = panelCode(panelKey);
-  // ZPL font cannot render Arabic; print animal code only on thermal labels.
   const animal = truncate(String(sample?.animal_code || '').trim(), 24);
+  const layout = computeLayout({
+    showBarcodeText: !!barcode,
+    showPanel: !!panelZpl,
+    showAnimal: !!animal,
+  });
 
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(code128Field(barcode));
-    lines.push(textLine(LAYOUT.barcodeTextY, truncate(barcode, 24)));
+    lines.push(code128Field(barcode, layout.barcodeY));
+    lines.push(textLine(layout.barcodeTextY, truncate(barcode, 24)));
   }
 
   if (panelZpl) {
-    lines.push(textLine(LAYOUT.panelY, panelZpl));
+    lines.push(textLine(layout.panelY, panelZpl));
   }
 
   if (animal) {
-    lines.push(textLine(LAYOUT.animalY, animal));
+    lines.push(textLine(layout.animalY, animal));
   }
 
   lines.push('^XZ');
