@@ -129,17 +129,29 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
-// Calibrated layout (ZD421 50×25 mm) — user-tested positions.
-const BARCODE_X = 40;
+// Calibrated Y positions (ZD421 50×25 mm).
 const BARCODE_Y = 20;
-const BAR_MODULE = 3;
-const BAR_RATIO = 2;
 const BAR_HEIGHT = 60;
+const BAR_RATIO = 3;
+const QUIET_ZONE_DOTS = 40;
 const LAYOUT = {
   barcodeTextY: 90,
   panelY: 112,
   animalY: 134,
 };
+
+const code128Modules = (barcode) => 11 * String(barcode).length + 35;
+
+/** Max module width so Code128 is NOT squeezed (unscannable on Zebra). */
+const pickBarcodeModule = (barcode) => {
+  const modules = code128Modules(barcode);
+  const maxMod = (LABEL_WIDTH - QUIET_ZONE_DOTS) / modules;
+  if (maxMod >= 2) return 2;
+  if (maxMod >= 1.5) return 1.5;
+  return 1;
+};
+
+const barcodeWidthDots = (barcode, moduleWidth) => Math.ceil(code128Modules(barcode) * moduleWidth);
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -152,14 +164,18 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** Minimal header — ^CI0 (not ^CI28) keeps Code128 barcodes scannable. */
+/** ^CI0 + direct thermal darkness — required for scanner-readable bars. */
 const zplLandscapeHeader = () => [
   '^XA',
   '^CI0',
+  '^MTD',
+  '^MD40',
+  '^MNW',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
   '^LH0,0',
   '^LT0',
+  '^PR2',
 ];
 
 const TEXT_LINE = '^A0N,18,18';
@@ -168,9 +184,12 @@ const textLine = (y, value) => (
   `^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`
 );
 
-const barcodeField = (barcode) => (
-  `^FO${BARCODE_X},${BARCODE_Y}^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD${zplEscape(barcode)}^FS`
-);
+const barcodeField = (barcode) => {
+  const mod = pickBarcodeModule(barcode);
+  const w = barcodeWidthDots(barcode, mod);
+  const x = Math.max(10, Math.floor((LABEL_WIDTH - w) / 2));
+  return `^FO${x},${BARCODE_Y}^BY${mod},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD${zplEscape(barcode)}^FS`;
+};
 
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const { barcode, panelKey } = buildLabelLines(sample, {
