@@ -203,28 +203,40 @@ async function sendZplHttp(device, zpl) {
   await browserPrintFetch('/write', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device, data: zpl }),
+    body: JSON.stringify({ device: device || { name: 'LIMS Zebra Bridge' }, data: zpl }),
     timeoutMs: 8000,
   });
+}
+
+/** Send ZPL via local LIMS bridge (RAW) — preferred on Windows with zebra-local-bridge. */
+async function sendZplLocalBridge(zpl) {
+  await sendZplHttp(null, zpl);
 }
 
 export async function printToZebra(sample, { isArabic = false } = {}) {
   const zpl = buildCbcLabelZpl(sample, { isArabic });
 
+  // 1) LIMS local bridge (RAW) — works with send-zebra-raw.ps1
   try {
-    const device = await getDefaultDeviceSdk();
-    await sendZplSdk(device, zpl);
-    return { method: 'zpl', device: device.name || device.uid };
-  } catch (sdkError) {
+    await sendZplLocalBridge(zpl);
+    return { method: 'zpl-bridge', device: 'LIMS Zebra Bridge' };
+  } catch (bridgeError) {
+    // 2) Official Zebra Browser Print SDK
     try {
-      const device = await getDefaultPrinter();
-      if (!device) throw sdkError;
-      await sendZplHttp(device, zpl);
+      const device = await getDefaultDeviceSdk();
+      await sendZplSdk(device, zpl);
       return { method: 'zpl', device: device.name || device.uid };
-    } catch {
-      throw isBrowserPrintMissing(sdkError)
-        ? sdkError
-        : new ZebraPrintError(sdkError.message || 'Zebra print failed', SERVICE_UNAVAILABLE);
+    } catch (sdkError) {
+      try {
+        const device = await getDefaultPrinter();
+        if (!device) throw sdkError;
+        await sendZplHttp(device, zpl);
+        return { method: 'zpl', device: device.name || device.uid };
+      } catch {
+        throw isBrowserPrintMissing(bridgeError) && isBrowserPrintMissing(sdkError)
+          ? bridgeError
+          : new ZebraPrintError(sdkError.message || bridgeError.message || 'Zebra print failed', SERVICE_UNAVAILABLE);
+      }
     }
   }
 }

@@ -73,10 +73,7 @@ export async function printSampleLabel(sample) {
 
       if (fallbackOk) {
         if (isBrowserPrintMissing(error) && zebraPrinted === 0) {
-          toast(i18n.t('samples.zebraBrowserPrintHint'), { icon: 'ℹ️', duration: 6000 });
-        }
-        if (zebraPrinted === 0) {
-          toast.success(i18n.t('samples.zebraBrowserFallbackOk'));
+          toast.error(i18n.t('samples.zebraBridgeRequired'), { duration: 8000 });
         }
         return 'browser';
       }
