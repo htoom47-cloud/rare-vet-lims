@@ -140,14 +140,13 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ZPL header — matches calibrated ZD421 direct thermal 50×25 mm. */
+/** ZPL header — ZD421 direct thermal 50×25 mm. Use ^CI0 so ^BC Code128 renders (UTF-8 ^CI28 breaks barcodes). */
 const zplLandscapeHeader = () => [
   '^XA',
-  '^CI28',
+  '^CI0',
   '^MTD',
   '^MD30',
   '^MNW',
-  '^MMT',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
   '^LH0,0',
@@ -177,8 +176,8 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    // BY2 + height 35: reliable on ZD421; ^LT0 avoids clipping top of label.
-    lines.push(field(`^FO30,6^BY2,2,35^BCN,35,N,N,N^FD${zplEscape(barcode)}^FS`));
+    // Match printer-setup-label.zpl (^CI0 + ^BCN) — proven on ZD421.
+    lines.push(`^FO40,8^BY2,2,32^BCN,32,N,N,N^FD${zplEscape(barcode)}^FS`);
     lines.push(textLine(52, truncate(barcode, 24)));
   }
 
