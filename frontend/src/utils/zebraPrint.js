@@ -128,6 +128,9 @@ export async function getDefaultPrinter() {
 
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
+const BAR_HEIGHT = 46;
+const BAR_MODULE = 1.5;
+const BAR_RATIO = 3;
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -161,10 +164,33 @@ const zplLandscapeHeader = () => [
 const field = (zpl) => `^FWN${zpl}`;
 
 const TEXT_LINE = '^A0N,18,16';
-const textLine = (y, value) => field(`^FO0,${y}^FB400,1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`);
 
-/** Code128 subset B prefix for reliable scan of BC-… / SMP-… IDs. */
-const code128Field = (barcode) => `^FO10,2^BY1.5,3,46^BCN,46,N,N,N^FD>:${zplEscape(barcode)}^FS`;
+/** Centered text line across full label width. */
+const textLine = (y, value) => field(
+  `^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`,
+);
+
+/** Approximate Code128 width (subset B) in dots for horizontal centering. */
+const estimateCode128WidthDots = (barcode) => {
+  const len = String(barcode).length;
+  const modules = 11 * len + 35;
+  return Math.ceil(modules * BAR_MODULE);
+};
+
+/** Horizontally centered Code128 barcode. */
+const code128Field = (barcode) => {
+  const widthDots = estimateCode128WidthDots(barcode);
+  const x = Math.max(8, Math.floor((LABEL_WIDTH - widthDots) / 2));
+  return field(
+    `^FO${x},4^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD>:${zplEscape(barcode)}^FS`,
+  );
+};
+
+const LAYOUT = {
+  barcodeTextY: 54,
+  panelY: 74,
+  animalY: 92,
+};
 
 /** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
@@ -180,17 +206,16 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    // BY1.5 fits 18-char IDs on 400-dot width; height 46 for scanner readability.
     lines.push(code128Field(barcode));
-    lines.push(textLine(54, truncate(barcode, 24)));
+    lines.push(textLine(LAYOUT.barcodeTextY, truncate(barcode, 24)));
   }
 
   if (panelZpl) {
-    lines.push(textLine(76, panelZpl));
+    lines.push(textLine(LAYOUT.panelY, panelZpl));
   }
 
   if (animal) {
-    lines.push(textLine(96, animal));
+    lines.push(textLine(LAYOUT.animalY, animal));
   }
 
   lines.push('^XZ');
