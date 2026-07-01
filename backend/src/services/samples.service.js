@@ -1,5 +1,6 @@
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { barcodeLookupSql } = require('../utils/barcode-lookup');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
 const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
@@ -106,7 +107,8 @@ const getById = async (id) => {
 };
 
 const getByBarcode = async (barcode) => {
-  const result = await query('SELECT id FROM samples WHERE barcode = $1 OR sample_code = $1', [barcode]);
+  const id = String(barcode || '').trim();
+  const result = await query(`SELECT id FROM samples WHERE ${barcodeLookupSql()}`, [id]);
   if (!result.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');
   return getById(result.rows[0].id);
 };

@@ -3,6 +3,7 @@ const { AppError } = require('../middleware/errorHandler');
 const resultsService = require('./results.service');
 const referenceRangesService = require('./reference-ranges.service');
 const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS } = require('../utils/norma-cbc-map');
+const { barcodeLookupSql } = require('../utils/barcode-lookup');
 
 const resultLimsCode = (row) => row.limsCode || mapNormaCode(row.code) || row.code;
 
@@ -82,9 +83,9 @@ const findSampleByBarcode = async (barcode) => {
     `SELECT s.id, s.sample_code, s.barcode, s.status, a.animal_type
      FROM samples s
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE s.barcode = $1 OR s.sample_code = $1 OR s.barcode ILIKE $2 OR s.sample_code ILIKE $2
+     WHERE ${barcodeLookupSql('s')}
      ORDER BY s.created_at DESC LIMIT 1`,
-    [id, id]
+    [id]
   );
   return result.rows[0] || null;
 };

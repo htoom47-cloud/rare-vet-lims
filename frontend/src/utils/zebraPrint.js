@@ -128,24 +128,12 @@ export async function getDefaultPrinter() {
 
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
-const MIN_MODULE = 2;     // 2 dots ≈ 0.25 mm — scanner minimum at 203 dpi
-const QUIET_ZONE_DOTS = 56;
 
 const LAYOUT = {
-  barcodeTextY: 78,
-  panelY: 100,
-  animalY: 122,
+  barcodeTextY: 82,
+  panelY: 104,
+  animalY: 126,
 };
-
-const code128Modules = (barcode) => 11 * String(barcode).length + 35;
-
-const code128FitsAtMinModule = (barcode) => (
-  code128Modules(barcode) * MIN_MODULE <= LABEL_WIDTH - QUIET_ZONE_DOTS
-);
-
-const barcodeWidthDots = (barcode, moduleWidth = MIN_MODULE) => (
-  Math.ceil(code128Modules(barcode) * moduleWidth)
-);
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -158,15 +146,26 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ^CI0 + direct thermal — UTF-8 ^CI28 breaks Code128 on Zebra. */
+/** Digits-only for compact Code128-C on 50 mm (scanner reads numbers; LIMS matches full BC-/SMP-). */
+export const thermalScanDigits = (barcode) => {
+  let digits = String(barcode || '').replace(/\D/g, '');
+  if (digits.length % 2 === 1) digits = `0${digits}`;
+  return digits;
+};
+
+const code128CModules = (digits) => {
+  const pairs = String(digits).length / 2;
+  return 11 + pairs * 11 + 11 + 13;
+};
+
 const zplLandscapeHeader = () => [
   '^XA',
-  '^FX LIMS label v3',
+  '^FX LIMS label v4 numeric',
   '^CI0',
   '^MTD',
-  '^MD30',
+  '^MD35',
   '^MNW',
-  '^PR2,2',
+  '^PR3',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
   '^LH0,0',
@@ -181,25 +180,15 @@ const field = (zpl) => `^FWN${zpl}`;
 const TEXT_LINE = '^A0N,17,15';
 const textLine = (y, value) => field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`);
 
-/** Code128 — only when it fits at scannable module width (BY2). */
-const code128Field = (barcode) => {
-  const barHeight = 48;
-  const w = barcodeWidthDots(barcode, MIN_MODULE);
-  const x = Math.max(12, Math.floor((LABEL_WIDTH - w) / 2));
-  return field(`^FO${x},14^BY${MIN_MODULE},2.5,${barHeight}^BCN,${barHeight},N,N,N^FD${zplEscape(barcode)}^FS`);
+/** Thick Code128-C — fits 50 mm, readable by 1D USB scanners. */
+const barcodeField = (barcode) => {
+  const digits = thermalScanDigits(barcode);
+  const moduleWidth = 3;
+  const barHeight = 68;
+  const w = code128CModules(digits) * moduleWidth;
+  const x = Math.max(10, Math.floor((LABEL_WIDTH - w) / 2));
+  return field(`^FO${x},8^BY${moduleWidth},3,${barHeight}^BCN,${barHeight},N,N,N^FD>;>8${digits}^FS`);
 };
-
-/** QR for long BC-/SMP- codes — fits 50 mm and scans reliably on thermal. */
-const qrField = (barcode) => {
-  const mag = String(barcode).length > 14 ? 3 : 4;
-  const size = 25 + mag * 18;
-  const x = Math.max(8, Math.floor((LABEL_WIDTH - size) / 2));
-  return field(`^FO${x},8^BQN,2,${mag}^FDQA,${zplEscape(barcode)}^FS`);
-};
-
-const barcodeField = (barcode) => (
-  code128FitsAtMinModule(barcode) ? code128Field(barcode) : qrField(barcode)
-);
 
 export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
   buildLabelLines(sample, { isArabic, panelKey: sample?.panelKey })
