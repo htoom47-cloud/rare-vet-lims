@@ -5,9 +5,22 @@ import { CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
+import QualResultToggle from '../components/results/QualResultToggle';
 import { samplesAPI, resultsAPI } from '../services/api';
 import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest } from '../constants/normaCbcPanel';
-import { formatResultValue, parameterDisplayName, testDisplayName } from '../utils/formatResultValue';
+import {
+  canonicalQualValue,
+  formatResultValue,
+  parameterDisplayName,
+  testDisplayName,
+} from '../utils/formatResultValue';
+
+const qualFlag = (value) => {
+  const q = canonicalQualValue(value);
+  if (q === 'Positive') return 'POS';
+  if (q === 'Negative') return 'NEG';
+  return '';
+};
 
 export default function VetReview() {
   const { t, i18n } = useTranslation();
@@ -15,9 +28,15 @@ export default function VetReview() {
   const [samples, setSamples] = useState([]);
   const [selected, setSelected] = useState(null);
   const [results, setResults] = useState({});
+  const [editValues, setEditValues] = useState({});
   const [doctorNotes, setDoctorNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
+
+  const qualLabels = {
+    positive: t('parasitology.positive'),
+    negative: t('parasitology.negative'),
+  };
 
   const load = () => {
     setLoading(true);
@@ -43,13 +62,19 @@ export default function VetReview() {
     const { data } = await samplesAPI.get(sample.id);
     setSelected(data.data);
     const resMap = {};
+    const editMap = {};
     for (const test of data.data.tests || []) {
       try {
         const res = await resultsAPI.get(test.id);
         resMap[test.id] = res.data.data;
-      } catch { resMap[test.id] = null; }
+        editMap[test.id] = (res.data.data?.values || []).map((v) => ({ ...v }));
+      } catch {
+        resMap[test.id] = null;
+        editMap[test.id] = [];
+      }
     }
     setResults(resMap);
+    setEditValues(editMap);
     setDoctorNotes('');
   };
 
@@ -59,11 +84,28 @@ export default function VetReview() {
 
   const pendingTests = (sample) => (sample?.tests || []).filter((test) => {
     const res = results[test.id];
-    return res && !res.is_validated && hasFilledValues(res.values);
+    return res && !res.is_validated && hasFilledValues(editValues[test.id] || res.values);
   });
 
+  const updateEditValue = (testId, parameterId, patch) => {
+    setEditValues((prev) => ({
+      ...prev,
+      [testId]: (prev[testId] || []).map((row) => (
+        row.parameter_id === parameterId ? { ...row, ...patch } : row
+      )),
+    }));
+  };
+
+  const valuesForSubmit = (testId) => (editValues[testId] || [])
+    .filter((v) => String(v.value ?? '').trim() !== '')
+    .map((v) => ({ parameter_id: v.parameter_id, value: v.value }));
+
   const validateTest = async (sampleTestId, closeAfter = true) => {
-    await resultsAPI.validate(sampleTestId, doctorNotes);
+    const payload = {
+      doctor_notes: doctorNotes,
+      values: valuesForSubmit(sampleTestId),
+    };
+    await resultsAPI.validate(sampleTestId, payload);
     if (closeAfter) {
       toast.success(t('resultValidation.approved'));
       setSelected(null);
@@ -94,7 +136,7 @@ export default function VetReview() {
   const renderFlagCell = (v) => {
     const hasValue = String(v.value ?? '').trim() !== '' || String(v.pct_value ?? '').trim() !== '';
     if (!hasValue) return <td className="text-gray-400">—</td>;
-    const flag = v.flag || 'NORMAL';
+    const flag = v.flag || qualFlag(v.value) || 'NORMAL';
     return (
       <td>
         <StatusBadge status={flag} label={flagLabel(flag)} />
@@ -102,16 +144,47 @@ export default function VetReview() {
     );
   };
 
-  const renderValueRows = (test, values) => {
+  const renderResultCell = (testId, v, editable) => {
+    if (!editable) {
+      return <td>{formatResultValue(v, t)}</td>;
+    }
+    if (v.unit === 'qual') {
+      return (
+        <td>
+          <QualResultToggle
+            value={v.value}
+            labels={qualLabels}
+            onChange={(next) => updateEditValue(testId, v.parameter_id, {
+              value: next,
+              flag: qualFlag(next),
+            })}
+          />
+        </td>
+      );
+    }
+    return (
+      <td>
+        <input
+          type="text"
+          className="input-field py-1 max-w-[140px]"
+          value={v.value ?? ''}
+          onChange={(e) => updateEditValue(testId, v.parameter_id, { value: e.target.value })}
+        />
+        {v.unit && v.unit !== 'qual' && (
+          <span className="text-xs text-gray-500 ms-1">{v.unit}</span>
+        )}
+      </td>
+    );
+  };
+
+  const renderValueRows = (test, values, editable) => {
     const rows = (items) => items.map((v) => (
       <tr key={v.parameter_code || v.parameter_id} className="border-t">
         <td className="py-1">
           {parameterDisplayName(v, i18n.language)}
           {v.pct_value && <span className="text-gray-500 text-xs ms-1">*{v.pct_value}%</span>}
         </td>
-        <td>
-          {formatResultValue(v, t)}
-        </td>
+        {renderResultCell(test.id, v, editable)}
         <td className="text-gray-500">{v.reference || '—'}</td>
         {renderFlagCell(v)}
       </tr>
@@ -170,6 +243,8 @@ export default function VetReview() {
       <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`${t('resultValidation.review')}: ${selected?.sample_code}`} size="xl">
         {selected?.tests?.map((test) => {
           const res = results[test.id];
+          const rows = editValues[test.id] || res?.values || [];
+          const editable = res && !res.is_validated;
           return (
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
               <div className="flex justify-between items-center mb-3">
@@ -180,24 +255,29 @@ export default function VetReview() {
                   </span>
                 )}
               </div>
-              {res?.values?.length > 0 && hasFilledValues(res.values) ? (
-                <table className="w-full text-sm mb-3">
-                  <thead>
-                    <tr className="text-gray-500">
-                      <th className="text-start py-1">{t('resultValidation.parameter')}</th>
-                      <th className="text-start">{t('resultValidation.result')}</th>
-                      <th className="text-start">{t('resultValidation.reference', { defaultValue: 'Reference' })}</th>
-                      <th className="text-start">{t('resultValidation.flag')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {renderValueRows(test, res.values)}
-                  </tbody>
-                </table>
+              {rows.length > 0 && hasFilledValues(rows) ? (
+                <>
+                  {editable && (
+                    <p className="text-xs text-primary-600 mb-2">{t('resultValidation.editHint')}</p>
+                  )}
+                  <table className="w-full text-sm mb-3">
+                    <thead>
+                      <tr className="text-gray-500">
+                        <th className="text-start py-1">{t('resultValidation.parameter')}</th>
+                        <th className="text-start">{t('resultValidation.result')}</th>
+                        <th className="text-start">{t('resultValidation.reference', { defaultValue: 'Reference' })}</th>
+                        <th className="text-start">{t('resultValidation.flag')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {renderValueRows(test, rows, editable)}
+                    </tbody>
+                  </table>
+                </>
               ) : (
                 <p className="text-gray-500 text-sm mb-3">{t('resultValidation.noResultsYet')}</p>
               )}
-              {res && !res.is_validated && hasFilledValues(res.values) && (
+              {editable && hasFilledValues(rows) && (
                 <button type="button" onClick={() => validateTest(test.id)} className="btn-secondary text-sm">
                   {t('resultValidation.approveTest')}
                 </button>

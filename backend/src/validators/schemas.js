@@ -96,6 +96,14 @@ const resultEntrySchema = Joi.object({
   technician_notes: Joi.string().allow('', null),
 });
 
+const resultValidateSchema = Joi.object({
+  doctor_notes: Joi.string().allow('', null),
+  values: Joi.array().items(Joi.object({
+    parameter_id: Joi.string().uuid().required(),
+    value: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
+  })).min(1),
+});
+
 const resultApproveBatchSchema = Joi.object({
   items: Joi.array().items(Joi.object({
     sample_test_id: Joi.string().uuid().required(),
@@ -189,6 +197,7 @@ module.exports = {
   packageSchema,
   resultEntrySchema,
   resultApproveBatchSchema,
+  resultValidateSchema,
   invoiceSchema,
   quoteSchema,
   paymentSchema,

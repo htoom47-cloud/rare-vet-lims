@@ -19,8 +19,8 @@ const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(raw
 
 const formatQualValue = (value, unit) => {
   if (unit !== 'qual' || !value) return value;
-  if (isPositiveQual(value)) return 'Positive';
-  if (isNegativeQual(value)) return 'Negative';
+  if (isPositiveQual(value)) return 'إيجابي';
+  if (isNegativeQual(value)) return 'سلبي';
   return value;
 };
 
@@ -243,7 +243,10 @@ const enterResults = async (data, userId) => {
   }
 };
 
-const validateResults = async (sampleTestId, userId, doctorNotes) => {
+const validateResults = async (sampleTestId, userId, doctorNotes, values) => {
+  if (values?.length) {
+    await enterResults({ sample_test_id: sampleTestId, values }, userId);
+  }
   const result = await query(
     `UPDATE results SET is_validated = true, validated_by = $1, validated_at = NOW(), doctor_notes = $2
      WHERE sample_test_id = $3 RETURNING *`,

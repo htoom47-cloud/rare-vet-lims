@@ -346,6 +346,7 @@ const resources = {
         nothingToApprove: 'No tests ready for approval',
         notes: 'Reviewer notes',
         notesPlaceholder: 'Optional notes...',
+        editHint: 'You can edit results before approval',
         flags: {
           NORMAL: 'Normal',
           HIGH: 'High',
@@ -1158,6 +1159,7 @@ const resources = {
         nothingToApprove: 'لا توجد فحوصات جاهزة للاعتماد',
         notes: 'ملاحظات المراجع',
         notesPlaceholder: 'ملاحظات اختيارية...',
+        editHint: 'يمكنك تعديل النتيجة قبل الاعتماد',
         flags: {
           NORMAL: 'طبيعي',
           HIGH: 'مرتفع',

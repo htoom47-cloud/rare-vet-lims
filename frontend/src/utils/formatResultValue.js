@@ -1,5 +1,11 @@
-const isPositiveQual = (raw) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(String(raw || '').trim());
-const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(String(raw || '').trim());
+export const isPositiveQual = (raw) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(String(raw || '').trim());
+export const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(String(raw || '').trim());
+
+export const canonicalQualValue = (raw) => {
+  if (isPositiveQual(raw)) return 'Positive';
+  if (isNegativeQual(raw)) return 'Negative';
+  return '';
+};
 
 export const formatResultValue = ({ value, unit, flag }, t) => {
   const raw = String(value ?? '').trim();

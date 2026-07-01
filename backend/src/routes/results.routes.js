@@ -3,7 +3,7 @@ const multer = require('multer');
 const service = require('../services/results.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { resultEntrySchema, resultApproveBatchSchema } = require('../validators/schemas');
+const { resultEntrySchema, resultApproveBatchSchema, resultValidateSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
@@ -99,9 +99,14 @@ router.post('/approve-batch', authorize(PERMISSIONS.RESULTS_VALIDATE), validate(
   } catch (err) { next(err); }
 });
 
-router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
+router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), validate(resultValidateSchema), async (req, res, next) => {
   try {
-    const data = await service.validateResults(req.params.sampleTestId, req.user.id, req.body.doctor_notes);
+    const data = await service.validateResults(
+      req.params.sampleTestId,
+      req.user.id,
+      req.body.doctor_notes,
+      req.body.values
+    );
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
