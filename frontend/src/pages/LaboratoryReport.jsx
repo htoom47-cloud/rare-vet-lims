@@ -8,15 +8,18 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   Download,
+  FileText,
   Mail,
   MessageCircle,
   Printer,
+  RotateCcw,
 } from 'lucide-react';
 import AppLogo from '../components/ui/AppLogo';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { notificationsAPI, reportsAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { DEMO_REPORT } from '../data/demoReport';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
 import { isSinglePageLayout, isAbnormalFlag, flattenResults } from '../utils/reportLayout';
@@ -120,11 +123,15 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const { user, hasPermission } = useAuth();
   const reportRef = useRef(null);
   const [report, setReport] = useState(initialReport || (demoMode ? DEMO_REPORT : null));
   const [loading, setLoading] = useState(!demoMode && !initialReport);
   const [sending, setSending] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [regeneratingPdf, setRegeneratingPdf] = useState(false);
+
+  const canRegeneratePdf = !demoMode && hasPermission('reports.generate');
 
   const isAr = report?.language === 'ar' || i18n.language === 'ar';
   const dir = isAr ? 'rtl' : 'ltr';
@@ -219,6 +226,30 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     }
   };
 
+  const handleOpenOfficialPdf = async () => {
+    if (!report?.pdfUrl) return;
+    try {
+      await reportsAPI.openPdf(report.pdfUrl);
+    } catch {
+      toast.error(t('reports.openFailed'));
+    }
+  };
+
+  const handleRegenerateOfficialPdf = async () => {
+    if (!id || !report?.pdfUrl) return;
+    setRegeneratingPdf(true);
+    toast.dismiss();
+    try {
+      const updated = await reportsAPI.regenerateAndOpen(id, report.pdfUrl);
+      setReport((prev) => (prev ? { ...prev, pdfUrl: updated.pdf_url } : prev));
+      toast.success(t('reports.regenerateDone'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('reports.regenerateFailed'));
+    } finally {
+      setRegeneratingPdf(false);
+    }
+  };
+
   const handleWhatsApp = () => {
     const text = encodeURIComponent(`${isAr ? 'تقرير' : 'Report'}: ${report.reportNumber}\n${report.verifyUrl}`);
     window.open(`https://wa.me/${(report.customer.mobile || '').replace(/\D/g, '')}?text=${text}`, '_blank');
@@ -265,6 +296,22 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
         </Button>
         <div className="flex flex-wrap gap-1.5">
           <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>
+          {report.pdfUrl && (
+            <Button variant="secondary" size="sm" onClick={handleOpenOfficialPdf} className="gap-1.5 h-8 text-xs">
+              <FileText size={14} />{t('labReport.openOfficialPdf')}
+            </Button>
+          )}
+          {canRegeneratePdf && report.pdfUrl && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRegenerateOfficialPdf}
+              disabled={regeneratingPdf}
+              className="gap-1.5 h-8 text-xs text-amber-800"
+            >
+              <RotateCcw size={14} />{regeneratingPdf ? t('common.loading') : t('labReport.regeneratePdf')}
+            </Button>
+          )}
           <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-1.5 h-8 text-xs"><Download size={14} />{exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}</Button>
           {!hideShareActions && (
             <>

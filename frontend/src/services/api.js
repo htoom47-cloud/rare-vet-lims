@@ -229,9 +229,15 @@ export const reportsAPI = {
       approve_vet: opts.approve_vet ?? false,
     }, { timeout: 120000 }),
   approve: (reportId, type) => api.post(`/reports/${reportId}/approve`, { type }),
+  regeneratePdf: (reportId) => api.post(`/reports/${reportId}/regenerate-pdf`, {}, { timeout: 120000 }),
   verify: (code) => api.get(`/reports/verify/${code}`),
   openPdf: openReportPdf,
   downloadPdf: downloadReportPdf,
+  async regenerateAndOpen(reportId, pdfUrl) {
+    const { data } = await this.regeneratePdf(reportId);
+    await openReportPdf(data.data.pdf_url || pdfUrl);
+    return data.data;
+  },
 };
 
 export const notificationsAPI = {

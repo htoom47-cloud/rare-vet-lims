@@ -56,6 +56,20 @@ router.post('/:id/approve', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res
   } catch (err) { next(err); }
 });
 
+router.post('/:id/regenerate-pdf', authorize(PERMISSIONS.REPORTS_GENERATE), async (req, res, next) => {
+  try {
+    const data = await service.regeneratePdfById(req.params.id);
+    res.json({
+      success: true,
+      data: {
+        id: data.id,
+        report_number: data.report_number,
+        pdf_url: data.pdf_url,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/download/:filename', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
   try {
     await service.servePdf(req.params.filename, res);

@@ -358,20 +358,40 @@ const buildPdfPayload = async (reportRow) => {
 };
 
 const regeneratePdf = async (reportRow) => {
-  const existingName = extractFilename(reportRow.pdf_url);
-  const reportData = await buildPdfPayload(reportRow);
-  const localDir = path.join(ensureUploadDir(), 'reports');
-  const pdf = await generateReportPDF(reportData, localDir, existingName ? { filename: existingName } : {});
+  try {
+    const existingName = extractFilename(reportRow.pdf_url);
+    const reportData = await buildPdfPayload(reportRow);
+    const localDir = path.join(ensureUploadDir(), 'reports');
+    const pdf = await generateReportPDF(reportData, localDir, existingName ? { filename: existingName } : {});
 
-  const saved = await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
-  if (saved.url !== reportRow.pdf_url) {
-    await query('UPDATE reports SET pdf_url = $1 WHERE id = $2', [saved.url, reportRow.id]);
-  }
+    const saved = await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
+    if (saved.url !== reportRow.pdf_url) {
+      await query('UPDATE reports SET pdf_url = $1 WHERE id = $2', [saved.url, reportRow.id]);
+    }
 
-  if (reportRow.pdf_url && reportRow.pdf_url !== saved.url) {
-    await deleteFile(reportRow.pdf_url);
+    if (reportRow.pdf_url && reportRow.pdf_url !== saved.url) {
+      await deleteFile(reportRow.pdf_url);
+    }
+    return saved.url;
+  } catch (err) {
+    if (err.isOperational) throw err;
+    logger.error('Report PDF regeneration failed', {
+      reportId: reportRow.id,
+      message: err.message,
+      stack: err.stack,
+    });
+    throw new AppError(
+      `Could not regenerate report PDF: ${err.message}`,
+      500,
+      'PDF_REGENERATION_FAILED'
+    );
   }
-  return saved.url;
+};
+
+const regeneratePdfById = async (reportId) => {
+  const reportRow = await getById(reportId);
+  const pdfUrl = await regeneratePdf(reportRow);
+  return { ...reportRow, pdf_url: pdfUrl };
 };
 
 const ensurePdfFile = async (reportRow) => {
@@ -616,4 +636,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, getPreview, generate, approve, verify, servePdf };
+module.exports = { list, getPreview, generate, approve, verify, servePdf, regeneratePdfById };

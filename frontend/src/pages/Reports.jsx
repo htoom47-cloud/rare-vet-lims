@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Download, Eye, FileText, FilePlus, Stethoscope } from 'lucide-react';
+import { CheckCircle2, Download, Eye, FileText, FilePlus, RotateCcw, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -60,7 +60,7 @@ function ApprovalLine({ label, approved, approverName, approvedAt, canApprove, o
 export default function Reports() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [searchParams] = useSearchParams();
   const [reports, setReports] = useState([]);
   const [completedSamples, setCompletedSamples] = useState([]);
@@ -71,6 +71,7 @@ export default function Reports() {
   const [generating, setGenerating] = useState(false);
   const [sendingId, setSendingId] = useState(null);
   const [approvingKey, setApprovingKey] = useState(null);
+  const [regeneratingId, setRegeneratingId] = useState(null);
 
   const [selectedSample, setSelectedSample] = useState(null);
   const [language, setLanguage] = useState('ar');
@@ -80,6 +81,7 @@ export default function Reports() {
 
   const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
   const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
+  const canRegeneratePdf = hasPermission('reports.generate');
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)
     : user?.full_name;
@@ -123,7 +125,24 @@ export default function Reports() {
   };
 
   const openPdf = async (report) => {
-    navigate(`/reports/${report.id}/view`);
+    try {
+      await reportsAPI.openPdf(report.pdf_url);
+    } catch {
+      toast.error(t('reports.openFailed'));
+    }
+  };
+
+  const regeneratePdf = async (report) => {
+    setRegeneratingId(report.id);
+    try {
+      await reportsAPI.regenerateAndOpen(report.id, report.pdf_url);
+      toast.success(t('reports.regenerateDone'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('reports.regenerateFailed'));
+    } finally {
+      setRegeneratingId(null);
+    }
   };
 
   const openGenerateForSample = (sample) => {
@@ -248,9 +267,21 @@ export default function Reports() {
             <Eye size={14} /> {t('labReport.title')}
           </button>
           {r.pdf_url && (
-            <button type="button" onClick={() => openPdf(r)} className="text-primary-600 flex items-center gap-1 text-sm">
-              <Download size={14} /> {t('common.print')}
-            </button>
+            <>
+              <button type="button" onClick={() => openPdf(r)} className="text-primary-600 flex items-center gap-1 text-sm">
+                <Download size={14} /> PDF
+              </button>
+              {canRegeneratePdf && (
+                <button
+                  type="button"
+                  onClick={() => regeneratePdf(r)}
+                  disabled={regeneratingId === r.id}
+                  className="text-amber-700 flex items-center gap-1 text-sm disabled:opacity-50"
+                >
+                  <RotateCcw size={14} /> {regeneratingId === r.id ? t('common.loading') : t('reports.regeneratePdf')}
+                </button>
+              )}
+            </>
           )}
           <button onClick={() => sendToCustomer(r)} disabled={sendingId === r.id} className="text-green-600 text-sm">
             {t('workflow.sendToCustomer')}
