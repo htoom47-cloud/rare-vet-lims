@@ -161,9 +161,6 @@ const zplLandscapeHeader = () => [
   '^PR3',
 ];
 
-/** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
-const field = (zpl) => `^FWN${zpl}`;
-
 const TEXT_LINE = '^A0N,16,14';
 
 /** Centered text line across full label width. */
