@@ -741,7 +741,8 @@ const resources = {
       users: {
         title: 'Users & Permissions', role: 'Role', permissions: 'Permissions',
         newUser: 'New User', editUser: 'Edit User', created: 'User created', updated: 'User updated',
-        permsSaved: 'Permissions saved', savePermissions: 'Save Permissions',
+        permsSaved: 'Permissions saved ({{count}})', permsPartialSave: 'Only {{saved}} of {{requested}} permissions were saved — invalid codes were skipped',
+        savePermissions: 'Save Permissions',
         adminOnly: 'This page is restricted to administrators only',
         adminOnlyHint: 'Only the admin account can manage users and role permissions',
         adminPermsLocked: 'Admin role has all permissions and cannot be modified',
@@ -1562,7 +1563,8 @@ const resources = {
       users: {
         title: 'المستخدمين والصلاحيات', role: 'الدور', permissions: 'الصلاحيات',
         newUser: 'مستخدم جديد', editUser: 'تعديل المستخدم', created: 'تم إنشاء المستخدم', updated: 'تم تحديث المستخدم',
-        permsSaved: 'تم حفظ الصلاحيات', savePermissions: 'حفظ الصلاحيات',
+        permsSaved: 'تم حفظ الصلاحيات ({{count}})', permsPartialSave: 'تم حفظ {{saved}} من {{requested}} صلاحية فقط — بعض الرموز غير صالحة',
+        savePermissions: 'حفظ الصلاحيات',
         adminOnly: 'هذه الصفحة مخصصة لحساب المدير فقط',
         adminOnlyHint: 'فقط حساب المدير يمكنه إدارة المستخدمين وصلاحيات الأدوار',
         adminPermsLocked: 'دور المدير يملك كل الصلاحيات ولا يمكن تعديلها',
