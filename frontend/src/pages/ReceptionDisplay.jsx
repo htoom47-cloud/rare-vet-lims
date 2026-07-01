@@ -202,7 +202,7 @@ export default function ReceptionDisplay() {
               <div className="text-center flex flex-col items-center justify-center">
                 <img
                   src="/reception-display-usb/pricing-banner.png"
-                  alt="Al-Nwadr Lab Pricing"
+                  alt="عرض الافتتاح — قائمة الأسعار"
                   className="max-w-full max-h-[calc(100vh-200px)] rounded-xl border-2 border-primary-400/35 shadow-2xl object-contain"
                 />
               </div>
