@@ -24,15 +24,7 @@ import { DEMO_REPORT } from '../data/demoReport';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
 import { isSinglePageLayout, isAbnormalFlag, flattenResults } from '../utils/reportLayout';
 
-const ANIMAL_TYPES = {
-  camel: { en: 'Camel', ar: 'إبل' },
-  horse: { en: 'Horse', ar: 'حصان' },
-  sheep: { en: 'Sheep', ar: 'غنم' },
-  goat: { en: 'Goat', ar: 'ماعز' },
-  bird: { en: 'Bird', ar: 'طير' },
-  cat: { en: 'Cat', ar: 'قط' },
-  dog: { en: 'Dog', ar: 'كلب' },
-};
+import { ANIMAL_TYPES } from '../constants/animalTypes';
 
 const GENDERS = {
   male: { en: 'M', ar: 'ذ' },

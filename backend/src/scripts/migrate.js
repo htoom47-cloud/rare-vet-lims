@@ -295,6 +295,15 @@ async function applyPatches() {
       ALTER TABLE price_quotes ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) DEFAULT 0
     `);
     await client.query('ALTER TABLE animals ADD COLUMN IF NOT EXISTS breed VARCHAR(100)');
+    try {
+      await client.query(`ALTER TYPE animal_type ADD VALUE IF NOT EXISTS 'other'`);
+    } catch (_) {
+      try { await client.query(`ALTER TYPE animal_type ADD VALUE 'other'`); } catch (e) { /* exists */ }
+    }
+    await client.query(`
+      UPDATE animals SET animal_type = 'other'
+      WHERE animal_type::text IN ('bird', 'cat', 'dog')
+    `);
     await syncLabContactInfo(client);
   } finally {
     client.release();

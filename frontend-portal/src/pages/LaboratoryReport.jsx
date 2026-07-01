@@ -18,15 +18,7 @@ import { cn } from '../lib/utils';
 import { portalReportsAPI } from '../services/portalApi';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
 
-const ANIMAL_TYPES = {
-  camel: { en: 'Camel', ar: 'إبل' },
-  horse: { en: 'Horse', ar: 'حصان' },
-  sheep: { en: 'Sheep', ar: 'غنم' },
-  goat: { en: 'Goat', ar: 'ماعز' },
-  bird: { en: 'Bird', ar: 'طير' },
-  cat: { en: 'Cat', ar: 'قط' },
-  dog: { en: 'Dog', ar: 'كلب' },
-};
+import { ANIMAL_TYPES } from '../utils/animalTypes';
 
 const GENDERS = {
   male: { en: 'M', ar: 'ذ' },

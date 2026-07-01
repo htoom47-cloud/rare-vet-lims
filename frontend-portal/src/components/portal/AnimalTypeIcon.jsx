@@ -1,4 +1,4 @@
-import { Bird, Cat, Dog } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 function CamelIcon({ size = 24, className }) {
@@ -71,17 +71,18 @@ const TYPE_ICONS = {
   horse: HorseIcon,
   sheep: SheepIcon,
   goat: GoatIcon,
-  bird: Bird,
-  cat: Cat,
-  dog: Dog,
+  other: HelpCircle,
+  bird: HelpCircle,
+  cat: HelpCircle,
+  dog: HelpCircle,
 };
 
 export default function AnimalTypeIcon({ type, size = 24, className }) {
   const Icon = TYPE_ICONS[type];
   if (!Icon) {
-    return <HorseIcon size={size} className={cn('opacity-60', className)} />;
+    return <HelpCircle size={size} className={cn('opacity-60', className)} />;
   }
-  return <Icon size={size} className={className} strokeWidth={type === 'bird' || type === 'cat' || type === 'dog' ? 2 : undefined} />;
+  return <Icon size={size} className={className} strokeWidth={type === 'other' ? 2 : undefined} />;
 }
 
 export { TYPE_ICONS, CamelIcon, HorseIcon, SheepIcon, GoatIcon };

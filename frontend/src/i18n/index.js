@@ -481,7 +481,7 @@ const resources = {
         age: 'Age', agePlaceholder: 'e.g. 3 years', gender: 'Gender', breed: 'Breed', weight: 'Weight', color: 'Color', rfid: 'RFID/Chip',
         owner: 'Owner', selectOwner: 'Select owner', medicalHistory: 'Medical History', created: 'Animal registered',
         genders: { male: 'Male', female: 'Female', unknown: 'Unknown' },
-        types: { camel: 'Camel', horse: 'Horse', sheep: 'Sheep', goat: 'Goat', bird: 'Bird', cat: 'Cat', dog: 'Dog' },
+        types: { camel: 'Camel', sheep: 'Sheep', horse: 'Horse', goat: 'Goat', other: 'Other' },
       },
       samples: {
         title: 'Sample Management', register: 'Register Sample', barcode: 'Barcode',
@@ -1293,7 +1293,7 @@ const resources = {
         age: 'العمر', agePlaceholder: 'مثال: 3 سنوات', gender: 'الجنس', breed: 'السلالة', weight: 'الوزن', color: 'اللون', rfid: 'رقم الشريحة',
         owner: 'المالك', selectOwner: 'اختر المالك', medicalHistory: 'التاريخ الطبي', created: 'تم تسجيل الحيوان',
         genders: { male: 'ذكر', female: 'أنثى', unknown: 'غير محدد' },
-        types: { camel: 'جمل', horse: 'حصان', sheep: 'غنم', goat: 'ماعز', bird: 'طائر', cat: 'قط', dog: 'كلب' },
+        types: { camel: 'إبل', sheep: 'غنم', horse: 'خيل', goat: 'ماعز', other: 'أخرى' },
       },
       samples: {
         title: 'إدارة العينات', register: 'تسجيل عينة', barcode: 'الباركود',

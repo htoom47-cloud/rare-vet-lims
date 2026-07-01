@@ -39,11 +39,7 @@ const FLAG_SYMBOL = {
   POS: '+', NEG: '\u2212',
 };
 
-const ANIMAL_TYPES = {
-  camel: { en: 'Camel', ar: 'إبل' }, horse: { en: 'Horse', ar: 'حصان' },
-  sheep: { en: 'Sheep', ar: 'غنم' }, goat: { en: 'Goat', ar: 'ماعز' },
-  bird: { en: 'Bird', ar: 'طير' }, cat: { en: 'Cat', ar: 'قط' }, dog: { en: 'Dog', ar: 'كلب' },
-};
+const { ANIMAL_TYPE_LABELS } = require('../../constants/animal-types');
 const GENDERS = {
   male: { en: 'M', ar: 'ذ' }, female: { en: 'F', ar: 'أ' }, unknown: { en: '-', ar: '-' },
 };
@@ -324,8 +320,8 @@ const generateSinglePagePDF = async (reportData, outputDir, options = {}) => {
         animalCode: reportData.animalCode,
         animalName: reportData.animalName || '-',
         species: {
-          en: ANIMAL_TYPES[reportData.animalType]?.en || reportData.animalType,
-          ar: ANIMAL_TYPES[reportData.animalType]?.ar || reportData.animalType,
+          en: ANIMAL_TYPE_LABELS[reportData.animalType]?.en || reportData.animalType,
+          ar: ANIMAL_TYPE_LABELS[reportData.animalType]?.ar || reportData.animalType,
         },
         gender: {
           en: GENDERS[reportData.animalGender]?.en || '-',

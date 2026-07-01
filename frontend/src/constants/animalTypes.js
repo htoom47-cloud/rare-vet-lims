@@ -1,3 +1,4 @@
+/** Active animal types — order: إبل، غنم، خيل، ماعز، أخرى */
 export const ANIMAL_TYPE_CODES = ['camel', 'sheep', 'horse', 'goat', 'other'];
 
 export const ANIMAL_TYPES = {
@@ -11,18 +12,7 @@ export const ANIMAL_TYPES = {
   dog: { en: 'Other', ar: 'أخرى' },
 };
 
-export const animalLabel = (type, isAr) => {
-  const e = ANIMAL_TYPES[type];
-  return e ? (isAr ? e.ar : e.en) : (type || '—');
-};
-
-const GENDERS = {
-  male: { en: 'Male', ar: 'ذكر' },
-  female: { en: 'Female', ar: 'أنثى' },
-  unknown: { en: '—', ar: '—' },
-};
-
-export const genderLabel = (gender, isAr) => {
-  const e = GENDERS[gender];
-  return e ? (isAr ? e.ar : e.en) : (gender || '—');
+export const animalTypeLabel = (type, isAr) => {
+  const entry = ANIMAL_TYPES[type];
+  return entry ? (isAr ? entry.ar : entry.en) : (type || '—');
 };

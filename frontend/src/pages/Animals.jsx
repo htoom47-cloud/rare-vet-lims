@@ -6,7 +6,7 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { animalsAPI, customersAPI } from '../services/api';
 
-const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
+import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
 const GENDERS = ['male', 'female', 'unknown'];
 
 const EMPTY_FORM = {
@@ -96,7 +96,7 @@ export default function Animals() {
           <div>
             <label className="block text-sm font-medium mb-1">{t('animals.type')}</label>
             <select value={form.animal_type} onChange={(e) => setField('animal_type', e.target.value)} className="input-field">
-              {ANIMAL_TYPES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
+              {ANIMAL_TYPE_CODES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
             </select>
           </div>
 

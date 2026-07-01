@@ -92,11 +92,7 @@ const BRAND = {
 };
 
 const TABLE_BORDER_W = 0.58;
-const ANIMAL_TYPES = {
-  camel: { en: 'Camel', ar: 'إبل' }, horse: { en: 'Horse', ar: 'حصان' },
-  sheep: { en: 'Sheep', ar: 'غنم' }, goat: { en: 'Goat', ar: 'ماعز' },
-  bird: { en: 'Bird', ar: 'طير' }, cat: { en: 'Cat', ar: 'قط' }, dog: { en: 'Dog', ar: 'كلب' },
-};
+const { ANIMAL_TYPE_LABELS } = require('../../constants/animal-types');
 const GENDERS = {
   male: { en: 'Male', ar: 'ذكر' }, female: { en: 'Female', ar: 'أنثى' }, unknown: { en: 'Unknown', ar: 'غير محدد' },
 };
@@ -277,7 +273,7 @@ const drawHeader = (doc, data, barcodeBuffer, logoBuf) => {
 
 const drawPatientCard = (doc, data, y0) => {
   const isAr = data.language === 'ar';
-  const species = ANIMAL_TYPES[data.animalType] || { en: data.animalType || '-', ar: data.animalType || '-' };
+  const species = ANIMAL_TYPE_LABELS[data.animalType] || { en: data.animalType || '-', ar: data.animalType || '-' };
   const gender = GENDERS[data.animalGender] || GENDERS.unknown;
   const cardH = 76;
   roundRect(doc, TX, y0, TW, cardH, 3, BRAND.white, BRAND.border);

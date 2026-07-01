@@ -78,7 +78,7 @@ CREATE INDEX idx_customers_name ON customers(full_name);
 
 -- ==================== ANIMALS ====================
 CREATE TYPE animal_type AS ENUM (
-    'camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'
+    'camel', 'sheep', 'horse', 'goat', 'other'
 );
 
 CREATE TYPE animal_gender AS ENUM ('male', 'female', 'unknown');

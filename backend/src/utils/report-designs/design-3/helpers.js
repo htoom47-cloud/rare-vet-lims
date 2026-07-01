@@ -2,15 +2,7 @@ const env = require('../../../config/env');
 const { LAB_NAME_EN, LAB_NAME_AR } = require('../../../constants/brand');
 const { isAbnormalFlag } = require('../layout-mode');
 
-const ANIMAL_TYPES = {
-  camel: { en: 'Camel', ar: 'إبل' },
-  horse: { en: 'Horse', ar: 'حصان' },
-  sheep: { en: 'Sheep', ar: 'غنم' },
-  goat: { en: 'Goat', ar: 'ماعز' },
-  bird: { en: 'Bird', ar: 'طير' },
-  cat: { en: 'Cat', ar: 'قط' },
-  dog: { en: 'Dog', ar: 'كلب' },
-};
+const { ANIMAL_TYPE_LABELS } = require('../../../constants/animal-types');
 
 const GENDERS = {
   male: { en: 'Male', ar: 'ذكر' },
@@ -93,7 +85,7 @@ const getLabMeta = () => ({
 const getPatientFields = (data) => {
   const lang = data.language || 'ar';
   const isAr = lang === 'ar';
-  const species = ANIMAL_TYPES[data.animalType] || { en: data.animalType || '-', ar: data.animalType || '-' };
+  const species = ANIMAL_TYPE_LABELS[data.animalType] || { en: data.animalType || '-', ar: data.animalType || '-' };
   const gender = GENDERS[data.animalGender] || GENDERS.unknown;
 
   const defs = isAr

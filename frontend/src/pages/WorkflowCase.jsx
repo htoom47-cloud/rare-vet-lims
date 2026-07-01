@@ -33,7 +33,8 @@ import {
 } from '../utils/fieldVisitService';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 
-const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
+import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
+
 const EMPTY_ANIMAL = {
   animal_type: 'camel',
   gender: 'male',
@@ -473,7 +474,7 @@ export default function WorkflowCase() {
                   <div>
                     <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.type')}</label>
                     <select value={newAnimal.animal_type} onChange={(e) => setNewAnimal({ ...newAnimal, animal_type: e.target.value })} className="input-field">
-                      {ANIMAL_TYPES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
+                      {ANIMAL_TYPE_CODES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
                     </select>
                   </div>
                   <div>

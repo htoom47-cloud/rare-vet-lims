@@ -25,8 +25,10 @@ const customerSchema = Joi.object({
   credit_limit: Joi.number().min(0).default(0),
 });
 
+const { ANIMAL_TYPE_CODES } = require('../constants/animal-types');
+
 const animalSchema = Joi.object({
-  animal_type: Joi.string().valid('camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog').required(),
+  animal_type: Joi.string().valid(...ANIMAL_TYPE_CODES).required(),
   name_tag: Joi.string().allow('', null),
   age: Joi.string().allow('', null),
   gender: Joi.string().valid('male', 'female', 'unknown').default('unknown'),

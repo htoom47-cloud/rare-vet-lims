@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import { fmtCatalog } from '../utils/vat';
 
-const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
+import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
 
 const emptyTestForm = () => ({
   code: '', name: '', name_ar: '', category_id: '', description: '', price: 0,
@@ -1131,7 +1131,7 @@ export default function Tests() {
           <div>
             <label className="block text-sm font-medium mb-1">{t('tests.animalType')}</label>
             <select value={rangeForm.animal_type} onChange={(e) => setRangeForm({ ...rangeForm, animal_type: e.target.value })} className="input-field" required>
-              {ANIMAL_TYPES.map((type) => (
+              {ANIMAL_TYPE_CODES.map((type) => (
                 <option key={type} value={type}>{t(`animals.types.${type}`)}</option>
               ))}
             </select>
