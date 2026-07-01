@@ -140,22 +140,21 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ZPL header — force landscape 50×25 mm, horizontal fields (no rotation). */
+/** ZPL header — matches calibrated ZD421 direct thermal 50×25 mm. */
 const zplLandscapeHeader = () => [
   '^XA',
   '^CI28',
-  '^MUd',
+  '^MTD',
+  '^MD30',
+  '^MNW',
+  '^MMT',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
-  '^MD20',
   '^LH0,0',
   '^LT0',
   '^LS0',
-  '^LRN',
   '^FWN',
   '^PON',
-  '^MNM',
-  '^MMT',
 ];
 
 /** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
@@ -175,15 +174,15 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(field(`^FO40,10^BY1.5,2,22^BCN,22,Y,N,N^FD${zplEscape(barcode)}^FS`));
+    lines.push(field(`^FO40,10^BY2,2,28^BCN,28,Y,N,N^FD${zplEscape(barcode)}^FS`));
   }
 
   if (panelZpl) {
-    lines.push(field(`^FO0,52^FB400,1,0,C,0^A0N,16,14^FD${zplEscape(panelZpl)}^FS`));
+    lines.push(field(`^FO0,58^FB400,1,0,C,0^A0N,16,14^FD${zplEscape(panelZpl)}^FS`));
   }
 
   if (animal) {
-    lines.push(field(`^FO0,72^FB400,1,0,C,0^A0N,12,10^FD${zplEscape(animal)}^FS`));
+    lines.push(field(`^FO0,78^FB400,1,0,C,0^A0N,12,10^FD${zplEscape(animal)}^FS`));
   }
 
   lines.push('^XZ');
