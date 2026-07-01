@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   Download,
   FileText,
-  Mail,
   MessageCircle,
   Printer,
   RotateCcw,
@@ -18,7 +17,7 @@ import AppLogo from '../components/ui/AppLogo';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
-import { notificationsAPI, reportsAPI } from '../services/api';
+import { reportsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { DEMO_REPORT } from '../data/demoReport';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
@@ -119,7 +118,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const reportRef = useRef(null);
   const [report, setReport] = useState(initialReport || (demoMode ? DEMO_REPORT : null));
   const [loading, setLoading] = useState(!demoMode && !initialReport);
-  const [sending, setSending] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [regeneratingPdf, setRegeneratingPdf] = useState(false);
 
@@ -247,21 +245,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     window.open(`https://wa.me/${(report.customer.mobile || '').replace(/\D/g, '')}?text=${text}`, '_blank');
   };
 
-  const handleEmail = async () => {
-    if (!report?.sampleId) return;
-    const recipient = report.customer.mobile || report.lab?.email;
-    if (!recipient) { toast.error(t('labReport.noRecipient')); return; }
-    setSending('email');
-    try {
-      await notificationsAPI.sendReport(report.sampleId, 'email', recipient);
-      toast.success(t('labReport.sent'));
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || t('labReport.sendFailed'));
-    } finally {
-      setSending(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="space-y-4 max-w-[210mm] mx-auto">
@@ -308,7 +291,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           {!hideShareActions && (
             <>
               <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
-              <Button variant="secondary" size="sm" onClick={handleEmail} disabled={sending === 'email'} className="gap-1.5 h-8 text-xs"><Mail size={14} />{t('labReport.email')}</Button>
             </>
           )}
         </div>

@@ -7,6 +7,7 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { reportsAPI, samplesAPI, notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { isReception } from '../utils/roles';
 
 const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
@@ -81,6 +82,7 @@ export default function Reports() {
 
   const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
   const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
+  const canSendSmsToCustomer = isReception(user) && hasPermission('notifications.send_report');
   const canRegeneratePdf = hasPermission('reports.generate');
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)
@@ -283,9 +285,11 @@ export default function Reports() {
               )}
             </>
           )}
-          <button onClick={() => sendToCustomer(r)} disabled={sendingId === r.id} className="text-green-600 text-sm">
-            {t('workflow.sendToCustomer')}
-          </button>
+          {canSendSmsToCustomer && (
+            <button onClick={() => sendToCustomer(r)} disabled={sendingId === r.id} className="text-green-600 text-sm">
+              {t('workflow.sendToCustomer')}
+            </button>
+          )}
         </div>
       ),
     },

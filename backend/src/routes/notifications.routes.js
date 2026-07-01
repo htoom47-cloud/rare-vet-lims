@@ -1,6 +1,8 @@
 const express = require('express');
 const service = require('../services/notifications.service');
+const env = require('../config/env');
 const { authenticate, authorize } = require('../middleware/auth');
+const { AppError } = require('../middleware/errorHandler');
 const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
@@ -27,9 +29,16 @@ router.post('/queue', authorize(PERMISSIONS.SETTINGS_MANAGE), async (req, res, n
   } catch (err) { next(err); }
 });
 
-router.post('/send-report/:sampleId', authorize(PERMISSIONS.REPORTS_GENERATE), async (req, res, next) => {
+router.post('/send-report/:sampleId', authenticate, async (req, res, next) => {
   try {
-    const data = await service.sendReportNotification(req.params.sampleId, req.body.channel, req.body.recipient);
+    const channel = req.body.channel || env.notifications.defaultChannel;
+    const required = channel === 'sms'
+      ? PERMISSIONS.NOTIFICATIONS_SEND_REPORT
+      : PERMISSIONS.REPORTS_GENERATE;
+    if (!req.user.permissions.includes(required) && req.user.role_name !== 'admin') {
+      throw new AppError('Insufficient permissions', 403, 'FORBIDDEN');
+    }
+    const data = await service.sendReportNotification(req.params.sampleId, channel, req.body.recipient);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

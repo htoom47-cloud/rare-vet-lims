@@ -26,6 +26,7 @@ import { getResultsEntryTargets } from '../utils/parasitologyTests';
 import { fmtCatalog } from '../utils/vat';
 import { packageLabel, packageTestIds } from '../utils/packageSelection';
 import { useAuth } from '../context/AuthContext';
+import { isReception } from '../utils/roles';
 
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -36,7 +37,8 @@ export default function Samples() {
   const { t, i18n } = useTranslation();
 
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canSendSmsToCustomer = isReception(user) && hasPermission('notifications.send_report');
 
   const [samples, setSamples] = useState([]);
 
@@ -624,7 +626,7 @@ export default function Samples() {
 
               )}
 
-              {detailSample.workflow?.has_report && !detailSample.workflow?.sent_to_customer && (
+              {canSendSmsToCustomer && detailSample.workflow?.has_report && !detailSample.workflow?.sent_to_customer && (
 
                 <button onClick={sendReportToCustomer} disabled={sending} className="btn-primary text-sm">{t('workflow.sendToCustomer')}</button>
 
