@@ -290,6 +290,7 @@ const drawPatientCard = (doc, data, y0) => {
     { en: 'Animal', ar: 'الحيوان', val: data.animalName || '-' },
     { en: 'Species', ar: 'النوع', val: isAr ? species.ar : species.en },
     { en: 'Breed', ar: 'السلالة', val: data.animalBreed || '-' },
+    { en: 'Color', ar: 'اللون', val: data.animalColor || '-' },
     { en: 'Gender', ar: 'الجنس', val: isAr ? gender.ar : gender.en },
     { en: 'Age', ar: 'العمر', val: data.animalAge || '-' },
     { en: 'Sample', ar: 'العينة', val: data.sampleCode || '-' },

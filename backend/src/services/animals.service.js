@@ -61,9 +61,9 @@ const getHistory = async (id) => {
 const create = async (data, userId) => {
   const animalCode = generateCode('ANM');
   const result = await query(
-    `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, rfid_chip, owner_id, medical_history, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [uuidv4(), animalCode, data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.rfid_chip, data.owner_id, data.medical_history, userId]
+    `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip, owner_id, medical_history, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [uuidv4(), animalCode, data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId]
   );
   return result.rows[0];
 };
@@ -71,9 +71,9 @@ const create = async (data, userId) => {
 const update = async (id, data) => {
   await getById(id);
   const result = await query(
-    `UPDATE animals SET animal_type=$1, name_tag=$2, age=$3, gender=$4, weight=$5, color=$6,
-     rfid_chip=$7, owner_id=$8, medical_history=$9, updated_at=NOW() WHERE id=$10 RETURNING *`,
-    [data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.rfid_chip, data.owner_id, data.medical_history, id]
+    `UPDATE animals SET animal_type=$1, name_tag=$2, age=$3, gender=$4, weight=$5, color=$6, breed=$7,
+     rfid_chip=$8, owner_id=$9, medical_history=$10, updated_at=NOW() WHERE id=$11 RETURNING *`,
+    [data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, id]
   );
   return result.rows[0];
 };

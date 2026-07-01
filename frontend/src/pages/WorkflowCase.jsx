@@ -34,6 +34,14 @@ import {
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 
 const ANIMAL_TYPES = ['camel', 'horse', 'sheep', 'goat', 'bird', 'cat', 'dog'];
+const EMPTY_ANIMAL = {
+  animal_type: 'camel',
+  gender: 'male',
+  age: '',
+  name_tag: '',
+  breed: '',
+  color: '',
+};
 
 export default function WorkflowCase() {
   const { t, i18n } = useTranslation();
@@ -62,7 +70,7 @@ export default function WorkflowCase() {
   const [printOpen, setPrintOpen] = useState(false);
 
   const [newCustomer, setNewCustomer] = useState({ full_name: '', mobile: '', city: '', farm_company: '' });
-  const [newAnimal, setNewAnimal] = useState({ animal_type: 'camel', name_tag: '', gender: 'male' });
+  const [newAnimal, setNewAnimal] = useState(EMPTY_ANIMAL);
   const [creating, setCreating] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewAnimal, setShowNewAnimal] = useState(false);
@@ -223,7 +231,7 @@ export default function WorkflowCase() {
       setAnimalTests((prev) => ({ ...prev, [data.data.id]: [] }));
       setAnimalPackages((prev) => ({ ...prev, [data.data.id]: [] }));
       setShowNewAnimal(false);
-      setNewAnimal({ animal_type: 'camel', name_tag: '', gender: 'male' });
+      setNewAnimal(EMPTY_ANIMAL);
       toast.success(t('workflow.animalCreated'));
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -461,15 +469,37 @@ export default function WorkflowCase() {
             </button>
             {showNewAnimal && (
               <div className="border rounded-lg p-4 bg-primary-50/50 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <select value={newAnimal.animal_type} onChange={(e) => setNewAnimal({ ...newAnimal, animal_type: e.target.value })} className="input-field">
-                    {ANIMAL_TYPES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
-                  </select>
-                  <input value={newAnimal.name_tag} onChange={(e) => setNewAnimal({ ...newAnimal, name_tag: e.target.value })} placeholder={t('animals.tag')} className="input-field" />
-                  <select value={newAnimal.gender} onChange={(e) => setNewAnimal({ ...newAnimal, gender: e.target.value })} className="input-field">
-                    <option value="male">{t('workflow.male')}</option>
-                    <option value="female">{t('workflow.female')}</option>
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.type')}</label>
+                    <select value={newAnimal.animal_type} onChange={(e) => setNewAnimal({ ...newAnimal, animal_type: e.target.value })} className="input-field">
+                      {ANIMAL_TYPES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.gender')}</label>
+                    <select value={newAnimal.gender} onChange={(e) => setNewAnimal({ ...newAnimal, gender: e.target.value })} className="input-field">
+                      <option value="male">{t('workflow.male')}</option>
+                      <option value="female">{t('workflow.female')}</option>
+                      <option value="unknown">{t('animals.genders.unknown')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.age')}</label>
+                    <input value={newAnimal.age} onChange={(e) => setNewAnimal({ ...newAnimal, age: e.target.value })} placeholder={t('animals.agePlaceholder')} className="input-field" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.name')}</label>
+                    <input value={newAnimal.name_tag} onChange={(e) => setNewAnimal({ ...newAnimal, name_tag: e.target.value })} placeholder={t('animals.name')} className="input-field" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.breed')}</label>
+                    <input value={newAnimal.breed} onChange={(e) => setNewAnimal({ ...newAnimal, breed: e.target.value })} placeholder={t('animals.breed')} className="input-field" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.color')}</label>
+                    <input value={newAnimal.color} onChange={(e) => setNewAnimal({ ...newAnimal, color: e.target.value })} placeholder={t('animals.color')} className="input-field" />
+                  </div>
                 </div>
                 <button onClick={createAnimal} disabled={creating || !customerId} className="btn-primary w-full py-3">
                   {t('workflow.createAnimal')}

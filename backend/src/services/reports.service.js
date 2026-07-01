@@ -190,7 +190,7 @@ const buildReportData = async (sampleId, opts) => {
             c.mobile as customer_mobile,
             a.animal_code, a.animal_type, a.name_tag as animal_name,
             a.gender as animal_gender, a.rfid_chip as animal_chip,
-            a.age as animal_age, a.color as animal_breed
+            a.age as animal_age, a.breed as animal_breed, a.color as animal_color
      FROM samples s
      JOIN customers c ON s.customer_id = c.id
      JOIN animals a ON s.animal_id = a.id
@@ -326,6 +326,7 @@ const buildReportData = async (sampleId, opts) => {
     animalChip: sample.animal_chip,
     animalAge: sample.animal_age || '-',
     animalBreed: sample.animal_breed || '-',
+    animalColor: sample.animal_color || '-',
     panelName,
     language,
     verificationCode,
@@ -541,7 +542,7 @@ const getPreview = async (id) => {
   const metaResult = await query(
     `SELECT s.barcode, s.collection_date, s.received_date, s.department, s.notes as sample_notes,
             s.completed_date, s.status as sample_status,
-            a.age, a.color, a.weight,
+            a.age, a.color, a.breed, a.weight,
             inv.invoice_number as order_number,
             cb.full_name as collected_by_name, cb.full_name_ar as collected_by_name_ar
      FROM samples s
@@ -590,7 +591,8 @@ const getPreview = async (id) => {
       gender: base.animalGender,
       chip: base.animalChip,
       age: meta.age,
-      color: meta.color,
+      breed: meta.breed || base.animalBreed,
+      color: meta.color || base.animalColor,
       weight: meta.weight,
     },
     sample: {

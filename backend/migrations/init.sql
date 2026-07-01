@@ -92,6 +92,7 @@ CREATE TABLE animals (
     gender animal_gender DEFAULT 'unknown',
     weight DECIMAL(8,2),
     color VARCHAR(100),
+    breed VARCHAR(100),
     rfid_chip VARCHAR(100),
     owner_id UUID REFERENCES customers(id) ON DELETE SET NULL,
     image_url TEXT,

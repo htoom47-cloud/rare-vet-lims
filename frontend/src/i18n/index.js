@@ -477,9 +477,10 @@ const resources = {
         notFound: 'No customer found with this number',
       },
       animals: {
-        title: 'Animal Management', animalId: 'Animal ID', type: 'Animal Type', tag: 'Name/Tag',
-        age: 'Age', gender: 'Gender', weight: 'Weight', color: 'Color', rfid: 'RFID/Chip',
-        owner: 'Owner', medicalHistory: 'Medical History',
+        title: 'Animal Management', animalId: 'Animal ID', type: 'Animal Type', name: 'Name', tag: 'Name/Tag',
+        age: 'Age', agePlaceholder: 'e.g. 3 years', gender: 'Gender', breed: 'Breed', weight: 'Weight', color: 'Color', rfid: 'RFID/Chip',
+        owner: 'Owner', selectOwner: 'Select owner', medicalHistory: 'Medical History', created: 'Animal registered',
+        genders: { male: 'Male', female: 'Female', unknown: 'Unknown' },
         types: { camel: 'Camel', horse: 'Horse', sheep: 'Sheep', goat: 'Goat', bird: 'Bird', cat: 'Cat', dog: 'Dog' },
       },
       samples: {
@@ -1288,9 +1289,10 @@ const resources = {
         notFound: 'لا يوجد عميل بهذا الرقم',
       },
       animals: {
-        title: 'إدارة الحيوانات', animalId: 'رقم الحيوان', type: 'نوع الحيوان', tag: 'الاسم/الرقم',
-        age: 'العمر', gender: 'الجنس', weight: 'الوزن', color: 'اللون', rfid: 'رقم الشريحة',
-        owner: 'المالك', medicalHistory: 'التاريخ الطبي',
+        title: 'إدارة الحيوانات', animalId: 'رقم الحيوان', type: 'النوع', name: 'الاسم', tag: 'الاسم/الرقم',
+        age: 'العمر', agePlaceholder: 'مثال: 3 سنوات', gender: 'الجنس', breed: 'السلالة', weight: 'الوزن', color: 'اللون', rfid: 'رقم الشريحة',
+        owner: 'المالك', selectOwner: 'اختر المالك', medicalHistory: 'التاريخ الطبي', created: 'تم تسجيل الحيوان',
+        genders: { male: 'ذكر', female: 'أنثى', unknown: 'غير محدد' },
         types: { camel: 'جمل', horse: 'حصان', sheep: 'غنم', goat: 'ماعز', bird: 'طائر', cat: 'قط', dog: 'كلب' },
       },
       samples: {

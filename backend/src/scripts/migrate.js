@@ -294,6 +294,7 @@ async function applyPatches() {
     await client.query(`
       ALTER TABLE price_quotes ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) DEFAULT 0
     `);
+    await client.query('ALTER TABLE animals ADD COLUMN IF NOT EXISTS breed VARCHAR(100)');
     await syncLabContactInfo(client);
   } finally {
     client.release();
