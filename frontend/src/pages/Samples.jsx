@@ -266,18 +266,30 @@ export default function Samples() {
     navigate(`/reports?generate=${detailSample.id}`);
   };
 
-  const sendReportToCustomer = async () => {
-    if (!detailSample) return;
+  const sendReportToCustomer = async (sample) => {
+    const target = sample || detailSample;
+    if (!target?.id) return;
     setSending(true);
     try {
-      await notificationsAPI.sendReport(detailSample.id, 'sms', detailSample.customer_mobile);
+      await notificationsAPI.sendReport(target.id, 'sms', target.customer_mobile);
       toast.success(t('workflow.sentToCustomer'));
-      viewDetail(detailSample);
+      if (detailSample?.id === target.id) {
+        viewDetail(target);
+      } else {
+        load();
+      }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
     } finally {
       setSending(false);
     }
+  };
+
+  const canSendForSample = (sample) => {
+    if (!canSendSmsToCustomer || !sample) return false;
+    const hasReport = sample.workflow?.has_report ?? parseInt(sample.reports_count, 10) > 0;
+    const sent = sample.workflow?.sent_to_customer ?? parseInt(sample.notifications_count, 10) > 0;
+    return hasReport && !sent;
   };
 
 
@@ -307,6 +319,16 @@ export default function Samples() {
         {r.status === 'received' && <button onClick={(e) => { e.stopPropagation(); updateStatus(r.id, 'running'); }} className="text-purple-600 text-xs">{t('samples.statuses.running')}</button>}
 
         <button onClick={(e) => { e.stopPropagation(); openPrintLabel(r); }} className="text-gray-600 text-xs flex items-center gap-1"><Printer size={12} /> {t('common.print')}</button>
+
+        {canSendForSample(r) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); sendReportToCustomer(r); }}
+            disabled={sending}
+            className="text-green-700 text-xs font-medium"
+          >
+            {t('workflow.sendToCustomer')}
+          </button>
+        )}
 
       </div>
 
@@ -629,9 +651,9 @@ export default function Samples() {
 
               )}
 
-              {canSendSmsToCustomer && detailSample.workflow?.has_report && !detailSample.workflow?.sent_to_customer && (
+              {canSendForSample(detailSample) && (
 
-                <button onClick={sendReportToCustomer} disabled={sending} className="btn-primary text-sm">{t('workflow.sendToCustomer')}</button>
+                <button onClick={() => sendReportToCustomer(detailSample)} disabled={sending} className="btn-primary text-sm">{t('workflow.sendToCustomer')}</button>
 
               )}
 
