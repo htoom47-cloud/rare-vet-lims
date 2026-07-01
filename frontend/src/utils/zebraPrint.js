@@ -128,10 +128,10 @@ export async function getDefaultPrinter() {
 
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
-const BAR_HEIGHT = 56;
+const BAR_HEIGHT = 45;
 const BAR_MODULE = 1.5;
 const BAR_RATIO = 3;
-const BARCODE_Y = 10; // small top margin without shrinking the barcode
+const BARCODE_Y = 25;
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -167,8 +167,8 @@ const field = (zpl) => `^FWN${zpl}`;
 const TEXT_LINE = '^A0N,16,14';
 
 /** Centered text line across full label width. */
-const textLine = (y, value) => field(
-  `^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`,
+const textLine = (y, value) => (
+  `^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`
 );
 
 /** Approximate Code128 width (subset B) in dots for horizontal centering. */
@@ -182,15 +182,13 @@ const estimateCode128WidthDots = (barcode) => {
 const code128Field = (barcode) => {
   const widthDots = estimateCode128WidthDots(barcode);
   const x = Math.max(8, Math.floor((LABEL_WIDTH - widthDots) / 2));
-  return field(
-    `^FO${x},${BARCODE_Y}^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD>:${zplEscape(barcode)}^FS`,
-  );
+  return `^FO${x},${BARCODE_Y}^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD>:${zplEscape(barcode)}^FS`;
 };
 
 const LAYOUT = {
-  barcodeTextY: BARCODE_Y + BAR_HEIGHT + 4,
-  panelY: BARCODE_Y + BAR_HEIGHT + 20,
-  animalY: BARCODE_Y + BAR_HEIGHT + 36,
+  barcodeTextY: 78,
+  panelY: 94,
+  animalY: 110,
 };
 
 /** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
