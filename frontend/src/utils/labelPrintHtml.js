@@ -21,8 +21,8 @@ const LABEL_PRINT_STYLES = `
   }
   .label-50x25 {
     width: 50mm; height: 25mm; box-sizing: border-box;
-    padding: 2mm 1.5mm 1.5mm;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0.5mm 1.2mm 0.4mm;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     font-family: Arial, Helvetica, sans-serif; color: #000;
     overflow: hidden;
     page-break-inside: avoid;
@@ -90,8 +90,8 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
       var code = ${barcodeJson};
       if (code && document.getElementById('sample-barcode')) {
         JsBarcode('#sample-barcode', code, {
-          format: 'CODE128', width: 1.05, height: 22, displayValue: true,
-          fontSize: 10, margin: 0, background: '#ffffff', lineColor: '#000000'
+          format: 'CODE128', width: 1.05, height: 20, displayValue: true,
+          fontSize: 9, margin: 0, background: '#ffffff', lineColor: '#000000'
         });
       }
       ${autoPrintScript}
@@ -152,8 +152,8 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
         if (!code) return;
         el.id = 'sample-barcode-' + idx;
         JsBarcode('#sample-barcode-' + idx, code, {
-          format: 'CODE128', width: 1.05, height: 22, displayValue: true,
-          fontSize: 10, margin: 0, background: '#ffffff', lineColor: '#000000'
+          format: 'CODE128', width: 1.05, height: 20, displayValue: true,
+          fontSize: 9, margin: 0, background: '#ffffff', lineColor: '#000000'
         });
       });
       ${autoPrintScript}

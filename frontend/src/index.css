@@ -148,12 +148,12 @@
 .label-50x25 {
   width: 50mm;
   height: 25mm;
-  padding: 2mm 1.5mm 1.5mm;
+  padding: 0.5mm 1.2mm 0.4mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-start;
   overflow: hidden;
 }
 
@@ -184,14 +184,19 @@
 .label-50x25-line {
   margin: 0;
   padding: 0;
-  font-size: 5.5pt;
-  line-height: 1.05;
+  font-size: 8pt;
+  line-height: 1.12;
   text-align: center;
   font-family: Arial, Helvetica, sans-serif;
   color: #000;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.label-50x25-barcode svg text {
+  font-size: 10pt !important;
+  font-weight: 600;
 }
 
 .label-50x25-tests {
