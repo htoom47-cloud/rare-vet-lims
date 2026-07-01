@@ -88,7 +88,7 @@ async function main() {
     }
 
     console.log('Permissions catalog:', catalogCodes.size, 'codes');
-    for (const role of ['manager', 'lab_specialist', 'veterinarian', 'lab_technician', 'reception']) {
+    for (const role of Object.keys(ROLE_PERMISSIONS)) {
       const roleRow = await client.query('SELECT id FROM roles WHERE name = $1', [role]);
       if (!roleRow.rows[0]) continue;
       const dbPerms = await client.query(

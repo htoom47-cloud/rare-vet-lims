@@ -45,7 +45,7 @@ const navSections = [
       { path: '/workbench', icon: Activity, label: 'nav.workbench', permission: 'results.enter' },
       { path: '/parasitology/upload', icon: Camera, label: 'nav.parasitologyUpload', permission: 'results.upload_images' },
       { path: '/parasitology', icon: Bug, label: 'nav.parasitology', permissions: ['results.enter', 'results.validate'] },
-      { path: '/vet-review', icon: Stethoscope, label: 'nav.vetReview', permissions: ['results.validate', 'results.edit', 'results.unvalidate'] },
+      { path: '/vet-review', icon: Stethoscope, label: 'nav.vetReview', permissions: ['results.validate', 'results.edit', 'results.unvalidate', 'results.enter'] },
       { path: '/tests', icon: TestTube, label: 'nav.tests', permission: 'tests.view' },
       { path: '/inventory', icon: Package, label: 'nav.inventory', permission: 'inventory.view' },
       { path: '/quality', icon: Shield, label: 'nav.quality', permission: 'quality.view' },

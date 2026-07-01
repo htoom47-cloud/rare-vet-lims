@@ -1,5 +1,5 @@
 /**
- * Verify role → permission matrix for results.* (no HTTP server).
+ * Verify role → permission matrix for results.* across ALL roles (no HTTP server).
  * Usage: node src/scripts/verify-permissions-roles.js
  */
 require('dotenv').config();
@@ -9,44 +9,12 @@ const { PERMISSIONS, ROLE_PERMISSIONS } = require('../utils/permissions');
 const authorize = (userPerms, roleName, ...required) =>
   required.some((p) => userPerms.includes(p) || roleName === 'admin');
 
-const CASES = [
-  {
-    role: 'veterinarian',
-    expect: {
-      enter: true, // results.edit also grants POST /results/enter
-      edit: true,
-      validate: true,
-      unvalidate: true,
-    },
-  },
-  {
-    role: 'lab_specialist',
-    expect: {
-      enter: true,
-      edit: true,
-      validate: true,
-      unvalidate: true,
-    },
-  },
-  {
-    role: 'lab_technician',
-    expect: {
-      enter: true,
-      edit: true,
-      validate: false,
-      unvalidate: false,
-    },
-  },
-  {
-    role: 'reception',
-    expect: {
-      enter: false,
-      edit: false,
-      validate: false,
-      unvalidate: false,
-    },
-  },
-];
+const expectedResultsAccess = (perms, role) => ({
+  enter: authorize(perms, role, PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_EDIT),
+  edit: authorize(perms, role, PERMISSIONS.RESULTS_EDIT),
+  validate: authorize(perms, role, PERMISSIONS.RESULTS_VALIDATE),
+  unvalidate: authorize(perms, role, PERMISSIONS.RESULTS_UNVALIDATE),
+});
 
 async function permsForRole(client, roleName) {
   const role = await client.query('SELECT id FROM roles WHERE name = $1', [roleName]);
@@ -65,30 +33,25 @@ async function main() {
   const errors = [];
 
   try {
-    for (const { role, expect } of CASES) {
+    for (const role of Object.keys(ROLE_PERMISSIONS)) {
       const perms = await permsForRole(client, role);
       if (!perms) {
         errors.push(`Role missing in DB: ${role}`);
         continue;
       }
 
-      const filePerms = new Set(ROLE_PERMISSIONS[role] || []);
+      const filePerms = ROLE_PERMISSIONS[role] || [];
       for (const code of filePerms) {
         if (!perms.includes(code)) {
           errors.push(`${role}: DB missing ${code} (defined in permissions.js)`);
         }
       }
 
-      const checks = {
-        enter: authorize(perms, role, PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_EDIT),
-        edit: authorize(perms, role, PERMISSIONS.RESULTS_EDIT),
-        validate: authorize(perms, role, PERMISSIONS.RESULTS_VALIDATE),
-        unvalidate: authorize(perms, role, PERMISSIONS.RESULTS_UNVALIDATE),
-      };
-
-      for (const [key, wanted] of Object.entries(expect)) {
-        if (checks[key] !== wanted) {
-          errors.push(`${role}: route guard ${key} expected ${wanted}, got ${checks[key]}`);
+      const checks = expectedResultsAccess(perms, role);
+      const fileChecks = expectedResultsAccess(filePerms, role);
+      for (const key of Object.keys(checks)) {
+        if (checks[key] !== fileChecks[key]) {
+          errors.push(`${role}: DB/file mismatch on ${key} (db=${checks[key]}, file=${fileChecks[key]})`);
         }
       }
 
@@ -102,7 +65,7 @@ async function main() {
       errors.forEach((e) => console.error(' -', e));
       process.exit(1);
     }
-    console.log('\nOK — role permission matrix matches expectations.');
+    console.log('\nOK — all roles match permissions.js.');
   } finally {
     client.release();
     await pool.end();

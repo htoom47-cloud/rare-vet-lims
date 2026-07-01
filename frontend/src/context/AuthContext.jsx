@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -6,6 +7,8 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const skipPathRefresh = useRef(true);
 
   const loadUser = useCallback(async ({ silent = false } = {}) => {
     const token = localStorage.getItem('accessToken');
@@ -44,6 +47,15 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('auth:token-refreshed', refresh);
     };
   }, [loadUser]);
+
+  // Refresh permissions when navigating — applies to every role.
+  useEffect(() => {
+    if (skipPathRefresh.current) {
+      skipPathRefresh.current = false;
+      return;
+    }
+    if (localStorage.getItem('accessToken')) loadUser({ silent: true });
+  }, [location.pathname, loadUser]);
 
   const login = async (username, password) => {
     const { data } = await authAPI.login(username, password);

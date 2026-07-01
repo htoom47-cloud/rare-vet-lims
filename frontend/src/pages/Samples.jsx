@@ -36,12 +36,11 @@ export default function Samples() {
   const { t, i18n } = useTranslation();
 
   const navigate = useNavigate();
-  const { user, hasPermission, loadUser } = useAuth();
+  const { hasPermission, hasAnyPermission } = useAuth();
   const canSendSmsToCustomer = hasPermission('notifications.send_report');
-
-  useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+  const canReviewResults = hasAnyPermission(
+    'results.validate', 'results.edit', 'results.unvalidate', 'results.enter'
+  );
 
   const [samples, setSamples] = useState([]);
 
@@ -633,7 +632,7 @@ export default function Samples() {
                 );
               })()}
 
-              {detailSample.workflow?.has_results && !detailSample.workflow?.all_validated && (
+              {detailSample.workflow?.has_results && !detailSample.workflow?.all_validated && canReviewResults && (
 
                 <button onClick={() => { setDetailSample(null); navigate(`/vet-review?sample=${detailSample.id}`); }} className="btn-secondary text-sm">{t('workflow.goApprove')}</button>
 
