@@ -147,6 +147,7 @@ const zplLandscapeHeader = () => [
   '^MUd',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
+  '^MD20',
   '^LH0,0',
   '^LT0',
   '^LS0',
