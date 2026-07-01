@@ -129,26 +129,27 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
-// Calibrated Y positions (ZD421 50×25 mm).
-const BARCODE_Y = 20;
-const BAR_HEIGHT = 60;
+// Calibrated for ZD421 50×25 mm direct thermal.
+const BARCODE_Y = 12;
+const BAR_HEIGHT = 52;
 const BAR_RATIO = 3;
-const QUIET_ZONE_DOTS = 40;
+const QUIET_ZONE_DOTS = 48;
 const LAYOUT = {
-  barcodeTextY: 90,
-  panelY: 112,
-  animalY: 134,
+  barcodeTextY: 72,
+  panelY: 94,
+  animalY: 116,
 };
 
 const code128Modules = (barcode) => 11 * String(barcode).length + 35;
 
-/** Max module width so Code128 is NOT squeezed (unscannable on Zebra). */
+/** Shrink module width so long BC-… codes fit with quiet zones (JsBarcode auto-scales on paper). */
 const pickBarcodeModule = (barcode) => {
   const modules = code128Modules(barcode);
   const maxMod = (LABEL_WIDTH - QUIET_ZONE_DOTS) / modules;
   if (maxMod >= 2) return 2;
+  if (maxMod >= 1.65) return 1.65;
   if (maxMod >= 1.5) return 1.5;
-  return 1;
+  return Math.max(1.2, Math.floor(maxMod * 20) / 20);
 };
 
 const barcodeWidthDots = (barcode, moduleWidth) => Math.ceil(code128Modules(barcode) * moduleWidth);
@@ -164,33 +165,41 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ^CI0 + direct thermal darkness — required for scanner-readable bars. */
+/** ^CI0 + direct thermal — UTF-8 ^CI28 breaks Code128 on Zebra. */
 const zplLandscapeHeader = () => [
   '^XA',
   '^CI0',
   '^MTD',
   '^MD40',
   '^MNW',
+  '^PR4,4',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
   '^LH0,0',
   '^LT0',
-  '^PR2',
+  '^LS0',
+  '^FWN',
+  '^PON',
 ];
 
-const TEXT_LINE = '^A0N,18,18';
+/** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
+const field = (zpl) => `^FWN${zpl}`;
 
-const textLine = (y, value) => (
-  `^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`
-);
+const TEXT_LINE = '^A0N,18,16';
+const textLine = (y, value) => field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`);
 
 const barcodeField = (barcode) => {
   const mod = pickBarcodeModule(barcode);
   const w = barcodeWidthDots(barcode, mod);
-  const x = Math.max(10, Math.floor((LABEL_WIDTH - w) / 2));
-  return `^FO${x},${BARCODE_Y}^BY${mod},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD${zplEscape(barcode)}^FS`;
+  const x = Math.max(8, Math.floor((LABEL_WIDTH - w) / 2));
+  return field(`^FO${x},${BARCODE_Y}^BY${mod},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD${zplEscape(barcode)}^FS`);
 };
 
+export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
+  buildLabelLines(sample, { isArabic, panelKey: sample?.panelKey })
+);
+
+/** ZPL for Zebra ZD421 50×25 mm — horizontal barcode and text. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const { barcode, panelKey } = buildLabelLines(sample, {
     isArabic,
