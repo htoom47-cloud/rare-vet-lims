@@ -12,6 +12,7 @@ const upsertReferenceRange = async ({
   unit,
   notes,
   source = 'norma',
+  onlyIfMissing = false,
 }) => {
   if (parameterId == null || !animalType || min == null || max == null) return null;
 
@@ -21,9 +22,11 @@ const upsertReferenceRange = async ({
   const noteText = notes || `Synced from ${source}`;
 
   const existing = await query(
-    `SELECT id FROM test_reference_ranges WHERE parameter_id = $1 AND animal_type = $2`,
+    `SELECT id, notes FROM test_reference_ranges WHERE parameter_id = $1 AND animal_type = $2`,
     [parameterId, animalType]
   );
+
+  if (existing.rows[0] && onlyIfMissing) return existing.rows[0];
 
   if (existing.rows[0]) {
     const result = await query(
@@ -54,11 +57,17 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
   let skipped = 0;
 
   for (const row of results) {
-    const limsCode = mapNormaCode(row.code);
+    const limsCode = row.limsCode || mapNormaCode(row.code);
+    if (!limsCode) {
+      skipped += 1;
+      continue;
+    }
+
+    const fromHl7 = row.referenceMin != null && row.referenceMax != null;
     let refMin = row.referenceMin;
     let refMax = row.referenceMax;
 
-    if (refMin == null || refMax == null) {
+    if (!fromHl7) {
       const profile = getNormaReference(animalType, limsCode);
       if (profile) {
         refMin = profile.min;
@@ -81,15 +90,18 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
       skipped += 1;
       continue;
     }
+
+    const profile = getNormaReference(animalType, limsCode);
     await upsertReferenceRange({
       parameterId: param.rows[0].id,
       animalType,
       min: refMin,
       max: refMax,
-      criticalLow: getNormaReference(animalType, limsCode)?.crit_low,
-      criticalHigh: getNormaReference(animalType, limsCode)?.crit_high,
+      criticalLow: profile?.crit_low,
+      criticalHigh: profile?.crit_high,
       unit: row.unit || param.rows[0].unit,
-      source: row.referenceMin != null ? 'norma-hl7' : 'norma-profile',
+      source: fromHl7 ? 'norma-hl7' : 'norma-profile',
+      onlyIfMissing: !fromHl7,
     });
     updated += 1;
   }
@@ -97,7 +109,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
   return { updated, skipped };
 };
 
-/** Ensure all Norma profile reference ranges exist for a CBC test + animal type. */
+/** Seed missing Norma profile reference ranges (does not overwrite HL7-synced values). */
 const syncNormaProfileForAnimal = async (testCode, animalType) => {
   const { NORMA_CBC_REFERENCES } = require('../utils/norma-cbc-references');
   const ranges = NORMA_CBC_REFERENCES[animalType];
@@ -125,6 +137,7 @@ const syncNormaProfileForAnimal = async (testCode, animalType) => {
       criticalHigh: ref.crit_high,
       unit: param.unit,
       source: 'norma-profile',
+      onlyIfMissing: true,
     });
     updated += 1;
   }
