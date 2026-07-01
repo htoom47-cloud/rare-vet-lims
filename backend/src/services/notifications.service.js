@@ -18,25 +18,15 @@ const assertChannelEnabled = (channel) => {
   }
 };
 
-const buildReportMessage = ({ sampleCode, reportNumber, verificationCode, customerName }) => {
-  const verifyLine = verificationCode ? `\nرمز التحقق: ${verificationCode}` : '';
-  const verifyLineEn = verificationCode ? `\nVerify code: ${verificationCode}` : '';
-  const portalLine = env.portalAppUrl ? `\nبوابة العميل: ${env.portalAppUrl}` : '';
-  const portalLineEn = env.portalAppUrl ? `\nClient portal: ${env.portalAppUrl}` : '';
-
+const buildReportMessage = ({ reportNumber, customerName }) => {
+  const name = (customerName || 'العميل').trim();
   return [
-    `${env.lab.nameAr}`,
-    `عزيزي ${customerName || 'العميل'}، تقريركم جاهز.`,
-    `العينة: ${sampleCode}`,
-    `رقم التقرير: ${reportNumber}${verifyLine}${portalLine}`,
+    env.lab.nameAr,
+    `عزيزي ${name}، تقريركم جاهز`,
+    `التقرير: ${reportNumber}`,
+    env.portalAppUrl ? `البوابة: ${env.portalAppUrl}` : null,
     `للاستفسار: ${env.lab.phone}`,
-    '',
-    `${env.lab.name}`,
-    `Dear ${customerName || 'customer'}, your lab report is ready.`,
-    `Sample: ${sampleCode}`,
-    `Report: ${reportNumber}${verifyLineEn}${portalLineEn}`,
-    `Contact: ${env.lab.phone}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 };
 
 const queue = async ({ channel, recipient, subject, body, metadata }) => {
@@ -137,9 +127,7 @@ const sendReportNotification = async (sampleId, channel, recipient) => {
   if (!e164) throw new AppError('Invalid customer phone number', 400, 'INVALID_PHONE');
 
   const body = buildReportMessage({
-    sampleCode: row.sample_code,
     reportNumber: row.report_number,
-    verificationCode: row.qr_verification_code,
     customerName: row.full_name,
   });
 
