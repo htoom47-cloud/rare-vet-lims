@@ -13,15 +13,18 @@ const truncate = (text, max) => {
 const LABEL_PRINT_STYLES = `
   @page { size: 50mm 25mm; margin: 0; }
   html, body {
-    margin: 0; padding: 0; width: 50mm; height: 25mm;
-    overflow: hidden; background: #fff;
+    margin: 0; padding: 0;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    background: #fff;
   }
   .label-50x25 {
     width: 50mm; height: 25mm; box-sizing: border-box;
     padding: 2mm 1.5mm 1.5mm;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     font-family: Arial, Helvetica, sans-serif; color: #000;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .label-50x25 svg { max-width: 100%; height: auto; display: block; }
   .label-50x25-line {
@@ -119,7 +122,7 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   const pages = list.map((sample) => labelBodyHtml(sample, isArabic)).join('\n');
   const autoPrintScript = autoPrint ? `
       window.onload = function () {
-        setTimeout(function () { window.focus(); window.print(); }, 200);
+        setTimeout(function () { window.focus(); window.print(); }, 350);
       };
       window.onafterprint = function () { window.close(); };
   ` : '';
@@ -132,8 +135,15 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>
     ${LABEL_PRINT_STYLES}
-    .label-page { page-break-after: always; break-after: page; }
-    .label-page:last-child { page-break-after: auto; break-after: auto; }
+    body { width: 50mm; }
+    .label-page {
+      page-break-after: always;
+      break-after: page;
+    }
+    .label-page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
   </style>
 </head>
 <body>
@@ -189,7 +199,7 @@ export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
   doc.open();
   doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: false }));
   doc.close();
-  await triggerFramePrint(iframe, { waitMs: 280 });
+  await triggerFramePrint(iframe, { waitMs: 200 + list.length * 100 });
   return true;
 }
 

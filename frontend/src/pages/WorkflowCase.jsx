@@ -798,7 +798,7 @@ export default function WorkflowCase() {
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {expandSampleLabelJobs(printSample).map((job, idx) => (
                 <BarcodeLabel
-                  key={job.tests?.[0]?.test_id || job.tests?.[0]?.id || idx}
+                  key={`${job.tests?.map((t) => t.test_id || t.id).join('-') || idx}`}
                   sample={job}
                 />
               ))}
