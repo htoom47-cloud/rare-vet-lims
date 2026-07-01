@@ -19,7 +19,27 @@ if (env.nodeEnv === 'production') {
   app.set('trust proxy', 1);
 }
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+/** Local Zebra RAW bridge (reception PCs) — must be allowed in CSP connect-src. */
+const ZEBRA_BRIDGE_ORIGINS = [
+  'http://127.0.0.1:9100',
+  'http://localhost:9100',
+  'https://127.0.0.1:9101',
+  'https://localhost:9101',
+];
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+      'connect-src': ["'self'", ...ZEBRA_BRIDGE_ORIGINS],
+      'frame-src': ["'self'", 'blob:'],
+      'child-src': ["'self'", 'blob:'],
+      'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+    },
+  },
+}));
 // CORS applies to API only — global CORS breaks Vite module scripts (crossorigin) on custom domains.
 app.use('/api', cors({
   origin(origin, callback) {
