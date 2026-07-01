@@ -126,8 +126,10 @@ export async function getDefaultPrinter() {
 }
 
 
-const LABEL_WIDTH = 400;
-const LABEL_HEIGHT = 200;
+const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
+const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
+const ORIGIN_X = 20;
+const ORIGIN_Y = 20;
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -140,7 +142,7 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ZPL for Zebra ZD421 50×25 mm — barcode + panel code + animal. */
+/** ZPL for Zebra ZD421 50×25 mm landscape — all fields within 400×200 dots, horizontal text. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const { barcode, animalLine, panelKey } = buildLabelLines(sample, {
     isArabic,
@@ -155,21 +157,26 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
     `^PW${LABEL_WIDTH}`,
     `^LL${LABEL_HEIGHT}`,
     '^LH0,0',
-    '^LT22',
+    '^LT0',
     '^LS0',
+    '^FWN',
+    '^PON',
   ];
 
+  let y = ORIGIN_Y;
+
   if (barcode) {
-    lines.push(`^FO35,18^BY1.7,2,24^BCN,24,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(`^FO${ORIGIN_X},${y}^BY1.4,2,20^BCN,20,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    y += 38;
   }
 
-  let y = 66;
   if (panelZpl) {
-    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,14,12^FD${zplEscape(panelZpl)}^FS`);
-    y += 16;
+    lines.push(`^FO${ORIGIN_X},${y}^A0N,16,14^FD${zplEscape(panelZpl)}^FS`);
+    y += 18;
   }
+
   if (animal) {
-    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(animal)}^FS`);
+    lines.push(`^FO${ORIGIN_X},${y}^A0N,12,10^FD${zplEscape(animal)}^FS`);
   }
 
   lines.push('^XZ');
