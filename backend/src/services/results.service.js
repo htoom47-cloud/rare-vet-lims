@@ -151,6 +151,32 @@ const enterResults = async (data, userId) => {
 
     if (existing.rows[0]) {
       resultId = existing.rows[0].id;
+      const validatedRow = await client.query(
+        'SELECT is_validated FROM results WHERE id = $1',
+        [resultId]
+      );
+      if (validatedRow.rows[0]?.is_validated) {
+        if (!data.allow_validated_edit) {
+          throw new AppError('Results are approved — unapprove first or use edit permission', 403, 'VALIDATED_LOCKED');
+        }
+        await client.query(
+          `UPDATE results SET is_validated = false, validated_by = NULL, validated_at = NULL WHERE id = $1`,
+          [resultId]
+        );
+        await client.query(
+          `UPDATE sample_tests SET status = 'running', completed_at = NULL WHERE id = $1`,
+          [data.sample_test_id]
+        );
+        const stRow = await client.query(
+          'SELECT sample_id FROM sample_tests WHERE id = $1',
+          [data.sample_test_id]
+        );
+        await client.query(
+          `UPDATE samples SET status = 'running', completed_date = NULL, updated_at = NOW()
+           WHERE id = $1 AND status = 'completed'`,
+          [stRow.rows[0].sample_id]
+        );
+      }
       await client.query('DELETE FROM result_values WHERE result_id = $1', [resultId]);
       await client.query(
         `UPDATE results SET technician_notes = $1, entered_by = $2, updated_at = NOW() WHERE id = $3`,
@@ -273,6 +299,48 @@ const validateResults = async (sampleTestId, userId, doctorNotes, values) => {
   }
 
   return getBySampleTest(sampleTestId);
+};
+
+const unvalidateResults = async (sampleTestId) => {
+  const client = await getClient();
+  let committed = false;
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE results
+       SET is_validated = false, validated_by = NULL, validated_at = NULL
+       WHERE sample_test_id = $1 AND is_validated = true
+       RETURNING id`,
+      [sampleTestId]
+    );
+    if (!result.rows[0]) {
+      throw new AppError('Validated results not found', 404, 'NOT_FOUND');
+    }
+
+    await client.query(
+      `UPDATE sample_tests SET status = 'running', completed_at = NULL WHERE id = $1`,
+      [sampleTestId]
+    );
+
+    const st = await client.query('SELECT sample_id FROM sample_tests WHERE id = $1', [sampleTestId]);
+    await client.query(
+      `UPDATE samples SET status = 'running', completed_date = NULL, updated_at = NOW()
+       WHERE id = $1 AND status = 'completed'`,
+      [st.rows[0].sample_id]
+    );
+
+    await client.query('COMMIT');
+    committed = true;
+    return getBySampleTest(sampleTestId);
+  } catch (err) {
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const approveBatch = async (items, userId) => {
@@ -479,6 +547,7 @@ module.exports = {
   enterResults,
   approveBatch,
   validateResults,
+  unvalidateResults,
   getPreviousResults,
   getCriticalAlerts,
   addAttachment,

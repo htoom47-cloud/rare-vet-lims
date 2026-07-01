@@ -85,9 +85,14 @@ router.get('/previous/:animalId/:parameterId', authorize(PERMISSIONS.RESULTS_VIE
   } catch (err) { next(err); }
 });
 
-router.post('/enter', authorize(PERMISSIONS.RESULTS_ENTER), validate(resultEntrySchema), async (req, res, next) => {
+router.post('/enter', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_EDIT), validate(resultEntrySchema), async (req, res, next) => {
   try {
-    const data = await service.enterResults(req.body, req.user.id);
+    const allowValidatedEdit = req.user.permissions.includes(PERMISSIONS.RESULTS_EDIT)
+      || req.user.role_name === 'admin';
+    const data = await service.enterResults(
+      { ...req.body, allow_validated_edit: allowValidatedEdit },
+      req.user.id
+    );
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -107,6 +112,13 @@ router.post('/validate/:sampleTestId', authorize(PERMISSIONS.RESULTS_VALIDATE), 
       req.body.doctor_notes,
       req.body.values
     );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/unvalidate/:sampleTestId', authorize(PERMISSIONS.RESULTS_UNVALIDATE), async (req, res, next) => {
+  try {
+    const data = await service.unvalidateResults(req.params.sampleTestId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

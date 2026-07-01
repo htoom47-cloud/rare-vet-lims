@@ -21,10 +21,11 @@ import { expandSampleLabelJobs, totalLabelCountForSample } from '../utils/labelC
 import WorkflowStepper from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
 
-import { samplesAPI, animalsAPI, testsAPI, billingAPI, notificationsAPI } from '../services/api';
+import { samplesAPI, animalsAPI, testsAPI, billingAPI, notificationsAPI, resultsAPI } from '../services/api';
 import { getResultsEntryTargets } from '../utils/parasitologyTests';
 import { fmtCatalog } from '../utils/vat';
 import { packageLabel, packageTestIds } from '../utils/packageSelection';
+import { useAuth } from '../context/AuthContext';
 
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -35,6 +36,7 @@ export default function Samples() {
   const { t, i18n } = useTranslation();
 
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
 
   const [samples, setSamples] = useState([]);
 
@@ -527,11 +529,44 @@ export default function Samples() {
 
               {detailSample.tests?.map((test) => (
 
-                <div key={test.id} className="flex justify-between text-sm py-1 border-b">
+                <div key={test.id} className="flex justify-between items-center gap-2 text-sm py-1 border-b">
 
                   <span>{test.test_name}</span>
 
-                  <span>{fmtCatalog(test.price)} — <StatusBadge status={test.status} /></span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span>{fmtCatalog(test.price)} — <StatusBadge status={test.status} /></span>
+                    {test.is_validated && hasPermission('results.unvalidate') && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm(t('resultValidation.unvalidateConfirm'))) return;
+                          try {
+                            await resultsAPI.unvalidate(test.id);
+                            toast.success(t('resultValidation.unvalidated'));
+                            const { data } = await samplesAPI.get(detailSample.id);
+                            setDetailSample(data.data);
+                          } catch (err) {
+                            toast.error(err.response?.data?.error?.message || 'خطأ');
+                          }
+                        }}
+                        className="text-xs text-amber-700 hover:underline"
+                      >
+                        {t('resultValidation.unvalidate')}
+                      </button>
+                    )}
+                    {test.is_validated && hasPermission('results.edit') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDetailSample(null);
+                          navigate(`/vet-review?sample=${detailSample.id}`);
+                        }}
+                        className="text-xs text-primary-600 hover:underline"
+                      >
+                        {t('resultValidation.editResults')}
+                      </button>
+                    )}
+                  </div>
 
                 </div>
 
@@ -574,6 +609,12 @@ export default function Samples() {
               {detailSample.workflow?.has_results && !detailSample.workflow?.all_validated && (
 
                 <button onClick={() => { setDetailSample(null); navigate(`/vet-review?sample=${detailSample.id}`); }} className="btn-secondary text-sm">{t('workflow.goApprove')}</button>
+
+              )}
+
+              {detailSample.workflow?.all_validated && (hasPermission('results.edit') || hasPermission('results.unvalidate')) && (
+
+                <button onClick={() => { setDetailSample(null); navigate(`/vet-review?sample=${detailSample.id}`); }} className="btn-secondary text-sm">{t('resultValidation.editResults')}</button>
 
               )}
 

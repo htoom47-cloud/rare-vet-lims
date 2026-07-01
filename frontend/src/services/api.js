@@ -117,6 +117,7 @@ export const resultsAPI = {
   enter: (data) => api.post('/results/enter', data),
   approveBatch: (items) => api.post('/results/approve-batch', { items }, { timeout: 90000 }),
   validate: (sampleTestId, payload = {}) => api.post(`/results/validate/${sampleTestId}`, payload),
+  unvalidate: (sampleTestId) => api.post(`/results/unvalidate/${sampleTestId}`),
   clear: (sampleTestId) => api.delete(`/results/sample-test/${sampleTestId}`),
   critical: () => api.get('/results/critical'),
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),

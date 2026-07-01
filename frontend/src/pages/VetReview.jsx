@@ -7,6 +7,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import QualResultToggle from '../components/results/QualResultToggle';
 import { samplesAPI, resultsAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest } from '../constants/normaCbcPanel';
 import {
   canonicalQualValue,
@@ -24,6 +25,11 @@ const qualFlag = (value) => {
 
 export default function VetReview() {
   const { t, i18n } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canValidate = hasPermission('results.validate');
+  const canEdit = hasPermission('results.edit');
+  const canEnter = hasPermission('results.enter');
+  const canUnvalidate = hasPermission('results.unvalidate');
   const [searchParams] = useSearchParams();
   const [samples, setSamples] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -99,6 +105,46 @@ export default function VetReview() {
   const valuesForSubmit = (testId) => (editValues[testId] || [])
     .filter((v) => String(v.value ?? '').trim() !== '')
     .map((v) => ({ parameter_id: v.parameter_id, value: v.value }));
+
+  const canEditTest = (res) => {
+    if (!res) return false;
+    if (res.is_validated) return canEdit;
+    return canEnter || canEdit || canValidate;
+  };
+
+  const refreshTestResult = (testId, data) => {
+    setResults((prev) => ({ ...prev, [testId]: data }));
+    setEditValues((prev) => ({
+      ...prev,
+      [testId]: (data?.values || []).map((v) => ({ ...v })),
+    }));
+  };
+
+  const saveChanges = async (testId) => {
+    try {
+      const { data } = await resultsAPI.enter({
+        sample_test_id: testId,
+        values: valuesForSubmit(testId),
+      });
+      refreshTestResult(testId, data.data);
+      toast.success(t('resultValidation.changesSaved'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const unvalidateTest = async (testId) => {
+    if (!window.confirm(t('resultValidation.unvalidateConfirm'))) return;
+    try {
+      const { data } = await resultsAPI.unvalidate(testId);
+      refreshTestResult(testId, data.data);
+      toast.success(t('resultValidation.unvalidated'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
 
   const validateTest = async (sampleTestId, closeAfter = true) => {
     const payload = {
@@ -244,7 +290,7 @@ export default function VetReview() {
         {selected?.tests?.map((test) => {
           const res = results[test.id];
           const rows = editValues[test.id] || res?.values || [];
-          const editable = res && !res.is_validated;
+          const editable = canEditTest(res);
           return (
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
               <div className="flex justify-between items-center mb-3">
@@ -278,9 +324,23 @@ export default function VetReview() {
                 <p className="text-gray-500 text-sm mb-3">{t('resultValidation.noResultsYet')}</p>
               )}
               {editable && hasFilledValues(rows) && (
-                <button type="button" onClick={() => validateTest(test.id)} className="btn-secondary text-sm">
-                  {t('resultValidation.approveTest')}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {res?.is_validated && canEdit && (
+                    <button type="button" onClick={() => saveChanges(test.id)} className="btn-secondary text-sm">
+                      {t('resultValidation.saveChanges')}
+                    </button>
+                  )}
+                  {res?.is_validated && canUnvalidate && (
+                    <button type="button" onClick={() => unvalidateTest(test.id)} className="btn-secondary text-sm text-amber-700">
+                      {t('resultValidation.unvalidate')}
+                    </button>
+                  )}
+                  {!res?.is_validated && canValidate && (
+                    <button type="button" onClick={() => validateTest(test.id)} className="btn-secondary text-sm">
+                      {t('resultValidation.approveTest')}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           );
@@ -296,7 +356,7 @@ export default function VetReview() {
               placeholder={t('resultValidation.notesPlaceholder')}
             />
           </div>
-          {pendingTests(selected).length > 0 && (
+          {canValidate && pendingTests(selected).length > 0 && (
             <button type="button" onClick={validateAll} disabled={validating} className="btn-primary w-full py-3">
               {validating ? t('common.loading') : t('resultValidation.approveAll')}
             </button>
