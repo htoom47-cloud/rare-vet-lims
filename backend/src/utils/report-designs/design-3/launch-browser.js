@@ -1,31 +1,59 @@
 /**
  * Resolve Puppeteer launch options for local dev and Render/Linux production.
  */
-const getLaunchOptions = async (puppeteer) => {
-  const args = [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--font-render-hinting=none',
-  ];
+const path = require('path');
 
-  const options = { headless: true, args };
+const BASE_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--font-render-hinting=none',
+];
 
+const setCacheDir = () => {
+  if (process.env.PUPPETEER_CACHE_DIR) return;
+  const backendRoot = path.join(__dirname, '../../..');
+  process.env.PUPPETEER_CACHE_DIR = path.join(backendRoot, '.cache', 'puppeteer');
+};
+
+const getLaunchOptions = async () => {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    options.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    return options;
+    return {
+      headless: true,
+      args: BASE_ARGS,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    };
   }
 
-  if (typeof puppeteer.executablePath === 'function') {
-    try {
-      options.executablePath = await puppeteer.executablePath();
-    } catch {
-      /* use puppeteer default lookup */
-    }
+  if (process.platform === 'linux') {
+    const chromium = require('@sparticuz/chromium');
+    chromium.setGraphicsMode = false;
+    return {
+      args: [...chromium.args, ...BASE_ARGS],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    };
   }
 
-  return options;
+  setCacheDir();
+
+  try {
+    const puppeteerDev = require('puppeteer');
+    return {
+      headless: true,
+      args: BASE_ARGS,
+      executablePath: await puppeteerDev.executablePath(),
+    };
+  } catch {
+    const puppeteerCore = require('puppeteer-core');
+    return {
+      headless: true,
+      args: BASE_ARGS,
+      executablePath: await puppeteerCore.executablePath(),
+    };
+  }
 };
 
 const isChromeMissingError = (err) => (

@@ -93,6 +93,8 @@ services:
         value: portal.rarevetcare.com
       - key: CORS_ORIGINS
         value: https://lims.rarevetcare.com,https://portal.rarevetcare.com,https://rare-vet-lims.onrender.com
+      - key: REPORT_DESIGN
+        value: "3"
       - key: PUPPETEER_CACHE_DIR
         value: /opt/render/project/src/backend/.cache/puppeteer
       - key: PORTAL_JWT_EXPIRES_IN
