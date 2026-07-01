@@ -1,6 +1,7 @@
 import Barcode from 'react-barcode';
 import QRCode from 'react-qr-code';
 import { useTranslation } from 'react-i18next';
+import { panelCode } from '../../utils/labelPanel';
 
 const truncate = (text, max) => {
   const s = String(text || '').trim();
@@ -16,10 +17,12 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
   const { i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
 
-  const testLabel = (sample.tests || [])
-    .map((t) => (isArabic ? t.test_name_ar : t.test_name) || t.test_name || t.test_code)
-    .filter(Boolean)
-    .join(' · ');
+  const testLabel = sample.panelKey
+    ? panelCode(sample.panelKey)
+    : (sample.tests || [])
+      .map((t) => (isArabic ? t.test_name_ar : t.test_name) || t.test_name || t.test_code)
+      .filter(Boolean)
+      .join(' · ');
 
   const data = {
     sampleId: sample.sample_code,
@@ -48,8 +51,8 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
               value={barcodeText}
               format="CODE128"
               width={1.05}
-              height={24}
-              fontSize={7}
+              height={22}
+              fontSize={10}
               margin={0}
               displayValue
               background="#ffffff"
@@ -61,14 +64,14 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
         )}
 
         <div className="label-50x25-details">
-          {animalLine && (
-            <p className="label-50x25-line" title={animalLine}>
-              {truncate(animalLine, 32)}
-            </p>
-          )}
           {data.testTypes && (
             <p className="label-50x25-line label-50x25-tests" title={data.testTypes}>
-              {truncate(data.testTypes, 34)}
+              {truncate(data.testTypes, 30)}
+            </p>
+          )}
+          {animalLine && (
+            <p className="label-50x25-line" title={animalLine}>
+              {truncate(animalLine, 28)}
             </p>
           )}
         </div>

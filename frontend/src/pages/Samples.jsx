@@ -611,7 +611,7 @@ export default function Samples() {
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {expandSampleLabelJobs(printSample).map((job, idx) => (
               <BarcodeLabel
-                key={`${job.tests?.map((t) => t.test_id || t.id).join('-') || idx}`}
+                key={job.panelKey || idx}
                 sample={job}
               />
             ))}

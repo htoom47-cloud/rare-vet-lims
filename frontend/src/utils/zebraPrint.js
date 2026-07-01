@@ -1,3 +1,5 @@
+import { buildLabelLines, panelCode } from './labelPanel';
+
 const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
 
 export class ZebraPrintError extends Error {
@@ -123,6 +125,7 @@ export async function getDefaultPrinter() {
   }
 }
 
+
 const LABEL_WIDTH = 400;
 const LABEL_HEIGHT = 200;
 
@@ -137,18 +140,14 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-const testLabelFor = (sample, isArabic) => (sample.tests || [])
-  .map((t) => (isArabic ? t.test_name_ar : t.test_name) || t.test_name || t.test_code)
-  .filter(Boolean)
-  .join(' · ');
-
+/** ZPL for Zebra ZD421 50×25 mm — barcode + panel + animal (Latin/short Arabic). */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
-  const barcode = String(sample.barcode || sample.sample_code || '').trim();
-  const animalLine = truncate(
-    [sample.animal_code, sample.animal_name].filter(Boolean).join(' · '),
-    34
-  );
-  const testLine = truncate(testLabelFor(sample, isArabic), 36);
+  const { barcode, panelLine, animalLine, panelKey } = buildLabelLines(sample, {
+    isArabic,
+    panelKey: sample.panelKey,
+  });
+  // Zebra renders Latin panel codes reliably on 50×25 mm labels.
+  const panelZpl = panelCode(panelKey) || panelLine;
 
   const lines = [
     '^XA',
@@ -156,21 +155,20 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
     `^PW${LABEL_WIDTH}`,
     `^LL${LABEL_HEIGHT}`,
     '^LH0,0',
-    '^LT22',
-    '^LS0',
   ];
 
   if (barcode) {
-    lines.push(`^FO35,18^BY1.7,2,24^BCN,24,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(`^FO24,6^BY1.5,2,32^BCN,32,N,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(`^FO8,42^FB384,1,0,C,0^A0N,16,14^FD${zplEscape(truncate(barcode, 22))}^FS`);
   }
 
-  let y = 66;
-  if (animalLine) {
-    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(animalLine)}^FS`);
-    y += 14;
+  let y = 60;
+  if (panelZpl) {
+    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,18,16^FD${zplEscape(truncate(panelZpl, 24))}^FS`);
+    y += 20;
   }
-  if (testLine) {
-    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(testLine)}^FS`);
+  if (animalLine) {
+    lines.push(`^FO8,${y}^FB384,1,0,C,0^A0N,14,12^FD${zplEscape(truncate(animalLine, 28))}^FS`);
   }
 
   lines.push('^XZ');

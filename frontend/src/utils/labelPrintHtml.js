@@ -1,3 +1,5 @@
+import { buildLabelLines } from './labelPanel';
+
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -38,23 +40,18 @@ const LABEL_PRINT_STYLES = `
 `;
 
 export const labelMetaFromSample = (sample, isArabic = false) => {
-  const barcode = String(sample?.barcode || sample?.sample_code || '').trim();
-  const testLine = (sample?.tests || [])
-    .map((t) => (isArabic ? t.test_name_ar : t.test_name) || t.test_name || t.test_code)
-    .filter(Boolean)
-    .join(' · ');
-  const animalLine = [sample?.animal_code, sample?.animal_name].filter(Boolean).join(' · ');
-
+  const meta = buildLabelLines(sample, { isArabic, panelKey: sample?.panelKey });
   return {
-    barcode,
-    animalLine: truncate(animalLine, 28),
-    testLine: truncate(testLine, 30),
+    barcode: meta.barcode,
+    panelLine: truncate(meta.panelLine, 24),
+    animalLine: truncate(meta.animalLine, 28),
+    testLine: truncate(meta.testLine, 30),
   };
 };
 
 /** Standalone 50×25 mm print page — never includes modal UI. */
 export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = false } = {}) => {
-  const { barcode, animalLine, testLine } = labelMetaFromSample(sample, isArabic);
+  const { barcode, panelLine, animalLine } = labelMetaFromSample(sample, isArabic);
   const barcodeJson = JSON.stringify(barcode || 'NO-BARCODE');
   const autoPrintScript = autoPrint ? `
       window.onload = function () {
@@ -85,8 +82,8 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
 <body>
   <div class="label-50x25">
     ${barcode ? '<svg id="sample-barcode"></svg>' : '<p class="label-50x25-error">No barcode</p>'}
+    ${panelLine ? `<p class="label-50x25-line label-50x25-tests">${escapeHtml(panelLine)}</p>` : ''}
     ${animalLine ? `<p class="label-50x25-line">${escapeHtml(animalLine)}</p>` : ''}
-    ${testLine ? `<p class="label-50x25-line label-50x25-tests">${escapeHtml(testLine)}</p>` : ''}
   </div>
   <script>
     (function () {
@@ -105,12 +102,12 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
 };
 
 const labelBodyHtml = (sample, isArabic) => {
-  const { barcode, animalLine, testLine } = labelMetaFromSample(sample, isArabic);
+  const { barcode, panelLine, animalLine } = labelMetaFromSample(sample, isArabic);
   return `
   <div class="label-50x25 label-page">
     ${barcode ? `<svg class="sample-barcode" data-code="${escapeHtml(barcode)}"></svg>` : '<p class="label-50x25-error">No barcode</p>'}
+    ${panelLine ? `<p class="label-50x25-line label-50x25-tests">${escapeHtml(panelLine)}</p>` : ''}
     ${animalLine ? `<p class="label-50x25-line">${escapeHtml(animalLine)}</p>` : ''}
-    ${testLine ? `<p class="label-50x25-line label-50x25-tests">${escapeHtml(testLine)}</p>` : ''}
   </div>`;
 };
 
