@@ -1,42 +1,24 @@
 import toast from 'react-hot-toast';
 import i18n from '../i18n';
-import { printLabelViaIframe, printLabelFromPreview, openLabelPrintWindow } from './labelPrintHtml';
+import { printLabelsViaIframe, printLabelFromPreview, openLabelPrintWindow } from './labelPrintHtml';
 import { printToZebra, isBrowserPrintMissing } from './zebraPrint';
 import { expandSampleLabelJobs, expandSamplesForLabelPrint } from './labelCopies';
 
-/** Browser print fallback for all label copies of one sample. */
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/** Browser print — one dialog, one page per test tube. */
 export async function printAllThermalLabels(sample, { isArabic = i18n.language === 'ar' } = {}) {
   const jobs = expandSampleLabelJobs(sample);
-  let ok = false;
-  for (let i = 0; i < jobs.length; i += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const printed = await printThermalLabel(jobs[i], { isArabic });
-    if (printed) ok = true;
-  }
-  return ok;
-}
+  if (!jobs.length) return false;
 
-/** Browser print fallback — iframe first (no popups), then optional new window. */
-export async function printThermalLabel(sample, { isArabic = i18n.language === 'ar' } = {}) {
-  if (document.querySelector('.label-preview')) {
-    try {
-      const ok = await printLabelFromPreview();
-      if (ok) return true;
-    } catch {
-      /* fall through */
-    }
+  try {
+    const ok = await printLabelsViaIframe(jobs, { isArabic });
+    if (ok) return true;
+  } catch {
+    /* fall through */
   }
 
-  if (sample) {
-    try {
-      const ok = await printLabelViaIframe(sample, { isArabic });
-      if (ok) return true;
-    } catch {
-      /* fall through */
-    }
-  }
-
-  return openLabelPrintWindow(sample, { isArabic });
+  return openLabelPrintWindow(null, { isArabic, samples: jobs });
 }
 
 /** Auto-print after registration (ZPL only). Returns count printed. */
@@ -50,8 +32,10 @@ export async function autoPrintSampleLabels(samples) {
       // eslint-disable-next-line no-await-in-loop
       await printToZebra(jobs[i], { isArabic });
       printed += 1;
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(120);
     } catch {
-      break;
+      /* try remaining labels */
     }
   }
 
@@ -64,6 +48,7 @@ export async function printSampleLabel(sample) {
 
   const isArabic = i18n.language === 'ar';
   const jobs = expandSampleLabelJobs(sample);
+  if (!jobs.length) return 'browser';
 
   let zebraPrinted = 0;
   let lastDevice = 'Zebra';
@@ -74,20 +59,25 @@ export async function printSampleLabel(sample) {
       const result = await printToZebra(jobs[i], { isArabic });
       zebraPrinted += 1;
       lastDevice = result.device || lastDevice;
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(120);
     } catch (error) {
       if (zebraPrinted > 0) {
         toast.success(
           i18n.t('samples.zebraPrintPartial', { printed: zebraPrinted, total: jobs.length, printer: lastDevice })
         );
-        return 'zebra';
       }
 
-      const fallbackOk = await printAllThermalLabels(sample, { isArabic });
+      const fallbackOk = await printLabelsViaIframe(jobs.slice(zebraPrinted), { isArabic })
+        || openLabelPrintWindow(null, { isArabic, samples: jobs.slice(zebraPrinted) });
+
       if (fallbackOk) {
-        if (isBrowserPrintMissing(error)) {
+        if (isBrowserPrintMissing(error) && zebraPrinted === 0) {
           toast(i18n.t('samples.zebraBrowserPrintHint'), { icon: 'ℹ️', duration: 6000 });
         }
-        toast.success(i18n.t('samples.zebraBrowserFallbackOk'));
+        if (zebraPrinted === 0) {
+          toast.success(i18n.t('samples.zebraBrowserFallbackOk'));
+        }
         return 'browser';
       }
 
@@ -110,4 +100,13 @@ export async function printSampleLabel(sample) {
     );
   }
   return 'zebra';
+}
+
+/** Manual print from on-screen preview only (single visible label). */
+export async function printVisibleLabelPreview() {
+  try {
+    return await printLabelFromPreview();
+  } catch {
+    return false;
+  }
 }

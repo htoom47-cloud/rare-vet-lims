@@ -16,7 +16,7 @@ import BarcodeScanner from '../components/barcode/BarcodeScanner';
 
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
 import { printSampleLabel } from '../utils/printLabel';
-import { totalLabelCountForSample } from '../utils/labelCopies';
+import { expandSampleLabelJobs, totalLabelCountForSample } from '../utils/labelCopies';
 
 import WorkflowStepper from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
@@ -130,10 +130,6 @@ export default function Samples() {
 
   const openPrintLabel = async (row) => {
     try {
-      if (row.tests?.length) {
-        setPrintSample(row);
-        return;
-      }
       const { data } = await samplesAPI.get(row.id);
       setPrintSample(data.data);
     } catch {
@@ -612,7 +608,14 @@ export default function Samples() {
               {t('samples.labelCopiesHint', { count: totalLabelCountForSample(printSample) })}
             </p>
           )}
-          <BarcodeLabel sample={printSample} />
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {expandSampleLabelJobs(printSample).map((job, idx) => (
+              <BarcodeLabel
+                key={job.tests?.[0]?.test_id || job.tests?.[0]?.id || idx}
+                sample={job}
+              />
+            ))}
+          </div>
 
           <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
 

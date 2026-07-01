@@ -8,7 +8,7 @@ import CustomerSearch from '../components/customers/CustomerSearch';
 import Modal from '../components/ui/Modal';
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
 import { printSampleLabel, autoPrintSampleLabels, printAllThermalLabels } from '../utils/printLabel';
-import { totalLabelCountForSample } from '../utils/labelCopies';
+import { expandSampleLabelJobs, totalLabelCountForSample, totalLabelCountForSamples } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
 import { fmtCatalog } from '../utils/vat';
@@ -317,19 +317,24 @@ export default function WorkflowCase() {
         created.push(data.data);
       }
       setSamples(created);
-      setPrintSample(created[0]);
       setStep(4);
       toast.success(t('workflow.samplesCreated', { count: created.length }));
+
+      const expected = totalLabelCountForSamples(created);
       const printed = await autoPrintSampleLabels(created);
-      if (printed > 0) {
+      if (printed >= expected) {
         toast.success(t('samples.autoPrintOk', { count: printed }));
-      } else if (created.length) {
+        return;
+      }
+
+      let browserOk = false;
+      for (const sample of created) {
+        // eslint-disable-next-line no-await-in-loop
+        browserOk = (await printAllThermalLabels(sample)) || browserOk;
+      }
+      if (!browserOk && created[0]) {
         setPrintSample(created[0]);
         setPrintOpen(true);
-        for (const sample of created) {
-          // eslint-disable-next-line no-await-in-loop
-          await printAllThermalLabels(sample);
-        }
       }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -359,11 +364,6 @@ export default function WorkflowCase() {
 
   const openPrintLabel = async (row) => {
     try {
-      if (row.tests?.length) {
-        setPrintSample(row);
-        setPrintOpen(true);
-        return;
-      }
       const { data } = await samplesAPI.get(row.id);
       setPrintSample(data.data);
       setPrintOpen(true);
@@ -795,7 +795,14 @@ export default function WorkflowCase() {
                 {t('samples.labelCopiesHint', { count: totalLabelCountForSample(printSample) })}
               </p>
             )}
-            <BarcodeLabel sample={printSample} />
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {expandSampleLabelJobs(printSample).map((job, idx) => (
+                <BarcodeLabel
+                  key={job.tests?.[0]?.test_id || job.tests?.[0]?.id || idx}
+                  sample={job}
+                />
+              ))}
+            </div>
           </>
         )}
         <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
