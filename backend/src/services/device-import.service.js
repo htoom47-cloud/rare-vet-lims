@@ -31,6 +31,8 @@ const enrichPctFromAbs = async (results, values, testCode) => {
   return values;
 };
 
+/** When Norma sends WBC + diff % only, compute # = WBC × % / 100. */
+const enrichDiffAbsFromPct = async (results, values, testCode) => {
   const byCode = Object.fromEntries(results.map((r) => [resultLimsCode(r), r]));
   const wbc = parseFloat(byCode.WBC?.value);
   if (Number.isNaN(wbc)) return values;
