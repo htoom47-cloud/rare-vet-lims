@@ -7,9 +7,10 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI } from '../services/api';
 import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest } from '../constants/normaCbcPanel';
+import { formatResultValue, parameterDisplayName, testDisplayName } from '../utils/formatResultValue';
 
 export default function VetReview() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
   const [samples, setSamples] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -105,11 +106,11 @@ export default function VetReview() {
     const rows = (items) => items.map((v) => (
       <tr key={v.parameter_code || v.parameter_id} className="border-t">
         <td className="py-1">
-          {v.parameter_name}
+          {parameterDisplayName(v, i18n.language)}
           {v.pct_value && <span className="text-gray-500 text-xs ms-1">*{v.pct_value}%</span>}
         </td>
         <td>
-          {String(v.value ?? '').trim() !== '' ? `${v.value} ${v.unit || ''}`.trim() : '—'}
+          {formatResultValue(v, t)}
         </td>
         <td className="text-gray-500">{v.reference || '—'}</td>
         {renderFlagCell(v)}
@@ -172,7 +173,7 @@ export default function VetReview() {
           return (
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
               <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold">{test.test_name}</h4>
+                <h4 className="font-semibold">{testDisplayName(test, i18n.language)}</h4>
                 {res?.is_validated && (
                   <span className="text-green-600 text-sm flex items-center gap-1">
                     <CheckCircle size={14} /> {t('resultValidation.approvedBadge')}

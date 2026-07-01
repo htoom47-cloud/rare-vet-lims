@@ -65,7 +65,7 @@ const getBySampleTest = async (sampleTestId) => {
   const result = await query(
     `SELECT r.id AS result_id, r.sample_test_id, r.is_validated, r.doctor_notes, r.technician_notes, r.has_critical,
             rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical,
-            tp.name AS parameter_name, tp.code AS parameter_code, tp.unit, tp.sort_order,
+            tp.name AS parameter_name, tp.name_ar AS parameter_name_ar, tp.code AS parameter_code, tp.unit, tp.sort_order,
             tr.min_value, tr.max_value, t.code AS test_code
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
@@ -98,6 +98,7 @@ const getBySampleTest = async (sampleTestId) => {
     values.push({
       parameter_id: row.parameter_id,
       parameter_name: panelRow?.symbol || row.parameter_name,
+      parameter_name_ar: row.parameter_name_ar,
       parameter_code: row.parameter_code,
       norma_section: panelRow?.section || null,
       value: row.value,
