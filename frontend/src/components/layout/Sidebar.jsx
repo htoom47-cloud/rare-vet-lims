@@ -15,6 +15,7 @@ const receptionNavSections = [
       { path: '/', icon: LayoutDashboard, label: 'reception.home', permission: 'dashboard.view' },
       { path: '/workflow', icon: Route, label: 'reception.newCase', permission: 'samples.create' },
       { path: '/samples', icon: FlaskConical, label: 'reception.viewSamples', permission: 'samples.view' },
+      { path: '/reports', icon: FileText, label: 'nav.reports', permission: 'reports.view' },
       { path: '/price-list', icon: Tags, label: 'nav.priceList', permissions: ['price_list.view', 'tests.view'] },
       { path: '/billing', icon: CreditCard, label: 'reception.billing', permission: 'billing.view' },
       { path: '/accounting', icon: BarChart3, label: 'nav.accounting', permission: 'billing.view' },

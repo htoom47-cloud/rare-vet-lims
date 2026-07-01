@@ -38,6 +38,7 @@ export default function Samples() {
   const navigate = useNavigate();
   const { hasPermission, hasAnyPermission } = useAuth();
   const canSendSmsToCustomer = hasPermission('notifications.send_report');
+  const canGenerateReport = hasPermission('reports.generate');
   const canReviewResults = hasAnyPermission(
     'results.validate', 'results.edit', 'results.unvalidate', 'results.enter'
   );
@@ -644,7 +645,7 @@ export default function Samples() {
 
               )}
 
-              {detailSample.workflow?.all_validated && !detailSample.workflow?.has_report && (
+              {detailSample.workflow?.all_validated && !detailSample.workflow?.has_report && canGenerateReport && (
 
                 <button onClick={generateReportOnly} disabled={sending} className="btn-primary text-sm">{t('workflow.goExtract')}</button>
 
