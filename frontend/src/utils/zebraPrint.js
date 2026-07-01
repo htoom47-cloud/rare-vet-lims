@@ -148,35 +148,36 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
     isArabic,
     panelKey: sample.panelKey,
   });
+
   const panelZpl = panelCode(panelKey);
   const animal = truncate(animalLine, 34);
 
   const lines = [
     '^XA',
     '^CI28',
-    `^PW${LABEL_WIDTH}`,
-    `^LL${LABEL_HEIGHT}`,
+    '^PW400',
+    '^LL200',
     '^LH0,0',
     '^LT0',
     '^LS0',
     '^FWN',
-    '^PON',
+    '^POR',
   ];
 
   let y = ORIGIN_Y;
 
   if (barcode) {
-    lines.push(`^FO${ORIGIN_X},${y}^BY1.4,2,20^BCN,20,Y,N,N^FD${zplEscape(barcode)}^FS`);
-    y += 38;
+    lines.push(`^FO${ORIGIN_X},${y}^BY1.5,2,35^BCN,35,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    y += 58;
   }
 
   if (panelZpl) {
-    lines.push(`^FO${ORIGIN_X},${y}^A0N,16,14^FD${zplEscape(panelZpl)}^FS`);
-    y += 18;
+    lines.push(`^FO${ORIGIN_X},${y}^A0N,24,22^FD${zplEscape(panelZpl)}^FS`);
+    y += 28;
   }
 
   if (animal) {
-    lines.push(`^FO${ORIGIN_X},${y}^A0N,12,10^FD${zplEscape(animal)}^FS`);
+    lines.push(`^FO${ORIGIN_X},${y}^A0N,18,16^FD${zplEscape(animal)}^FS`);
   }
 
   lines.push('^XZ');
