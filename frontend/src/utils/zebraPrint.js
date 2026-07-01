@@ -151,7 +151,7 @@ const zplLandscapeHeader = () => [
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
   '^LH0,0',
-  '^LT22',
+  '^LT0',
   '^LS0',
   '^FWN',
   '^PON',
@@ -177,16 +177,17 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(field(`^FO50,20^BY1.5,2,20^BCN,20,N,N,N^FD${zplEscape(barcode)}^FS`));
-    lines.push(textLine(46, truncate(barcode, 24)));
+    // BY2 + height 35: reliable on ZD421; ^LT0 avoids clipping top of label.
+    lines.push(field(`^FO30,6^BY2,2,35^BCN,35,N,N,N^FD${zplEscape(barcode)}^FS`));
+    lines.push(textLine(52, truncate(barcode, 24)));
   }
 
   if (panelZpl) {
-    lines.push(textLine(68, panelZpl));
+    lines.push(textLine(76, panelZpl));
   }
 
   if (animal) {
-    lines.push(textLine(90, animal));
+    lines.push(textLine(100, animal));
   }
 
   lines.push('^XZ');
