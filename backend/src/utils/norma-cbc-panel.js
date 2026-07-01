@@ -63,6 +63,124 @@ const NORMA_CBC_PCT_BY_ABS = {
   BAS: 'BAS_PCT',
 };
 
+/** WBC differential rows in reports/UI — show % (LYM%) not absolute # (LYM). */
+const NORMA_CBC_WBC_DIFF_PCT_CODES = Object.values(NORMA_CBC_PCT_BY_ABS);
+
+/**
+ * Resolve one CBC screen row for display (report, API, workbench).
+ * WBC differential uses percentage param; WBC/RBC/PLT use absolute.
+ */
+function resolveCbcScreenRow(screenCode, byCode) {
+  const pctCode = NORMA_CBC_PCT_BY_ABS[screenCode];
+  const absData = byCode[screenCode];
+  const pctData = pctCode ? byCode[pctCode] : null;
+  const screenPanel = getNormaPanelRow(screenCode);
+
+  if (pctCode) {
+    const pctPanel = getNormaPanelRow(pctCode);
+    const pctValue = String(pctData?.value ?? '').trim();
+    if (pctValue !== '') {
+      return {
+        parameter_id: pctData.parameter_id,
+        parameter_code: pctCode,
+        parameter_name: pctPanel?.symbol || `${screenCode}%`,
+        parameter_name_ar: pctPanel?.name_ar || pctData.parameter_name_ar,
+        norma_section: screenPanel?.section || 'WBC',
+        value: pctData.value,
+        numeric_value: pctData.numeric_value ?? null,
+        unit: '%',
+        flag: pctData.flag || null,
+        is_critical: pctData.is_critical || false,
+        reference: pctData.reference ?? null,
+        sort_order: screenPanel?.displayOrder ?? pctData.sort_order,
+      };
+    }
+
+    const wbc = parseFloat(byCode.WBC?.value);
+    const abs = parseFloat(absData?.value);
+    if (!Number.isNaN(wbc) && wbc > 0 && !Number.isNaN(abs)) {
+      const computed = Math.round((abs / wbc * 100) * 10) / 10;
+      return {
+        parameter_id: pctData?.parameter_id || absData?.parameter_id || null,
+        parameter_code: pctCode,
+        parameter_name: pctPanel?.symbol || `${screenCode}%`,
+        parameter_name_ar: pctPanel?.name_ar || absData?.parameter_name_ar,
+        norma_section: screenPanel?.section || 'WBC',
+        value: String(computed),
+        numeric_value: computed,
+        unit: '%',
+        flag: pctData?.flag || absData?.flag || null,
+        is_critical: pctData?.is_critical || absData?.is_critical || false,
+        reference: pctData?.reference ?? null,
+        sort_order: screenPanel?.displayOrder,
+      };
+    }
+    return null;
+  }
+
+  if (!absData || String(absData.value ?? '').trim() === '') return null;
+
+  return {
+    parameter_id: absData.parameter_id,
+    parameter_code: screenCode,
+    parameter_name: screenPanel?.symbol || absData.parameter_name || screenCode,
+    parameter_name_ar: absData.parameter_name_ar,
+    norma_section: screenPanel?.section || null,
+    value: absData.value,
+    numeric_value: absData.numeric_value ?? null,
+    unit: absData.unit || screenPanel?.unit || null,
+    flag: absData.flag || null,
+    is_critical: absData.is_critical || false,
+    reference: absData.reference ?? null,
+    sort_order: absData.sort_order,
+  };
+}
+
+function mapCbcRowsForDisplay(rawRows) {
+  const byCode = Object.fromEntries(rawRows.map((r) => [r.parameter_code || r.code, r]));
+  const rows = NORMA_CBC_SCREEN_ORDER
+    .map((code) => resolveCbcScreenRow(code, byCode))
+    .filter(Boolean);
+
+  if (rows.length > 0) return rows;
+
+  // Fallback: return any stored values if screen mapping produced nothing
+  return rawRows
+    .filter((r) => String(r.value ?? '').trim() !== '')
+    .map((r) => {
+      const panelRow = getNormaPanelRow(r.parameter_code);
+      return {
+        parameter_id: r.parameter_id,
+        parameter_code: r.parameter_code,
+        parameter_name: panelRow?.symbol || r.parameter_name || r.parameter_code,
+        parameter_name_ar: r.parameter_name_ar,
+        norma_section: panelRow?.section || null,
+        value: r.value,
+        numeric_value: r.numeric_value ?? null,
+        unit: r.unit || panelRow?.unit || null,
+        flag: r.flag || null,
+        is_critical: r.is_critical || false,
+        reference: r.reference ?? null,
+        sort_order: r.sort_order,
+      };
+    });
+}
+
+/** Drop absolute WBC diff rows when % exists (for flat report export). */
+function filterCbcReportRows(rows) {
+  const byCode = Object.fromEntries(rows.map((r) => [r.parameter_code, r]));
+  return rows.filter((row) => {
+    if (!Object.prototype.hasOwnProperty.call(NORMA_CBC_PCT_BY_ABS, row.parameter_code)) return true;
+    const pctCode = NORMA_CBC_PCT_BY_ABS[row.parameter_code];
+    const pct = byCode[pctCode];
+    if (pct && String(pct.value ?? '').trim() !== '') return false;
+    const wbc = parseFloat(byCode.WBC?.value);
+    const abs = parseFloat(row.value);
+    if (!Number.isNaN(wbc) && wbc > 0 && !Number.isNaN(abs)) return false;
+    return true;
+  });
+}
+
 const NORMA_CBC_UI_HIDDEN = new Set(Object.values(NORMA_CBC_PCT_BY_ABS));
 
 const NORMA_CBC_PANEL_CODES = new Set(NORMA_CBC_PANEL.map((p) => p.code));
@@ -103,10 +221,14 @@ module.exports = {
   NORMA_CBC_ORDER,
   NORMA_CBC_SCREEN_ORDER,
   NORMA_CBC_PCT_BY_ABS,
+  NORMA_CBC_WBC_DIFF_PCT_CODES,
   NORMA_CBC_UI_HIDDEN,
   NORMA_CBC_PANEL_CODES,
   NORMA_SYMBOL_BY_CODE,
   NORMA_SECTION_BY_CODE,
   getNormaPanelRow,
   buildCbcDisplayParameters,
+  resolveCbcScreenRow,
+  mapCbcRowsForDisplay,
+  filterCbcReportRows,
 };

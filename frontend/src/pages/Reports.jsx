@@ -7,7 +7,6 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { reportsAPI, samplesAPI, notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { isReception } from '../utils/roles';
 
 const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
@@ -82,7 +81,7 @@ export default function Reports() {
 
   const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
   const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
-  const canSendSmsToCustomer = isReception(user) && hasPermission('notifications.send_report');
+  const canSendSmsToCustomer = hasPermission('notifications.send_report');
   const canRegeneratePdf = hasPermission('reports.generate');
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)
@@ -98,10 +97,10 @@ export default function Reports() {
 
   useEffect(() => {
     const sampleId = searchParams.get('generate');
-    if (!sampleId || !completedSamples.length) return;
+    if (!sampleId || !completedSamples.length || !canRegeneratePdf) return;
     const sample = completedSamples.find((s) => s.id === sampleId);
     if (sample) openGenerateForSample(sample);
-  }, [searchParams, completedSamples]);
+  }, [searchParams, completedSamples, canRegeneratePdf]);
 
   const handleVerify = async () => {
     try {
@@ -302,9 +301,11 @@ export default function Reports() {
           <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
           <p className="text-sm text-primary-500 mt-1">{t('reports.subtitle')}</p>
         </div>
-        <button onClick={() => { setSelectedSample(null); setGenerateOpen(true); }} className="btn-primary flex items-center gap-2">
-          <FilePlus size={18} /> {t('reports.generate')}
-        </button>
+        {canRegeneratePdf && (
+          <button onClick={() => { setSelectedSample(null); setGenerateOpen(true); }} className="btn-primary flex items-center gap-2">
+            <FilePlus size={18} /> {t('reports.generate')}
+          </button>
+        )}
       </div>
 
       <div className="card mb-6">
@@ -417,9 +418,11 @@ export default function Reports() {
               )}
             </div>
 
-            <button type="button" onClick={generateReport} disabled={generating} className="btn-primary w-full py-3">
-              {generating ? t('common.loading') : t('reports.generatePdf')}
-            </button>
+            {canRegeneratePdf && (
+              <button type="button" onClick={generateReport} disabled={generating} className="btn-primary w-full py-3">
+                {generating ? t('common.loading') : t('reports.generatePdf')}
+              </button>
+            )}
           </div>
         )}
       </Modal>

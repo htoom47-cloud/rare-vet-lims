@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -6,21 +7,55 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const skipPathRefresh = useRef(true);
 
-  const loadUser = useCallback(async () => {
+  const loadUser = useCallback(async ({ silent = false } = {}) => {
     const token = localStorage.getItem('accessToken');
-    if (!token) { setLoading(false); return; }
+    if (!token) {
+      if (!silent) setLoading(false);
+      return;
+    }
     try {
       const { data } = await authAPI.me();
       setUser(data.data);
     } catch {
-      localStorage.clear();
+      if (!silent) localStorage.clear();
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => { loadUser(); }, [loadUser]);
+
+  // Keep sidebar/button permissions in sync after deploy or admin role edits.
+  useEffect(() => {
+    const refresh = () => {
+      if (localStorage.getItem('accessToken')) loadUser({ silent: true });
+    };
+    const interval = setInterval(refresh, 5 * 60 * 1000);
+    window.addEventListener('focus', refresh);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('auth:token-refreshed', refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('auth:token-refreshed', refresh);
+    };
+  }, [loadUser]);
+
+  // Refresh permissions when navigating — applies to every role.
+  useEffect(() => {
+    if (skipPathRefresh.current) {
+      skipPathRefresh.current = false;
+      return;
+    }
+    if (localStorage.getItem('accessToken')) loadUser({ silent: true });
+  }, [location.pathname, loadUser]);
 
   const login = async (username, password) => {
     const { data } = await authAPI.login(username, password);

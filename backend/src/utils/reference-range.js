@@ -1,7 +1,9 @@
-/** Parse reference range strings from Norma HL7/ASTM (e.g. "4.0-15.0", "4 - 15"). */
+/** Parse reference range strings from Norma HL7/ASTM (e.g. "4.0-15.0", "4 - 15", "4,0-15,0"). */
 const parseReferenceRange = (raw) => {
   if (raw == null || raw === '') return null;
-  const s = String(raw).trim();
+  let s = String(raw).trim();
+  s = s.replace(/^[([{<]+/, '').replace(/[)\]}>]+$/, '');
+  s = s.replace(/,/g, '.');
   const m = s.match(/([\d.]+)\s*[-–—~]\s*([\d.]+)/);
   if (!m) return null;
   const min = parseFloat(m[1]);

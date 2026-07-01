@@ -5,7 +5,7 @@ const { pool } = require('../config/database');
 const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
 const { ensureParasitologyCatalog } = require('./ensure-parasitology');
-const { ROLE_PERMISSIONS, PERMISSIONS } = require('../utils/permissions');
+const { syncPermissionsCatalog, syncRolePermissions } = require('../utils/sync-permissions');
 
 async function syncLabContactInfo(client) {
   const NEW_PHONE = process.env.LAB_PHONE || '0115007257';
@@ -46,38 +46,6 @@ async function syncLabContactInfo(client) {
   await client.query('UPDATE invoices SET pdf_url = NULL WHERE pdf_url IS NOT NULL');
   await client.query('UPDATE price_quotes SET pdf_url = NULL WHERE pdf_url IS NOT NULL');
   logger.info('Invoice and quote PDF cache cleared for lab contact refresh');
-}
-
-async function syncPermissionsCatalog(client) {
-  for (const [key, code] of Object.entries(PERMISSIONS)) {
-    const module = code.split('.')[0];
-    await client.query(
-      `INSERT INTO permissions (code, module, description) VALUES ($1, $2, $3)
-       ON CONFLICT (code) DO UPDATE SET module = EXCLUDED.module, description = EXCLUDED.description`,
-      [code, module, key]
-    );
-  }
-  logger.info('Permissions catalog synced');
-}
-
-async function syncAllRolePermissions(client) {
-  for (const [roleName, perms] of Object.entries(ROLE_PERMISSIONS)) {
-    const roleResult = await client.query('SELECT id FROM roles WHERE name = $1', [roleName]);
-    if (!roleResult.rows[0]) continue;
-    const roleId = roleResult.rows[0].id;
-
-    await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
-    for (const code of perms) {
-      const perm = await client.query('SELECT id FROM permissions WHERE code = $1', [code]);
-      if (perm.rows[0]) {
-        await client.query(
-          'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [roleId, perm.rows[0].id]
-        );
-      }
-    }
-  }
-  logger.info('Role permissions synced');
 }
 
 async function backfillUsernames(client) {
@@ -129,7 +97,7 @@ async function ensureLabSpecialistRole(client) {
      VALUES ('lab_specialist', 'أخصائي مختبر', 'Laboratory specialist')
      ON CONFLICT (name) DO UPDATE SET name_ar = EXCLUDED.name_ar, description = EXCLUDED.description`
   );
-  await syncAllRolePermissions(client);
+  await syncRolePermissions(client);
 }
 
 async function applyPatches() {
@@ -173,7 +141,7 @@ async function applyPatches() {
     await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
     await ensureParasitologyCatalog();
     await syncPermissionsCatalog(client);
-    await syncAllRolePermissions(client);
+    await syncRolePermissions(client);
     await client.query(`
       CREATE TABLE IF NOT EXISTS customer_otp_codes (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

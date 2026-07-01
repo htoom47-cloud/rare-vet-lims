@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, FlaskConical, CreditCard, Search, BarChart3, Tags, Monitor, Usb } from 'lucide-react';
+import { Plus, FlaskConical, CreditCard, Search, BarChart3, Tags, Monitor, Usb, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import { samplesAPI } from '../services/api';
@@ -9,7 +9,7 @@ import { samplesAPI } from '../services/api';
 export default function ReceptionHome() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, hasAnyPermission } = useAuth();
+  const { user, hasAnyPermission, hasPermission } = useAuth();
   const [customerId, setCustomerId] = useState('');
   const [recentSamples, setRecentSamples] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +97,12 @@ export default function ReceptionHome() {
           <FlaskConical className="text-primary-600" size={24} />
           <span className="text-sm font-medium">{t('reception.viewSamples')}</span>
         </button>
+        {hasPermission('reports.view') && (
+          <button onClick={() => navigate('/reports')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
+            <FileText className="text-primary-600" size={24} />
+            <span className="text-sm font-medium">{t('nav.reports')}</span>
+          </button>
+        )}
         {hasAnyPermission('price_list.view', 'tests.view') && (
         <button onClick={() => navigate('/price-list')} className="card p-4 flex flex-col items-center gap-2 hover:bg-primary-50">
           <Tags className="text-primary-600" size={24} />

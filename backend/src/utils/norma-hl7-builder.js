@@ -5,7 +5,7 @@ const { NORMA_CBC_REFERENCES } = require('./norma-cbc-references');
 const PARAM_UNITS = {
   WBC: '10^3/uL', LYM: '10^3/uL', LYM_PCT: '%', MON: '10^3/uL', MON_PCT: '%',
   NEU: '10^3/uL', NEU_PCT: '%', EOS: '10^3/uL', EOS_PCT: '%', BAS: '10^3/uL', BAS_PCT: '%',
-  RBC: '10^6/uL', HGB: 'g/dL', MCV: 'fL', HCT: '%', MCH: 'pg', MCHC: 'g/dL',
+  RBC: '10^6/uL', HGB: 'g/L', MCV: 'fL', HCT: '%', MCH: 'pg', MCHC: 'g/L',
   'RDW-SD': 'fL', 'RDW-CV': '%', PLT: '10^3/uL', MPV: 'fL', PCT: '%',
   'PDW-SD': 'fL', 'PDW-CV': '%', 'PLC-R': '%', 'PLC-C': '10^3/uL', RDW: '%',
 };

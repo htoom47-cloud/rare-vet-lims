@@ -1,7 +1,8 @@
 /**
  * Sync Norma iVet CBC reference ranges into test_reference_ranges.
- * Usage: node src/scripts/sync-norma-references.js [animal_type]
+ * Usage: node src/scripts/sync-norma-references.js [animal_type] [--force]
  * Default animal_type: camel
+ * Without --force: only inserts missing ranges (preserves HL7-learned values from device).
  */
 require('dotenv').config();
 const { query, pool } = require('../config/database');
@@ -12,7 +13,9 @@ const logger = require('../config/logger');
 const DEFAULT_TEST_CODE = 'CBC-FULL';
 
 async function main() {
-  const animalType = (process.argv[2] || 'camel').toLowerCase();
+  const args = process.argv.slice(2);
+  const force = args.includes('--force');
+  const animalType = (args.find((a) => !a.startsWith('--')) || 'camel').toLowerCase();
   const ranges = NORMA_CBC_REFERENCES[animalType];
   if (!ranges) {
     logger.error(`No Norma reference table for animal type: ${animalType}`);
@@ -49,11 +52,12 @@ async function main() {
       criticalHigh: ref.crit_high,
       unit: param.unit,
       source: 'norma-profile',
+      onlyIfMissing: !force,
     });
     synced += 1;
   }
 
-  logger.info(`Norma references synced for ${animalType}: ${synced} parameters (${missing} codes not in DB)`);
+  logger.info(`Norma references synced for ${animalType}: ${synced} parameters (${missing} codes not in DB)${force ? ' [force overwrite]' : ' [missing only]'}`);
   await pool.end();
 }
 

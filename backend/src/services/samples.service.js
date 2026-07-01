@@ -37,9 +37,13 @@ const list = async ({ status, search, awaiting_validation, page, limit }) => {
 
   params.push(l, offset);
   const result = await query(
-    `SELECT s.*, c.full_name as customer_name, a.animal_code, a.animal_type, a.name_tag as animal_name,
+    `SELECT s.*, c.full_name as customer_name, c.mobile as customer_mobile,
+            a.animal_code, a.animal_type, a.name_tag as animal_name,
             u.full_name as technician_name,
-            (SELECT COUNT(*) FROM sample_tests st WHERE st.sample_id = s.id) as test_count
+            (SELECT COUNT(*) FROM sample_tests st WHERE st.sample_id = s.id) as test_count,
+            (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id) as reports_count,
+            (SELECT COUNT(*) FROM notification_queue nq
+             WHERE nq.metadata::jsonb->>'sample_id' = s.id::text) as notifications_count
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id

@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
+const logger = require('../config/logger');
 
 const DEMO_ACCOUNTS = [
   { username: 'reception', email: 'reception@rarevetcare.com' },
@@ -58,16 +59,27 @@ const updateRolePermissions = async (roleId, permissionCodes) => {
     throw new AppError('Cannot modify admin role permissions', 403, 'FORBIDDEN');
   }
 
+  const codes = [...new Set((permissionCodes || []).map((c) => String(c).trim()).filter(Boolean))];
   await query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
 
-  for (const code of permissionCodes) {
+  const skipped = [];
+  for (const code of codes) {
     const perm = await query('SELECT id FROM permissions WHERE code = $1', [code]);
     if (perm.rows[0]) {
       await query(
         'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
         [roleId, perm.rows[0].id]
       );
+    } else {
+      skipped.push(code);
     }
+  }
+
+  if (skipped.length) {
+    logger.warn('Role permission save skipped unknown codes', {
+      role: roleResult.rows[0].name,
+      skipped,
+    });
   }
 
   return getPermissions(roleId);

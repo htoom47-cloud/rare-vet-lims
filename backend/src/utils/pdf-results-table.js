@@ -33,7 +33,7 @@ const CBC_SECTIONS = [
     key: 'wbc',
     titleEn: 'White Blood Cells',
     titleAr: 'كريات الدم البيضاء',
-    codes: ['WBC', 'LYM', 'MON', 'NEU', 'EOS', 'BAS'],
+    codes: ['WBC', 'LYM_PCT', 'MON_PCT', 'NEU_PCT', 'EOS_PCT', 'BAS_PCT'],
     column: 'left',
   },
   {

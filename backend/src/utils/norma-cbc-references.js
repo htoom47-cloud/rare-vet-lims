@@ -1,7 +1,7 @@
 /**
  * Norma iVet-5 / Icon CBC reference intervals for LIMS.
- * Primary source: Norma camel profile (matches device HL7 OBX-7 for WBC 4–15).
- * Updated automatically when Norma sends results with reference ranges in HL7.
+ * Fallback defaults for camel — overridden automatically when Norma sends OBX-7 in HL7.
+ * Run apply-norma-hl7-refs.js after changing device profiles to sync DB from latest import.
  */
 const { defaultCritical } = require('./reference-range');
 

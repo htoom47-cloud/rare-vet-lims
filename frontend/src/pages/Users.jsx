@@ -80,9 +80,20 @@ export default function Users() {
     if (!selectedRole || selectedRole.name === 'admin') return;
     setSavingPerms(true);
     try {
-      await usersAPI.updateRolePermissions(selectedRole.id, editedPermissions);
-      toast.success(t('users.permsSaved'));
-      await viewPermissions(selectedRole);
+      const { data } = await usersAPI.updateRolePermissions(selectedRole.id, editedPermissions);
+      const saved = data.data || [];
+      const savedCodes = saved.map((p) => p.code);
+      setRolePermissions(saved);
+      setEditedPermissions(savedCodes);
+      if (savedCodes.length !== editedPermissions.length) {
+        toast.error(t('users.permsPartialSave', {
+          saved: savedCodes.length,
+          requested: editedPermissions.length,
+          defaultValue: `Saved ${savedCodes.length} of ${editedPermissions.length} permissions — some codes are invalid`,
+        }));
+      } else {
+        toast.success(t('users.permsSaved', { count: savedCodes.length, defaultValue: 'Permissions saved' }));
+      }
     } catch (err) {
       toast.error(apiError(err));
     } finally {
