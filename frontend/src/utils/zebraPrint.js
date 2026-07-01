@@ -160,7 +160,7 @@ const zplLandscapeHeader = () => [
 /** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
 const field = (zpl) => `^FWN${zpl}`;
 
-const TEXT_LINE = '^A0N,14,12';
+const TEXT_LINE = '^A0N,20,18';
 const textLine = (y, value) => field(`^FO0,${y}^FB400,1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`);
 
 /** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
@@ -177,16 +177,16 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(field(`^FO50,24^BY1.6,2,22^BCN,22,N,N,N^FD${zplEscape(barcode)}^FS`));
-    lines.push(textLine(52, truncate(barcode, 24)));
+    lines.push(field(`^FO50,20^BY1.5,2,20^BCN,20,N,N,N^FD${zplEscape(barcode)}^FS`));
+    lines.push(textLine(46, truncate(barcode, 24)));
   }
 
   if (panelZpl) {
-    lines.push(textLine(72, panelZpl));
+    lines.push(textLine(68, panelZpl));
   }
 
   if (animal) {
-    lines.push(textLine(92, animal));
+    lines.push(textLine(90, animal));
   }
 
   lines.push('^XZ');
