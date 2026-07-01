@@ -140,7 +140,27 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ZPL for Zebra ZD421 50×25 mm — matches calibrated layout (barcode top, text below). */
+/** ZPL header — force landscape 50×25 mm, horizontal fields (no rotation). */
+const zplLandscapeHeader = () => [
+  '^XA',
+  '^CI28',
+  '^MUd',
+  `^PW${LABEL_WIDTH}`,
+  `^LL${LABEL_HEIGHT}`,
+  '^LH0,0',
+  '^LT0',
+  '^LS0',
+  '^LRN',
+  '^FWN',
+  '^PON',
+  '^MNM',
+  '^MMT',
+];
+
+/** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
+const field = (zpl) => `^FWN${zpl}`;
+
+/** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const { barcode, panelKey } = buildLabelLines(sample, {
     isArabic,
@@ -151,30 +171,18 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   // ZPL font cannot render Arabic; print animal code only on thermal labels.
   const animal = truncate(String(sample?.animal_code || '').trim(), 24);
 
-  const lines = [
-    '^XA',
-    '^CI28',
-    `^PW${LABEL_WIDTH}`,
-    `^LL${LABEL_HEIGHT}`,
-    '^LH0,0',
-    '^LT0',
-    '^LS0',
-    '^FWN',
-    '^PON',
-    '^MMT',
-    '^MNW',
-  ];
+  const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(`^FO35,18^BY1.7,2,24^BCN,24,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(field(`^FO40,10^BY1.5,2,22^BCN,22,Y,N,N^FD${zplEscape(barcode)}^FS`));
   }
 
   if (panelZpl) {
-    lines.push(`^FO8,66^FB384,1,0,C,0^A0N,14,12^FD${zplEscape(panelZpl)}^FS`);
+    lines.push(field(`^FO0,52^FB400,1,0,C,0^A0N,16,14^FD${zplEscape(panelZpl)}^FS`));
   }
 
   if (animal) {
-    lines.push(`^FO8,80^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(animal)}^FS`);
+    lines.push(field(`^FO0,72^FB400,1,0,C,0^A0N,12,10^FD${zplEscape(animal)}^FS`));
   }
 
   lines.push('^XZ');
