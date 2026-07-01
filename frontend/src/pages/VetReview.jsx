@@ -325,7 +325,7 @@ export default function VetReview() {
               )}
               {editable && hasFilledValues(rows) && (
                 <div className="flex flex-wrap gap-2">
-                  {res?.is_validated && canEdit && (
+                  {canEdit && (res?.is_validated || !canValidate) && (
                     <button type="button" onClick={() => saveChanges(test.id)} className="btn-secondary text-sm">
                       {t('resultValidation.saveChanges')}
                     </button>

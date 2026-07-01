@@ -7,20 +7,43 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadUser = useCallback(async () => {
+  const loadUser = useCallback(async ({ silent = false } = {}) => {
     const token = localStorage.getItem('accessToken');
-    if (!token) { setLoading(false); return; }
+    if (!token) {
+      if (!silent) setLoading(false);
+      return;
+    }
     try {
       const { data } = await authAPI.me();
       setUser(data.data);
     } catch {
-      localStorage.clear();
+      if (!silent) localStorage.clear();
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => { loadUser(); }, [loadUser]);
+
+  // Keep sidebar/button permissions in sync after deploy or admin role edits.
+  useEffect(() => {
+    const refresh = () => {
+      if (localStorage.getItem('accessToken')) loadUser({ silent: true });
+    };
+    const interval = setInterval(refresh, 5 * 60 * 1000);
+    window.addEventListener('focus', refresh);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('auth:token-refreshed', refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('auth:token-refreshed', refresh);
+    };
+  }, [loadUser]);
 
   const login = async (username, password) => {
     const { data } = await authAPI.login(username, password);
