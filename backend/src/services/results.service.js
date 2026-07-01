@@ -5,8 +5,7 @@ const {
   compareByNormaOrder,
   getNormaPanelRow,
   DEFAULT_CBC_TEST_CODE,
-  NORMA_CBC_PCT_BY_ABS,
-  NORMA_CBC_SCREEN_ORDER,
+  mapCbcRowsForDisplay,
 } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
@@ -36,30 +35,7 @@ const getAttachments = async (resultId) => {
   return result.rows;
 };
 
-const formatCbcResultValues = (rawValues) => {
-  const byCode = Object.fromEntries(rawValues.map((v) => [v.parameter_code, v]));
-
-  return NORMA_CBC_SCREEN_ORDER.map((code) => {
-    const v = byCode[code];
-    const panelRow = getNormaPanelRow(code);
-    const pctCode = NORMA_CBC_PCT_BY_ABS[code];
-    const pct = pctCode ? byCode[pctCode] : null;
-
-    return {
-      parameter_id: v?.parameter_id || null,
-      parameter_name: panelRow?.symbol || code,
-      parameter_code: code,
-      norma_section: panelRow?.section || null,
-      value: v?.value ?? '',
-      numeric_value: v?.numeric_value ?? null,
-      unit: v?.unit || panelRow?.unit || null,
-      flag: v?.flag || null,
-      is_critical: v?.is_critical || false,
-      reference: v?.reference ?? null,
-      pct_value: pct?.value ?? '',
-    };
-  });
-};
+const formatCbcResultValues = (rawValues) => mapCbcRowsForDisplay(rawValues);
 
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(

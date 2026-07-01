@@ -7,7 +7,7 @@ const logger = require('../config/logger');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
-const { compareByNormaOrder } = require('../utils/norma-cbc-map');
+const { compareByNormaOrder, filterCbcReportRows, getNormaPanelRow } = require('../utils/norma-cbc-map');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -241,7 +241,9 @@ const buildReportData = async (sampleId, opts) => {
 
   const uniqueByParameter = [];
   const seenParameters = new Set();
-  const sortedRows = [...resultsData.rows].sort(compareByNormaOrder);
+  const sortedRows = filterCbcReportRows(
+    [...resultsData.rows].sort(compareByNormaOrder)
+  );
   for (const row of sortedRows) {
     if (seenParameters.has(row.parameter_id)) continue;
     seenParameters.add(row.parameter_id);
@@ -255,11 +257,13 @@ const buildReportData = async (sampleId, opts) => {
     return value;
   };
 
-  const results = uniqueByParameter.map((r) => ({
+  const results = uniqueByParameter.map((r) => {
+    const panelRow = getNormaPanelRow(r.parameter_code);
+    return {
     code: r.parameter_code,
     testCode: r.test_code,
-    nameAr: r.parameter_name_ar || r.parameter_name || r.test_name_ar || r.test_name,
-    nameEn: r.parameter_name || r.test_name,
+    nameAr: panelRow?.name_ar || r.parameter_name_ar || r.parameter_name || r.test_name_ar || r.test_name,
+    nameEn: panelRow?.symbol || r.parameter_name || r.test_name,
     testNameAr: r.test_name_ar || r.test_name,
     testNameEn: r.test_name,
     value: qualLabel(
@@ -278,7 +282,8 @@ const buildReportData = async (sampleId, opts) => {
     method: r.test_method || '-',
     instrument: resolveInstrument(r.category_code, r.test_code),
     categoryCode: r.category_code || null,
-  }));
+  };
+  });
 
   const attachmentsResult = await query(
     `SELECT ra.file_url, ra.caption, t.name as test_name, t.name_ar as test_name_ar

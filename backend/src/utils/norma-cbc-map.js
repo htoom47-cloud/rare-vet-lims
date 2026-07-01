@@ -11,6 +11,9 @@ const {
   NORMA_SECTION_BY_CODE,
   getNormaPanelRow,
   buildCbcDisplayParameters,
+  resolveCbcScreenRow,
+  mapCbcRowsForDisplay,
+  filterCbcReportRows,
 } = require('./norma-cbc-panel');
 
 const NORMA_CBC_MAP = {
@@ -113,4 +116,7 @@ module.exports = {
   enrichCbcParameters,
   getNormaPanelRow,
   buildCbcDisplayParameters,
+  resolveCbcScreenRow,
+  mapCbcRowsForDisplay,
+  filterCbcReportRows,
 };

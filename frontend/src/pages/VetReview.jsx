@@ -85,7 +85,7 @@ export default function VetReview() {
   };
 
   const hasFilledValues = (values) => (values || []).some(
-    (v) => String(v.value ?? '').trim() !== '' || String(v.pct_value ?? '').trim() !== ''
+    (v) => String(v.value ?? '').trim() !== ''
   );
 
   const pendingTests = (sample) => (sample?.tests || []).filter((test) => {
@@ -180,7 +180,7 @@ export default function VetReview() {
   const flagLabel = (flag) => t(`resultValidation.flags.${flag}`, { defaultValue: flag });
 
   const renderFlagCell = (v) => {
-    const hasValue = String(v.value ?? '').trim() !== '' || String(v.pct_value ?? '').trim() !== '';
+    const hasValue = String(v.value ?? '').trim() !== '';
     if (!hasValue) return <td className="text-gray-400">—</td>;
     const flag = v.flag || qualFlag(v.value) || 'NORMAL';
     return (
@@ -228,7 +228,6 @@ export default function VetReview() {
       <tr key={v.parameter_code || v.parameter_id} className="border-t">
         <td className="py-1">
           {parameterDisplayName(v, i18n.language)}
-          {v.pct_value && <span className="text-gray-500 text-xs ms-1">*{v.pct_value}%</span>}
         </td>
         {renderResultCell(test.id, v, editable)}
         <td className="text-gray-500">{v.reference || '—'}</td>

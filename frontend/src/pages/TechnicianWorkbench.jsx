@@ -140,9 +140,6 @@ export default function TechnicianWorkbench() {
     <div key={param.parameter_id}>
       <label className="text-sm font-medium">
         {param.name}
-        {param.pct_value && (
-          <span className="text-xs text-gray-500 ms-1">*{param.pct_value}%</span>
-        )}
         {param.unit && param.unit !== 'qual' && ` (${param.unit})`}
         {param.missing_in_db && (
           <span className="text-xs text-amber-600 ms-1">({t('workbench.paramMissing', { defaultValue: 'not synced' })})</span>
