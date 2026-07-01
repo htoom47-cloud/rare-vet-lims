@@ -145,7 +145,7 @@ const zplLandscapeHeader = () => [
   '^XA',
   '^CI0',
   '^MTD',
-  '^MD30',
+  '^MD35',
   '^MNW',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
@@ -154,13 +154,17 @@ const zplLandscapeHeader = () => [
   '^LS0',
   '^FWN',
   '^PON',
+  '^PR3',
 ];
 
 /** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
 const field = (zpl) => `^FWN${zpl}`;
 
-const TEXT_LINE = '^A0N,20,18';
+const TEXT_LINE = '^A0N,18,16';
 const textLine = (y, value) => field(`^FO0,${y}^FB400,1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`);
+
+/** Code128 subset B prefix for reliable scan of BC-… / SMP-… IDs. */
+const code128Field = (barcode) => `^FO10,2^BY1.5,3,46^BCN,46,N,N,N^FD>:${zplEscape(barcode)}^FS`;
 
 /** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
@@ -176,9 +180,9 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    // Match printer-setup-label.zpl (^CI0 + ^BCN) — proven on ZD421.
-    lines.push(`^FO40,8^BY2,2,32^BCN,32,N,N,N^FD${zplEscape(barcode)}^FS`);
-    lines.push(textLine(52, truncate(barcode, 24)));
+    // BY1.5 fits 18-char IDs on 400-dot width; height 46 for scanner readability.
+    lines.push(code128Field(barcode));
+    lines.push(textLine(54, truncate(barcode, 24)));
   }
 
   if (panelZpl) {
@@ -186,7 +190,7 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   }
 
   if (animal) {
-    lines.push(textLine(100, animal));
+    lines.push(textLine(96, animal));
   }
 
   lines.push('^XZ');
