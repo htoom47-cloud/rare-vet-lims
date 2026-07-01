@@ -151,7 +151,7 @@ const zplLandscapeHeader = () => [
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
   '^LH0,0',
-  '^LT0',
+  '^LT22',
   '^LS0',
   '^FWN',
   '^PON',
@@ -174,15 +174,15 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(field(`^FO40,10^BY2,2,28^BCN,28,Y,N,N^FD${zplEscape(barcode)}^FS`));
+    lines.push(field(`^FO50,28^BY1.7,2,24^BCN,24,Y,N,N^FD${zplEscape(barcode)}^FS`));
   }
 
   if (panelZpl) {
-    lines.push(field(`^FO0,58^FB400,1,0,C,0^A0N,16,14^FD${zplEscape(panelZpl)}^FS`));
+    lines.push(field(`^FO0,72^FB400,1,0,C,0^A0N,16,14^FD${zplEscape(panelZpl)}^FS`));
   }
 
   if (animal) {
-    lines.push(field(`^FO0,78^FB400,1,0,C,0^A0N,12,10^FD${zplEscape(animal)}^FS`));
+    lines.push(field(`^FO0,92^FB400,1,0,C,0^A0N,12,10^FD${zplEscape(animal)}^FS`));
   }
 
   lines.push('^XZ');
