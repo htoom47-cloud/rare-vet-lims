@@ -6,8 +6,31 @@ const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS } = require('.
 
 const resultLimsCode = (row) => row.limsCode || mapNormaCode(row.code) || row.code;
 
-/** When Norma sends WBC + diff % only, compute abs (#) = WBC × % / 100. */
-const enrichDiffAbsFromPct = async (results, values, testCode) => {
+/** When Norma sends WBC + diff # only, compute % = abs / WBC × 100. */
+const enrichPctFromAbs = async (results, values, testCode) => {
+  const byCode = Object.fromEntries(results.map((r) => [resultLimsCode(r), r]));
+  const wbc = parseFloat(byCode.WBC?.value);
+  if (Number.isNaN(wbc) || wbc <= 0) return values;
+
+  const filled = new Set(
+    values.filter((v) => String(v.value ?? '').trim() !== '').map((v) => v.parameter_id)
+  );
+
+  for (const [absCode, pctCode] of Object.entries(NORMA_CBC_PCT_BY_ABS)) {
+    const pctParam = await resolveParameter(testCode, pctCode);
+    if (!pctParam || filled.has(pctParam.id)) continue;
+
+    const abs = parseFloat(byCode[absCode]?.value);
+    if (Number.isNaN(abs)) continue;
+
+    const computed = Math.round((abs / wbc * 100) * 10) / 10;
+    values.push({ parameter_id: pctParam.id, value: String(computed) });
+    filled.add(pctParam.id);
+  }
+
+  return values;
+};
+
   const byCode = Object.fromEntries(results.map((r) => [resultLimsCode(r), r]));
   const wbc = parseFloat(byCode.WBC?.value);
   if (Number.isNaN(wbc)) return values;
@@ -117,6 +140,7 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
   }
 
   await enrichDiffAbsFromPct(results, values, testCode);
+  await enrichPctFromAbs(results, values, testCode);
   await enrichPlcFromPlt(results, values, testCode);
 
   if (!values.length) {
@@ -126,12 +150,17 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
 
   let mergedValues = values;
   try {
-    const existing = await resultsService.getBySampleTest(sampleTest.id);
-    if (existing?.values?.length) {
+    const existingRaw = await query(
+      `SELECT rv.parameter_id, rv.value
+       FROM results r
+       JOIN result_values rv ON rv.result_id = r.id
+       WHERE r.sample_test_id = $1
+         AND rv.value IS NOT NULL AND TRIM(rv.value) <> ''`,
+      [sampleTest.id]
+    );
+    if (existingRaw.rows.length) {
       const byParam = new Map(
-        existing.values
-          .filter((v) => v.value != null && String(v.value).trim() !== '')
-          .map((v) => [v.parameter_id, String(v.value)])
+        existingRaw.rows.map((row) => [row.parameter_id, String(row.value)])
       );
       for (const v of values) byParam.set(v.parameter_id, v.value);
       mergedValues = [...byParam.entries()].map(([parameter_id, value]) => ({ parameter_id, value }));
