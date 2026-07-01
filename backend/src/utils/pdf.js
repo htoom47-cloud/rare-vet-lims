@@ -1,6 +1,6 @@
 /**
  * Active lab report PDF generator — delegates to report-designs registry.
- * Default: design 1. Override with REPORT_DESIGN env var.
+ * Default: design 3 (VetConnect HTML). Override with REPORT_DESIGN=1|2|3 env var.
  */
 const registry = require('./report-designs');
 

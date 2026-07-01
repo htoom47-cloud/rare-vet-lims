@@ -84,6 +84,8 @@ const env = {
     address: process.env.LAB_ADDRESS || 'Kingdom of Saudi Arabia',
     phone: process.env.LAB_PHONE || '0115007257',
     email: process.env.LAB_EMAIL || 'alnwader.10hz@gmail.com',
+    website: process.env.LAB_WEBSITE || 'https://lims.rarevetcare.com',
+    licenseNumber: process.env.LAB_LICENSE_NUMBER || '',
     vatNumber: process.env.VAT_NUMBER || '311042487300003',
   },
   portal: {

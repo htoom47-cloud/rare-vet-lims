@@ -66,6 +66,8 @@ const buildApprovalFields = (reportRow, isArabic) => ({
         isArabic
       ),
       approvedAt: reportRow.lab_specialist_approved_at,
+      license: reportRow.lab_specialist_license || env.lab.licenseNumber || null,
+      title: 'Laboratory Specialist',
     }
     : { approved: false },
   vetApproval: reportRow.vet_approved_by
@@ -76,6 +78,8 @@ const buildApprovalFields = (reportRow, isArabic) => ({
         isArabic
       ),
       approvedAt: reportRow.vet_approved_at,
+      license: reportRow.vet_license || null,
+      title: 'Veterinarian',
     }
     : { approved: false },
 });
@@ -115,6 +119,66 @@ const getById = async (id) => {
   return result.rows[0];
 };
 
+const formatTrendNumber = (value) => {
+  if (value == null || value === '') return null;
+  const num = Number(value);
+  if (Number.isNaN(num)) return null;
+  return num;
+};
+
+const loadResultTrends = async (animalId, currentSampleId, codes) => {
+  const empty = { previousByCode: {}, trendHistory: {} };
+  if (!animalId || !codes?.length) return empty;
+
+  const hist = await query(
+    `WITH recent_samples AS (
+       SELECT s.id, s.completed_date
+       FROM samples s
+       WHERE s.animal_id = $1 AND s.status = 'completed'
+       ORDER BY s.completed_date DESC NULLS LAST
+       LIMIT 6
+     )
+     SELECT tp.code, rv.numeric_value, rv.value, rs.completed_date, rs.id AS sample_id
+     FROM recent_samples rs
+     JOIN sample_tests st ON st.sample_id = rs.id
+     JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
+     JOIN result_values rv ON rv.result_id = res.id
+     JOIN test_parameters tp ON rv.parameter_id = tp.id
+     WHERE tp.code = ANY($2)
+     ORDER BY rs.completed_date ASC, tp.code`,
+    [animalId, codes]
+  ).catch(() => ({ rows: [] }));
+
+  const trendHistory = {};
+  const latestByCode = {};
+
+  hist.rows.forEach((row) => {
+    const code = String(row.code || '').toUpperCase();
+    const numericValue = formatTrendNumber(row.numeric_value ?? row.value);
+    if (!trendHistory[code]) trendHistory[code] = [];
+    trendHistory[code].push({
+      value: row.value,
+      numericValue,
+      date: row.completed_date,
+      sampleId: row.sample_id,
+    });
+    latestByCode[code] = { value: row.value, numericValue, sampleId: row.sample_id, date: row.completed_date };
+  });
+
+  const previousByCode = {};
+  Object.entries(latestByCode).forEach(([code, entry]) => {
+    if (entry.sampleId !== currentSampleId) {
+      previousByCode[code] = entry;
+      return;
+    }
+    const series = trendHistory[code] || [];
+    const prev = [...series].reverse().find((p) => p.sampleId !== currentSampleId);
+    if (prev) previousByCode[code] = prev;
+  });
+
+  return { previousByCode, trendHistory };
+};
+
 const buildReportData = async (sampleId, opts) => {
   const {
     reportNumber, verificationCode, language, generatedBy,
@@ -125,7 +189,8 @@ const buildReportData = async (sampleId, opts) => {
     `SELECT s.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar,
             c.mobile as customer_mobile,
             a.animal_code, a.animal_type, a.name_tag as animal_name,
-            a.gender as animal_gender, a.rfid_chip as animal_chip
+            a.gender as animal_gender, a.rfid_chip as animal_chip,
+            a.age as animal_age, a.color as animal_breed
      FROM samples s
      JOIN customers c ON s.customer_id = c.id
      JOIN animals a ON s.animal_id = a.id
@@ -232,10 +297,23 @@ const buildReportData = async (sampleId, opts) => {
     throw err;
   });
 
+  const parameterCodes = results.map((r) => r.code).filter(Boolean);
+  const { previousByCode, trendHistory } = await loadResultTrends(
+    sample.animal_id,
+    sampleId,
+    parameterCodes
+  );
+
+  const panelName = [...new Set(results.map((r) => r.testNameEn).filter(Boolean))][0]
+    || 'Laboratory Panel';
+
   return {
     reportNumber,
     sampleCode: sample.sample_code,
+    barcode: sample.barcode,
     date: sample.completed_date || new Date(),
+    collectionDate: sample.collection_date,
+    issuedDate: opts.issuedDate || sample.completed_date || new Date(),
     customerName: isArabic
       ? (sample.customer_name_ar || sample.customer_name)
       : sample.customer_name,
@@ -246,14 +324,20 @@ const buildReportData = async (sampleId, opts) => {
     animalName: sample.animal_name,
     animalGender: sample.animal_gender,
     animalChip: sample.animal_chip,
+    animalAge: sample.animal_age || '-',
+    animalBreed: sample.animal_breed || '-',
+    panelName,
     language,
     verificationCode,
     doctorNotes: uniqueByParameter[0]?.doctor_notes,
     aiInterpretation: aiInterpretation ?? null,
+    clinicalInterpretation: aiInterpretation ?? null,
     treatmentRecommendations: treatmentRecommendations ?? null,
     labApproval: labApproval ?? { approved: false },
     vetApproval: vetApproval ?? { approved: false },
     results,
+    previousByCode,
+    trendHistory,
     attachments: attachmentsResult.rows,
   };
 };
@@ -267,6 +351,7 @@ const buildPdfPayload = async (reportRow) => {
     generatedBy: reportRow.generated_by,
     aiInterpretation: reportRow.ai_interpretation,
     treatmentRecommendations: reportRow.treatment_recommendations,
+    issuedDate: reportRow.created_at,
     ...buildApprovalFields(reportRow, isArabic),
   });
   return { ...base, isFinal: reportRow.is_final !== false };

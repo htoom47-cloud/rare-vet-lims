@@ -1,9 +1,13 @@
 /**
  * Lab report design registry.
  * Design 1 = compact professional bilingual layout (saved Jun 2026).
- * Set REPORT_DESIGN=1 (default) in env to select active PDF generator.
+ * Design 2 = legacy PDFKit premium layout.
+ * Design 3 = VetConnect HTML/CSS (default) — Puppeteer PDF.
+ * Set REPORT_DESIGN=1|2|3 in env.
  */
 const design1 = require('./design-1');
+const design2 = require('./design-2');
+const design3 = require('./design-3');
 
 const DESIGNS = {
   1: {
@@ -38,16 +42,61 @@ const DESIGNS = {
       'QR verification + confidentiality notice in footer',
     ],
   },
+  2: {
+    id: 2,
+    name: 'Premium World-Class Medical Report',
+    nameAr: 'تقرير طبي عالمي المستوى',
+    referenceReport: null,
+    gitCommit: null,
+    pdf: design2,
+    files: {
+      pdf: 'backend/src/utils/report-designs/design-2.js',
+      clinical: 'backend/src/utils/report-designs/design-2-clinical.js',
+      sparkline: 'backend/src/utils/report-designs/design-2-sparkline.js',
+    },
+    traits: [
+      'IDEXX-style premium header with logo, QR, barcode, report/sample cards',
+      'Patient information card (owner, animal, dates)',
+      'Zebra results table with abnormal row highlighting',
+      'Clinical Summary auto-bullets + Clinical Interpretation',
+      'Previous result comparison + sparkline trends',
+      'Electronic signatures + lab seal',
+      'Minimal footer with contact info only',
+      'Brand watermark background',
+    ],
+  },
+  3: {
+    id: 3,
+    name: 'VetConnect HTML Report (Design 3)',
+    nameAr: 'تقرير VetConnect — HTML/CSS',
+    referenceReport: null,
+    gitCommit: null,
+    pdf: design3,
+    files: {
+      pdf: 'backend/src/utils/report-designs/design-3/index.js',
+      html: 'backend/src/utils/report-designs/design-3/build-html.js',
+      styles: 'backend/src/utils/report-designs/design-3/styles.css',
+      helpers: 'backend/src/utils/report-designs/design-3/helpers.js',
+    },
+    traits: [
+      'HTML/CSS Grid + Flexbox layout (Puppeteer → PDF)',
+      'Design system: 8px grid, typography scale, status colors',
+      'Page 1: header, patient, overview, results table',
+      'Page 2: clinical summary, interpretation, signatures, QR',
+      'Full RTL/LTR — no overlap, no ellipsis, no fixed coordinates',
+      'IDEXX VetConnect / Antech inspired modern lab report',
+    ],
+  },
 };
 
 const getActiveDesignId = () => {
-  const raw = process.env.REPORT_DESIGN || '1';
+  const raw = process.env.REPORT_DESIGN || '3';
   const id = Number(raw);
-  return DESIGNS[id] ? id : 1;
+  return DESIGNS[id] ? id : 3;
 };
 
 const getDesign = (id = getActiveDesignId()) => {
-  const design = DESIGNS[Number(id)] || DESIGNS[1];
+  const design = DESIGNS[Number(id)] || DESIGNS[3];
   if (!design) throw new Error(`Unknown report design: ${id}`);
   return design;
 };
