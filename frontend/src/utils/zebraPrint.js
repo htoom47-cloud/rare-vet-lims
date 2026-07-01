@@ -140,15 +140,16 @@ const truncate = (text, max) => {
   return `${s.slice(0, max - 1)}…`;
 };
 
-/** ZPL for Zebra ZD421 50×25 mm — horizontal, centered, within 400×200 dots. */
+/** ZPL for Zebra ZD421 50×25 mm — matches calibrated layout (barcode top, text below). */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
-  const { barcode, animalLine, panelKey } = buildLabelLines(sample, {
+  const { barcode, panelKey } = buildLabelLines(sample, {
     isArabic,
     panelKey: sample.panelKey,
   });
 
   const panelZpl = panelCode(panelKey);
-  const animal = truncate(animalLine, 34);
+  // ZPL font cannot render Arabic; print animal code only on thermal labels.
+  const animal = truncate(String(sample?.animal_code || '').trim(), 24);
 
   const lines = [
     '^XA',
@@ -156,22 +157,24 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
     `^PW${LABEL_WIDTH}`,
     `^LL${LABEL_HEIGHT}`,
     '^LH0,0',
-    '^LT22',
+    '^LT0',
     '^LS0',
     '^FWN',
     '^PON',
+    '^MMT',
+    '^MNW',
   ];
 
   if (barcode) {
-    lines.push(`^FO35,18^BY1.5,2,26^BCN,26,Y,N,N^FD${zplEscape(barcode)}^FS`);
+    lines.push(`^FO35,18^BY1.7,2,24^BCN,24,Y,N,N^FD${zplEscape(barcode)}^FS`);
   }
 
   if (panelZpl) {
-    lines.push(`^FO8,62^FB384,1,0,C,0^A0N,20,18^FD${zplEscape(panelZpl)}^FS`);
+    lines.push(`^FO8,66^FB384,1,0,C,0^A0N,14,12^FD${zplEscape(panelZpl)}^FS`);
   }
 
   if (animal) {
-    lines.push(`^FO8,84^FB384,1,0,C,0^A0N,14,12^FD${zplEscape(animal)}^FS`);
+    lines.push(`^FO8,80^FB384,1,0,C,0^A0N,11,10^FD${zplEscape(animal)}^FS`);
   }
 
   lines.push('^XZ');

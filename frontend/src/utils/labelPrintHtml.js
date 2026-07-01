@@ -16,11 +16,12 @@ const LABEL_PRINT_STYLES = `
   @page { size: 50mm 25mm; margin: 0; }
   html, body {
     margin: 0; padding: 0;
+    width: 50mm; height: 25mm;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     background: #fff;
   }
   .label-50x25 {
-    width: 50mm; height: 25mm; box-sizing: border-box;
+    width: 50mm; height: 25mm; max-height: 25mm; box-sizing: border-box;
     padding: 0.5mm 1.2mm 0.4mm;
     display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     font-family: Arial, Helvetica, sans-serif; color: #000;
@@ -28,7 +29,7 @@ const LABEL_PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .label-50x25 svg { max-width: 100%; height: auto; display: block; }
+  .label-50x25 svg { max-width: 100%; max-height: 11mm; height: auto; display: block; }
   .label-50x25-line {
     margin: 0.2mm 0 0; padding: 0; font-size: 8pt; line-height: 1.12;
     text-align: center; max-width: 100%; overflow: hidden;
@@ -132,8 +133,11 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>
     ${LABEL_PRINT_STYLES}
-    body { width: 50mm; }
+    html, body { width: 50mm; }
     .label-page {
+      width: 50mm;
+      height: 25mm;
+      max-height: 25mm;
       page-break-after: always;
       break-after: page;
     }
