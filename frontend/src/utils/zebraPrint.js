@@ -128,10 +128,10 @@ export async function getDefaultPrinter() {
 
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
-const BAR_HEIGHT = 40;
+const BAR_HEIGHT = 56;
 const BAR_MODULE = 1.5;
 const BAR_RATIO = 3;
-const BARCODE_Y = 14; // top margin — avoids clipping upper bars on ZD421
+const BARCODE_Y = 10; // small top margin without shrinking the barcode
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -164,7 +164,7 @@ const zplLandscapeHeader = () => [
 /** Prefix each field so printer-stored ^FWR/^FWB cannot rotate output. */
 const field = (zpl) => `^FWN${zpl}`;
 
-const TEXT_LINE = '^A0N,18,16';
+const TEXT_LINE = '^A0N,16,14';
 
 /** Centered text line across full label width. */
 const textLine = (y, value) => field(
@@ -188,9 +188,9 @@ const code128Field = (barcode) => {
 };
 
 const LAYOUT = {
-  barcodeTextY: BARCODE_Y + BAR_HEIGHT + 6,
-  panelY: BARCODE_Y + BAR_HEIGHT + 26,
-  animalY: BARCODE_Y + BAR_HEIGHT + 44,
+  barcodeTextY: BARCODE_Y + BAR_HEIGHT + 4,
+  panelY: BARCODE_Y + BAR_HEIGHT + 20,
+  animalY: BARCODE_Y + BAR_HEIGHT + 36,
 };
 
 /** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
