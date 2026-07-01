@@ -54,22 +54,35 @@ export const normaSectionLabel = (section, t) => {
 
 export const isNormaCbcTest = (test) => test?.test_code === 'CBC-FULL' || test?.code === 'CBC-FULL';
 
-const valueFrom = (param, valuesByParam) => (param?.id ? valuesByParam.get(param.id) : null);
+const indexApiValues = (apiValues = []) => {
+  const valuesByParam = new Map();
+  const valuesByCode = new Map();
+  for (const v of apiValues) {
+    if (v?.parameter_id) valuesByParam.set(v.parameter_id, v);
+    if (v?.parameter_code) valuesByCode.set(v.parameter_code, v);
+  }
+  return { valuesByParam, valuesByCode };
+};
 
-function resolveCbcScreenField(screenCode, byCode, valuesByParam) {
+const valueFrom = (param, valuesByParam, valuesByCode, code) => {
+  if (code && valuesByCode.has(code)) return valuesByCode.get(code);
+  return param?.id ? valuesByParam.get(param.id) : null;
+};
+
+function resolveCbcScreenField(screenCode, byCode, valuesByParam, valuesByCode) {
   const pctCode = NORMA_CBC_PCT_BY_ABS[screenCode];
   const screenMeta = PANEL_BY_CODE[screenCode] || { symbol: screenCode, section: null };
   const absParam = byCode[screenCode];
   const pctParam = pctCode ? byCode[pctCode] : null;
-  const absVal = valueFrom(absParam, valuesByParam);
-  const pctVal = valueFrom(pctParam, valuesByParam);
+  const absVal = valueFrom(absParam, valuesByParam, valuesByCode, screenCode);
+  const pctVal = pctCode ? valueFrom(pctParam, valuesByParam, valuesByCode, pctCode) : null;
 
   if (pctCode) {
     const pctMeta = PANEL_BY_CODE[pctCode] || { symbol: `${screenCode}%`, section: 'WBC', unit: '%' };
     const pctText = String(pctVal?.value ?? '').trim();
     if (pctText !== '') {
       return {
-        parameter_id: pctParam?.id || null,
+        parameter_id: pctVal.parameter_id || pctParam?.id || null,
         code: pctCode,
         name: pctMeta.symbol,
         unit: '%',
@@ -77,15 +90,16 @@ function resolveCbcScreenField(screenCode, byCode, valuesByParam) {
         value: pctVal.value,
         flag: pctVal?.flag,
         reference: pctVal?.reference || '',
-        missing_in_db: !pctParam,
+        missing_in_db: !pctParam && !pctVal.parameter_id,
       };
     }
-    const wbc = parseFloat(valuesByParam.get(byCode.WBC?.id)?.value);
+    const wbcRow = valuesByCode.get('WBC') || valueFrom(byCode.WBC, valuesByParam, valuesByCode, 'WBC');
+    const wbc = parseFloat(wbcRow?.value);
     const abs = parseFloat(absVal?.value);
     if (!Number.isNaN(wbc) && wbc > 0 && !Number.isNaN(abs)) {
       const computed = Math.round((abs / wbc * 100) * 10) / 10;
       return {
-        parameter_id: pctParam?.id || absParam?.id || null,
+        parameter_id: pctVal?.parameter_id || pctParam?.id || absVal?.parameter_id || absParam?.id || null,
         code: pctCode,
         name: pctMeta.symbol,
         unit: '%',
@@ -100,12 +114,12 @@ function resolveCbcScreenField(screenCode, byCode, valuesByParam) {
   }
 
   const p = realmParam(screenCode, absParam, screenMeta);
-  if (!p.id && !absVal) return null;
+  if (!absVal && !p.id) return null;
   return {
-    parameter_id: p.id,
+    parameter_id: absVal?.parameter_id || p.id,
     code: screenCode,
     name: p.norma_symbol || screenMeta.symbol,
-    unit: p.unit || screenMeta.unit,
+    unit: absVal?.unit || p.unit || screenMeta.unit,
     norma_section: screenMeta.section,
     value: absVal?.value || '',
     flag: absVal?.flag,
@@ -114,13 +128,41 @@ function resolveCbcScreenField(screenCode, byCode, valuesByParam) {
   };
 }
 
+const rowFromApiValue = (src, dataCode) => {
+  const meta = PANEL_BY_CODE[dataCode] || {};
+  return {
+    parameter_id: src.parameter_id || null,
+    code: dataCode,
+    name: src.parameter_name || meta.symbol || dataCode,
+    unit: src.unit || meta.unit,
+    norma_section: src.norma_section || meta.section,
+    value: src.value ?? '',
+    flag: src.flag,
+    reference: src.reference || '',
+    missing_in_db: !src.parameter_id,
+  };
+};
+
 export const buildCbcResultFields = (apiParameters = [], existing = null) => {
   const byCode = Object.fromEntries((apiParameters || []).map((p) => [p.code, p]));
-  const valuesByParam = new Map((existing?.values || []).map((v) => [v.parameter_id, v]));
+  const apiValues = existing?.values || [];
+  const { valuesByParam, valuesByCode } = indexApiValues(apiValues);
+
+  if (apiValues.some((v) => v.norma_section && String(v.value ?? '').trim() !== '')) {
+    return NORMA_CBC_SCREEN_ORDER.map((screenCode) => {
+      const pctCode = NORMA_CBC_PCT_BY_ABS[screenCode];
+      const dataCode = pctCode || screenCode;
+      const src = valuesByCode.get(dataCode);
+      if (src && String(src.value ?? '').trim() !== '') {
+        return rowFromApiValue(src, dataCode);
+      }
+      return resolveCbcScreenField(screenCode, byCode, valuesByParam, valuesByCode);
+    }).filter((row) => row && String(row.value ?? '').trim() !== '');
+  }
 
   return NORMA_CBC_SCREEN_ORDER
-    .map((code) => resolveCbcScreenField(code, byCode, valuesByParam))
-    .filter(Boolean);
+    .map((code) => resolveCbcScreenField(code, byCode, valuesByParam, valuesByCode))
+    .filter((row) => row && String(row.value ?? '').trim() !== '');
 };
 
 function realmParam(code, p, meta) {

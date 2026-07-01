@@ -138,9 +138,32 @@ function resolveCbcScreenRow(screenCode, byCode) {
 
 function mapCbcRowsForDisplay(rawRows) {
   const byCode = Object.fromEntries(rawRows.map((r) => [r.parameter_code || r.code, r]));
-  return NORMA_CBC_SCREEN_ORDER
+  const rows = NORMA_CBC_SCREEN_ORDER
     .map((code) => resolveCbcScreenRow(code, byCode))
     .filter(Boolean);
+
+  if (rows.length > 0) return rows;
+
+  // Fallback: return any stored values if screen mapping produced nothing
+  return rawRows
+    .filter((r) => String(r.value ?? '').trim() !== '')
+    .map((r) => {
+      const panelRow = getNormaPanelRow(r.parameter_code);
+      return {
+        parameter_id: r.parameter_id,
+        parameter_code: r.parameter_code,
+        parameter_name: panelRow?.symbol || r.parameter_name || r.parameter_code,
+        parameter_name_ar: r.parameter_name_ar,
+        norma_section: panelRow?.section || null,
+        value: r.value,
+        numeric_value: r.numeric_value ?? null,
+        unit: r.unit || panelRow?.unit || null,
+        flag: r.flag || null,
+        is_critical: r.is_critical || false,
+        reference: r.reference ?? null,
+        sort_order: r.sort_order,
+      };
+    });
 }
 
 /** Drop absolute WBC diff rows when % exists (for flat report export). */
