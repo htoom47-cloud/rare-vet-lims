@@ -128,13 +128,12 @@ export async function getDefaultPrinter() {
 
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
-const BAR_HEIGHT = 45;
-const BAR_MODULE = 1.5;
+const BAR_HEIGHT = 52;
 const BAR_RATIO = 3;
-const TEXT_LINE_H = 16;
-const AFTER_BAR_GAP = 8;
-const LINE_STEP = 16;
-const MIN_TOP_Y = 20;
+const TEXT_LINE_H = 14;
+const AFTER_BAR_GAP = 6;
+const LINE_STEP = 14;
+const MIN_TOP_Y = 18;
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
@@ -152,7 +151,7 @@ const zplLandscapeHeader = () => [
   '^XA',
   '^CI0',
   '^MTD',
-  '^MD35',
+  '^MD40',
   '^MNW',
   `^PW${LABEL_WIDTH}`,
   `^LL${LABEL_HEIGHT}`,
@@ -161,24 +160,37 @@ const zplLandscapeHeader = () => [
   '^LS0',
   '^FWN',
   '^PON',
-  '^PR3',
+  '^PR2',
 ];
 
-const TEXT_LINE = '^A0N,16,14';
+const TEXT_LINE = '^A0N,14,12';
 
 /** Centered text line across full label width. */
 const textLine = (y, value) => (
   `^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`
 );
 
-/** Approximate Code128 width (subset B) in dots for horizontal centering. */
-const estimateCode128WidthDots = (barcode) => {
-  const len = String(barcode).length;
-  const modules = 11 * len + 35;
-  return Math.ceil(modules * BAR_MODULE);
+/** Code128 module width that fits long BC-… IDs on 400-dot width. */
+const pickBarcodeModule = (barcode) => {
+  const modules = 11 * String(barcode).length + 35;
+  if (modules * 2 <= LABEL_WIDTH - 30) return 2;
+  if (modules * 1.5 <= LABEL_WIDTH - 30) return 1.5;
+  return 1;
 };
 
-/** Vertically + horizontally centered layout for 50×25 mm label. */
+const estimateCode128WidthDots = (barcode, moduleWidth) => {
+  const modules = 11 * String(barcode).length + 35;
+  return Math.ceil(modules * moduleWidth);
+};
+
+/** Code128 — auto subset; taller bars + darker print for handheld scanners. */
+const barcodeField = (barcode, barcodeY) => {
+  const mod = pickBarcodeModule(barcode);
+  const widthDots = estimateCode128WidthDots(barcode, mod);
+  const x = Math.max(12, Math.floor((LABEL_WIDTH - widthDots) / 2));
+  return `^FO${x},${barcodeY}^BY${mod},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD${zplEscape(barcode)}^FS`;
+};
+
 const computeLayout = ({ showBarcodeText, showPanel, showAnimal }) => {
   const textLineCount = [showBarcodeText, showPanel, showAnimal].filter(Boolean).length;
   const blockHeight = BAR_HEIGHT + AFTER_BAR_GAP + textLineCount * LINE_STEP;
@@ -200,14 +212,6 @@ const computeLayout = ({ showBarcodeText, showPanel, showAnimal }) => {
   };
 };
 
-/** Horizontally centered Code128 barcode. */
-const code128Field = (barcode, barcodeY) => {
-  const widthDots = estimateCode128WidthDots(barcode);
-  const x = Math.max(8, Math.floor((LABEL_WIDTH - widthDots) / 2));
-  return `^FO${x},${barcodeY}^BY${BAR_MODULE},${BAR_RATIO},${BAR_HEIGHT}^BCN,${BAR_HEIGHT},N,N,N^FD>:${zplEscape(barcode)}^FS`;
-};
-
-/** ZPL for Zebra ZD421 50×25 mm landscape — horizontal barcode and text. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const { barcode, panelKey } = buildLabelLines(sample, {
     isArabic,
@@ -225,7 +229,7 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const lines = [...zplLandscapeHeader()];
 
   if (barcode) {
-    lines.push(code128Field(barcode, layout.barcodeY));
+    lines.push(barcodeField(barcode, layout.barcodeY));
     lines.push(textLine(layout.barcodeTextY, truncate(barcode, 24)));
   }
 
