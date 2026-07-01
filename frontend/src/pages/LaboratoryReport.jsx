@@ -508,11 +508,8 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           </section>
         )}
 
-        {(report.interpretation || report.recommendations) && (
+        {(report.recommendations) && (
           <div className="lab-rpt-notes">
-            {report.interpretation && (
-              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.interpretation')}:</b> {report.interpretation}</p>
-            )}
             {report.recommendations && (
               <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.recommendations')}:</b> {report.recommendations}</p>
             )}

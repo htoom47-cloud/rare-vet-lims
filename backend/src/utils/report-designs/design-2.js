@@ -15,7 +15,6 @@ const { isAbnormalFlag } = require('./layout-mode');
 const {
   buildResultCounts,
   buildClinicalSummary,
-  resolveStructuredInterpretation,
 } = require('./design-2-clinical');
 const { calcChangePct, shouldShowTrend } = require('./design-2-sparkline');
 
@@ -536,38 +535,13 @@ const drawInterpCardAt = (doc, x, y, w, titleEn, titleAr, body, isList) => {
   return h;
 };
 
-const drawInterpretationBlock = (doc, y, sections, logoBuf) => {
-  y = ensureSpace(doc, y, 20, logoBuf, () => M + 4);
-  roundRect(doc, TX, y, TW, 17, 3, BRAND.accentPale, BRAND.border);
-  cellBi(doc, 'Clinical Interpretation', 'التفسير السريري', TX + 8, y + 3, TW - 16, { size: FS.sectionHead, weight: 'semibold', color: BRAND.primary });
-  y += 20;
-
-  const cards = [
-    ['Diagnosis Suggestion', 'اقتراح التشخيص', sections.diagnosisSuggestion, false],
-    ['Possible Causes', 'الأسباب المحتملة', sections.possibleCauses, true],
-    ['Recommended Tests', 'الفحوصات الموصى بها', sections.recommendedTests, true],
-    ['Recommendations', 'التوصيات', sections.recommendations, false],
-  ].filter(([, , body, isList]) => {
-    const lines = isList ? (body || []) : [body].filter(Boolean);
-    return lines.length > 0;
-  });
-
-  const gap = 8;
-  const colW = (TW - gap) / 2;
-
-  for (let i = 0; i < cards.length; i += 2) {
-    const left = cards[i];
-    const right = cards[i + 1];
-    const rowH = Math.max(
-      interpCardHeight(left[2], left[3]),
-      right ? interpCardHeight(right[2], right[3]) : 0,
-    );
-    y = ensureSpace(doc, y, rowH + 4, logoBuf, () => M + 4);
-    drawInterpCardAt(doc, TX, y, colW, left[0], left[1], left[2], left[3]);
-    if (right) drawInterpCardAt(doc, TX + colW + gap, y, colW, right[0], right[1], right[2], right[3]);
-    y += rowH + 4;
-  }
-  return y + 2;
+const drawTreatmentRecommendations = (doc, y, text, logoBuf) => {
+  const manual = String(text || '').trim();
+  if (!manual) return y;
+  const h = interpCardHeight(manual, false);
+  y = ensureSpace(doc, y, h + 4, logoBuf, () => M + 4);
+  drawInterpCardAt(doc, TX, y, TW, 'Treatment Recommendations', 'التوصيات العلاجية', manual, false);
+  return y + h + 4;
 };
 
 const drawLabSeal = (doc, cx, cy, r) => {
@@ -743,7 +717,6 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
   const lang = reportData.language || 'ar';
   const counts = buildResultCounts(reportData.results || []);
   const summaryItems = buildClinicalSummary(reportData.results || [], lang);
-  const interpretation = resolveStructuredInterpretation(reportData);
 
   return new Promise((resolve, reject) => {
     (async () => {
@@ -759,7 +732,7 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
         y = drawResultOverview(doc, y, counts, lang);
         y = drawResultsTable(doc, reportData.results || [], { ...reportData, _logoBuf: logoBuf }, y);
         y = drawClinicalSummaryCard(doc, y, summaryItems, lang, logoBuf);
-        y = drawInterpretationBlock(doc, y, interpretation, logoBuf);
+        y = drawTreatmentRecommendations(doc, y, reportData.treatmentRecommendations, logoBuf);
         y = await drawAttachments(doc, y, reportData.attachments || [], logoBuf);
         y = drawSignatures(doc, y, reportData, qrBuffer);
         stampFooter(doc);

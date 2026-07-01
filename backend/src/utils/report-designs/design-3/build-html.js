@@ -6,7 +6,6 @@ const { HAS_LOGO, getBrandLogoBuffer } = require('../../pdf-logo');
 const {
   buildResultCounts,
   buildClinicalSummary,
-  resolveStructuredInterpretation,
 } = require('../design-2-clinical');
 const {
   escapeHtml,
@@ -157,33 +156,13 @@ const buildClinicalSummarySection = (items, lang) => {
     </section>`;
 };
 
-const buildInterpCard = (titleEn, titleAr, body, isList, lang, wide = false) => {
-  const lines = isList ? (body || []) : [body].filter(Boolean);
-  if (!lines.length) return '';
-  const title = lang === 'ar' ? titleAr : titleEn;
-  const bodyHtml = isList
-    ? `<ul>${lines.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>`
-    : `<p>${escapeHtml(lines[0])}</p>`;
-  const wideCls = wide ? ' interp-card--wide' : '';
+const buildTreatmentRecommendationsSection = (text, lang) => {
+  const body = String(text || '').trim();
+  if (!body) return '';
   return `
-    <div class="interp-card${wideCls}">
-      <div class="interp-card__head">${escapeHtml(title)}</div>
-      <div class="interp-card__body">${bodyHtml}</div>
-    </div>`;
-};
-
-const buildInterpretationSection = (sections, lang) => {
-  const cards = [
-    buildInterpCard('Diagnosis Suggestion', 'اقتراح التشخيص', sections.diagnosisSuggestion, false, lang, true),
-    buildInterpCard('Possible Causes', 'الأسباب المحتملة', sections.possibleCauses, true, lang, false),
-    buildInterpCard('Recommended Tests', 'الفحوصات الموصى بها', sections.recommendedTests, true, lang, false),
-    buildInterpCard('Recommendations', 'التوصيات', sections.recommendations, false, lang, true),
-  ].filter(Boolean).join('');
-  if (!cards) return '';
-  return `
-    <section class="section">
-      <div class="section__head section__head--light">${t(lang, 'Clinical Interpretation', 'التفسير السريري')}</div>
-      <div class="interp-grid">${cards}</div>
+    <section class="section card">
+      <div class="section__head">${t(lang, 'Treatment Recommendations', 'التوصيات العلاجية')}</div>
+      <div class="card__body interp-card__body"><p>${escapeHtml(body)}</p></div>
     </section>`;
 };
 
@@ -252,7 +231,6 @@ const buildReportHtml = async (reportData) => {
 
   const counts = buildResultCounts(reportData.results || []);
   const summaryItems = buildClinicalSummary(reportData.results || [], lang);
-  const interpretation = resolveStructuredInterpretation(reportData);
   const css = loadStyles();
 
   const mainBlock = `
@@ -266,7 +244,7 @@ const buildReportHtml = async (reportData) => {
   const clinicalBlock = `
     <div class="clinical-page">
       ${buildClinicalSummarySection(summaryItems, lang)}
-      ${buildInterpretationSection(interpretation, lang)}
+      ${buildTreatmentRecommendationsSection(reportData.treatmentRecommendations, lang)}
       ${buildSignatures(reportData, lab, qrDataUri, lang)}
       ${buildIssueBar(reportData, lang)}
     </div>`;
