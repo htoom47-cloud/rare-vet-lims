@@ -1,6 +1,7 @@
 const { query } = require('../config/database');
 const { defaultCritical } = require('../utils/reference-range');
 const { getNormaReference } = require('../utils/norma-cbc-references');
+const { DEFAULT_CBC_TEST_CODE, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
 
 const upsertReferenceRange = async ({
   parameterId,
@@ -51,13 +52,12 @@ const upsertReferenceRange = async ({
 const syncFromParsedResults = async ({ results, testCode, animalType }) => {
   if (!results?.length || !animalType) return { updated: 0, skipped: 0 };
 
-  const { mapNormaCode, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
   const code = testCode || DEFAULT_CBC_TEST_CODE;
   let updated = 0;
   let skipped = 0;
 
   for (const row of results) {
-    const limsCode = row.limsCode || mapNormaCode(row.code);
+    const limsCode = resolveNormaResultLimsCode(row);
     if (!limsCode) {
       skipped += 1;
       continue;
@@ -92,6 +92,10 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
     }
 
     const profile = getNormaReference(animalType, limsCode);
+    const noteText = fromHl7
+      ? (row.reference ? `Norma: ${row.reference}` : `Norma HL7: ${refMin}-${refMax}`)
+      : undefined;
+
     await upsertReferenceRange({
       parameterId: param.rows[0].id,
       animalType,
@@ -100,6 +104,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
       criticalLow: profile?.crit_low,
       criticalHigh: profile?.crit_high,
       unit: row.unit || param.rows[0].unit,
+      notes: noteText,
       source: fromHl7 ? 'norma-hl7' : 'norma-profile',
       onlyIfMissing: !fromHl7,
     });

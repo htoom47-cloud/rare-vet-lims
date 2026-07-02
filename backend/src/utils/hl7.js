@@ -1,5 +1,7 @@
 const { parseReferenceRange } = require('./reference-range');
-const { mapNormaCode, mapNormaIndex } = require('./norma-cbc-map');
+const { mapNormaCode, mapNormaIndex, resolveNormaResultLimsCode } = require('./norma-cbc-map');
+
+const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
 
 function splitSegments(raw) {
   return raw
@@ -45,7 +47,11 @@ const firstId = (...candidates) => {
   return null;
 };
 
-const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
+/** WBC diff sent as LYM + unit % → store refs on LYM_PCT parameter. */
+const resolveLimsCodeForObx = (limsCode, codeRaw, unit) => {
+  if (!limsCode) return null;
+  return resolveNormaResultLimsCode({ limsCode, code: codeRaw, unit });
+};
 
 const extractObxCode = (fields) => {
   const obx3Parts = String(fields[3] || '').split('^').map((s) => s.trim()).filter(Boolean);
@@ -138,13 +144,14 @@ function parseHl7(raw) {
 
     if (type === 'OBX') {
       const codeRaw = extractObxCode(fields);
-      const limsCode = codeRaw ? mapNormaCode(codeRaw) : null;
+      const limsCodeBase = codeRaw ? mapNormaCode(codeRaw) : null;
 
       const rawValue = sanitizeObxValue(fields[5] ?? fields[4] ?? '');
       const numeric = parseFloat(rawValue);
       const unit = (fields[6] || '').trim();
       const refRaw = (fields[7] || '').trim();
       const ref = parseReferenceRange(refRaw);
+      const limsCode = resolveLimsCodeForObx(limsCodeBase, codeRaw, unit);
       const normalized = limsCode ? normalizeNormaValue(limsCode, rawValue, unit) : { value: rawValue, unit };
 
       if (limsCode && rawValue !== '' && !Number.isNaN(numeric)) {

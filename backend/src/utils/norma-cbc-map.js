@@ -85,6 +85,18 @@ function compareByNormaOrder(a, b) {
     .localeCompare((b.parameterId ?? b.parameter_id ?? '').toString());
 }
 
+/** Map Norma OBX row → LIMS parameter code (handles LYM + % → LYM_PCT). */
+function resolveNormaResultLimsCode(row) {
+  const base = row?.limsCode || mapNormaCode(row?.code) || null;
+  if (!base) return null;
+  const u = String(row?.unit || '').trim();
+  const raw = String(row?.code || '').toUpperCase();
+  if ((u === '%' || raw.includes('%')) && NORMA_CBC_PCT_BY_ABS[base]) {
+    return NORMA_CBC_PCT_BY_ABS[base];
+  }
+  return base;
+}
+
 function enrichCbcParameters(parameters = []) {
   return parameters.map((p) => {
     const row = getNormaPanelRow(p.code);
@@ -111,6 +123,7 @@ module.exports = {
   DEFAULT_CBC_TEST_CODE,
   mapNormaCode,
   mapNormaIndex,
+  resolveNormaResultLimsCode,
   normaSortIndex,
   compareByNormaOrder,
   enrichCbcParameters,

@@ -1,15 +1,28 @@
-/** Parse reference range strings from Norma HL7/ASTM (e.g. "4.0-15.0", "4 - 15", "4,0-15,0"). */
+/** Parse reference range strings from Norma HL7/ASTM (e.g. "4.0-15.0", "4 - 15", "4,0-15,0", "4.0^15.0"). */
 const parseReferenceRange = (raw) => {
   if (raw == null || raw === '') return null;
   let s = String(raw).trim();
   s = s.replace(/^[([{<]+/, '').replace(/[)\]}>]+$/, '');
+
+  // HL7 OBX-7 sometimes uses ^ between low and high
+  if (s.includes('^')) {
+    const parts = s.split('^').map((p) => p.trim().replace(/,/g, '.')).filter((p) => /^[\d.]+$/.test(p));
+    if (parts.length >= 2) {
+      const min = parseFloat(parts[0]);
+      const max = parseFloat(parts[1]);
+      if (!Number.isNaN(min) && !Number.isNaN(max)) {
+        return { min: Math.min(min, max), max: Math.max(min, max), raw: String(raw).trim() };
+      }
+    }
+  }
+
   s = s.replace(/,/g, '.');
   const m = s.match(/([\d.]+)\s*[-–—~]\s*([\d.]+)/);
   if (!m) return null;
   const min = parseFloat(m[1]);
   const max = parseFloat(m[2]);
   if (Number.isNaN(min) || Number.isNaN(max)) return null;
-  return { min: Math.min(min, max), max: Math.max(min, max) };
+  return { min: Math.min(min, max), max: Math.max(min, max), raw: String(raw).trim() };
 };
 
 const defaultCritical = (min, max) => {

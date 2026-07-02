@@ -2,10 +2,10 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const resultsService = require('./results.service');
 const referenceRangesService = require('./reference-ranges.service');
-const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS } = require('../utils/norma-cbc-map');
+const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
 const { barcodeLookupSql } = require('../utils/barcode-lookup');
 
-const resultLimsCode = (row) => row.limsCode || mapNormaCode(row.code) || row.code;
+const resultLimsCode = (row) => resolveNormaResultLimsCode(row) || row.code;
 
 /** When Norma sends WBC + diff # only, compute % = abs / WBC × 100. */
 const enrichPctFromAbs = async (results, values, testCode) => {
@@ -126,9 +126,7 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
     testCode,
     animalType: animalType || 'camel',
   });
-  if (refSync.updated === 0) {
-    await referenceRangesService.syncNormaProfileForAnimal(testCode, animalType || 'camel');
-  }
+  await referenceRangesService.syncNormaProfileForAnimal(testCode, animalType || 'camel');
 
   const values = [];
   const skipped = [];
@@ -190,6 +188,7 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
     added: values.length,
     skipped,
     reference_ranges_synced: refSync.updated,
+    reference_ranges_skipped: refSync.skipped,
     result: saved,
   };
 };
