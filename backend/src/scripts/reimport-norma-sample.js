@@ -100,42 +100,18 @@ async function reimportViaDb(sampleId) {
 async function reimportViaApi(sampleCode) {
   if (!DEVICE_KEY || !DEVICE_ID) throw new Error('DEVICE_API_KEY and DEVICE_ID required for --api mode');
 
-  const loginPass = process.env.API_PASS || process.env.ADMIN_INITIAL_PASSWORD || 'RareVet2026';
-  const login = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: loginPass }),
-  });
-  const lj = await login.json();
-  if (!login.ok) throw new Error(`Login failed: ${lj?.error?.message || login.status}`);
-  const token = lj.data.accessToken;
-
-  const scan = await fetch(`${API}/samples/scan/${encodeURIComponent(sampleCode)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const sj = await scan.json();
-  if (!scan.ok) throw new Error(sj?.error?.message || 'Sample not found');
-  const sampleId = sj.data.id;
-
-  const dbg = await fetch(`${API}/devices/ref-debug/sample/${sampleId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const dj = await dbg.json();
-  const rawHl7 = dj?.data?.rawHl7;
-  if (!rawHl7) throw new Error('No raw HL7 in ref-debug (deploy new code first or use DB mode)');
-
-  console.log('Re-ingesting via device API for', sj.data.sample_code);
-  const ingest = await fetch(`${API}/devices/ingest/${DEVICE_ID}`, {
+  console.log('Replaying Norma HL7 via device API for', sampleCode);
+  const replay = await fetch(`${API}/devices/ingest/${DEVICE_ID}/replay`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Device-Key': DEVICE_KEY,
     },
-    body: JSON.stringify({ message: rawHl7 }),
+    body: JSON.stringify({ sampleCode }),
   });
-  const ij = await ingest.json();
-  if (!ingest.ok) throw new Error(ij?.error?.message || `Ingest failed ${ingest.status}`);
-  return ij.data;
+  const rj = await replay.json();
+  if (!replay.ok) throw new Error(rj?.error?.message || `Replay failed ${replay.status}`);
+  return rj.data;
 }
 
 async function main() {

@@ -18,6 +18,17 @@ router.post('/ingest/:deviceId', authenticateDevice, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/ingest/:deviceId/replay', authenticateDevice, async (req, res, next) => {
+  try {
+    const sampleCode = req.body.sampleCode || req.body.sample_code || req.body.sampleId;
+    if (!sampleCode) {
+      return res.status(400).json({ success: false, error: { message: 'sampleCode required' } });
+    }
+    const data = await service.replaySampleImport(req.device, sampleCode);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.use(authenticate);
 
 router.get('/reference-ranges/list', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {

@@ -135,6 +135,63 @@ const processInboundMessage = async (device, rawMessage) => {
   }
 };
 
+const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
+const { normalizeSampleScanId } = require('../utils/barcode-scan');
+
+const replaySampleImport = async (device, sampleCode) => {
+  const raw = String(sampleCode || '').trim();
+  if (!raw) throw new AppError('sampleCode required', 400, 'VALIDATION');
+
+  const id = normalizeSampleScanId(raw) || raw;
+  const sampleResult = await query(
+    `SELECT s.id, s.sample_code FROM samples s
+     WHERE ${barcodeLookupSql('s')}
+     ORDER BY ${barcodeLookupOrderSql('s')}
+     LIMIT 1`,
+    [id]
+  );
+  const sample = sampleResult.rows[0];
+  if (!sample) throw new AppError('Sample not found', 404, 'NOT_FOUND');
+
+  const msg = await query(
+    `SELECT id, raw_message FROM device_messages
+     WHERE sample_id = $1 AND status = 'imported' AND raw_message IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [sample.id]
+  );
+  if (!msg.rows[0]?.raw_message) {
+    throw new AppError('No imported Norma HL7 stored for this sample', 404, 'NO_MESSAGE');
+  }
+
+  await query(
+    `UPDATE results r SET is_validated = false, validated_by = NULL, validated_at = NULL
+     FROM sample_tests st
+     WHERE r.sample_test_id = st.id AND st.sample_id = $1`,
+    [sample.id]
+  );
+  await query(
+    `UPDATE sample_tests SET status = 'running', completed_at = NULL WHERE sample_id = $1`,
+    [sample.id]
+  );
+  await query(
+    `UPDATE samples SET status = 'running', completed_date = NULL, updated_at = NOW() WHERE id = $1`,
+    [sample.id]
+  );
+
+  logger.info('Replaying Norma HL7 import', { sample: sample.sample_code, messageId: msg.rows[0].id });
+  const result = await processInboundMessage(device, msg.rows[0].raw_message);
+
+  let audit = null;
+  try {
+    const normaRefDebug = require('./norma-ref-debug.service');
+    audit = await normaRefDebug.analyzeSample(sample.id);
+  } catch (err) {
+    logger.warn('Norma replay audit skipped', { error: err.message });
+  }
+
+  return { ...result, audit };
+};
+
 const receiveMessage = async (deviceId, rawMessage, direction = 'inbound', device = null) => {
   const dev = device || await getById(deviceId);
   if (direction !== 'inbound') {
@@ -156,5 +213,5 @@ const getMessages = async (deviceId, limit = 50) => {
 };
 
 module.exports = {
-  list, getById, create, update, regenerateApiKey, receiveMessage, getMessages, SUPPORTED_DEVICES, generateApiKey,
+  list, getById, create, update, regenerateApiKey, receiveMessage, replaySampleImport, getMessages, SUPPORTED_DEVICES, generateApiKey,
 };
