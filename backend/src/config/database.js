@@ -6,15 +6,19 @@ const buildSslConfig = () => {
   if (env.nodeEnv !== 'production') return false;
   if (process.env.DATABASE_SSL === 'false') return false;
 
-  const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
-  const ssl = { rejectUnauthorized };
-
-  if (process.env.DATABASE_CA_CERT) {
-    ssl.ca = process.env.DATABASE_CA_CERT;
-    ssl.rejectUnauthorized = true;
+  const caCert = process.env.DATABASE_CA_CERT?.trim();
+  if (caCert) {
+    return { ca: caCert, rejectUnauthorized: true };
   }
 
-  return ssl;
+  const rejectEnv = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED;
+  if (rejectEnv === 'true') return { rejectUnauthorized: true };
+  if (rejectEnv === 'false') return { rejectUnauthorized: false };
+
+  // Render managed Postgres uses a self-signed cert without a bundled CA.
+  if (process.env.RENDER) return { rejectUnauthorized: false };
+
+  return { rejectUnauthorized: true };
 };
 
 const buildPoolConfig = () => {
