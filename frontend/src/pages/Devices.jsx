@@ -5,7 +5,25 @@ import toast from 'react-hot-toast';
 import { devicesAPI } from '../services/api';
 
 const BRIDGE_LISTEN_PORT = 21110;
-const bridgeApiUrl = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
+const LIMS_CLOUD_API = 'https://lims.rarevetcare.com/api';
+
+/** Full cloud API URL for bridge.env (never a relative /api path). */
+const resolveBridgeApiUrl = () => {
+  const env = import.meta.env.VITE_API_URL;
+  if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return `${window.location.origin}/api`.replace(/\/$/, '');
+  return LIMS_CLOUD_API;
+};
+
+const buildBridgeEnvFile = (norma) => {
+  if (!norma) return '';
+  return [
+    `LIMS_API_URL=${resolveBridgeApiUrl()}`,
+    `DEVICE_ID=${norma.id}`,
+    `DEVICE_API_KEY=${norma.config?.api_key || 'YOUR_KEY'}`,
+    `LISTEN_PORT=${BRIDGE_LISTEN_PORT}`,
+  ].join('\n');
+};
 
 export default function Devices() {
   const { t } = useTranslation();
@@ -91,6 +109,24 @@ export default function Devices() {
     toast.success(t('devices.keyCopied'));
   };
 
+  const copyBridgeEnv = () => {
+    const text = buildBridgeEnvFile(norma);
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success(t('devices.bridgeEnvCopied'));
+  };
+
+  const copyPm2Commands = () => {
+    const text = [
+      'cd C:\\RareVet\\bridge',
+      '.\\configure-lab-bridge.ps1',
+      'pm2 status',
+      'pm2 logs norma-bridge --lines 20',
+    ].join('\n');
+    navigator.clipboard.writeText(text);
+    toast.success(t('devices.commandsCopied'));
+  };
+
   const norma = configured.find((d) => d.name === 'Norma CBC') || selected;
 
   return (
@@ -146,11 +182,28 @@ export default function Devices() {
                   </p>
                   <p><strong>{t('devices.protocol')}:</strong> HL7 (أو ASTM)</p>
                   <p><strong>{t('devices.lisPort')}:</strong> {BRIDGE_LISTEN_PORT}</p>
+                  <p className="text-xs text-primary-600 dark:text-primary-400 pt-1 border-t border-primary-200/60">
+                    {t('devices.lisIpHint')}
+                  </p>
+                  <p className="text-xs text-primary-600 dark:text-primary-400">
+                    {t('devices.bcSmpHint')}
+                  </p>
+                </div>
+
+                <div className="text-sm space-y-2">
+                  <p className="font-medium">{t('devices.normaLisTitle')}</p>
+                  <ul className="text-xs space-y-1 text-primary-700 dark:text-primary-300 list-disc list-inside">
+                    <li>{t('devices.normaLisIp')}</li>
+                    <li>{t('devices.normaLisPort', { port: BRIDGE_LISTEN_PORT })}</li>
+                    <li>{t('devices.normaLisHl7')}</li>
+                    <li>{t('devices.normaLisAuto')}</li>
+                    <li>{t('devices.normaLisRepeatId')}</li>
+                  </ul>
                 </div>
 
                 <div className="text-sm space-y-2">
                   <p className="font-medium">{t('devices.stepsTitle')}</p>
-                  <ol className="list-decimal list-inside space-y-1 text-primary-700">
+                  <ol className="list-decimal list-inside space-y-1 text-primary-700 dark:text-primary-300">
                     <li>{t('devices.step1')}</li>
                     <li>{t('devices.step2')}</li>
                     <li>{t('devices.step3')}</li>
@@ -159,13 +212,26 @@ export default function Devices() {
                   </ol>
                 </div>
 
-                <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded-lg overflow-x-auto">
-{`cd bridge
-set LIMS_API_URL=${bridgeApiUrl}
-set DEVICE_ID=${norma.id}
-set DEVICE_API_KEY=${norma.config?.api_key || 'YOUR_KEY'}
-set LISTEN_PORT=${BRIDGE_LISTEN_PORT}
-npm start`}
+                <div>
+                  <p className="text-sm font-medium mb-1">{t('devices.bridgeEnvTitle')}</p>
+                  <p className="text-xs text-gray-500 mb-2">{t('devices.bridgeEnvHint')}</p>
+                  <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">
+{buildBridgeEnvFile(norma)}
+                  </pre>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <button type="button" onClick={copyBridgeEnv} className="btn-secondary text-xs py-1.5">
+                      {t('devices.copyBridgeEnv')}
+                    </button>
+                    <button type="button" onClick={copyPm2Commands} className="btn-secondary text-xs py-1.5">
+                      {t('devices.copyPm2Commands')}
+                    </button>
+                  </div>
+                </div>
+
+                <pre className="text-xs bg-gray-800 text-gray-300 p-3 rounded-lg overflow-x-auto">
+{`cd C:\\RareVet\\bridge
+.\\configure-lab-bridge.ps1
+pm2 logs norma-bridge --lines 20`}
                 </pre>
 
                 <button onClick={() => toggleActive(norma)} className="btn-secondary w-full">

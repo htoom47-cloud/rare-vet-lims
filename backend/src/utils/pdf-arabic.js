@@ -7,10 +7,18 @@ const path = require('path');
 const arabicReshaper = require('arabic-reshaper');
 const raster = require('./pdf-arabic-raster');
 
-const FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
-const FONT_BOLD_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Bold.ttf');
-const HAS_FONT = fs.existsSync(FONT_PATH);
-const HAS_BOLD_FONT = fs.existsSync(FONT_BOLD_PATH);
+const FONT_PATH = [
+  path.join(__dirname, '../../assets/fonts/IBMPlexSansArabic-Regular.ttf'),
+  path.join(__dirname, '../../assets/fonts/Cairo-Regular.ttf'),
+  path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf'),
+].find((p) => fs.existsSync(p));
+const FONT_BOLD_PATH = [
+  path.join(__dirname, '../../assets/fonts/IBMPlexSansArabic-Bold.ttf'),
+  path.join(__dirname, '../../assets/fonts/Cairo-Bold.ttf'),
+  path.join(__dirname, '../../assets/fonts/NotoSansArabic-Bold.ttf'),
+].find((p) => fs.existsSync(p));
+const HAS_FONT = !!FONT_PATH;
+const HAS_BOLD_FONT = !!FONT_BOLD_PATH;
 
 const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/;
 const ARABIC_RUN = /[\u0600-\u06FF\u0750-\u077F]+/g;

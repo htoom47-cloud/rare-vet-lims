@@ -7,7 +7,7 @@ import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/Wo
 import CustomerSearch from '../components/customers/CustomerSearch';
 import Modal from '../components/ui/Modal';
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
-import { printSampleLabel, autoPrintSampleLabels, printAllThermalLabels } from '../utils/printLabel';
+import { printSampleLabel, autoPrintSampleLabels } from '../utils/printLabel';
 import { expandSampleLabelJobs, totalLabelCountForSample, totalLabelCountForSamples } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
@@ -326,15 +326,14 @@ export default function WorkflowCase() {
         toast.success(t('samples.autoPrintOk', { count: printed }));
         return;
       }
-
-      let browserOk = false;
-      for (const sample of created) {
-        // eslint-disable-next-line no-await-in-loop
-        browserOk = (await printAllThermalLabels(sample)) || browserOk;
-      }
-      if (!browserOk && created[0]) {
-        setPrintSample(created[0]);
-        setPrintOpen(true);
+      if (printed > 0) {
+        toast.success(t('samples.zebraPrintPartial', { printed, total: expected, printer: 'Zebra' }));
+      } else {
+        toast.error(t('samples.zebraBridgeRequired'), { duration: 8000 });
+        if (created[0]) {
+          setPrintSample(created[0]);
+          setPrintOpen(true);
+        }
       }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');

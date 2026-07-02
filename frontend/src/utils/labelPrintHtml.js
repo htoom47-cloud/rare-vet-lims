@@ -190,7 +190,7 @@ const triggerFramePrint = (iframe, { waitMs = 180 } = {}) => new Promise((resolv
   setTimeout(run, waitMs);
 });
 
-/** Print all label jobs in one browser print dialog (one page per test tube). */
+/** @deprecated GDI/browser print only — prints blank on Zebra thermal. Do not use for labels. */
 export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
   const list = (samples || []).filter(Boolean);
   if (!list.length) return false;

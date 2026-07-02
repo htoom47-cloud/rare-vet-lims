@@ -27,6 +27,45 @@ const DEVICE = {
 };
 
 const TMP = path.join(__dirname, '_bridge-out.zpl');
+const LOG_DIR = path.join(__dirname, 'zpl-log');
+const LAST_DEBUG = path.join(LOG_DIR, '_last.json');
+
+let lastDebug = null;
+
+function ensureLogDir() {
+  if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+}
+
+function saveZplLog(zpl, meta, rawPayloadType) {
+  ensureLogDir();
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const zplPath = path.join(LOG_DIR, `lims-${stamp}.zpl`);
+  fs.writeFileSync(zplPath, zpl, 'ascii');
+  lastDebug = {
+    at: new Date().toISOString(),
+    zplPath,
+    zplLength: zpl.length,
+    zpl,
+    meta: meta || null,
+    rawPayloadType,
+  };
+  fs.writeFileSync(LAST_DEBUG, JSON.stringify(lastDebug, null, 2), 'utf8');
+  console.log(`[zebra-bridge] saved ZPL log: ${zplPath}`);
+  return lastDebug;
+}
+
+/** Accept ZPL string from LIMS fetch, Zebra Browser Print SDK, or raw body. */
+function extractZpl(payload) {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload;
+  let data = payload.data ?? payload.zpl ?? payload.raw ?? '';
+  if (typeof data === 'string') return data;
+  if (data && typeof data === 'object') {
+    if (typeof data.data === 'string') return data.data;
+    if (typeof data.zpl === 'string') return data.zpl;
+  }
+  return '';
+}
 
 async function sendZpl(zpl) {
   fs.writeFileSync(TMP, zpl, 'ascii');
@@ -71,6 +110,22 @@ async function handle(req, res) {
     return;
   }
 
+  if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+    const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>LIMS Zebra Bridge</title>
+<style>body{font-family:Segoe UI,Tahoma,sans-serif;max-width:520px;margin:48px auto;padding:0 16px}
+.ok{color:#0a7;font-size:1.25rem;font-weight:600}code{background:#f0f0f0;padding:2px 6px;border-radius:4px}</style></head>
+<body><p class="ok">✓ جسر الطباعة يعمل</p>
+<p>الطابعة: <strong>${DEVICE.name}</strong></p>
+<p>يمكنك الآن الطباعة من <a href="https://lims.onrender.com">LIMS</a> (حدّث الصفحة Ctrl+F5).</p>
+<p>اختبار JSON: <code>/default</code></p></body></html>`;
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(html);
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/default') {
     sendJson(res, 200, { device: DEVICE });
     return;
@@ -78,6 +133,18 @@ async function handle(req, res) {
 
   if (req.method === 'GET' && url.pathname === '/available') {
     sendJson(res, 200, { printer: [DEVICE], deviceList: [DEVICE] });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/debug/last') {
+    if (!lastDebug && fs.existsSync(LAST_DEBUG)) {
+      try {
+        lastDebug = JSON.parse(fs.readFileSync(LAST_DEBUG, 'utf8'));
+      } catch {
+        lastDebug = null;
+      }
+    }
+    sendJson(res, 200, lastDebug || { error: 'No print logged yet' });
     return;
   }
 
@@ -89,14 +156,26 @@ async function handle(req, res) {
     } catch {
       payload = { data: raw };
     }
-    const zpl = String(payload.data || '');
+    const rawPayloadType = typeof payload.data;
+    const meta = payload.meta || null;
+    const zpl = extractZpl(payload);
     if (!zpl.trim()) {
-      sendJson(res, 400, { error: 'Empty ZPL' });
+      console.error('[zebra-bridge] Empty ZPL. payload.data type:', rawPayloadType, 'meta:', meta);
+      sendJson(res, 400, { error: 'Empty ZPL', rawPayloadType, meta });
       return;
     }
-    console.log(`[zebra-bridge] RAW print ${zpl.length} bytes`);
+    if (!zpl.includes('^XA')) {
+      console.error('[zebra-bridge] Rejected invalid payload (not ZPL):', zpl.slice(0, 80));
+      sendJson(res, 400, { error: 'Invalid ZPL — expected ^XA header', preview: zpl.slice(0, 80), meta });
+      return;
+    }
+    if (meta) {
+      console.log('[zebra-bridge] meta:', JSON.stringify(meta));
+    }
+    console.log(`[zebra-bridge] RAW print ${zpl.length} bytes — ${zpl.slice(0, 40).replace(/\n/g, ' ')}...`);
+    saveZplLog(zpl, meta, rawPayloadType);
     await sendZpl(zpl);
-    sendJson(res, 200, { success: true });
+    sendJson(res, 200, { success: true, zplLength: zpl.length, meta });
     return;
   }
 

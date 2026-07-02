@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>تثبيت طباعة Zebra — LIMS</title>
+  <style>
+    body { font-family: Segoe UI, Tahoma, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    h1 { font-size: 1.35rem; }
+    a.btn { display: inline-block; margin: 0.5rem 0; padding: 0.75rem 1.25rem; background: #0d6efd; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; }
+    a.btn:hover { background: #0b5ed7; }
+    code, pre { background: #f4f4f4; padding: 0.75rem; display: block; overflow-x: auto; border-radius: 6px; font-size: 0.85rem; direction: ltr; text-align: left; }
+    .note { color: #555; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <h1>تثبيت LIMS Zebra Bridge — كمبيوتر الاستقبال</h1>
+  <p class="note">جهاز المعمل: <strong>192.168.1.102</strong> — لا تفتح ملفاً من مسار <code>dell</code>.</p>
+
+  <p><strong>الطريقة 1 (الأسهل):</strong></p>
+  <ol>
+    <li>حمّل الملف:</li>
+  </ol>
+  <a class="btn" href="/INSTALL-FROM-LAB-NETWORK.bat" download>تحميل INSTALL-FROM-LAB-NETWORK.bat</a>
+  <ol start="2">
+    <li>انقر يمين على الملف المحمّل → <strong>تشغيل كمسؤول</strong></li>
+    <li>اترك نافذة <strong>LIMS Zebra Bridge</strong> مفتوحة</li>
+    <li>افتح <a href="https://lims.rarevetcare.com">lims.rarevetcare.com</a> واضغط Ctrl+F5</li>
+  </ol>
+
+  <p><strong>الطريقة 2:</strong> حزمة ZIP كاملة</p>
+  <a class="btn" href="/reception-zebra.zip" download>تحميل reception-zebra.zip</a>
+
+  <p><strong>الطريقة 3:</strong> PowerShell كمسؤول — الصق هذا السطر:</p>
+  <pre>Invoke-WebRequest -Uri "http://192.168.1.102:8766/INSTALL-FROM-LAB-NETWORK.bat" -OutFile "$env:USERPROFILE\Desktop\lims-zebra-install.bat" -UseBasicParsing; Start-Process "$env:USERPROFILE\Desktop\lims-zebra-install.bat" -Verb RunAs</pre>
+
+  <p><strong>بعد التثبيت — اختبار طباعة:</strong> (PowerShell عادي)</p>
+  <pre>$zpl = (Invoke-WebRequest "http://192.168.1.102:8766/sample-label-cbc.zpl" -UseBasicParsing).Content
+$body = @{ device = @{ name = "Zebra" }; data = $zpl } | ConvertTo-Json -Compress
+Invoke-RestMethod -Uri "https://127.0.0.1:9101/write" -Method Post -Body $body -ContentType "application/json"</pre>
+</html>

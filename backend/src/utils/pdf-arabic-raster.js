@@ -2,10 +2,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const FONT_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf');
-const FONT_BOLD_PATH = path.join(__dirname, '../../assets/fonts/NotoSansArabic-Bold.ttf');
-const HAS_FONT = fs.existsSync(FONT_PATH);
-const HAS_BOLD = fs.existsSync(FONT_BOLD_PATH);
+const FONT_PATH = [
+  path.join(__dirname, '../../assets/fonts/IBMPlexSansArabic-Regular.ttf'),
+  path.join(__dirname, '../../assets/fonts/Cairo-Regular.ttf'),
+  path.join(__dirname, '../../assets/fonts/NotoSansArabic-Regular.ttf'),
+].find((p) => fs.existsSync(p));
+const FONT_BOLD_PATH = [
+  path.join(__dirname, '../../assets/fonts/IBMPlexSansArabic-Bold.ttf'),
+  path.join(__dirname, '../../assets/fonts/Cairo-Bold.ttf'),
+  path.join(__dirname, '../../assets/fonts/NotoSansArabic-Bold.ttf'),
+].find((p) => fs.existsSync(p));
+const HAS_FONT = !!FONT_PATH;
+const HAS_BOLD = !!FONT_BOLD_PATH;
 
 let available = false;
 let createCanvas;
@@ -38,7 +46,7 @@ const rasterAr = (text, boxW, boxH, opts = {}) => {
   const ctx = canvas.getContext('2d');
   ctx.scale(scale, scale);
   ctx.direction = 'rtl';
-  ctx.font = `${bold ? 'bold ' : ''}${size}px ${bold && HAS_BOLD ? 'NotoArPdfBold' : 'NotoArPdf'}`;
+  ctx.font = `${size}px ${bold && HAS_BOLD ? 'NotoArPdfBold' : 'NotoArPdf'}`;
   ctx.fillStyle = color;
   ctx.textBaseline = 'middle';
   let x = w / 2;

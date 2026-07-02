@@ -100,7 +100,7 @@ services:
       - key: PORTAL_JWT_EXPIRES_IN
         value: 7d
       - key: PORTAL_OTP_STATIC
-        value: "1234"
+        value: "off"
 
   - type: cron
     name: rare-vet-db-backup
