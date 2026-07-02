@@ -211,13 +211,19 @@ const buildReportData = async (sampleId, opts) => {
             tc.code as category_code,
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
             rv.value, rv.numeric_value, rv.notes AS rv_notes, tp.unit,
-            rv.flag, rv.is_critical, res.doctor_notes
+            rv.flag, rv.is_critical, res.doctor_notes,
+            trr.min_value AS trr_min, trr.max_value AS trr_max,
+            trr.critical_low AS trr_critical_low, trr.critical_high AS trr_critical_high,
+            trr.notes AS trr_notes
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN test_categories tc ON t.category_id = tc.id
      JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
      JOIN result_values rv ON rv.result_id = res.id
      JOIN test_parameters tp ON rv.parameter_id = tp.id
+     JOIN samples s ON st.sample_id = s.id
+     JOIN animals a ON s.animal_id = a.id
+     LEFT JOIN test_reference_ranges trr ON trr.parameter_id = tp.id AND trr.animal_type = a.animal_type
      WHERE st.sample_id = $1
      ORDER BY tp.sort_order, tp.id`,
     [sampleId]

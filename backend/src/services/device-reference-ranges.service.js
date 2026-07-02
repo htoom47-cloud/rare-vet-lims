@@ -333,41 +333,20 @@ const formatEffectiveReference = (row) => {
   return null;
 };
 
-/** Effective range for flag evaluation — Norma notes snapshot only for device imports. */
-const getEffectiveRangeForParameter = async ({ parameterId, parameterCode, species, unit, normaNotes }) => {
-  const fromNotes = verbatimFromResultNotes(normaNotes);
-  if (fromNotes) {
-    const { parseReferenceRange } = require('../utils/reference-range');
-    const parsed = parseReferenceRange(fromNotes);
-    if (parsed?.min != null && parsed?.max != null) {
-      return {
-        min_value: parsed.min,
-        max_value: parsed.max,
-        critical_low: null,
-        critical_high: null,
-        source: 'norma-notes',
-      };
-    }
+/** Effective range for flag evaluation — LIMS manual test_reference_ranges only. */
+const getEffectiveRangeForParameter = async ({ parameterId, species }) => {
+  if (!parameterId || !species) return null;
+  const { getLimsReferenceRange } = require('./reference-ranges.service');
+  const lims = await getLimsReferenceRange(parameterId, species);
+  if (lims?.min_value != null && lims?.max_value != null) {
+    return {
+      min_value: lims.min_value,
+      max_value: lims.max_value,
+      critical_low: lims.critical_low,
+      critical_high: lims.critical_high,
+      source: 'lims-manual',
+    };
   }
-
-  if (parameterCode && species) {
-    const device = await query(
-      `SELECT low_value AS min_value, high_value AS max_value, reference_text,
-              NULL::decimal AS critical_low, NULL::decimal AS critical_high, source
-       FROM device_reference_ranges
-       WHERE device_name ILIKE '%norma%'
-         AND parameter_code = $1 AND species = $2
-         AND (unit IS NULL OR unit = '' OR unit = $3)
-       ORDER BY CASE WHEN unit = $3 THEN 0 WHEN unit IS NULL OR unit = '' THEN 1 ELSE 2 END,
-                last_synced_at DESC
-       LIMIT 1`,
-      [parameterCode, species, unit || '']
-    );
-    if (device.rows[0]?.min_value != null && device.rows[0]?.max_value != null) {
-      return device.rows[0];
-    }
-  }
-
   return null;
 };
 

@@ -104,7 +104,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
       unit: row.unit || param.rows[0].unit,
       notes: noteText,
       source: fromHl7 ? 'norma-hl7' : 'norma-profile',
-      onlyIfMissing: !fromHl7,
+      onlyIfMissing: true,
     });
     updated += 1;
   }
@@ -147,4 +147,29 @@ const syncNormaProfileForAnimal = async (testCode, animalType) => {
   return { updated };
 };
 
-module.exports = { upsertReferenceRange, syncFromParsedResults, syncNormaProfileForAnimal };
+/** Manual LIMS reference range for a parameter + animal type (إبل، خيل، غنم، ماعز). */
+const getLimsReferenceRange = async (parameterId, animalType) => {
+  if (!parameterId || !animalType) return null;
+  const result = await query(
+    `SELECT min_value, max_value, critical_low, critical_high, unit, notes
+     FROM test_reference_ranges
+     WHERE parameter_id = $1 AND animal_type = $2
+     LIMIT 1`,
+    [parameterId, animalType]
+  );
+  return result.rows[0] || null;
+};
+
+const formatLimsRange = (range) => {
+  if (!range || range.min_value == null || range.max_value == null) return null;
+  const note = range.notes != null ? String(range.notes).trim() : '';
+  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:')) return note;
+  const fmt = (n) => {
+    const num = Number(n);
+    if (Number.isNaN(num)) return String(n);
+    return Number.isInteger(num) ? String(num) : String(num).replace(/\.?0+$/, '');
+  };
+  return `${fmt(range.min_value)}-${fmt(range.max_value)}`;
+};
+
+module.exports = { upsertReferenceRange, syncFromParsedResults, syncNormaProfileForAnimal, getLimsReferenceRange, formatLimsRange };

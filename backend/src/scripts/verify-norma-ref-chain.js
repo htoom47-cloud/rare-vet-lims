@@ -132,17 +132,24 @@ check('profile refs align with HL7 builder for camel', () => {
   }
 });
 
-console.log('\n=== Review 4: report display — verbatim Norma only ===');
-const { resolveReportReferenceDisplay, verbatimFromResultNotes } = require('../utils/reference-range');
+console.log('\n=== Review 4: report display — LIMS manual ranges ===');
+const { resolveReportReferenceDisplay, resolveReportReferenceBounds, verbatimFromResultNotes } = require('../utils/reference-range');
 
-check('resolveReportReferenceDisplay uses frozen OBX-7 verbatim', () => {
-  const row = { rv_notes: 'Norma: 4.0-12.0' };
-  assert.strictEqual(resolveReportReferenceDisplay(row), '4.0-12.0');
+check('resolveReportReferenceDisplay uses LIMS test_reference_ranges', () => {
+  const row = { trr_min: 8, trr_max: 15, rv_notes: 'Norma: 4.0-12.0' };
+  assert.strictEqual(resolveReportReferenceDisplay(row), '8-15');
 });
 
-check('resolveReportReferenceDisplay ignores LIMS tables (no notes → null)', () => {
-  const row = { rv_notes: null, min_value: 4, max_value: 12 };
+check('resolveReportReferenceDisplay returns null when LIMS range missing', () => {
+  const row = { rv_notes: 'Norma: 4.0-12.0' };
   assert.strictEqual(resolveReportReferenceDisplay(row), null);
+});
+
+check('resolveReportReferenceBounds uses LIMS min/max', () => {
+  const row = { trr_min: 4, trr_max: 15, rv_notes: 'Norma: 8.0-15.0' };
+  const bounds = resolveReportReferenceBounds(row);
+  assert.strictEqual(bounds.min, 4);
+  assert.strictEqual(bounds.max, 15);
 });
 
 check('PDF fmtRef prefers reference over min/max formatting', () => {
