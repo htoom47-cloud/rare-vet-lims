@@ -161,6 +161,10 @@ check('MONP maps to MON_PCT', () => {
   assert.strictEqual(resolveNormaResultLimsCode({ code: 'MONP', unit: '%' }), 'MON_PCT');
 });
 
+check('stored limsCode LYMP still resolves to LYM_PCT', () => {
+  assert.strictEqual(resolveNormaResultLimsCode({ code: 'LYMP', limsCode: 'LYMP', unit: '%' }), 'LYM_PCT');
+});
+
 check('PDF fmtRef prefers reference over min/max formatting', () => {
   const fmtRef = (row) => {
     const verbatim = row.reference && row.reference !== '-' ? String(row.reference).trim() : null;

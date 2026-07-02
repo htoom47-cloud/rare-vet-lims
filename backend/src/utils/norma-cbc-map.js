@@ -87,7 +87,9 @@ function compareByNormaOrder(a, b) {
 
 /** Map Norma OBX row → LIMS parameter code (handles LYM + % → LYM_PCT). */
 function resolveNormaResultLimsCode(row) {
-  const base = row?.limsCode || mapNormaCode(row?.code) || null;
+  const fromCode = mapNormaCode(row?.code);
+  const fromStored = row?.limsCode ? mapNormaCode(row.limsCode) : null;
+  const base = fromCode || fromStored || row?.limsCode || null;
   if (!base) return null;
   const u = String(row?.unit || '').trim();
   const raw = String(row?.code || '').toUpperCase();
