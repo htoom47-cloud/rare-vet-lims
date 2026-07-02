@@ -9,6 +9,9 @@ import {
   panelI18nKey,
 } from '../utils/parasitologyTests';
 import mediaUrl from '../utils/mediaUrl';
+import { normalizeSampleScanId } from '../utils/barcodeScan';
+
+const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
 
 const normalizeUploadFile = (file) => {
   if (!file || typeof File === 'undefined') return file;
@@ -80,7 +83,7 @@ export default function ParasitologyUpload() {
   }, [activeTest?.id, loadAttachments]);
 
   const loadSample = async (code) => {
-    const trimmed = code.trim();
+    const trimmed = normalizeSampleScanId(code.trim()) || code.trim();
     if (!trimmed) return;
     setLoading(true);
     try {
@@ -145,7 +148,8 @@ export default function ParasitologyUpload() {
       barcodeRef.current?.focus();
     } catch (err) {
       const status = err.response?.status;
-      if (status === 502 || status === 503) toast.error(t('parasitology.serverWaking'));
+      if (status === 403) toast.error(t('parasitology.uploadForbidden'));
+      else if (status === 502 || status === 503) toast.error(t('parasitology.serverWaking'));
       else toast.error(err.response?.data?.error?.message || t('parasitology.imageUploadFailed'));
     } finally {
       setUploading(false);

@@ -47,6 +47,9 @@ check('lab_technician lacks results.validate', () => {
 check('reception can send reports', () => {
   assert(ROLE_PERMISSIONS.reception.includes(PERMISSIONS.NOTIFICATIONS_SEND_REPORT));
 });
+check('reception can upload parasite images', () => {
+  assert(ROLE_PERMISSIONS.reception.includes(PERMISSIONS.RESULTS_UPLOAD_IMAGES));
+});
 
 console.log('\n=== Pass 2: Route files exist ===');
 const routeDir = path.join(__dirname, '../routes');
