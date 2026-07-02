@@ -19,6 +19,16 @@ router.get('/', authorize(PERMISSIONS.ANIMALS_VIEW), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/:id/trends', authorize(PERMISSIONS.RESULTS_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.getResultTrends(req.params.id, {
+      test_code: req.query.test_code,
+      parameter_code: req.query.parameter_code,
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', authorize(PERMISSIONS.ANIMALS_VIEW), async (req, res, next) => {
   try {
     const data = req.query.history === 'true' ? await service.getHistory(req.params.id) : await service.getById(req.params.id);

@@ -60,23 +60,42 @@ async function main() {
       token,
       body: { full_name: `Upload Test ${ts}`, mobile: `05${String(ts).slice(-8)}`, customer_type: 'individual' },
     });
+    if (!customer.ok) {
+      log('Create customer', false, customer.data?.error?.message);
+      process.exit(1);
+    }
     const animal = await req('POST', '/animals', {
       token,
-      body: { owner_id: customer.data.data.id, name: 'Test', animal_type: 'horse', gender: 'male' },
+      body: {
+        owner_id: customer.data.data.id,
+        animal_code: `UP-${ts}`,
+        animal_type: 'horse',
+        name_tag: 'Upload Test',
+        gender: 'male',
+      },
     });
+    if (!animal.ok) {
+      log('Create animal', false, animal.data?.error?.message);
+      process.exit(1);
+    }
     const testsRes = await req('GET', '/tests?limit=100', { token });
     const blood = (testsRes.data?.data || []).find((t) => t.code === 'PARAS-BLOOD');
     const sample = await req('POST', '/samples', {
       token,
       body: {
+        customer_id: customer.data.data.id,
         animal_id: animal.data.data.id,
-        tests: [{ test_id: blood.id }],
         priority: 'normal',
+        test_ids: [blood.id],
       },
     });
+    if (!sample.ok) {
+      log('Create sample', false, sample.data?.error?.message);
+      process.exit(1);
+    }
     sampleId = sample.data.data.id;
     sampleCode = sample.data.data.sample_code;
-    await req('POST', `/samples/${sampleId}/deliver`, { token, body: {} });
+    await req('PATCH', `/samples/${sampleId}/status`, { token, body: { status: 'received' } });
     const det = await req('GET', `/samples/${sampleId}`, { token });
     bloodTestId = (det.data?.data?.tests || []).find((t) => t.test_code === 'PARAS-BLOOD')?.id;
     log('Create test sample', !!bloodTestId, sampleCode);
@@ -95,37 +114,41 @@ async function main() {
   const upload = await req('POST', `/results/sample-test/${bloodTestId}/attachments`, { token, formData: form });
   log('Upload image (no parameter_id)', upload.ok, upload.data?.error?.message || `HTTP ${upload.status}`);
 
-  const bloodDetail = await req('GET', `/tests/${(await req('GET', '/tests?limit=100', { token })).data.data.find((t) => t.code === 'PARAS-BLOOD').id}`, { token });
+  const bloodMeta = (await req('GET', '/tests?limit=100', { token })).data.data.find((t) => t.code === 'PARAS-BLOOD');
+  const bloodDetail = await req('GET', `/tests/${bloodMeta.id}`, { token });
   const param = (bloodDetail.data?.data?.parameters || []).find((p) => p.unit === 'qual' && p.code !== 'NOTES');
+  if (!param) {
+    log('Qual parameter', false, 'missing');
+    process.exit(1);
+  }
+
+  const values = [{ parameter_id: param.id, value: 'Negative' }];
 
   const enter = await req('POST', '/results/enter', {
     token,
-    body: {
-      sample_test_id: bloodTestId,
-      values: [{ parameter_id: param?.id, value: 'Negative' }],
-    },
+    body: { sample_test_id: bloodTestId, values },
   });
   log('Enter result', enter.ok, enter.data?.error?.message);
 
   const approve = await req('POST', '/results/approve-batch', {
     token,
-    body: { items: [{ sample_test_id: bloodTestId }] },
+    body: { items: [{ sample_test_id: bloodTestId, values }] },
   });
   log('Approve batch', approve.ok, approve.data?.error?.message);
 
-  const report = await req('POST', '/reports/generate', {
+  const report = await req('POST', `/reports/generate/${sampleId}`, {
     token,
-    body: { sample_id: sampleId, language: 'ar' },
+    body: { language: 'ar', approve_lab: true, approve_vet: true },
   });
   log('Generate report', report.ok, report.data?.error?.message || report.data?.data?.report_number);
 
   if (report.ok) {
-    const reportId = report.data.data.id;
-    const pdfRes = await fetch(`${API}/reports/${reportId}/pdf`, {
+    const pdfUrl = report.data.data.pdf_url;
+    const pdfRes = await fetch(`${BASE}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
-    log('Download PDF', pdfRes.ok && pdfBuf.length > 5000, `${pdfBuf.length} bytes`);
+    log('Download PDF', pdfRes.ok && pdfBuf.length > 8000, `${pdfBuf.length} bytes`);
     if (pdfRes.ok) {
       const out = path.join(__dirname, '../../uploads/reports/_e2e-paras-upload-test.pdf');
       fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -134,7 +157,7 @@ async function main() {
     }
   }
 
-  const attCheck = await req('GET', `/results/${bloodTestId}`, { token });
+  const attCheck = await req('GET', `/results/sample-test/${bloodTestId}`, { token });
   const attCount = attCheck.data?.data?.attachments?.length || 0;
   log('Attachments on result', attCount > 0, `${attCount} file(s)`);
 

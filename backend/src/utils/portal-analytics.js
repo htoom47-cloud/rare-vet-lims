@@ -8,9 +8,9 @@ const PANELS = [
 ];
 
 const flagSeverity = (flag) => {
-  if (!flag || ['NORMAL', 'NEG', 'PENDING'].includes(flag)) return 0;
+  if (!flag || ['NORMAL', 'NEG', 'PENDING', ''].includes(flag)) return 0;
   if (String(flag).startsWith('CRIT')) return 3;
-  if (['H', 'L', 'POS'].includes(flag)) return 2;
+  if (['HIGH', 'LOW', 'H', 'L', 'POS'].includes(flag)) return 2;
   return 1;
 };
 

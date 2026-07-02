@@ -7,9 +7,14 @@ const logger = require('../config/logger');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
-const { compareByNormaOrder, filterCbcReportRows, getNormaPanelRow } = require('../utils/norma-cbc-map');
-const { resolveReportReferenceBounds, resolveReportReferenceDisplay } = require('../utils/reference-range');
-const { LIMS_REF_SELECT_SQL, limsRefLateralJoin } = require('./reference-ranges.service');
+const { compareByNormaOrder, filterCbcReportRows } = require('../utils/norma-cbc-map');
+const {
+  LIMS_REF_SELECT_SQL,
+  limsRefLateralJoin,
+} = require('./reference-range-engine.service');
+const resultEngine = require('./result-engine.service');
+const { buildReportSections, filterReportableAttachments, buildApprovalSection } = require('./report-builder.service');
+const portalSync = require('./portal-sync.service');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -206,6 +211,17 @@ const buildReportData = async (sampleId, opts) => {
 
   const sample = sampleResult.rows[0];
 
+  const orderedTestsResult = await query(
+    `SELECT t.id AS test_id, t.code AS test_code, t.name AS test_name, t.name_ar AS test_name_ar,
+            tc.code AS category_code
+     FROM sample_tests st
+     JOIN tests t ON st.test_id = t.id
+     LEFT JOIN test_categories tc ON t.category_id = tc.id
+     WHERE st.sample_id = $1
+     ORDER BY tc.sort_order NULLS LAST, t.sort_order, t.name`,
+    [sampleId]
+  );
+
   const resultsData = await query(
     `SELECT tp.id as parameter_id, tp.code as parameter_code, tp.sort_order,
             t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.method as test_method,
@@ -232,13 +248,6 @@ const buildReportData = async (sampleId, opts) => {
     throw new AppError('No validated results found', 400, 'NO_RESULTS');
   }
 
-  const formatNumber = (value) => {
-    if (value == null || value === '') return null;
-    const num = Number(value);
-    if (Number.isNaN(num)) return String(value);
-    return Number.isInteger(num) ? String(num) : num.toFixed(2).replace(/\.?0+$/, '');
-  };
-
   const uniqueByParameter = [];
   const seenParameters = new Set();
   const sortedRows = filterCbcReportRows(
@@ -251,42 +260,16 @@ const buildReportData = async (sampleId, opts) => {
   }
 
   const isArabic = language === 'ar';
-  const qualLabel = (value, flag) => {
-    if (flag === 'POS') return isArabic ? 'إيجابي' : 'Positive';
-    if (flag === 'NEG') return isArabic ? 'سلبي' : 'Negative';
-    return value;
-  };
 
-  const results = uniqueByParameter.map((r) => {
-    const panelRow = getNormaPanelRow(r.parameter_code);
-    const { min: minValue, max: maxValue } = resolveReportReferenceBounds(r);
-    const referenceDisplay = resolveReportReferenceDisplay(r) || '-';
-    return {
-    code: r.parameter_code,
-    testCode: r.test_code,
-    nameAr: panelRow?.name_ar || r.parameter_name_ar || r.parameter_name || r.test_name_ar || r.test_name,
-    nameEn: panelRow?.symbol || r.parameter_name || r.test_name,
-    testNameAr: r.test_name_ar || r.test_name,
-    testNameEn: r.test_name,
-    value: qualLabel(
-      formatNumber(r.numeric_value ?? r.value) ?? '-',
-      r.flag
-    ),
-    numericValue: r.numeric_value != null ? Number(r.numeric_value) : null,
-    unit: r.unit,
-    minValue,
-    maxValue,
-    reference: referenceDisplay,
-    flag: r.flag,
-    isCritical: r.is_critical,
-    method: r.test_method || '-',
-    instrument: resolveInstrument(r.category_code, r.test_code),
-    categoryCode: r.category_code || null,
-  };
-  });
+  const results = uniqueByParameter.map((r) => resultEngine.buildReportResultRow(r, {
+    language,
+    isArabic,
+    instrumentResolver: resolveInstrument,
+  }));
 
   const attachmentsResult = await query(
-    `SELECT ra.file_url, ra.caption, t.name as test_name, t.name_ar as test_name_ar
+    `SELECT ra.file_url, ra.caption, ra.include_in_report,
+            t.name as test_name, t.name_ar as test_name_ar, t.code as test_code
      FROM result_attachments ra
      JOIN results res ON ra.result_id = res.id
      JOIN sample_tests st ON res.sample_test_id = st.id
@@ -309,8 +292,19 @@ const buildReportData = async (sampleId, opts) => {
     parameterCodes
   );
 
-  const panelName = [...new Set(results.map((r) => r.testNameEn).filter(Boolean))][0]
+  const panelName = [...new Set(results.map((r) => r.testNameEn).filter(Boolean))].join(' + ')
     || 'Laboratory Panel';
+
+  const reportableAttachments = filterReportableAttachments(attachmentsResult.rows);
+
+  const sections = buildReportSections({
+    orderedTests: orderedTestsResult.rows,
+    results,
+    attachments: attachmentsResult.rows,
+    language,
+    labApproval: labApproval ?? { approved: false },
+    vetApproval: vetApproval ?? { approved: false },
+  });
 
   const normaMsg = await query(
     `SELECT parsed_data->>'animalType' AS norma_animal_type,
@@ -368,9 +362,14 @@ const buildReportData = async (sampleId, opts) => {
     labApproval: labApproval ?? { approved: false },
     vetApproval: vetApproval ?? { approved: false },
     results,
+    sections,
     previousByCode,
     trendHistory,
-    attachments: attachmentsResult.rows,
+    attachments: reportableAttachments,
+    approvalSection: buildApprovalSection({
+      labApproval: labApproval ?? { approved: false },
+      vetApproval: vetApproval ?? { approved: false },
+    }),
   };
 };
 
@@ -588,7 +587,7 @@ const getPreview = async (id) => {
   const isArabic = reportRow.language === 'ar';
   const verifyUrl = `${env.appUrl}/verify/${reportRow.qr_verification_code}`;
 
-  return {
+  return portalSync.buildUnifiedReportView({
     id: reportRow.id,
     sampleId: reportRow.sample_id,
     pdfUrl: reportRow.pdf_url,
@@ -637,7 +636,12 @@ const getPreview = async (id) => {
         : (meta.collected_by_name || '-'),
     },
     results: base.results,
+    sections: base.sections || [],
     attachments: await Promise.all((base.attachments || []).map(mapAttachmentForPreview)),
+    approvalSection: base.approvalSection || buildApprovalSection({
+      labApproval: base.labApproval,
+      vetApproval: base.vetApproval,
+    }),
     interpretation: base.aiInterpretation,
     recommendations: base.treatmentRecommendations,
     doctorNotes: base.doctorNotes,
@@ -646,7 +650,7 @@ const getPreview = async (id) => {
       vet: base.vetApproval,
     },
     generatedBy: reportRow.generated_by_name,
-  };
+  }, reportRow, { hasValidatedResults: true });
 };
 
 const verify = async (code) => {

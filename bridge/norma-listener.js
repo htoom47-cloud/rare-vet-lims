@@ -150,7 +150,8 @@ const server = net.createServer((socket) => {
           const skipped = result?.data?.imported?.skipped?.length;
           console.log(`[Norma] Imported: ${imported.sample_code} (${imported.imported || 0} values${skipped ? `, skipped: ${skipped}` : ''})`);
         } else if (result?.data?.warning) {
-          console.log(`[Norma] Stored with warning: ${result.data.warning}`);
+          const sid = result?.data?.parsed?.sampleId || '—';
+          console.log(`[Norma] Stored with warning: ${result.data.warning} (sampleId=${sid})`);
         } else {
           console.log('[Norma] Message forwarded to LIMS');
         }

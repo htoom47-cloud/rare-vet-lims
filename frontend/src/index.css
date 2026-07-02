@@ -175,14 +175,15 @@
 }
 
 .label-50x25-digits {
-  margin: 0.15mm 0 0;
+  margin: 0.2mm 0 0;
   padding: 0;
-  font-size: 7.5pt;
-  font-weight: 700;
+  font-size: 10.5pt;
+  font-weight: 800;
   line-height: 1.05;
   text-align: center;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
   color: #000;
+  font-family: 'Consolas', 'Courier New', monospace;
 }
 
 .label-50x25-barcode svg {
@@ -204,10 +205,10 @@
 .label-50x25-line {
   margin: 0;
   padding: 0;
-  font-size: 6.5pt;
-  line-height: 1.1;
+  font-size: 8pt;
+  line-height: 1.15;
   text-align: center;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Arial, 'Segoe UI', Tahoma, sans-serif;
   color: #000;
   white-space: nowrap;
   overflow: hidden;

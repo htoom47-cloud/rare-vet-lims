@@ -37,6 +37,27 @@ router.get('/scan/:barcode', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RES
   } catch (err) { next(err); }
 });
 
+router.get('/:id/workflow', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
+  try {
+    const data = await service.getWorkflowSummary(req.params.id);
+    res.json({ success: true, data, enabled: data.enabled !== false });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/workflow/action', authorize(PERMISSIONS.SAMPLES_UPDATE, PERMISSIONS.RESULTS_VALIDATE, PERMISSIONS.RESULTS_ENTER), async (req, res, next) => {
+  try {
+    const data = await service.advanceWorkflow(req.params.id, req.body.action, {
+      userId: req.user.id,
+      userRole: req.user.role_name,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      notes: req.body.notes,
+      device: req.body.device,
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
   try {
     const data = await service.getById(req.params.id);

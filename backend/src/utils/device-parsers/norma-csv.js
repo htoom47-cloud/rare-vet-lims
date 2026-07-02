@@ -40,7 +40,7 @@ function parseNormaCsv(raw) {
     const ref = parseReferenceRange(refRaw || `${refLow}-${refHigh}`);
     const limsCode = resolveNormaResultLimsCode({ code, unit });
 
-    if (/^SMP-|^BC-/i.test(code)) {
+    if (/^SMP-|^BC-/i.test(code) || /^\d{10,14}$/.test(code)) {
       sampleId = code;
       continue;
     }

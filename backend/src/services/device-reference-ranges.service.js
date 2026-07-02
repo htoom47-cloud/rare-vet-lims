@@ -285,6 +285,100 @@ const list = async ({
   return { rows: result.rows, total: count.rows[0]?.total || 0, page, limit };
 };
 
+const formatRefText = (low, high, fallback = '') => {
+  if (low == null || high == null) return fallback || null;
+  const fmt = (n) => {
+    const num = Number(n);
+    if (Number.isNaN(num)) return String(n);
+    return Number.isInteger(num) ? String(num) : String(num).replace(/\.?0+$/, '');
+  };
+  return `${fmt(low)}-${fmt(high)}`;
+};
+
+const getById = async (id) => {
+  const { AppError } = require('../middleware/errorHandler');
+  const result = await query('SELECT * FROM device_reference_ranges WHERE id = $1', [id]);
+  if (!result.rows[0]) throw new AppError('Reference range not found', 404, 'NOT_FOUND');
+  return result.rows[0];
+};
+
+const createManual = async ({
+  device_name,
+  parameter_code,
+  parameter_name,
+  species,
+  unit,
+  low_value,
+  high_value,
+  reference_text,
+}) => {
+  if (!parameter_code || !species) {
+    const { AppError } = require('../middleware/errorHandler');
+    throw new AppError('Parameter code and species required', 400, 'VALIDATION');
+  }
+  if (low_value == null || high_value == null) {
+    const { AppError } = require('../middleware/errorHandler');
+    throw new AppError('Low and high values required', 400, 'VALIDATION');
+  }
+
+  const upsert = await upsertDeviceReferenceRange({
+    deviceName: device_name || DEFAULT_DEVICE_NAME,
+    parameterCode: parameter_code,
+    parameterName: parameter_name || parameter_code,
+    species,
+    unit: unit || null,
+    lowValue: low_value,
+    highValue: high_value,
+    referenceText: reference_text || formatRefText(low_value, high_value),
+    source: 'manual',
+  });
+  return upsert?.row;
+};
+
+const updateById = async (id, data) => {
+  const { AppError } = require('../middleware/errorHandler');
+  const existing = await getById(id);
+
+  const low = data.low_value ?? existing.low_value;
+  const high = data.high_value ?? existing.high_value;
+  if (low == null || high == null) throw new AppError('Low and high values required', 400, 'VALIDATION');
+
+  const refText = data.reference_text != null
+    ? String(data.reference_text).trim() || null
+    : (formatRefText(low, high) || existing.reference_text);
+
+  await logRangeChange({
+    rangeId: id,
+    deviceName: existing.device_name,
+    parameterCode: existing.parameter_code,
+    species: existing.species,
+    unit: existing.unit,
+    oldLow: existing.low_value,
+    oldHigh: existing.high_value,
+    newLow: low,
+    newHigh: high,
+    reason: 'manual_edit',
+  });
+
+  const updated = await query(
+    `UPDATE device_reference_ranges
+     SET low_value = $1, high_value = $2,
+         reference_text = COALESCE($3, reference_text),
+         unit = COALESCE($4, unit),
+         source = 'manual',
+         updated_at = NOW()
+     WHERE id = $5 RETURNING *`,
+    [low, high, refText, data.unit ?? existing.unit, id]
+  );
+  return updated.rows[0];
+};
+
+const deleteAll = async () => {
+  const count = await query('SELECT COUNT(*)::int AS n FROM device_reference_ranges');
+  await query('DELETE FROM device_reference_ranges');
+  return { deleted: count.rows[0]?.n || 0 };
+};
+
 const listLogs = async ({ limit = 50, device_name, parameter_code } = {}) => {
   const params = [];
   const where = ['1=1'];
@@ -356,6 +450,10 @@ module.exports = {
   syncFromParsedMessage,
   syncFromRecentMessages,
   list,
+  getById,
+  createManual,
+  updateById,
+  deleteAll,
   listLogs,
   resolveSpecies,
   DEVICE_REF_LATERAL_SQL,

@@ -6,6 +6,15 @@ const generateCode = (prefix, length = 6) => {
   return `${prefix}-${date}-${num}`;
 };
 
+/** Unified 12-digit sample ID — YYMMDD + 6 random digits (same value for sample_code and barcode). */
+const generateSampleDigitsId = (suffixLength = 6) => {
+  const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const num = Math.floor(Math.random() * 10 ** suffixLength).toString().padStart(suffixLength, '0');
+  return `${date}${num}`;
+};
+
+const sampleDigitsOnly = (value) => String(value || '').replace(/\D/g, '');
+
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
 const paginate = (page = 1, limit = 20) => {
@@ -38,4 +47,13 @@ const normalizeMobileDigits = (mobile = '') => {
   return digits;
 };
 
-module.exports = { generateCode, hashToken, paginate, buildPagination, evaluateFlag, normalizeMobileDigits };
+module.exports = {
+  generateCode,
+  generateSampleDigitsId,
+  sampleDigitsOnly,
+  hashToken,
+  paginate,
+  buildPagination,
+  evaluateFlag,
+  normalizeMobileDigits,
+};

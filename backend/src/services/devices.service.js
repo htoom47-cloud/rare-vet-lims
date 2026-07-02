@@ -4,7 +4,11 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../config/logger');
 const { parseDeviceMessage } = require('../utils/device-parsers');
 const deviceImport = require('./device-import.service');
-const deviceRefRanges = require('./device-reference-ranges.service');
+const {
+  generatePlaintextKey,
+  prepareConfigWithHashedKey,
+  sanitizeDevice,
+} = require('../utils/device-api-key');
 
 const SUPPORTED_DEVICES = [
   { name: 'Norma CBC', model: 'iVet-5 / Icon-5', protocol: 'HL7', connection_type: 'tcp', default_port: 21110 },
@@ -12,23 +16,34 @@ const SUPPORTED_DEVICES = [
   { name: 'Mini Vidas', model: 'Mini Vidas', protocol: 'ASTM', connection_type: 'serial' },
 ];
 
-const generateApiKey = () => crypto.randomBytes(24).toString('hex');
+const generateApiKey = () => generatePlaintextKey();
 
 const parseMessage = (raw, protocol) => parseDeviceMessage(raw, protocol);
 
 const list = async () => {
   const result = await query('SELECT * FROM device_integrations ORDER BY name');
-  return { configured: result.rows, supported: SUPPORTED_DEVICES };
+  return {
+    configured: result.rows.map(sanitizeDevice),
+    supported: SUPPORTED_DEVICES,
+  };
 };
 
 const getById = async (id) => {
   const result = await query('SELECT * FROM device_integrations WHERE id = $1', [id]);
   if (!result.rows[0]) throw new AppError('Device not found', 404, 'NOT_FOUND');
-  return result.rows[0];
+  return sanitizeDevice(result.rows[0]);
+};
+
+const stripIncomingApiKey = (config = {}) => {
+  const next = { ...config };
+  delete next.api_key;
+  delete next.api_key_hash;
+  return next;
 };
 
 const create = async (data) => {
-  const config = { ...(data.config || {}), api_key: data.config?.api_key || generateApiKey() };
+  const baseConfig = stripIncomingApiKey(data.config || {});
+  const { config, plaintextKey } = await prepareConfigWithHashedKey(baseConfig);
   const result = await query(
     `INSERT INTO device_integrations (name, model, protocol, connection_type, host, port, serial_port, config, is_active)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
@@ -44,13 +59,21 @@ const create = async (data) => {
       data.is_active ?? false,
     ]
   );
-  return result.rows[0];
+  return { ...sanitizeDevice(result.rows[0]), api_key_once: plaintextKey };
 };
 
 const update = async (id, data) => {
-  const existing = await getById(id);
-  const config = { ...(existing.config || {}), ...(data.config || {}) };
-  if (!config.api_key) config.api_key = generateApiKey();
+  const existingRaw = await query('SELECT * FROM device_integrations WHERE id = $1', [id]);
+  if (!existingRaw.rows[0]) throw new AppError('Device not found', 404, 'NOT_FOUND');
+  const existing = existingRaw.rows[0];
+  const existingConfig = typeof existing.config === 'string'
+    ? JSON.parse(existing.config)
+    : (existing.config || {});
+  const config = { ...existingConfig, ...stripIncomingApiKey(data.config || {}) };
+  if (!config.api_key_hash && !config.api_key) {
+    const prepared = await prepareConfigWithHashedKey(config);
+    Object.assign(config, prepared.config);
+  }
 
   const result = await query(
     `UPDATE device_integrations SET name=$1, model=$2, protocol=$3, connection_type=$4, host=$5, port=$6,
@@ -69,17 +92,22 @@ const update = async (id, data) => {
       id,
     ]
   );
-  return result.rows[0];
+  return sanitizeDevice(result.rows[0]);
 };
 
 const regenerateApiKey = async (id) => {
-  const existing = await getById(id);
-  const config = { ...(existing.config || {}), api_key: generateApiKey() };
+  const existingRaw = await query('SELECT * FROM device_integrations WHERE id = $1', [id]);
+  if (!existingRaw.rows[0]) throw new AppError('Device not found', 404, 'NOT_FOUND');
+  const existing = existingRaw.rows[0];
+  const existingConfig = typeof existing.config === 'string'
+    ? JSON.parse(existing.config)
+    : (existing.config || {});
+  const { config, plaintextKey } = await prepareConfigWithHashedKey(stripIncomingApiKey(existingConfig));
   const result = await query(
     `UPDATE device_integrations SET config = $1 WHERE id = $2 RETURNING *`,
     [JSON.stringify(config), id]
   );
-  return result.rows[0];
+  return { ...sanitizeDevice(result.rows[0]), api_key_once: plaintextKey };
 };
 
 const processInboundMessage = async (device, rawMessage) => {
@@ -114,19 +142,6 @@ const processInboundMessage = async (device, rawMessage) => {
 
   try {
     const imported = await deviceImport.importFromParsed(parsed, device);
-    try {
-      await deviceRefRanges.syncFromParsedMessage({
-        device,
-        parsed,
-        messageId: msgResult.rows[0].id,
-        species: imported.reference_animal_type || imported.norma_animal_type || parsed.animalType,
-      });
-    } catch (syncErr) {
-      logger.warn('Device reference range sync failed — Norma import kept', {
-        error: syncErr.message,
-        sampleId: imported.sample_id,
-      });
-    }
     await query(
       `UPDATE device_messages SET status = 'imported', parsed_data = $1, sample_id = $2 WHERE id = $3`,
       [JSON.stringify({ ...parsed, import: imported }), imported.sample_id, msgResult.rows[0].id]

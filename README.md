@@ -91,8 +91,31 @@ rare-vet-lims/
 
 Interactive Swagger docs available at `/api/docs` when the backend is running.
 
-See [INSTALLATION.md](./INSTALLATION.md) for local development setup.
+See [INSTALLATION.md](./INSTALLATION.md) for local development setup.  
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for production deployment guide.
+
+## Engineering documentation
+
+Baseline inventory, architecture, and safety docs (Phase 0):
+
+| Document | Purpose |
+|----------|---------|
+| [PROJECT_INVENTORY.md](./PROJECT_INVENTORY.md) | Repo inventory — modules, pages, scripts |
+| [DEPENDENCY_MAP.md](./DEPENDENCY_MAP.md) | Service layers, hubs, report pipeline |
+| [DEAD_CODE_REPORT.md](./DEAD_CODE_REPORT.md) | Orphan / legacy code — safe removal order |
+| [DATABASE_DOCUMENTATION.md](./DATABASE_DOCUMENTATION.md) | PostgreSQL schema, tables, data flows |
+| [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | Full REST API (~172 endpoints) |
+| [LIMS_ENTERPRISE_V2_ARCHITECTURE.md](./LIMS_ENTERPRISE_V2_ARCHITECTURE.md) | v2 target architecture (design only) |
+
+**Change control & operations (Phase 0 safety baseline):**
+
+| Document | Purpose |
+|----------|---------|
+| [CHANGE_CONTROL.md](./CHANGE_CONTROL.md) | Rules before any delete, migration, or risky change |
+| [TESTING_CHECKLIST.md](./TESTING_CHECKLIST.md) | Mandatory manual regression checklist |
+| [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md) | DB + uploads backup and rollback procedures |
+
+Legacy API summary: [backend/API.md](./backend/API.md)
 
 ## License
 

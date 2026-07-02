@@ -6,6 +6,7 @@ const { AppError } = require('../middleware/errorHandler');
 const { hashToken, normalizeMobileDigits, paginate, buildPagination } = require('../utils/helpers');
 const { formatToE164 } = require('../utils/phone');
 const reportsService = require('./reports.service');
+const portalSync = require('./portal-sync.service');
 const billingService = require('./billing.service');
 const notificationProvider = require('./notification-providers');
 const {
@@ -199,18 +200,14 @@ const logPortalAccess = (customerId, action, reportId = null) => {
   logger.info('Portal access', { customerId, action, reportId });
 };
 
-const sanitizePortalPreview = (preview) => {
-  const { sampleId, generatedBy, ...safe } = preview;
-  return {
-    ...safe,
-    customer: preview.customer ? { name: preview.customer.name } : preview.customer,
-  };
-};
+const sanitizePortalPreview = (preview) => portalSync.sanitizeForPortal(preview);
+
+const portalReportFilter = portalSync.portalVisibilitySql('r');
 
 const listReports = async (customerId, { page, limit, animalId }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
 
-  const filters = ['s.customer_id = $1'];
+  const filters = ['s.customer_id = $1', portalReportFilter];
   const params = [customerId];
   if (animalId) {
     params.push(animalId);
@@ -230,6 +227,7 @@ const listReports = async (customerId, { page, limit, animalId }) => {
   const listParams = [...params, l, offset];
   const result = await query(
     `SELECT r.id, r.report_number, r.pdf_url, r.language, r.is_final, r.created_at,
+            r.lab_specialist_approved_by, r.vet_approved_by,
             s.sample_code, s.status as sample_status, s.animal_id,
             a.animal_code, a.animal_type, a.name_tag as animal_name
      FROM reports r
@@ -266,10 +264,11 @@ const fetchAnimalReports = async (customerId, animalId, limit = 20) => {
   }
   const result = await query(
     `SELECT r.id, r.report_number, r.pdf_url, r.created_at, r.is_final,
+            r.lab_specialist_approved_by, r.vet_approved_by,
             s.sample_code, s.collection_date
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1 AND s.animal_id = $2
+     WHERE s.customer_id = $1 AND s.animal_id = $2 AND ${portalReportFilter}
      ORDER BY r.created_at DESC
      ${limitClause}`,
     params
@@ -282,8 +281,12 @@ const latestResultsForAnimal = async (customerId, animalId) => {
   if (!reports[0]) return { results: [], report: null };
   await assertReportOwnership(reports[0].id, customerId);
   const preview = await reportsService.getPreview(reports[0].id);
+  const safe = sanitizePortalPreview(preview);
   return {
-    results: sanitizePortalPreview(preview).results || [],
+    results: safe.results || [],
+    sections: safe.sections || [],
+    summary: safe.summary || null,
+    flags: safe.flags || null,
     report: reports[0],
   };
 };
@@ -300,7 +303,7 @@ const listAnimals = async (customerId) => {
             MAX(r.created_at) AS latest_report_at
      FROM animals a
      JOIN samples s ON s.animal_id = a.id
-     JOIN reports r ON r.sample_id = s.id
+     JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
      WHERE a.owner_id = $1 AND a.is_active = true
      GROUP BY a.id
      ORDER BY latest_report_at DESC NULLS LAST, a.animal_code`,
@@ -320,6 +323,7 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
       FROM reports r
       JOIN samples s ON r.sample_id = s.id
       WHERE s.customer_id = $1 AND s.animal_id = $2 AND r.id = ANY($3::uuid[])
+        AND ${portalReportFilter}
       ORDER BY r.created_at ASC`;
     reportsParams = [customerId, animalId, reportIds];
   } else {
@@ -327,7 +331,7 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
       SELECT r.id, r.report_number, r.created_at, s.sample_code
       FROM reports r
       JOIN samples s ON r.sample_id = s.id
-      WHERE s.customer_id = $1 AND s.animal_id = $2
+      WHERE s.customer_id = $1 AND s.animal_id = $2 AND ${portalReportFilter}
       ORDER BY r.created_at DESC
       LIMIT 5`;
     reportsParams = [customerId, animalId];
@@ -346,12 +350,15 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
     reports.map(async (row) => {
       await assertReportOwnership(row.id, customerId);
       const preview = await reportsService.getPreview(row.id);
+      const safe = sanitizePortalPreview(preview);
       return {
         id: row.id,
         reportNumber: row.report_number,
         sampleCode: row.sample_code,
         date: row.created_at,
-        results: sanitizePortalPreview(preview).results || [],
+        results: safe.results || [],
+        sections: safe.sections || [],
+        sectionSignature: safe.sectionSignature || [],
       };
     })
   );
@@ -456,7 +463,7 @@ const getDashboard = async (customerId) => {
        COUNT(DISTINCT r.id) FILTER (WHERE r.created_at > NOW() - INTERVAL '7 days')::int AS new_reports_7d
      FROM customers c
      LEFT JOIN samples s ON s.customer_id = c.id
-     LEFT JOIN reports r ON r.sample_id = s.id
+     LEFT JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
      LEFT JOIN animals a ON a.owner_id = c.id AND a.is_active = true
      WHERE c.id = $1`,
     [customerId]
@@ -619,7 +626,7 @@ const getTrends = async (customerId, animalId, parameterCode, limit = 15) => {
     `SELECT r.id, r.report_number, r.created_at
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1 AND s.animal_id = $2
+     WHERE s.customer_id = $1 AND s.animal_id = $2 AND ${portalReportFilter}
      ORDER BY r.created_at ASC
      LIMIT $3`,
     [customerId, animalId, capped]
@@ -636,7 +643,8 @@ const getTrends = async (customerId, animalId, parameterCode, limit = 15) => {
   for (const row of reports) {
     await assertReportOwnership(row.id, customerId);
     const preview = await reportsService.getPreview(row.id);
-    const results = sanitizePortalPreview(preview).results || [];
+    const safe = sanitizePortalPreview(preview);
+    const results = safe.results || [];
     const match = results.find((r) => r.code === parameterCode);
     if (!match) continue;
     if (!meta) {
@@ -679,7 +687,7 @@ const listDocuments = async (customerId, { animalId, type } = {}) => {
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE ${where} AND r.pdf_url IS NOT NULL
+     WHERE ${where} AND r.pdf_url IS NOT NULL AND ${portalReportFilter}
      ORDER BY r.created_at DESC`,
     params
   );
@@ -775,6 +783,7 @@ const searchPortal = async (customerId, q) => {
      LEFT JOIN animals a ON s.animal_id = a.id
      WHERE s.customer_id = $1
        AND (r.report_number ILIKE $2 OR s.sample_code ILIKE $2)
+       AND ${portalReportFilter}
      ORDER BY r.created_at DESC
      LIMIT 8`,
     [customerId, like]
@@ -787,6 +796,7 @@ const getReportPreview = async (reportId, customerId) => {
   await assertReportOwnership(reportId, customerId);
   logPortalAccess(customerId, 'report_preview', reportId);
   const preview = await reportsService.getPreview(reportId);
+  portalSync.assertPortalReportVisible(preview);
   return sanitizePortalPreview(preview);
 };
 
@@ -794,7 +804,7 @@ const serveReportPdf = async (filename, customerId, res) => {
   const report = await query(
     `SELECT r.id, r.pdf_url FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1 AND r.pdf_url LIKE $2`,
+     WHERE s.customer_id = $1 AND r.pdf_url LIKE $2 AND ${portalReportFilter}`,
     [customerId, `%${filename}`]
   );
 

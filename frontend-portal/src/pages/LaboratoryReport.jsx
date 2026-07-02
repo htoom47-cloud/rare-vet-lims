@@ -16,7 +16,7 @@ import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { portalReportsAPI } from '../services/portalApi';
-import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
+import { printLabReport } from '../utils/labReportPrint';
 
 import { ANIMAL_TYPES } from '../utils/animalTypes';
 
@@ -153,9 +153,27 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
     };
   }, []);
 
-  const resultGroups = useMemo(() => groupResults(report?.results), [report]);
+  const resultGroups = useMemo(() => {
+    if (report?.sections?.length) {
+      return report.sections
+        .filter((s) => !s.isImageSection && s.results?.length)
+        .map((s) => ({
+          testCode: s.sectionType,
+          nameAr: s.titleAr || s.title,
+          nameEn: s.titleEn || s.title,
+          instrument: s.results[0]?.instrument,
+          items: s.results,
+        }));
+    }
+    return groupResults(report?.results);
+  }, [report]);
 
-  const attachments = useMemo(() => report?.attachments || [], [report]);
+  const attachments = useMemo(() => {
+    if (report?.attachments?.length) return report.attachments;
+    return (report?.sections || [])
+      .filter((s) => s.isImageSection)
+      .flatMap((s) => s.attachments || []);
+  }, [report]);
 
   const speciesLabel = (type) => {
     const e = ANIMAL_TYPES[type];
@@ -178,18 +196,18 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
   };
 
   const handleDownloadPdf = async () => {
-    if (!reportRef.current) return;
+    const pdfUrl = report?.pdf_url || report?.pdfUrl;
+    if (!pdfUrl) {
+      toast.error(t('labReport.downloadFailed'));
+      return;
+    }
     setExportingPdf(true);
     toast.dismiss();
     try {
-      await downloadLabReportPdf(reportRef.current, {
-        isAr,
-        filename: `${report.reportNumber}.pdf`,
-      });
-      setTimeout(() => toast.success(t('labReport.downloadDone')), 300);
+      await portalReportsAPI.openPdf(pdfUrl);
+      toast.success(t('labReport.downloadDone'));
     } catch {
       toast.error(t('labReport.downloadFailed'));
-      await handlePrint();
     } finally {
       setExportingPdf(false);
     }

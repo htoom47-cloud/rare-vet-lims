@@ -66,11 +66,33 @@ router.get('/reference-ranges/logs', authorize(PERMISSIONS.DEVICES_VIEW), async 
   } catch (err) { next(err); }
 });
 
-router.post('/reference-ranges/sync', authorize(PERMISSIONS.DEVICES_MANAGE), async (req, res, next) => {
+router.post('/reference-ranges/sync', authorize(PERMISSIONS.DEVICES_MANAGE), async (_req, res) => {
+  res.status(410).json({
+    success: false,
+    error: { message: 'Norma reference range sync is disabled — manage ranges manually' },
+  });
+});
+
+router.post('/reference-ranges', authorize(PERMISSIONS.DEVICES_MANAGE), async (req, res, next) => {
   try {
     const deviceRefRanges = require('../services/device-reference-ranges.service');
-    const hours = parseInt(req.body?.hours, 10) || 24;
-    const data = await deviceRefRanges.syncFromRecentMessages({ hours });
+    const data = await deviceRefRanges.createManual(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/reference-ranges/:id', authorize(PERMISSIONS.DEVICES_MANAGE), async (req, res, next) => {
+  try {
+    const deviceRefRanges = require('../services/device-reference-ranges.service');
+    const data = await deviceRefRanges.updateById(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/reference-ranges/all', authorize(PERMISSIONS.DEVICES_MANAGE), async (req, res, next) => {
+  try {
+    const deviceRefRanges = require('../services/device-reference-ranges.service');
+    const data = await deviceRefRanges.deleteAll();
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

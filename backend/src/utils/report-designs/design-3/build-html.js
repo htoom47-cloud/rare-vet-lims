@@ -119,7 +119,7 @@ const buildOverview = (counts, lang) => {
     </section>`;
 };
 
-const buildResultsTable = (results, lang) => {
+const buildResultsTable = (results, lang, sectionTitle) => {
   const headers = lang === 'ar'
     ? ['اسم الفحص', 'النتيجة', 'الوحدة', 'المجال المرجعي']
     : ['Test', 'Result', 'Unit', 'Reference Range'];
@@ -131,8 +131,12 @@ const buildResultsTable = (results, lang) => {
       <td class="col-unit">${escapeHtml(row.unit || '-')}</td>
       <td class="col-ref"><span class="ref-badge">${escapeHtml(formatRef(row))}</span></td>
     </tr>`).join('');
+  const titleBlock = sectionTitle
+    ? `<div class="section__head section__head--panel">${escapeHtml(sectionTitle)}</div>`
+    : '';
   return `
     <section class="section section--table">
+      ${titleBlock}
       <div class="table-wrap">
         <table class="results-table">
           <thead><tr>${headRow}</tr></thead>
@@ -140,6 +144,38 @@ const buildResultsTable = (results, lang) => {
         </table>
       </div>
     </section>`;
+};
+
+const buildImagesSection = async (attachments, lang, sectionTitle) => {
+  if (!attachments?.length) return '';
+  const { readImageBuffer } = require('../../../config/storage');
+  const imgs = await Promise.all(attachments.map(async (att) => {
+    const buffer = await readImageBuffer(att.file_url);
+    if (!buffer?.length) return '';
+    const src = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    const cap = att.caption ? `<figcaption>${escapeHtml(att.caption)}</figcaption>` : '';
+    return `<figure class="report-image"><img src="${src}" alt="" />${cap}</figure>`;
+  }));
+  const grid = imgs.filter(Boolean).join('');
+  if (!grid) return '';
+  return `
+    <section class="section card section--images">
+      <div class="section__head">${escapeHtml(sectionTitle || t(lang, 'Microscopy Images', 'صور الميكروسكوب'))}</div>
+      <div class="image-grid">${grid}</div>
+    </section>`;
+};
+
+const buildDynamicSections = async (sections, lang) => {
+  if (!sections?.length) return '';
+  const blocks = [];
+  for (const section of sections) {
+    if (section.isImageSection && section.attachments?.length) {
+      blocks.push(await buildImagesSection(section.attachments, lang, section.title));
+    } else if (section.results?.length) {
+      blocks.push(buildResultsTable(section.results, lang, section.title));
+    }
+  }
+  return blocks.join('');
 };
 
 const buildClinicalSummarySection = (items, lang) => {
@@ -232,13 +268,16 @@ const buildReportHtml = async (reportData) => {
   const counts = buildResultCounts(reportData.results || []);
   const summaryItems = buildClinicalSummary(reportData.results || [], lang);
   const css = loadStyles();
+  const dynamicSections = reportData.sections?.length
+    ? await buildDynamicSections(reportData.sections, lang)
+    : buildResultsTable(reportData.results || [], lang);
 
   const mainBlock = `
     <div class="report-main">
       ${buildHeader(reportData, lab, logoDataUri, barcodeDataUri, lang)}
       ${buildPatientSection(reportData, lang)}
       ${buildOverview(counts, lang)}
-      ${buildResultsTable(reportData.results || [], lang)}
+      ${dynamicSections}
     </div>`;
 
   const clinicalBlock = `

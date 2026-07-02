@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, PawPrint, FlaskConical, TestTube, FileText, Activity, Stethoscope,
-  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags, GitCompare,
+  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags, GitCompare, TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isReception, userRole } from '../../utils/roles';
@@ -52,6 +52,8 @@ const navSections = [
       { path: '/quality', icon: Shield, label: 'nav.quality', permission: 'quality.view' },
       { path: '/devices', icon: Cpu, label: 'nav.devices', permission: 'devices.view' },
       { path: '/device-reference-ranges', icon: Activity, label: 'nav.deviceRefRanges', permission: 'devices.view' },
+      { path: '/reference-ranges', icon: Activity, label: 'nav.referenceRanges', permission: 'reference_ranges.manage' },
+      { path: '/animal-trends', icon: TrendingUp, label: 'nav.animalTrends', permission: 'results.view' },
       { path: '/norma-ref-debug', icon: GitCompare, label: 'nav.normaRefDebug', permission: 'devices.view' },
     ],
   },

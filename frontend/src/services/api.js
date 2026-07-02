@@ -57,9 +57,18 @@ export const customersAPI = {
   delete: (id) => api.delete(`/customers/${id}`),
 };
 
+export const referenceRangesAPI = {
+  list: (params) => api.get('/reference-ranges', { params }),
+  create: (data) => api.post('/reference-ranges', data),
+  update: (id, data) => api.put(`/reference-ranges/${id}`, data),
+  delete: (id) => api.delete(`/reference-ranges/${id}`),
+  logs: (id) => api.get(`/reference-ranges/${id}/logs`),
+};
+
 export const animalsAPI = {
   list: (params) => api.get('/animals', { params }),
   get: (id, history) => api.get(`/animals/${id}`, { params: { history } }),
+  trends: (id, params) => api.get(`/animals/${id}/trends`, { params }),
   create: (data) => api.post('/animals', data),
   update: (id, data) => api.put(`/animals/${id}`, data),
   uploadImage: async (id, file) => {
@@ -111,6 +120,8 @@ export const testsAPI = {
   updateParameter: (parameterId, data) => api.put(`/tests/parameters/${parameterId}`, data),
   deleteParameter: (parameterId) => api.delete(`/tests/parameters/${parameterId}`),
   addReferenceRange: (parameterId, data) => api.post(`/tests/parameters/${parameterId}/ranges`, data),
+  updateReferenceRange: (rangeId, data) => api.put(`/tests/parameters/ranges/${rangeId}`, data),
+  deleteReferenceRange: (rangeId) => api.delete(`/tests/parameters/ranges/${rangeId}`),
 };
 
 export const resultsAPI = {
@@ -119,7 +130,7 @@ export const resultsAPI = {
   approveBatch: (items) => api.post('/results/approve-batch', { items }, { timeout: 90000 }),
   validate: (sampleTestId, payload = {}) => api.post(`/results/validate/${sampleTestId}`, payload),
   unvalidate: (sampleTestId) => api.post(`/results/unvalidate/${sampleTestId}`),
-  clear: (sampleTestId) => api.delete(`/results/sample-test/${sampleTestId}`),
+  updateAttachment: (id, data) => api.patch(`/results/attachments/${id}`, data),
   critical: () => api.get('/results/critical'),
   previous: (animalId, parameterId) => api.get(`/results/previous/${animalId}/${parameterId}`),
   uploadAttachment: async (sampleTestId, file, opts = {}) => {
@@ -416,7 +427,9 @@ export const devicesAPI = {
   messages: (id) => api.get(`/devices/${id}/messages`),
   referenceRanges: (params) => api.get('/devices/reference-ranges/list', { params }),
   referenceRangeLogs: (params) => api.get('/devices/reference-ranges/logs', { params }),
-  syncReferenceRanges: (body) => api.post('/devices/reference-ranges/sync', body),
+  createReferenceRange: (data) => api.post('/devices/reference-ranges', data),
+  updateReferenceRange: (id, data) => api.put(`/devices/reference-ranges/${id}`, data),
+  deleteAllReferenceRanges: () => api.delete('/devices/reference-ranges/all'),
   refDebugMessage: (messageId) => api.get(`/devices/ref-debug/message/${messageId}`),
   refDebugSample: (sampleId) => api.get(`/devices/ref-debug/sample/${sampleId}`),
   refDebugSpeciesAudit: () => api.get('/devices/ref-debug/species-audit'),

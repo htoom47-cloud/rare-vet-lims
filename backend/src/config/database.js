@@ -2,8 +2,23 @@ const { Pool } = require('pg');
 const env = require('./env');
 const logger = require('./logger');
 
+const buildSslConfig = () => {
+  if (env.nodeEnv !== 'production') return false;
+  if (process.env.DATABASE_SSL === 'false') return false;
+
+  const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
+  const ssl = { rejectUnauthorized };
+
+  if (process.env.DATABASE_CA_CERT) {
+    ssl.ca = process.env.DATABASE_CA_CERT;
+    ssl.rejectUnauthorized = true;
+  }
+
+  return ssl;
+};
+
 const buildPoolConfig = () => {
-  const ssl = env.nodeEnv === 'production' ? { rejectUnauthorized: false } : false;
+  const ssl = buildSslConfig();
   const common = { max: 20, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, ssl };
 
   if (env.databaseUrl) {
@@ -42,4 +57,4 @@ const query = async (text, params) => {
 
 const getClient = () => pool.connect();
 
-module.exports = { pool, query, getClient };
+module.exports = { pool, query, getClient, buildSslConfig };

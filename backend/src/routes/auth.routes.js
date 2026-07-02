@@ -3,6 +3,7 @@ const authService = require('../services/auth.service');
 const { validate } = require('../middleware/validate');
 const { loginSchema } = require('../validators/schemas');
 const { authenticate } = require('../middleware/auth');
+const { loginRateLimit } = require('../middleware/loginRateLimit');
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ const router = express.Router();
  *     summary: User login
  *     tags: [Authentication]
  */
-router.post('/login', validate(loginSchema), async (req, res, next) => {
+router.post('/login', loginRateLimit, validate(loginSchema), async (req, res, next) => {
   try {
     const data = await authService.login(req.body.username, req.body.password);
     res.json({ success: true, data });

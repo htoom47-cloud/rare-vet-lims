@@ -2,39 +2,14 @@ const { query } = require('../config/database');
 const { defaultCritical, normaReferenceNote } = require('../utils/reference-range');
 const { getNormaReference } = require('../utils/norma-cbc-references');
 const { DEFAULT_CBC_TEST_CODE, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
+const engine = require('./reference-range-engine.service');
 
-/** Prefer manually entered LIMS ranges over Norma-synced duplicates. */
-const LIMS_REF_PRIORITY_ORDER = `
-  CASE
-    WHEN trr.notes IS NOT NULL
-      AND trr.notes NOT LIKE 'Norma:%'
-      AND trr.notes NOT LIKE 'Synced from%' THEN 0
-    WHEN trr.notes IS NULL OR TRIM(trr.notes) = '' THEN 1
-    ELSE 2
-  END,
-  trr.id DESC`;
-
-const isManualLimsNotes = (notes) => {
-  const n = String(notes || '').trim();
-  if (!n) return false;
-  return !n.startsWith('Norma:') && !n.startsWith('Synced from');
-};
-
-const LIMS_REF_SELECT_SQL = `
-  trr.min_value AS trr_min,
-  trr.max_value AS trr_max,
-  trr.critical_low AS trr_critical_low,
-  trr.critical_high AS trr_critical_high,
-  trr.notes AS trr_notes`;
-
-const limsRefLateralJoin = (paramExpr = 'tp.id', speciesExpr = 'a.animal_type') => `
-  LEFT JOIN LATERAL (
-    SELECT min_value, max_value, critical_low, critical_high, notes
-    FROM test_reference_ranges trr
-    WHERE trr.parameter_id = ${paramExpr} AND trr.animal_type = ${speciesExpr}
-    ORDER BY ${LIMS_REF_PRIORITY_ORDER}
-    LIMIT 1
-  ) trr ON true`;
+const {
+  LIMS_REF_SELECT_SQL,
+  limsRefLateralJoin,
+  RANGE_PRIORITY_ORDER: LIMS_REF_PRIORITY_ORDER,
+  isManualLimsNotes,
+} = engine;
 
 const upsertReferenceRange = async ({
   parameterId,
@@ -239,18 +214,22 @@ const syncNormaProfileForAnimal = async (testCode, animalType) => {
   return { updated };
 };
 
-/** Manual LIMS reference range for a parameter + animal type. */
-const getLimsReferenceRange = async (parameterId, animalType) => {
-  if (!parameterId || !animalType) return null;
-  const result = await query(
-    `SELECT min_value, max_value, critical_low, critical_high, unit, notes
-     FROM test_reference_ranges trr
-     WHERE trr.parameter_id = $1 AND trr.animal_type = $2
-     ORDER BY ${LIMS_REF_PRIORITY_ORDER}
-     LIMIT 1`,
-    [parameterId, animalType]
-  );
-  return result.rows[0] || null;
+/** Manual LIMS reference range for a parameter + animal type (via Reference Range Engine). */
+const getLimsReferenceRange = async (parameterId, animalType, extras = {}) => {
+  const resolved = await engine.resolveReferenceRange({
+    parameter_id: parameterId,
+    animal_type: animalType,
+    ...extras,
+  });
+  if (!resolved || resolved.source === engine.RANGE_SOURCES.DEVICE) return null;
+  return {
+    min_value: resolved.min_value,
+    max_value: resolved.max_value,
+    critical_low: resolved.critical_low,
+    critical_high: resolved.critical_high,
+    unit: resolved.unit,
+    notes: resolved.notes,
+  };
 };
 
 const formatLimsRange = (range) => {
@@ -275,4 +254,5 @@ module.exports = {
   LIMS_REF_SELECT_SQL,
   limsRefLateralJoin,
   isManualLimsNotes,
+  LIMS_REF_PRIORITY_ORDER,
 };

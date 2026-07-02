@@ -148,6 +148,13 @@ router.delete('/sample-test/:id', authorize(PERMISSIONS.RESULTS_ENTER), async (r
   } catch (err) { next(err); }
 });
 
+router.patch('/attachments/:id', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
+  try {
+    const data = await service.updateAttachment(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.delete('/attachments/:id', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
   try {
     const data = await service.removeAttachment(req.params.id);

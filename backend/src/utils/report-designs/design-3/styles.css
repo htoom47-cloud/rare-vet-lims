@@ -794,4 +794,32 @@ body[dir='rtl'] {
     page-break-before: always;
     break-before: page;
   }
+
+  .section--images .image-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .report-image img {
+    max-width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .report-image figcaption {
+    font-size: 10px;
+    margin-top: 4px;
+    text-align: center;
+  }
+
+  .section__head--panel {
+    background: #f5f0e8;
+    font-weight: 700;
+    padding: 8px 12px;
+    border-bottom: 1px solid #ddd;
+  }
 }

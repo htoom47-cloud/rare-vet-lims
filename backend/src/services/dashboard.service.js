@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const { reconcileSampleStatuses } = require('./samples.service');
+const workflowEngine = require('./laboratory-workflow.service');
 
 /** Lab calendar day (Saudi Arabia) for dashboard “today” metrics. */
 const LAB_TZ = 'Asia/Riyadh';
@@ -118,6 +119,9 @@ const getStats = async () => {
       date: r.date,
       revenue: parseFloat(r.revenue || 0),
     })),
+    ...(workflowEngine.isEnabled()
+      ? { workflow: await workflowEngine.getWorkflowDashboardCounts() }
+      : {}),
   };
 };
 

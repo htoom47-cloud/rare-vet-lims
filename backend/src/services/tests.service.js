@@ -205,7 +205,35 @@ const addReferenceRange = async (parameterId, range) => upsertReferenceRange({
   notes: range.notes ?? null,
   source: 'manual',
   onlyIfMissing: false,
+  force: true,
 });
+
+const updateReferenceRange = async (rangeId, range) => {
+  const { defaultCritical } = require('../utils/reference-range');
+  const existing = await query('SELECT * FROM test_reference_ranges WHERE id = $1', [rangeId]);
+  if (!existing.rows[0]) throw new AppError('Reference range not found', 404, 'NOT_FOUND');
+
+  const min = range.min_value;
+  const max = range.max_value;
+  if (min == null || max == null) throw new AppError('Min and max values required', 400, 'VALIDATION');
+
+  const crit = defaultCritical(min, max);
+  const result = await query(
+    `UPDATE test_reference_ranges
+     SET min_value = $1, max_value = $2, critical_low = $3, critical_high = $4,
+         unit = COALESCE($5, unit), notes = $6
+     WHERE id = $7 RETURNING *`,
+    [min, max, range.critical_low ?? crit.crit_low, range.critical_high ?? crit.crit_high,
+      range.unit, range.notes ?? null, rangeId]
+  );
+  return result.rows[0];
+};
+
+const deleteReferenceRange = async (rangeId) => {
+  const result = await query('DELETE FROM test_reference_ranges WHERE id = $1 RETURNING id', [rangeId]);
+  if (!result.rows[0]) throw new AppError('Reference range not found', 404, 'NOT_FOUND');
+  return { deleted: true };
+};
 
 const deleteTest = async (id) => {
   await getById(id);
@@ -294,6 +322,7 @@ const deletePackage = async (id) => {
 module.exports = {
   listCategories, getCategoryById, createCategory, updateCategory, deleteCategory,
   list, getById, create, update, deleteTest,
-  addParameter, updateParameter, deleteParameter, addReferenceRange,
+  addParameter, updateParameter, deleteParameter,
+  addReferenceRange, updateReferenceRange, deleteReferenceRange,
   listPackages, getPackageById, createPackage, updatePackage, deletePackage,
 };

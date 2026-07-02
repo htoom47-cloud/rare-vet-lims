@@ -91,6 +91,22 @@ const env = {
   },
   portal: {
     staticOtp: resolvePortalStaticOtp(),
+    /** When true, preliminary validated reports (reviewed) appear in customer portal */
+    showReviewed: process.env.PORTAL_SHOW_REVIEWED === 'true',
+  },
+  workflow: {
+    enabled: process.env.WORKFLOW_ENGINE_ENABLED === 'true',
+  },
+  backup: {
+    uploads: {
+      enabled: process.env.UPLOAD_BACKUP_ENABLED === 'true',
+      dir: process.env.UPLOAD_BACKUP_DIR || './backups/uploads',
+      retentionDays: parseInt(process.env.UPLOAD_BACKUP_RETENTION_DAYS || '14', 10),
+      s3Prefix: process.env.UPLOAD_BACKUP_S3_PREFIX || 'backups/uploads',
+    },
+  },
+  database: {
+    sslRejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
   },
   notifications: {
     provider: process.env.NOTIFICATION_PROVIDER || 'msegat',

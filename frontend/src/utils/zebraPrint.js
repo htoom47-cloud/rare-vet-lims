@@ -1,4 +1,5 @@
 import { buildThermalLabelContent } from './labelPanel';
+import { encodeCode128C } from './barcodeScan';
 
 const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
 
@@ -129,14 +130,15 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
-/** Vertical layout — barcode size unchanged; text rows below. */
+/** Vertical layout v6 — readable Arabic + 12-digit ID; barcode tuned for 50 mm. */
 const LAYOUT = {
-  barcodeY: 8,
-  barcodeHeight: 68,
-  digitsY: 80,
-  sampleY: 96,
-  animalY: 112,
-  testY: 128,
+  barcodeY: 2,
+  barcodeHeight: 52,
+  digitsY: 58,
+  customerY: 76,
+  animalY: 94,
+  dateY: 112,
+  testY: 130,
 };
 
 const zplEscape = (value) => String(value ?? '')
@@ -144,12 +146,8 @@ const zplEscape = (value) => String(value ?? '')
   .replace(/\^/g, '\\^')
   .replace(/~/g, '\\~');
 
-/** Digits-only for compact Code128-C on 50 mm (scanner reads numbers; LIMS matches full BC-/SMP-). */
-export const thermalScanDigits = (barcode) => {
-  let digits = String(barcode || '').replace(/\D/g, '');
-  if (digits.length % 2 === 1) digits = `0${digits}`;
-  return digits;
-};
+/** Code128-C payload — even length; display digits on label stay unpadded. */
+export const thermalScanDigits = (barcode) => encodeCode128C(barcode);
 
 const code128CModules = (digits) => {
   const pairs = String(digits).length / 2;
@@ -158,7 +156,7 @@ const code128CModules = (digits) => {
 
 const zplLandscapeHeader = () => [
   '^XA',
-  '^FX LIMS label v5 professional',
+  '^FX LIMS label v6 readable',
   '^CI28',
   '^MTD',
   '^MD35',
@@ -175,9 +173,9 @@ const zplLandscapeHeader = () => [
 
 const field = (zpl) => `^FWN${zpl}`;
 
-const FONT_DIGITS = '^A0N,16,15';
-const FONT_LINE = '^A0N,13,12';
-const FONT_LINE_BOLD = '^A0N,13,13';
+const FONT_DIGITS = '^A0N,24,22';
+const FONT_LINE = '^A0N,16,14';
+const FONT_LINE_BOLD = '^A0N,16,16';
 
 const textLine = (y, value, font = FONT_LINE) => (
   field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
@@ -197,7 +195,7 @@ export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
   buildThermalLabelContent(sample, { isArabic })
 );
 
-/** ZPL for Zebra ZD421 50×25 mm — professional lab layout. */
+/** ZPL for Zebra ZD421 50×25 mm — Barcode Engine layout (Arabic text outside ^BC). */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
   const content = buildThermalLabelContent(sample, { isArabic });
   const lines = [...zplLandscapeHeader()];
@@ -207,11 +205,14 @@ export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
     if (content.barcodeDigits) {
       lines.push(textLine(LAYOUT.digitsY, content.barcodeDigits, FONT_DIGITS));
     }
-    if (content.sampleLine) {
-      lines.push(textLine(LAYOUT.sampleY, content.sampleLine, FONT_LINE_BOLD));
+    if (content.customerLine) {
+      lines.push(textLine(LAYOUT.customerY, content.customerLine, FONT_LINE));
     }
     if (content.animalLine) {
       lines.push(textLine(LAYOUT.animalY, content.animalLine, FONT_LINE));
+    }
+    if (content.dateLine) {
+      lines.push(textLine(LAYOUT.dateY, content.dateLine, FONT_LINE));
     }
     if (content.testLine) {
       lines.push(textLine(LAYOUT.testY, content.testLine, FONT_LINE_BOLD));

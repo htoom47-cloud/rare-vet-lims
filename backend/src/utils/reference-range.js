@@ -72,6 +72,7 @@ const resolveLimsReferenceBounds = (row) => ({
 });
 
 const formatLimsRangeDisplay = (row) => {
+  if (row?.trr_text_reference) return String(row.trr_text_reference).trim();
   if (!hasLimsReferenceRow(row)) return null;
   const note = row?.trr_notes != null ? String(row.trr_notes).trim() : '';
   if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:') && !/^LIMS /i.test(note)) return note;
@@ -86,17 +87,15 @@ const formatLimsRangeDisplay = (row) => {
 /** UI/workbench reference — LIMS manual ranges for camel, horse, sheep, goat. */
 const resolveLimsReferenceDisplay = (row) => formatLimsRangeDisplay(row);
 
-/** Report bounds: LIMS manual ranges first (إبل، خيل، غنم، ماعز). */
-const resolveReportReferenceBounds = (row) => {
-  if (hasLimsReferenceRow(row)) {
-    const lims = resolveLimsReferenceBounds(row);
-    return { min: lims.min, max: lims.max };
-  }
-  return { min: null, max: null };
-};
+/** @deprecated Prefer reference-range-engine.service — lazy delegate avoids circular import. */
+const resolveReportReferenceBounds = (row) => (
+  require('../services/reference-range-engine.service').resolveReportReferenceBounds(row)
+);
 
-/** Report reference column: LIMS manual ranges when configured. */
-const resolveReportReferenceDisplay = (row) => resolveLimsReferenceDisplay(row);
+/** Report reference column — delegated to Reference Range Engine. */
+const resolveReportReferenceDisplay = (row) => (
+  require('../services/reference-range-engine.service').resolveReportReferenceDisplay(row)
+);
 
 /** @deprecated use resolveLimsReferenceDisplay — kept for imports that expect the old name */
 const resolveNormaReferenceOnly = (row) => resolveLimsReferenceDisplay(row);

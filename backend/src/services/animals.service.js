@@ -90,4 +90,45 @@ const remove = async (id) => {
   return { message: 'Animal deactivated' };
 };
 
-module.exports = { list, getById, getHistory, create, update, updateImage, remove };
+const getResultTrends = async (animalId, { test_code, parameter_code } = {}) => {
+  await getById(animalId);
+  const params = [animalId];
+  let testFilter = '';
+  if (test_code) {
+    params.push(test_code);
+    testFilter = ` AND t.code = $${params.length}`;
+  }
+  let paramFilter = '';
+  if (parameter_code) {
+    params.push(parameter_code);
+    paramFilter = ` AND tp.code = $${params.length}`;
+  }
+
+  const result = await query(
+    `SELECT s.id AS sample_id, s.sample_code, s.completed_date,
+            t.code AS test_code, t.name AS test_name, t.name_ar AS test_name_ar,
+            tp.code AS parameter_code, tp.name AS parameter_name, tp.name_ar AS parameter_name_ar,
+            tp.unit, rv.value, rv.numeric_value, rv.flag,
+            trr.min_value AS ref_min, trr.max_value AS ref_max
+     FROM samples s
+     JOIN sample_tests st ON st.sample_id = s.id
+     JOIN tests t ON t.id = st.test_id
+     JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
+     JOIN result_values rv ON rv.result_id = res.id
+     JOIN test_parameters tp ON tp.id = rv.parameter_id
+     JOIN animals a ON a.id = s.animal_id
+     LEFT JOIN LATERAL (
+       SELECT min_value, max_value FROM test_reference_ranges trr
+       WHERE trr.parameter_id = tp.id AND trr.animal_type = a.animal_type
+         AND (trr.is_active IS NULL OR trr.is_active = true)
+       ORDER BY trr.id DESC LIMIT 1
+     ) trr ON true
+     WHERE s.animal_id = $1 AND s.status = 'completed'${testFilter}${paramFilter}
+     ORDER BY s.completed_date ASC, tp.sort_order`,
+    params
+  );
+
+  return result.rows;
+};
+
+module.exports = { list, getById, getHistory, create, update, updateImage, remove, getResultTrends };

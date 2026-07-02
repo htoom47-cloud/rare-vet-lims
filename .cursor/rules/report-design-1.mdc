@@ -35,3 +35,4 @@ Phrases: **تصميم التقرير رقم 1**, **report design 1**, **design #
 
 - `backend/src/utils/pdf.js` → delegates to `report-designs` registry
 - Default design id: **1**
+- **Single-page mode** (CBC ≤34 rows, no images): `layout-mode.js` + `design-1-single-page.js` — one unified table, compact header, abnormal summary inline

@@ -1,22 +1,40 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, Search } from 'lucide-react';
+import { Plus, Search, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
+import Modal from '../components/ui/Modal';
 import { devicesAPI } from '../services/api';
-import { ANIMAL_TYPE_CODES, ANIMAL_TYPES, animalTypeLabel } from '../constants/animalTypes';
+import { useAuth } from '../context/AuthContext';
+import { ANIMAL_TYPE_CODES, animalTypeLabel } from '../constants/animalTypes';
 
 const SPECIES_OPTIONS = ANIMAL_TYPE_CODES.filter((c) => c !== 'other');
 
+const emptyForm = () => ({
+  device_name: 'Norma CBC',
+  parameter_code: '',
+  parameter_name: '',
+  species: 'camel',
+  unit: '',
+  low_value: '',
+  high_value: '',
+  reference_text: '',
+});
+
 export default function DeviceReferenceRanges() {
   const { t, i18n } = useTranslation();
+  const { hasPermission } = useAuth();
   const isAr = i18n.language === 'ar';
+  const canManage = hasPermission('devices.manage');
+
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm());
   const [filters, setFilters] = useState({
-    device_name: 'Norma',
+    device_name: '',
     species: '',
     search: '',
   });
@@ -41,21 +59,52 @@ export default function DeviceReferenceRanges() {
 
   useEffect(() => { load(); }, [load]);
 
-  const runSync = async () => {
-    setSyncing(true);
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingId(null);
+    setForm(emptyForm());
+  };
+
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormOpen(true);
+  };
+
+  const openEdit = (row) => {
+    setEditingId(row.id);
+    setForm({
+      device_name: row.device_name || 'Norma CBC',
+      parameter_code: row.parameter_code || '',
+      parameter_name: row.parameter_name || '',
+      species: row.species || 'camel',
+      unit: row.unit || '',
+      low_value: row.low_value ?? '',
+      high_value: row.high_value ?? '',
+      reference_text: row.reference_text || '',
+    });
+    setFormOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      ...form,
+      low_value: form.low_value !== '' ? Number(form.low_value) : null,
+      high_value: form.high_value !== '' ? Number(form.high_value) : null,
+    };
     try {
-      const { data } = await devicesAPI.syncReferenceRanges({ hours: 24 });
-      const s = data.data;
-      toast.success(
-        isAr
-          ? `تمت المزامنة: ${s.inserted} جديد، ${s.updated} محدّث`
-          : `Synced: ${s.inserted} new, ${s.updated} updated`
-      );
+      if (editingId) {
+        await devicesAPI.updateReferenceRange(editingId, payload);
+        toast.success(t('deviceRefRanges.updated'));
+      } else {
+        await devicesAPI.createReferenceRange(payload);
+        toast.success(t('deviceRefRanges.created'));
+      }
+      closeForm();
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('common.error'));
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -77,7 +126,7 @@ export default function DeviceReferenceRanges() {
     { key: 'unit', label: isAr ? 'الوحدة' : 'Unit', render: (r) => r.unit || '—' },
     {
       key: 'reference_text',
-      label: isAr ? 'OBX-7 (Norma)' : 'OBX-7',
+      label: isAr ? 'المدى المرجعي' : 'Ref. Range',
       render: (r) => r.reference_text || '—',
     },
     {
@@ -91,35 +140,34 @@ export default function DeviceReferenceRanges() {
       render: (r) => (r.high_value != null ? Number(r.high_value) : '—'),
     },
     { key: 'source', label: isAr ? 'المصدر' : 'Source' },
-    {
-      key: 'last_synced_at',
-      label: isAr ? 'آخر تحديث' : 'Last sync',
-      render: (r) => r.last_synced_at ? new Date(r.last_synced_at).toLocaleString() : '—',
-    },
+    ...(canManage ? [{
+      key: 'actions',
+      label: t('common.actions'),
+      render: (r) => (
+        <button
+          type="button"
+          onClick={() => openEdit(r)}
+          className="text-primary-600 text-sm flex items-center gap-1"
+        >
+          <Pencil size={14} /> {t('common.edit')}
+        </button>
+      ),
+    }] : []),
   ];
 
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold">
-            {isAr ? 'معدلات الأجهزة الطبيعية' : 'Device Reference Ranges'}
-          </h1>
-          <p className="text-sm text-primary-500 mt-1">
-            {isAr
-              ? 'المعدلات المستوردة من Norma CBC — تُحدَّث تلقائياً عند كل استيراد ويومياً الساعة 2 صباحاً'
-              : 'Ranges from Norma CBC — updated on each import and daily at 2 AM'}
-          </p>
+          <h1 className="text-2xl font-bold">{t('nav.deviceRefRanges')}</h1>
+          <p className="text-sm text-primary-500 mt-1">{t('deviceRefRanges.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          onClick={runSync}
-          disabled={syncing}
-          className="btn-primary flex items-center gap-2"
-        >
-          <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
-          {isAr ? 'مزامنة الآن' : 'Sync now'}
-        </button>
+        {canManage && (
+          <button type="button" onClick={openAdd} className="btn-primary flex items-center gap-2">
+            <Plus size={18} />
+            {t('deviceRefRanges.add')}
+          </button>
+        )}
       </div>
 
       <div className="card p-4 mb-4 flex flex-wrap gap-3 items-end">
@@ -129,6 +177,7 @@ export default function DeviceReferenceRanges() {
             className="input-field w-40"
             value={filters.device_name}
             onChange={(e) => setFilters((f) => ({ ...f, device_name: e.target.value }))}
+            placeholder={isAr ? 'الكل' : 'All'}
           />
         </div>
         <div>
@@ -167,7 +216,117 @@ export default function DeviceReferenceRanges() {
         {isAr ? 'سجل' : 'records'}
       </p>
 
-      <DataTable columns={columns} data={rows} loading={loading} emptyMessage={isAr ? 'لا توجد معدلات بعد — أرسل CBC من Norma' : 'No ranges yet — send CBC from Norma'} />
+      <DataTable
+        columns={columns}
+        data={rows}
+        loading={loading}
+        emptyMessage={t('deviceRefRanges.empty')}
+      />
+
+      <Modal
+        isOpen={formOpen}
+        onClose={closeForm}
+        title={editingId ? t('deviceRefRanges.edit') : t('deviceRefRanges.add')}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">{isAr ? 'الجهاز' : 'Device'}</label>
+            <input
+              value={form.device_name}
+              onChange={(e) => setForm({ ...form, device_name: e.target.value })}
+              className="input-field"
+              required
+              disabled={!!editingId}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{isAr ? 'كود المعامل' : 'Parameter code'}</label>
+              <input
+                value={form.parameter_code}
+                onChange={(e) => setForm({ ...form, parameter_code: e.target.value })}
+                className="input-field"
+                required
+                disabled={!!editingId}
+                placeholder="WBC"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{isAr ? 'اسم المعامل' : 'Parameter name'}</label>
+              <input
+                value={form.parameter_name}
+                onChange={(e) => setForm({ ...form, parameter_name: e.target.value })}
+                className="input-field"
+                placeholder="White Blood Cells"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{isAr ? 'النوع' : 'Species'}</label>
+              <select
+                value={form.species}
+                onChange={(e) => setForm({ ...form, species: e.target.value })}
+                className="input-field"
+                required
+                disabled={!!editingId}
+              >
+                {SPECIES_OPTIONS.map((code) => (
+                  <option key={code} value={code}>{animalTypeLabel(code, isAr)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{isAr ? 'الوحدة' : 'Unit'}</label>
+              <input
+                value={form.unit}
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                className="input-field"
+                placeholder="10^3/uL"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{isAr ? 'الحد الأدنى' : 'Low'}</label>
+              <input
+                type="number"
+                step="any"
+                value={form.low_value}
+                onChange={(e) => setForm({ ...form, low_value: e.target.value })}
+                className="input-field"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{isAr ? 'الحد الأعلى' : 'High'}</label>
+              <input
+                type="number"
+                step="any"
+                value={form.high_value}
+                onChange={(e) => setForm({ ...form, high_value: e.target.value })}
+                className="input-field"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{isAr ? 'نص المدى المرجعي' : 'Reference text'}</label>
+            <input
+              value={form.reference_text}
+              onChange={(e) => setForm({ ...form, reference_text: e.target.value })}
+              className="input-field"
+              placeholder="6.0-17.0"
+            />
+            <p className="text-xs text-gray-500 mt-1">{t('deviceRefRanges.refTextHint')}</p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={closeForm} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="submit" className="btn-primary">{t('common.save')}</button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

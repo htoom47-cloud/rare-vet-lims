@@ -1,11 +1,13 @@
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const { barcodeLookupSql } = require('../utils/barcode-lookup');
-const { generateCode, paginate, buildPagination } = require('../utils/helpers');
+const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
+const { normalizeSampleScanId } = require('../utils/barcode-scan');
+const { generateSampleDigitsId, paginate, buildPagination } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
 const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
 const { resolveSampleTestIds } = require('../utils/packageTests');
 const autoInvoice = require('./auto-invoice.service');
+const workflowEngine = require('./laboratory-workflow.service');
 const { uuidv4 } = require('../utils/uuid');
 
 const list = async ({ status, search, awaiting_validation, page, limit }) => {
@@ -91,7 +93,7 @@ const getById = async (id) => {
   );
 
   const row = result.rows[0];
-  return {
+  const payload = {
     ...row,
     tests: tests.rows,
     workflow: {
@@ -104,11 +106,26 @@ const getById = async (id) => {
       sent_to_customer: parseInt(row.notifications_count, 10) > 0,
     },
   };
+
+  if (workflowEngine.isEnabled()) {
+    try {
+      payload.workflowSummary = await workflowEngine.getWorkflowSummary(id, { skipTimeline: false });
+    } catch (err) {
+      payload.workflowSummary = { enabled: true, error: err.message };
+    }
+  }
+
+  return payload;
 };
 
 const getByBarcode = async (barcode) => {
-  const id = String(barcode || '').trim();
-  const result = await query(`SELECT id FROM samples WHERE ${barcodeLookupSql()}`, [id]);
+  const raw = String(barcode || '').trim();
+  const id = normalizeSampleScanId(raw) || raw;
+  if (!id) throw new AppError('Sample not found', 404, 'NOT_FOUND');
+  const result = await query(
+    `SELECT id FROM samples s WHERE ${barcodeLookupSql('s')} ORDER BY ${barcodeLookupOrderSql('s')} LIMIT 1`,
+    [id]
+  );
   if (!result.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');
   return getById(result.rows[0].id);
 };
@@ -118,8 +135,24 @@ const create = async (data, userId) => {
   try {
     await client.query('BEGIN');
 
-    const sampleCode = generateCode('SMP');
-    const barcode = generateCode('BC');
+    let sampleDigits = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = generateSampleDigitsId();
+      // eslint-disable-next-line no-await-in-loop
+      const exists = await client.query(
+        'SELECT 1 FROM samples WHERE sample_code = $1 OR barcode = $1 LIMIT 1',
+        [candidate]
+      );
+      if (!exists.rows.length) {
+        sampleDigits = candidate;
+        break;
+      }
+    }
+    if (!sampleDigits) {
+      throw new AppError('Could not generate unique sample ID', 500, 'SAMPLE_ID_COLLISION');
+    }
+    const sampleCode = sampleDigits;
+    const barcode = sampleDigits;
 
     const sampleResult = await client.query(
       `INSERT INTO samples (id, sample_code, barcode, customer_id, animal_id, department, priority, notes, status, created_by)
@@ -335,4 +368,16 @@ const getBarcode = async (id, format = 'code128') => {
   return { barcode: sample.barcode, sample_code: sample.sample_code, image: barcodeImage };
 };
 
-module.exports = { list, getById, getByBarcode, create, updateStatus, reconcileSampleStatuses, getQueue, getParasitologyQueue, getBarcode };
+module.exports = {
+  list,
+  getById,
+  getByBarcode,
+  create,
+  updateStatus,
+  reconcileSampleStatuses,
+  getQueue,
+  getParasitologyQueue,
+  getBarcode,
+  getWorkflowSummary: (id) => workflowEngine.getWorkflowSummary(id),
+  advanceWorkflow: (id, action, ctx) => workflowEngine.moveToNextStep(id, action, ctx),
+};

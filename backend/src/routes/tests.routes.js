@@ -134,6 +134,20 @@ router.post('/parameters/:parameterId/ranges', authorize(PERMISSIONS.TESTS_MANAG
   } catch (err) { next(err); }
 });
 
+router.put('/parameters/ranges/:rangeId', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.updateReferenceRange(req.params.rangeId, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/parameters/ranges/:rangeId', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.deleteReferenceRange(req.params.rangeId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.post('/reference-ranges/sync-from-sample/:sampleId', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
   try {
     const { syncLimsRefsFromSample } = require('../services/reference-ranges.service');

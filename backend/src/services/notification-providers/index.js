@@ -1,10 +1,14 @@
 const env = require('../../config/env');
 const twilio = require('./twilio.provider');
 const msegat = require('./msegat.provider');
+const email = require('./email.provider');
 
-const providers = { twilio, msegat };
+const providers = { twilio, msegat, email };
 
 const send = async (payload) => {
+  if (payload.channel === 'email') {
+    return email.send(payload);
+  }
   if (payload.channel === 'whatsapp') {
     return twilio.send(payload);
   }

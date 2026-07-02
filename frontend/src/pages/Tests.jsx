@@ -60,6 +60,7 @@ export default function Tests() {
 
   const [rangeOpen, setRangeOpen] = useState(false);
   const [rangeParam, setRangeParam] = useState(null);
+  const [editingRangeId, setEditingRangeId] = useState(null);
   const [rangeForm, setRangeForm] = useState(emptyRangeForm());
 
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
@@ -239,20 +240,64 @@ export default function Tests() {
     }
   };
 
-  const handleAddRange = async (e) => {
+  const openAddRange = (param) => {
+    setEditingRangeId(null);
+    setRangeParam(param);
+    setRangeForm({ ...emptyRangeForm(), unit: param.unit || '' });
+    setRangeOpen(true);
+  };
+
+  const openEditRange = (param, range) => {
+    setEditingRangeId(range.id);
+    setRangeParam(param);
+    setRangeForm({
+      animal_type: range.animal_type || 'camel',
+      min_value: range.min_value ?? '',
+      max_value: range.max_value ?? '',
+      critical_low: range.critical_low ?? '',
+      critical_high: range.critical_high ?? '',
+      unit: range.unit || param.unit || '',
+      notes: range.notes || '',
+    });
+    setRangeOpen(true);
+  };
+
+  const closeRangeModal = () => {
+    setRangeOpen(false);
+    setEditingRangeId(null);
+    setRangeForm(emptyRangeForm());
+  };
+
+  const handleRangeSubmit = async (e) => {
     e.preventDefault();
     if (!rangeParam?.id) return;
+    const payload = {
+      ...rangeForm,
+      min_value: rangeForm.min_value !== '' ? Number(rangeForm.min_value) : null,
+      max_value: rangeForm.max_value !== '' ? Number(rangeForm.max_value) : null,
+      critical_low: rangeForm.critical_low !== '' ? Number(rangeForm.critical_low) : null,
+      critical_high: rangeForm.critical_high !== '' ? Number(rangeForm.critical_high) : null,
+    };
     try {
-      await testsAPI.addReferenceRange(rangeParam.id, {
-        ...rangeForm,
-        min_value: rangeForm.min_value !== '' ? Number(rangeForm.min_value) : null,
-        max_value: rangeForm.max_value !== '' ? Number(rangeForm.max_value) : null,
-        critical_low: rangeForm.critical_low !== '' ? Number(rangeForm.critical_low) : null,
-        critical_high: rangeForm.critical_high !== '' ? Number(rangeForm.critical_high) : null,
-      });
-      toast.success(t('tests.rangeAdded'));
-      setRangeOpen(false);
-      setRangeForm(emptyRangeForm());
+      if (editingRangeId) {
+        await testsAPI.updateReferenceRange(editingRangeId, payload);
+        toast.success(t('tests.rangeUpdated'));
+      } else {
+        await testsAPI.addReferenceRange(rangeParam.id, payload);
+        toast.success(t('tests.rangeAdded'));
+      }
+      closeRangeModal();
+      await loadDetail(detail.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const handleDeleteRange = async (range) => {
+    if (!window.confirm(t('tests.confirmDeleteRange'))) return;
+    try {
+      await testsAPI.deleteReferenceRange(range.id);
+      toast.success(t('tests.rangeDeleted'));
       await loadDetail(detail.id);
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -1009,11 +1054,7 @@ export default function Tests() {
                             )}
                             <button
                               type="button"
-                              onClick={() => {
-                                setRangeParam(param);
-                                setRangeForm({ ...emptyRangeForm(), unit: param.unit || '' });
-                                setRangeOpen(true);
-                              }}
+                              onClick={() => openAddRange(param)}
                               className="text-primary-600 text-sm"
                             >
                               + {t('tests.addRange')}
@@ -1032,6 +1073,7 @@ export default function Tests() {
                                 <th className="text-start py-1">{t('tests.criticalLow')}</th>
                                 <th className="text-start py-1">{t('tests.criticalHigh')}</th>
                                 <th className="text-start py-1">{t('tests.unit')}</th>
+                                {canManage && <th className="text-start py-1">{t('common.actions')}</th>}
                               </tr>
                             </thead>
                             <tbody>
@@ -1043,6 +1085,26 @@ export default function Tests() {
                                   <td className="py-1.5 text-amber-600">{range.critical_low ?? '—'}</td>
                                   <td className="py-1.5 text-red-600">{range.critical_high ?? '—'}</td>
                                   <td className="py-1.5">{range.unit || '—'}</td>
+                                  {canManage && (
+                                    <td className="py-1.5">
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRange(param, range)}
+                                          className="text-primary-600 text-sm flex items-center gap-1"
+                                        >
+                                          <Pencil size={14} /> {t('common.edit')}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteRange(range)}
+                                          className="text-red-600 text-sm flex items-center gap-1"
+                                        >
+                                          <Trash2 size={14} /> {t('common.delete')}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  )}
                                 </tr>
                               ))}
                             </tbody>
@@ -1122,15 +1184,21 @@ export default function Tests() {
         </form>
       </Modal>
 
-      {/* إضافة مدى مرجعي */}
-      <Modal isOpen={rangeOpen} onClose={() => setRangeOpen(false)} title={t('tests.addRange')} size="md">
-        <form onSubmit={handleAddRange} className="space-y-4">
+      {/* إضافة / تعديل مدى مرجعي */}
+      <Modal isOpen={rangeOpen} onClose={closeRangeModal} title={editingRangeId ? t('tests.editRange') : t('tests.addRange')} size="md">
+        <form onSubmit={handleRangeSubmit} className="space-y-4">
           <p className="text-sm text-gray-500">
             {rangeParam && (i18n.language === 'ar' && rangeParam.name_ar ? rangeParam.name_ar : rangeParam.name)}
           </p>
           <div>
             <label className="block text-sm font-medium mb-1">{t('tests.animalType')}</label>
-            <select value={rangeForm.animal_type} onChange={(e) => setRangeForm({ ...rangeForm, animal_type: e.target.value })} className="input-field" required>
+            <select
+              value={rangeForm.animal_type}
+              onChange={(e) => setRangeForm({ ...rangeForm, animal_type: e.target.value })}
+              className="input-field"
+              required
+              disabled={!!editingRangeId}
+            >
               {ANIMAL_TYPE_CODES.map((type) => (
                 <option key={type} value={type}>{t(`animals.types.${type}`)}</option>
               ))}
@@ -1158,7 +1226,7 @@ export default function Tests() {
             <input value={rangeForm.notes} onChange={(e) => setRangeForm({ ...rangeForm, notes: e.target.value })} className="input-field" />
           </div>
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setRangeOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
+            <button type="button" onClick={closeRangeModal} className="btn-secondary">{t('common.cancel')}</button>
             <button type="submit" className="btn-primary">{t('common.save')}</button>
           </div>
         </form>

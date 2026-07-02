@@ -1,7 +1,11 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const resultsService = require('./results.service');
-const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
+const {
+  NORMA_CBC_PCT_BY_ABS,
+  DEFAULT_CBC_TEST_CODE,
+} = require('../utils/norma-cbc-map');
+const mappingEngine = require('./device-mapping-engine.service');
 const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
 const { normalizeSampleScanId } = require('../utils/barcode-scan');
 const { normaReferenceNote } = require('../utils/reference-range');
@@ -9,7 +13,9 @@ const { mapNormaSpeciesToRefSpeciesExact, normalizeSpeciesKey } = require('../ut
 const normaRefDebug = require('./norma-ref-debug.service');
 const logger = require('../config/logger');
 
-const resultLimsCode = (row) => resolveNormaResultLimsCode(row) || row.code;
+const resultLimsCode = (row) => (
+  mappingEngine.resolveSystemParameterCodeSync(row) || row.code
+);
 
 /** Copy Norma OBX-7 notes onto enriched rows that lack them (computed % / #). */
 const attachNormaNotesFromResults = (results, values, paramIdToCode) => {
@@ -131,8 +137,21 @@ const findSampleTest = async (sampleId, testCode = DEFAULT_CBC_TEST_CODE) => {
   return result.rows[0] || null;
 };
 
-const resolveParameter = async (testCode, deviceCode) => {
-  const limsCode = mapNormaCode(deviceCode);
+const deviceMappings = require('./device-parameter-mappings.service');
+
+const resolveParameter = async (testCode, deviceCode, device) => {
+  const mapping = await mappingEngine.resolveDeviceParameterMapping(
+    device?.id,
+    deviceCode,
+    { deviceName: device?.name }
+  );
+  const limsCode = mapping?.system_parameter_code
+    || await deviceMappings.resolveLimsCode({
+      deviceId: device?.id,
+      deviceName: device?.name,
+      deviceParameterCode: deviceCode,
+    });
+  if (!limsCode) return null;
   const result = await query(
     `SELECT tp.id, tp.code, tp.name
      FROM test_parameters tp
@@ -163,7 +182,7 @@ const resolveNormaSpecies = (parsed, limsAnimalType) => {
 };
 
 const importCbcResults = async ({
-  sampleId, results, testCode = DEFAULT_CBC_TEST_CODE, deviceName, parsed,
+  sampleId, results, testCode = DEFAULT_CBC_TEST_CODE, deviceName, parsed, device,
 }) => {
   const sampleTest = await findSampleTest(sampleId, testCode);
   if (!sampleTest) {
@@ -189,11 +208,32 @@ const importCbcResults = async ({
 
   const values = [];
   const skipped = [];
+  const mappingWarnings = [];
   const paramIdToCode = new Map();
 
   for (const row of results) {
-    const limsCode = resultLimsCode(row);
-    const param = await resolveParameter(testCode, limsCode);
+    const mapped = await mappingEngine.mapDeviceResultToSystemParameter(row, {
+      deviceId: device?.id,
+      deviceName: device?.name,
+      testCode,
+    });
+    const validation = mappingEngine.validateMappedDeviceResult(mapped);
+
+    if (!validation.valid) {
+      const label = row.code || row.limsCode || 'unknown';
+      skipped.push(validation.ignored ? `${label} (${validation.reason})` : label);
+      if (!validation.ignored) {
+        mappingWarnings.push({ code: label, reason: validation.reason });
+        logger.warn('Device mapping validation failed', { code: label, reason: validation.reason });
+      }
+      continue;
+    }
+
+    const limsCode = mapped.system_parameter_code;
+    const param = mapped.system_parameter_id
+      ? { id: mapped.system_parameter_id, code: limsCode, name: limsCode }
+      : await resolveParameter(testCode, row.code || limsCode, device);
+
     if (!param) {
       skipped.push(row.code || row.limsCode);
       continue;
@@ -272,6 +312,7 @@ const importCbcResults = async ({
     imported: mergedValues.length,
     added: values.length,
     skipped,
+    mapping_warnings: mappingWarnings,
     reference_animal_type: species,
     norma_animal_type: species,
     norma_species_raw: speciesRaw,
@@ -296,6 +337,7 @@ const importFromParsed = async (parsed, device) => {
     testCode,
     deviceName: device?.name,
     parsed,
+    device,
   });
 
   return {

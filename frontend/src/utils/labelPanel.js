@@ -1,4 +1,9 @@
 /** Panel grouping + display text for barcode labels (50×25 mm). */
+import {
+  displaySampleId,
+  encodeCode128C,
+} from './barcodeScan';
+import { animalTypeLabel } from '../constants/animalTypes';
 
 /** Short English codes printed on thermal labels (Zebra 50×25 mm). */
 export const PANEL_CODES = {
@@ -65,7 +70,7 @@ export const sortPanelKeys = (keys) => [...keys].sort((a, b) => {
 });
 
 export const buildLabelLines = (sample, { isArabic = false, panelKey = null } = {}) => {
-  const barcode = String(sample?.barcode || sample?.sample_code || '').trim();
+  const barcode = displaySampleId(sample?.sample_code || sample?.barcode);
   const animalLine = [sample?.animal_code, sample?.animal_name].filter(Boolean).join(' · ');
 
   let panel = panelKey;
@@ -90,8 +95,11 @@ export const buildLabelLines = (sample, { isArabic = false, panelKey = null } = 
   };
 };
 
-/** Digits printed under barcode (human-readable; no Code128-C odd padding). */
-export const barcodeDisplayDigits = (barcode) => String(barcode || '').replace(/\D/g, '');
+/** Human-readable digits under barcode — matches Norma / LIMS (no Code128-C pad). */
+export const barcodeDisplayDigits = (barcode) => displaySampleId(barcode);
+
+/** Code128-C value for thermal printers and HTML preview. */
+export const barcodeEncodeDigits = (barcode) => encodeCode128C(barcode);
 
 /** Truncate with ... suffix for 50 mm thermal labels. */
 export const truncateLabel = (text, max) => {
@@ -129,25 +137,50 @@ export const formatTestsForLabel = (sample, { isArabic = false } = {}) => {
   return keys.map((k) => panelFriendlyName(k, isArabic)).join(' + ');
 };
 
-/** Full thermal label text blocks (Zebra + HTML preview). */
+/** Full thermal label text blocks (Zebra + HTML preview) — matches barcode-engine.service.js */
 export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => {
-  const barcode = String(sample?.barcode || '').trim();
-  const sampleCode = String(sample?.sample_code || '').trim();
-  const animalName = String(sample?.animal_name || sample?.name_tag || '').trim();
-  const testsSummary = formatTestsForLabel(sample, { isArabic });
+  const id = displaySampleId(sample?.sample_code || sample?.barcode);
+  const samplePrefix = isArabic ? 'رقم العينة' : 'Sample ID';
+  const customerPrefix = isArabic ? 'العميل' : 'Client';
+  const animalPrefix = isArabic ? 'الحيوان' : 'Animal';
+  const typePrefix = isArabic ? 'النوع' : 'Type';
+  const datePrefix = isArabic ? 'التاريخ' : 'Date';
+  const testPrefix = isArabic ? 'الفحص' : 'Test';
 
-  const samplePrefix = isArabic ? 'رقم العينة:' : 'Sample:';
-  const animalPrefix = isArabic ? 'اسم الحيوان:' : 'Animal:';
-  const testPrefix = isArabic ? 'نوع الفحص:' : 'Test:';
+  const customerName = String(sample?.customer_name_ar || sample?.customer_name || '').trim();
+  const animalName = String(sample?.animal_name || sample?.name_tag || '').trim();
+  const animalType = animalTypeLabel(sample?.animal_type, isArabic);  const testsSummary = formatTestsForLabel(sample, { isArabic });
+
+  let sampleDate = '';
+  if (sample?.collection_date) {
+    const d = new Date(sample.collection_date);
+    if (!Number.isNaN(d.getTime())) {
+      sampleDate = d.toLocaleDateString(isArabic ? 'ar-SA' : 'en-GB', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+      });
+    }
+  }
+
+  const animalLine = animalName && animalType
+    ? `${animalPrefix}: ${animalName} · ${typePrefix}: ${animalType}`
+    : animalName
+      ? `${animalPrefix}: ${animalName}`
+      : animalType
+        ? `${typePrefix}: ${animalType}`
+        : '';
 
   return {
-    barcode,
-    barcodeDigits: barcodeDisplayDigits(barcode),
-    sampleLine: truncateLabel(`${samplePrefix} ${sampleCode}`, 34),
-    animalLine: truncateLabel(`${animalPrefix} ${animalName}`, 34),
-    testLine: truncateLabel(`${testPrefix} ${testsSummary}`, 34),
+    barcode: id,
+    barcodeDigits: id,
+    barcodeEncode: encodeCode128C(id),
+    sampleLine: truncateLabel(`${samplePrefix}: ${id}`, 36),
+    customerLine: customerName ? truncateLabel(`${customerPrefix}: ${customerName}`, 36) : '',
+    animalLine: animalLine ? truncateLabel(animalLine, 36) : '',
+    dateLine: sampleDate ? truncateLabel(`${datePrefix}: ${sampleDate}`, 36) : '',
+    testLine: truncateLabel(`${testPrefix}: ${testsSummary}`, 36),
     testsSummary,
-    sampleCode,
+    sampleCode: id,
     animalName,
+    customerName,
   };
 };

@@ -18,6 +18,7 @@
     "ensure-admin": "node src/scripts/ensure-admin.js",
     "purge-demo": "node src/scripts/purge-demo-users.js",
     "backup": "node src/scripts/backup-db.js",
+    "backup:uploads": "node src/scripts/backup-uploads.js",
     "test:s3": "node src/scripts/test-s3-storage.js",
     "test": "echo \"No tests configured\" && exit 0"
   },

@@ -162,15 +162,36 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     };
   }, []);
 
-  const resultGroups = useMemo(() => groupResults(report?.results), [report]);
-  const singlePage = useMemo(() => isSinglePageLayout(report), [report]);
+  const resultGroups = useMemo(() => {
+    if (report?.sections?.length) {
+      return report.sections
+        .filter((s) => !s.isImageSection && s.results?.length)
+        .map((s) => ({
+          testCode: s.sectionType,
+          nameAr: s.titleAr || s.title,
+          nameEn: s.titleEn || s.title,
+          instrument: s.results[0]?.instrument,
+          items: s.results,
+        }));
+    }
+    return groupResults(report?.results);
+  }, [report]);
+  const singlePage = useMemo(() => {
+    if ((report?.sections?.length || 0) > 1) return false;
+    return isSinglePageLayout(report);
+  }, [report]);
   const flatResults = useMemo(() => flattenResults(resultGroups), [resultGroups]);
   const abnormalResults = useMemo(
     () => (report?.results || []).filter((r) => isAbnormalFlag(r.flag)),
     [report]
   );
 
-  const attachments = useMemo(() => report?.attachments || [], [report]);
+  const attachments = useMemo(() => {
+    if (report?.attachments?.length) return report.attachments;
+    return (report?.sections || [])
+      .filter((s) => s.isImageSection)
+      .flatMap((s) => s.attachments || []);
+  }, [report]);
 
   const speciesLabel = (type) => {
     const e = ANIMAL_TYPES[type];
@@ -193,6 +214,20 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   };
 
   const handleDownloadPdf = async () => {
+    const pdfUrl = report?.pdf_url || report?.pdfUrl;
+    if (pdfUrl) {
+      setExportingPdf(true);
+      toast.dismiss();
+      try {
+        await reportsAPI.openPdf(pdfUrl);
+        toast.success(t('labReport.downloadDone'));
+      } catch {
+        toast.error(t('labReport.downloadFailed'));
+      } finally {
+        setExportingPdf(false);
+      }
+      return;
+    }
     if (!reportRef.current) return;
     setExportingPdf(true);
     toast.dismiss();

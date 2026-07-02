@@ -15,12 +15,13 @@ const resolveBridgeApiUrl = () => {
   return LIMS_CLOUD_API;
 };
 
-const buildBridgeEnvFile = (norma) => {
+const buildBridgeEnvFile = (norma, apiKeyOnce) => {
   if (!norma) return '';
+  const key = apiKeyOnce || norma.config?.api_key_once || 'REGENERATE_KEY_IN_DEVICES_PAGE';
   return [
     `LIMS_API_URL=${resolveBridgeApiUrl()}`,
     `DEVICE_ID=${norma.id}`,
-    `DEVICE_API_KEY=${norma.config?.api_key || 'YOUR_KEY'}`,
+    `DEVICE_API_KEY=${key}`,
     `LISTEN_PORT=${BRIDGE_LISTEN_PORT}`,
   ].join('\n');
 };
@@ -31,6 +32,7 @@ export default function Devices() {
   const [supported, setSupported] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [revealedApiKey, setRevealedApiKey] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
@@ -47,6 +49,7 @@ export default function Devices() {
 
   const selectDevice = async (device) => {
     setSelected(device);
+    setRevealedApiKey(device.api_key_once || null);
     const { data } = await devicesAPI.messages(device.id);
     setMessages(data.data || []);
   };
@@ -59,6 +62,7 @@ export default function Devices() {
         const { data } = await devicesAPI.update(existing.id, { ...existing, is_active: true, protocol: 'HL7', connection_type: 'tcp', port: BRIDGE_LISTEN_PORT });
         toast.success(t('devices.activated'));
         setSelected(data.data);
+        setRevealedApiKey(null);
       } else {
         const { data } = await devicesAPI.create({
           name: 'Norma CBC',
@@ -72,6 +76,7 @@ export default function Devices() {
         });
         toast.success(t('devices.created'));
         setSelected(data.data);
+        setRevealedApiKey(data.data?.api_key_once || null);
       }
       load();
     } catch (err) {
@@ -96,6 +101,7 @@ export default function Devices() {
       const { data } = await devicesAPI.regenerateKey(selected.id);
       toast.success(t('devices.keyRegenerated'));
       setSelected(data.data);
+      setRevealedApiKey(data.data?.api_key_once || null);
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -103,14 +109,17 @@ export default function Devices() {
   };
 
   const copyKey = () => {
-    const key = selected?.config?.api_key;
-    if (!key) return;
+    const key = revealedApiKey || selected?.api_key_once;
+    if (!key) {
+      toast.error(t('devices.keyHiddenHint') || 'Regenerate key to view once');
+      return;
+    }
     navigator.clipboard.writeText(key);
     toast.success(t('devices.keyCopied'));
   };
 
   const copyBridgeEnv = () => {
-    const text = buildBridgeEnvFile(norma);
+    const text = buildBridgeEnvFile(norma, revealedApiKey || selected?.api_key_once);
     if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success(t('devices.bridgeEnvCopied'));
@@ -176,7 +185,9 @@ export default function Devices() {
                   <p><strong>{t('devices.deviceId')}:</strong> <code className="text-xs break-all">{norma.id}</code></p>
                   <p className="flex items-center gap-2 flex-wrap">
                     <strong>{t('devices.apiKey')}:</strong>
-                    <code className="text-xs break-all">{norma.config?.api_key || '—'}</code>
+                    <code className="text-xs break-all">
+                      {revealedApiKey || selected?.api_key_once || norma.config?.api_key_masked || '••••••••'}
+                    </code>
                     <button onClick={copyKey} className="text-primary-600"><Copy size={14} /></button>
                     <button onClick={regenerateKey} className="text-primary-600"><RefreshCw size={14} /></button>
                   </p>

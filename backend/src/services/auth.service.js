@@ -3,9 +3,11 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { query } = require('../config/database');
 const env = require('../config/env');
+const logger = require('../config/logger');
 const { AppError } = require('../middleware/errorHandler');
 const { hashToken } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
+const notifications = require('./notifications.service');
 
 const login = async (username, password) => {
   const identifier = username.trim().toLowerCase();
@@ -87,17 +89,74 @@ const logout = async (refreshToken) => {
   }
 };
 
-const requestPasswordReset = async (email) => {
-  const result = await query('SELECT id FROM users WHERE email = $1 AND is_active = true', [email.toLowerCase()]);
-  if (!result.rows[0]) return { message: 'If the email exists, a reset link will be sent' };
+const deliverPasswordReset = async ({ email, phone, token }) => {
+  const resetUrl = `${env.staffAppUrl.replace(/\/$/, '')}/reset-password?token=${token}`;
+  const body = [
+    `${env.lab.name}`,
+    'Password reset request',
+    `Reset link (valid 1 hour): ${resetUrl}`,
+    `If you did not request this, ignore this message.`,
+  ].join('\n');
 
+  if (env.notifications.email) {
+    await notifications.queue({
+      channel: 'email',
+      recipient: email,
+      subject: `${env.lab.name} — Password Reset`,
+      body,
+      metadata: { type: 'password_reset' },
+    });
+    return 'email';
+  }
+
+  if (env.notifications.sms && phone) {
+    await notifications.queue({
+      channel: 'sms',
+      recipient: phone,
+      subject: null,
+      body: `${env.lab.nameAr}: رابط إعادة تعيين كلمة المرور ${resetUrl}`,
+      metadata: { type: 'password_reset' },
+    });
+    return 'sms';
+  }
+
+  if (env.nodeEnv === 'development') {
+    logger.debug('Password reset link generated (dev only — not sent via API)', {
+      email,
+      resetUrl,
+    });
+    return 'dev_logged';
+  }
+
+  logger.warn('Password reset token stored but no delivery channel enabled', { email });
+  return 'none';
+};
+
+const requestPasswordReset = async (email) => {
+  const generic = { message: 'If the email exists, a reset link will be sent' };
+  const normalized = email?.toLowerCase?.()?.trim();
+  if (!normalized) return generic;
+
+  const result = await query(
+    'SELECT id, email, phone FROM users WHERE email = $1 AND is_active = true',
+    [normalized]
+  );
+  if (!result.rows[0]) return generic;
+
+  const user = result.rows[0];
   const token = crypto.randomBytes(32).toString('hex');
   await query(
     `UPDATE users SET password_reset_token = $1, password_reset_expires = NOW() + INTERVAL '1 hour' WHERE id = $2`,
-    [hashToken(token), result.rows[0].id]
+    [hashToken(token), user.id]
   );
 
-  return { message: 'If the email exists, a reset link will be sent', resetToken: token };
+  try {
+    await deliverPasswordReset({ email: user.email, phone: user.phone, token });
+  } catch (err) {
+    logger.warn('Password reset delivery failed', { email: user.email, error: err.message });
+  }
+
+  return generic;
 };
 
 const resetPassword = async (token, newPassword) => {

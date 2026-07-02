@@ -7,22 +7,17 @@ const {
   DEFAULT_CBC_TEST_CODE,
   mapCbcRowsForDisplay,
 } = require('../utils/norma-cbc-map');
-const { evaluateFlag } = require('../utils/helpers');
-const { resolveLimsReferenceDisplay } = require('../utils/reference-range');
+const resultEngine = require('./result-engine.service');
 const { getLimsReferenceRange, LIMS_REF_SELECT_SQL, limsRefLateralJoin } = require('./reference-ranges.service');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
 const autoInvoice = require('./auto-invoice.service');
 
-const isPositiveQual = (raw) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(raw);
-const isNegativeQual = (raw) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(raw);
-
 const formatQualValue = (value, unit) => {
   if (unit !== 'qual' || !value) return value;
-  if (isPositiveQual(value)) return 'إيجابي';
-  if (isNegativeQual(value)) return 'سلبي';
-  return value;
+  const normalized = resultEngine.normalizeResultValue(value, resultEngine.VALUE_TYPES.QUAL);
+  return normalized.displayValue ?? value;
 };
 
 const getAttachments = async (resultId) => {
@@ -39,7 +34,10 @@ const getAttachments = async (resultId) => {
 
 const formatCbcResultValues = (rawValues) => mapCbcRowsForDisplay(rawValues);
 
-const resolveResultReference = (row) => resolveLimsReferenceDisplay(row) || null;
+const resolveResultReference = (row) => {
+  const evaluated = resultEngine.evaluateResult(row);
+  return evaluated.reference || null;
+};
 
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
@@ -167,37 +165,36 @@ const enterResults = async (data, userId) => {
 
     for (const val of data.values) {
       const raw = String(val.value ?? '').trim();
-      const numericValue = parseFloat(raw);
-      const isNumeric = raw !== '' && !Number.isNaN(numericValue);
-
-      let flag = '';
-      let isCritical = false;
 
       const paramMeta = await client.query(
         'SELECT unit, code FROM test_parameters WHERE id = $1',
         [val.parameter_id]
       );
       const unit = paramMeta.rows[0]?.unit;
+      const parameterCode = paramMeta.rows[0]?.code;
+      const range = await getLimsReferenceRange(val.parameter_id, animal_type);
 
-      if (unit === 'qual') {
-        const normalized = formatQualValue(raw, unit);
-        if (isPositiveQual(normalized)) flag = 'POS';
-        else if (isNegativeQual(normalized)) flag = 'NEG';
-      } else if (isNumeric) {
-        const range = await getLimsReferenceRange(val.parameter_id, animal_type);
-        if (range?.min_value != null && range?.max_value != null) {
-          const evaluated = evaluateFlag(
-            numericValue,
-            range.min_value,
-            range.max_value,
-            range.critical_low,
-            range.critical_high
-          );
-          flag = evaluated.flag;
-          isCritical = evaluated.isCritical;
-          if (isCritical) hasCritical = true;
-        }
-      }
+      const evaluated = resultEngine.evaluateResult(
+        { value: raw, unit, parameter_code: parameterCode },
+        { referenceRange: range ? {
+          source: 'lims',
+          min_value: range.min_value,
+          max_value: range.max_value,
+          critical_low: range.critical_low,
+          critical_high: range.critical_high,
+          text_reference: range.text_reference,
+          notes: range.notes,
+        } : null }
+      );
+
+      const storeFlag = evaluated.flag === resultEngine.RESULT_FLAGS.CRITICAL
+        ? (evaluated.detailFlag || resultEngine.RESULT_FLAGS.CRIT_HIGH)
+        : (evaluated.detailFlag || evaluated.flag || '');
+      if (evaluated.isCritical) hasCritical = true;
+
+      const storeValue = unit === 'qual'
+        ? (evaluated.displayValue ?? raw)
+        : (evaluated.value ?? raw);
 
       await client.query(
         `INSERT INTO result_values (id, result_id, parameter_id, value, numeric_value, flag, is_critical, notes)
@@ -206,10 +203,10 @@ const enterResults = async (data, userId) => {
           uuidv4(),
           resultId,
           val.parameter_id,
-          unit === 'qual' ? formatQualValue(raw, unit) : raw,
-          isNumeric ? numericValue : null,
-          flag,
-          isCritical,
+          storeValue,
+          evaluated.numericValue,
+          storeFlag === resultEngine.RESULT_FLAGS.NORMAL_WITHOUT_REF ? '' : storeFlag,
+          evaluated.isCritical,
           val.notes ?? null,
         ]
       );
@@ -458,6 +455,20 @@ const removeAttachment = async (attachmentId) => {
   return { deleted: true };
 };
 
+const updateAttachment = async (attachmentId, { caption, include_in_report }) => {
+  const existing = await query('SELECT id FROM result_attachments WHERE id = $1', [attachmentId]);
+  if (!existing.rows[0]) throw new AppError('Attachment not found', 404, 'NOT_FOUND');
+
+  const result = await query(
+    `UPDATE result_attachments
+     SET caption = COALESCE($1, caption),
+         include_in_report = COALESCE($2, include_in_report)
+     WHERE id = $3 RETURNING *`,
+    [caption, include_in_report, attachmentId]
+  );
+  return result.rows[0];
+};
+
 const clearSampleTestResults = async (sampleTestId) => {
   const st = await query(
     `SELECT st.id, st.sample_id, st.status, t.code AS test_code
@@ -533,6 +544,7 @@ module.exports = {
   getPreviousResults,
   getCriticalAlerts,
   addAttachment,
+  updateAttachment,
   removeAttachment,
   getAttachments,
   clearSampleTestResults,

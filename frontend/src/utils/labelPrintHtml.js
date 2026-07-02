@@ -1,5 +1,4 @@
-import { buildThermalLabelContent } from './labelPanel';
-import { thermalScanDigits } from './zebraPrint';
+import { buildThermalLabelContent, barcodeEncodeDigits } from './labelPanel';
 
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
@@ -30,13 +29,14 @@ const LABEL_PRINT_STYLES = `
   }
   .label-50x25-barcode-wrap svg { max-width: 100%; max-height: 10.5mm; height: auto; display: block; }
   .label-50x25-digits {
-    margin: 0.15mm 0 0; padding: 0;
-    font-size: 7.5pt; font-weight: 700; line-height: 1.05;
-    text-align: center; letter-spacing: 0.02em;
+    margin: 0.2mm 0 0; padding: 0;
+    font-size: 10.5pt; font-weight: 800; line-height: 1.05;
+    text-align: center; letter-spacing: 0.08em;
+    font-family: Consolas, 'Courier New', monospace;
   }
   .label-50x25-line {
     margin: 0.12mm 0 0; padding: 0;
-    font-size: 6.5pt; line-height: 1.1;
+    font-size: 8pt; line-height: 1.15;
     text-align: center; max-width: 100%;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     font-weight: 600;
@@ -51,7 +51,7 @@ export const labelMetaFromSample = (sample, isArabic = false) => (
 );
 
 const labelBodyInner = (content) => {
-  const encodeValue = content.barcode ? thermalScanDigits(content.barcode) : '';
+  const encodeValue = content.barcodeEncode || barcodeEncodeDigits(content.barcode);
   return `
     <div class="label-50x25-barcode-wrap">
       ${encodeValue
@@ -61,7 +61,6 @@ const labelBodyInner = (content) => {
     ? `<p class="label-50x25-digits">${escapeHtml(content.barcodeDigits)}</p>`
     : ''}
     </div>
-    ${content.sampleLine ? `<p class="label-50x25-line" title="${escapeHtml(content.sampleLine)}">${escapeHtml(content.sampleLine)}</p>` : ''}
     ${content.animalLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalLine)}">${escapeHtml(content.animalLine)}</p>` : ''}
     ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}`;
 };

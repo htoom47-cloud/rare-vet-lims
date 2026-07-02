@@ -355,6 +355,63 @@ async function applyPatches() {
         ALTER COLUMN low_value DROP NOT NULL,
         ALTER COLUMN high_value DROP NOT NULL
     `);
+    await client.query(`
+      ALTER TABLE test_reference_ranges
+        ADD COLUMN IF NOT EXISTS sex VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS age_min INTEGER,
+        ADD COLUMN IF NOT EXISTS age_max INTEGER,
+        ADD COLUMN IF NOT EXISTS age_unit VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS device_id UUID REFERENCES device_integrations(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS text_reference TEXT,
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
+        ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id),
+        ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES users(id),
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
+    `);
+    await client.query(`
+      ALTER TABLE result_attachments
+        ADD COLUMN IF NOT EXISTS include_in_report BOOLEAN DEFAULT true
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS device_parameter_mappings (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        device_id UUID REFERENCES device_integrations(id) ON DELETE SET NULL,
+        device_name VARCHAR(255) NOT NULL DEFAULT 'Norma CBC',
+        device_parameter_code VARCHAR(80) NOT NULL,
+        system_parameter_id UUID NOT NULL REFERENCES test_parameters(id) ON DELETE CASCADE,
+        display_name_ar VARCHAR(255),
+        display_name_en VARCHAR(255),
+        unit VARCHAR(50),
+        value_type VARCHAR(20) DEFAULT 'numeric',
+        is_active BOOLEAN DEFAULT true,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_dpm_device_code
+      ON device_parameter_mappings (device_name, UPPER(device_parameter_code))
+      WHERE is_active = true
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS reference_range_audit_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        reference_range_id UUID,
+        user_id UUID REFERENCES users(id),
+        action VARCHAR(50) NOT NULL,
+        old_value JSONB,
+        new_value JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ref_range_audit_created
+      ON reference_range_audit_logs (created_at DESC)
+    `);
+    const { seedNormaCbcMappings } = require('../services/device-parameter-mappings.service');
+    await seedNormaCbcMappings(client);
     await syncLabContactInfo(client);
     await ensureUniqueLimsReferenceRanges(client);
   } finally {

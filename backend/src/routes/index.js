@@ -39,6 +39,7 @@ router.use('/users', usersRoutes);
 router.use('/audit', auditRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/devices', devicesRoutes);
+router.use('/reference-ranges', require('./reference-ranges.routes'));
 router.use('/settings', settingsRoutes);
 router.use('/portal', portalRoutes);
 

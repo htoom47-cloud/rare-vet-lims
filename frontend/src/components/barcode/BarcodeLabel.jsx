@@ -1,8 +1,7 @@
 import Barcode from 'react-barcode';
 import QRCode from 'react-qr-code';
 import { useTranslation } from 'react-i18next';
-import { buildThermalLabelContent } from '../../utils/labelPanel';
-import { thermalScanDigits } from '../../utils/zebraPrint';
+import { buildThermalLabelContent, barcodeEncodeDigits } from '../../utils/labelPanel';
 
 /**
  * Sample label — default layout fits Zebra ZD421 direct thermal 50×25 mm rolls.
@@ -13,7 +12,7 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
   const isArabic = i18n.language === 'ar';
 
   const content = buildThermalLabelContent(sample, { isArabic });
-  const barcodeEncode = content.barcode ? thermalScanDigits(content.barcode) : '';
+  const barcodeEncode = content.barcodeEncode || barcodeEncodeDigits(content.barcode);
   const isThermal = size === 'thermal-50x25';
 
   if (isThermal) {
@@ -47,14 +46,19 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
         )}
 
         <div className="label-50x25-details">
-          {content.sampleLine && (
-            <p className="label-50x25-line" title={content.sampleLine}>
-              {content.sampleLine}
+          {content.customerLine && (
+            <p className="label-50x25-line label-50x25-meta" title={content.customerLine}>
+              {content.customerLine}
             </p>
           )}
           {content.animalLine && (
             <p className="label-50x25-line label-50x25-meta" title={content.animalLine}>
               {content.animalLine}
+            </p>
+          )}
+          {content.dateLine && (
+            <p className="label-50x25-line label-50x25-meta" title={content.dateLine}>
+              {content.dateLine}
             </p>
           )}
           {content.testLine && (
@@ -90,7 +94,7 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
       ) : content.barcode ? (
         <div className="flex justify-center my-3 min-h-[70px]">
           <Barcode
-            value={content.barcode}
+            value={barcodeEncode || content.barcode}
             format="CODE128"
             width={1.8}
             height={56}
