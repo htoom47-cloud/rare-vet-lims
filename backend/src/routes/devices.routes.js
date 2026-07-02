@@ -26,7 +26,15 @@ router.post('/ingest/:deviceId/replay', authenticateDevice, async (req, res, nex
     }
     const data = await service.replaySampleImport(req.device, sampleCode);
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.isOperational) {
+      return res.status(err.statusCode || 400).json({
+        success: false,
+        error: { code: err.code, message: err.message },
+      });
+    }
+    next(err);
+  }
 });
 
 router.use(authenticate);

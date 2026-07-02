@@ -114,12 +114,19 @@ const processInboundMessage = async (device, rawMessage) => {
 
   try {
     const imported = await deviceImport.importFromParsed(parsed, device);
-    await deviceRefRanges.syncFromParsedMessage({
-      device,
-      parsed,
-      messageId: msgResult.rows[0].id,
-      species: imported.reference_animal_type || imported.norma_animal_type || parsed.animalType,
-    });
+    try {
+      await deviceRefRanges.syncFromParsedMessage({
+        device,
+        parsed,
+        messageId: msgResult.rows[0].id,
+        species: imported.reference_animal_type || imported.norma_animal_type || parsed.animalType,
+      });
+    } catch (syncErr) {
+      logger.warn('Device reference range sync failed — Norma import kept', {
+        error: syncErr.message,
+        sampleId: imported.sample_id,
+      });
+    }
     await query(
       `UPDATE device_messages SET status = 'imported', parsed_data = $1, sample_id = $2 WHERE id = $3`,
       [JSON.stringify({ ...parsed, import: imported }), imported.sample_id, msgResult.rows[0].id]
