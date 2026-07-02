@@ -92,9 +92,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
     }
 
     const profile = getNormaReference(animalType, limsCode);
-    const noteText = fromHl7
-      ? normaReferenceNote(row.reference, refMin, refMax)
-      : undefined;
+    const noteText = fromHl7 ? normaReferenceNote(row.reference) : undefined;
 
     await upsertReferenceRange({
       parameterId: param.rows[0].id,

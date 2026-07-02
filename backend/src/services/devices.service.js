@@ -92,14 +92,14 @@ const processInboundMessage = async (device, rawMessage) => {
 
   await query('UPDATE device_integrations SET last_connected = NOW() WHERE id = $1', [device.id]);
 
-  const sampleId = String(parsed.sampleId || '').trim();
+  const sampleId = normalizeSampleScanId(String(parsed.sampleId || '').trim()) || String(parsed.sampleId || '').trim();
   if (!sampleId || !parsed.results?.length) {
     await query(`UPDATE device_messages SET status = 'unmatched', parsed_data = $1 WHERE id = $2`, [
       JSON.stringify({
         ...parsed,
         sampleId: sampleId || null,
         error: !sampleId ? 'Missing sample ID in HL7 message' : 'Missing results in HL7 message',
-        hint: 'Enter BC-... or SMP-... on Norma and enable Repeat Sample ID as Patient ID',
+        hint: 'Scan or enter the 12-digit sample ID from the label on Norma',
       }),
       msgResult.rows[0].id,
     ]);
@@ -118,7 +118,7 @@ const processInboundMessage = async (device, rawMessage) => {
       device,
       parsed,
       messageId: msgResult.rows[0].id,
-      species: imported.reference_animal_type || parsed.animalType,
+      species: imported.reference_animal_type || imported.norma_animal_type || parsed.animalType,
     });
     await query(
       `UPDATE device_messages SET status = 'imported', parsed_data = $1, sample_id = $2 WHERE id = $3`,

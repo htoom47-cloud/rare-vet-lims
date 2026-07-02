@@ -85,11 +85,15 @@ const fmtResult = (row) => {
   return { text: v, tone: 'normal' };
 };
 
+const { resolveReportReferenceDisplay, verbatimFromResultNotes } = require('./reference-range');
+
 const fmtRef = (row) => {
+  const verbatim = row.reference && row.reference !== '-' ? String(row.reference).trim() : null;
+  if (verbatim) return verbatim;
   if (row.minValue != null && row.maxValue != null) {
     return `${Number(row.minValue).toFixed(2)} - ${Number(row.maxValue).toFixed(2)}`;
   }
-  return row.reference && row.reference !== '-' ? row.reference : '-';
+  return '-';
 };
 
 const paramName = (row, lang) => {

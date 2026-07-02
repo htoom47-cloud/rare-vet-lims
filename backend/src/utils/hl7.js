@@ -1,6 +1,6 @@
 const { parseReferenceRange } = require('./reference-range');
 const { mapNormaCode, mapNormaIndex, resolveNormaResultLimsCode } = require('./norma-cbc-map');
-const { extractAnimalTypeFromSegments } = require('./norma-species-map');
+const { mapNormaSpeciesToRefSpeciesExact, extractAnimalTypeFromSegments, extractSpeciesRawFromSegments } = require('./norma-species-map');
 const { normalizeResultFlag, parseDeviceTimestamp } = require('./device-parsers/normalize');
 
 const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
@@ -22,8 +22,10 @@ const pickId = (field) => {
   return primary || null;
 };
 
+const { normalizeSampleScanId } = require('./barcode-scan');
+
 const normalizeSampleId = (id) => {
-  const value = String(id || '').trim();
+  const value = normalizeSampleScanId(id) || String(id || '').trim();
   return value || null;
 };
 
@@ -33,6 +35,7 @@ const extractFromRaw = (raw) => {
     /\b(SMP-\d{6}-\d+)\b/i,
     /\b(SMP-[A-Z0-9-]+)\b/i,
     /\b(BC-[A-Z0-9-]+)\b/i,
+    /\b(\d{12})\b/,
   ];
   for (const pattern of patterns) {
     const match = raw.match(pattern);
@@ -97,7 +100,9 @@ const normalizeNormaValue = (code, rawValue, unit) => {
 function parseHl7(raw) {
   const segments = splitSegments(raw);
   let sampleId = extractFromRaw(raw);
-  const animalType = extractAnimalTypeFromSegments(segments);
+  const animalTypeRaw = extractSpeciesRawFromSegments(segments);
+  const animalType = mapNormaSpeciesToRefSpeciesExact(animalTypeRaw)
+    || extractAnimalTypeFromSegments(segments);
   const results = [];
   let observedAt = null;
 
@@ -194,6 +199,7 @@ function parseHl7(raw) {
     protocol: 'HL7',
     sampleId: normalizeSampleId(sampleId),
     animalType: animalType || null,
+    animalTypeRaw: animalTypeRaw || null,
     observedAt,
     results,
     segments: segments.length,

@@ -417,6 +417,9 @@ export const devicesAPI = {
   referenceRanges: (params) => api.get('/devices/reference-ranges/list', { params }),
   referenceRangeLogs: (params) => api.get('/devices/reference-ranges/logs', { params }),
   syncReferenceRanges: (body) => api.post('/devices/reference-ranges/sync', body),
+  refDebugMessage: (messageId) => api.get(`/devices/ref-debug/message/${messageId}`),
+  refDebugSample: (sampleId) => api.get(`/devices/ref-debug/sample/${sampleId}`),
+  refDebugSpeciesAudit: () => api.get('/devices/ref-debug/species-audit'),
 };
 
 export const settingsAPI = {

@@ -318,6 +318,15 @@ async function applyPatches() {
       CREATE INDEX IF NOT EXISTS idx_device_ref_logs_created
       ON device_reference_range_logs (created_at DESC)
     `);
+    await client.query(`
+      ALTER TABLE device_reference_ranges
+        ADD COLUMN IF NOT EXISTS reference_text TEXT
+    `);
+    await client.query(`
+      ALTER TABLE device_reference_ranges
+        ALTER COLUMN low_value DROP NOT NULL,
+        ALTER COLUMN high_value DROP NOT NULL
+    `);
     await syncLabContactInfo(client);
   } finally {
     client.release();

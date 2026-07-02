@@ -132,5 +132,37 @@ check('profile refs align with HL7 builder for camel', () => {
   }
 });
 
+console.log('\n=== Review 4: report display — verbatim Norma only ===');
+const { resolveReportReferenceDisplay, verbatimFromResultNotes } = require('../utils/reference-range');
+
+check('resolveReportReferenceDisplay uses frozen OBX-7 verbatim', () => {
+  const row = { rv_notes: 'Norma: 4.0-12.0' };
+  assert.strictEqual(resolveReportReferenceDisplay(row), '4.0-12.0');
+});
+
+check('resolveReportReferenceDisplay ignores LIMS tables (no notes → null)', () => {
+  const row = { rv_notes: null, min_value: 4, max_value: 12 };
+  assert.strictEqual(resolveReportReferenceDisplay(row), null);
+});
+
+check('PDF fmtRef prefers reference over min/max formatting', () => {
+  const fmtRef = (row) => {
+    const verbatim = row.reference && row.reference !== '-' ? String(row.reference).trim() : null;
+    if (verbatim) return verbatim;
+    if (row.minValue != null && row.maxValue != null) {
+      return `${Number(row.minValue).toFixed(2)} - ${Number(row.maxValue).toFixed(2)}`;
+    }
+    return '-';
+  };
+  const row = { reference: '4.0-12.0', minValue: 4, maxValue: 12 };
+  assert.strictEqual(fmtRef(row), '4.0-12.0');
+  assert.notStrictEqual(fmtRef(row), '4.00 - 12.00');
+});
+
+check('verbatimFromResultNotes strips Norma: prefix only', () => {
+  assert.strictEqual(verbatimFromResultNotes('Norma: 20.0-40.0'), '20.0-40.0');
+  assert.strictEqual(verbatimFromResultNotes('LIMS default'), null);
+});
+
 console.log(`\n=== Result: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

@@ -8,8 +8,7 @@ const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
 const { compareByNormaOrder, filterCbcReportRows, getNormaPanelRow } = require('../utils/norma-cbc-map');
-const { resolveReportReferenceBounds } = require('../utils/reference-range');
-const { DEVICE_REF_LATERAL_SQL } = require('./device-reference-ranges.service');
+const { resolveReportReferenceBounds, resolveReportReferenceDisplay } = require('../utils/reference-range');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -212,8 +211,6 @@ const buildReportData = async (sampleId, opts) => {
             tc.code as category_code,
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
             rv.value, rv.numeric_value, rv.notes AS rv_notes, tp.unit,
-            COALESCE(dref.low_value, tr.min_value) AS min_value,
-            COALESCE(dref.high_value, tr.max_value) AS max_value,
             rv.flag, rv.is_critical, res.doctor_notes
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
@@ -221,19 +218,9 @@ const buildReportData = async (sampleId, opts) => {
      JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
      JOIN result_values rv ON rv.result_id = res.id
      JOIN test_parameters tp ON rv.parameter_id = tp.id
-     JOIN samples s ON st.sample_id = s.id
-     JOIN animals a ON s.animal_id = a.id
-     ${DEVICE_REF_LATERAL_SQL}
-     LEFT JOIN LATERAL (
-       SELECT min_value, max_value
-       FROM test_reference_ranges
-       WHERE parameter_id = tp.id AND (animal_type = $2 OR animal_type IS NULL)
-       ORDER BY CASE WHEN animal_type = $2 THEN 0 ELSE 1 END
-       LIMIT 1
-     ) tr ON true
      WHERE st.sample_id = $1
      ORDER BY tp.sort_order, tp.id`,
-    [sampleId, sample.animal_type]
+    [sampleId]
   );
 
   if (!resultsData.rows.length) {
@@ -268,6 +255,7 @@ const buildReportData = async (sampleId, opts) => {
   const results = uniqueByParameter.map((r) => {
     const panelRow = getNormaPanelRow(r.parameter_code);
     const { min: minValue, max: maxValue } = resolveReportReferenceBounds(r);
+    const referenceDisplay = resolveReportReferenceDisplay(r) || '-';
     return {
     code: r.parameter_code,
     testCode: r.test_code,
@@ -283,9 +271,7 @@ const buildReportData = async (sampleId, opts) => {
     unit: r.unit,
     minValue,
     maxValue,
-    reference: minValue != null
-      ? `${formatNumber(minValue)} - ${formatNumber(maxValue)}`
-      : '-',
+    reference: referenceDisplay,
     flag: r.flag,
     isCritical: r.is_critical,
     method: r.test_method || '-',
@@ -321,6 +307,29 @@ const buildReportData = async (sampleId, opts) => {
   const panelName = [...new Set(results.map((r) => r.testNameEn).filter(Boolean))][0]
     || 'Laboratory Panel';
 
+  const normaMsg = await query(
+    `SELECT parsed_data->>'animalType' AS norma_animal_type,
+            parsed_data->>'animalTypeRaw' AS norma_animal_type_raw
+     FROM device_messages
+     WHERE sample_id = $1 AND status = 'imported'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [sampleId]
+  ).catch(() => ({ rows: [] }));
+
+  const normaAnimalType = normaMsg.rows[0]?.norma_animal_type || null;
+  const normaAnimalTypeRaw = normaMsg.rows[0]?.norma_animal_type_raw || null;
+
+  try {
+    const normaRefDebug = require('./norma-ref-debug.service');
+    await normaRefDebug.auditReportBuild(sampleId, sample, uniqueByParameter, {
+      normaAnimalType,
+      normaAnimalTypeRaw,
+    });
+  } catch (err) {
+    logger.warn('Norma reference audit skipped', { sampleId, error: err.message });
+  }
+
   return {
     reportNumber,
     sampleCode: sample.sample_code,
@@ -335,6 +344,9 @@ const buildReportData = async (sampleId, opts) => {
     nationalId: '-',
     animalCode: sample.animal_code,
     animalType: sample.animal_type,
+    normaAnimalType,
+    normaAnimalTypeRaw,
+    normaSpeciesMatch: !normaAnimalType || String(sample.animal_type) === String(normaAnimalType),
     animalName: sample.animal_name,
     animalGender: sample.animal_gender,
     animalChip: sample.animal_chip,

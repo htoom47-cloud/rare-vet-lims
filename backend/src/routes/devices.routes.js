@@ -56,6 +56,32 @@ router.post('/reference-ranges/sync', authorize(PERMISSIONS.DEVICES_MANAGE), asy
   } catch (err) { next(err); }
 });
 
+router.get('/ref-debug/message/:messageId', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
+  try {
+    const normaRefDebug = require('../services/norma-ref-debug.service');
+    const data = await normaRefDebug.analyzeMessage(req.params.messageId);
+    if (!data) return res.status(404).json({ success: false, error: { message: 'Message not found' } });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/ref-debug/sample/:sampleId', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
+  try {
+    const normaRefDebug = require('../services/norma-ref-debug.service');
+    const data = await normaRefDebug.analyzeSample(req.params.sampleId);
+    if (!data) return res.status(404).json({ success: false, error: { message: 'No Norma message for sample' } });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/ref-debug/species-audit', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
+  try {
+    const normaRefDebug = require('../services/norma-ref-debug.service');
+    const data = await normaRefDebug.auditAllSpecies();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
   try {
     const data = await service.list();

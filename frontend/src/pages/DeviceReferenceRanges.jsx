@@ -76,14 +76,19 @@ export default function DeviceReferenceRanges() {
     },
     { key: 'unit', label: isAr ? 'الوحدة' : 'Unit', render: (r) => r.unit || '—' },
     {
+      key: 'reference_text',
+      label: isAr ? 'OBX-7 (Norma)' : 'OBX-7',
+      render: (r) => r.reference_text || '—',
+    },
+    {
       key: 'low_value',
       label: isAr ? 'الحد الأدنى' : 'Low',
-      render: (r) => Number(r.low_value),
+      render: (r) => (r.low_value != null ? Number(r.low_value) : '—'),
     },
     {
       key: 'high_value',
       label: isAr ? 'الحد الأعلى' : 'High',
-      render: (r) => Number(r.high_value),
+      render: (r) => (r.high_value != null ? Number(r.high_value) : '—'),
     },
     { key: 'source', label: isAr ? 'المصدر' : 'Source' },
     {

@@ -80,13 +80,23 @@ function mapNormaSpeciesToLims(raw) {
   return null;
 }
 
-/** Map Norma species text → device_reference_ranges.species key (7 species + other). */
-function mapNormaSpeciesToRefSpecies(raw) {
+/** Map Norma species text → device_reference_ranges.species key — exact alias match only. */
+function mapNormaSpeciesToRefSpeciesExact(raw) {
   if (raw == null || raw === '') return null;
   const key = normalizeSpeciesKey(raw);
   if (!key) return null;
   if (refAliasIndex[key]) return refAliasIndex[key];
+  if (ANIMAL_TYPE_CODES.includes(key)) return key;
+  return null;
+}
 
+/** @deprecated fuzzy match — use mapNormaSpeciesToRefSpeciesExact for Norma ingest. */
+function mapNormaSpeciesToRefSpecies(raw) {
+  const exact = mapNormaSpeciesToRefSpeciesExact(raw);
+  if (exact) return exact;
+  if (raw == null || raw === '') return null;
+  const key = normalizeSpeciesKey(raw);
+  if (!key) return null;
   for (const [alias, code] of Object.entries(refAliasIndex)) {
     if (alias.length < 3 || key.length < 3) continue;
     if (key.includes(alias) || alias.includes(key)) return code;
@@ -108,6 +118,20 @@ function pickCweSpeciesText(field) {
   return parts[0] || null;
 }
 
+function extractSpeciesRawFromSegments(segments) {
+  for (const segment of segments) {
+    const fields = segment.split('|');
+    const type = fields[0];
+    if (type === 'PID' || type === 'SPM' || type === 'OBR') {
+      for (let i = 1; i < fields.length; i += 1) {
+        const text = pickCweSpeciesText(fields[i]);
+        if (text) return text;
+      }
+    }
+  }
+  return null;
+}
+
 function extractAnimalTypeFromSegments(segments) {
   for (const segment of segments) {
     const fields = segment.split('|');
@@ -127,6 +151,9 @@ function extractAnimalTypeFromSegments(segments) {
 module.exports = {
   mapNormaSpeciesToLims,
   mapNormaSpeciesToRefSpecies,
+  mapNormaSpeciesToRefSpeciesExact,
   extractAnimalTypeFromSegments,
+  extractSpeciesRawFromSegments,
   normalizeSpeciesKey,
+  NORMA_REF_SPECIES_ALIASES,
 };
