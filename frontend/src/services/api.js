@@ -414,6 +414,9 @@ export const devicesAPI = {
   update: (id, data) => api.put(`/devices/${id}`, data),
   regenerateKey: (id) => api.post(`/devices/${id}/regenerate-key`),
   messages: (id) => api.get(`/devices/${id}/messages`),
+  referenceRanges: (params) => api.get('/devices/reference-ranges/list', { params }),
+  referenceRangeLogs: (params) => api.get('/devices/reference-ranges/logs', { params }),
+  syncReferenceRanges: (body) => api.post('/devices/reference-ranges/sync', body),
 };
 
 export const settingsAPI = {

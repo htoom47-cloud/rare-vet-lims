@@ -272,6 +272,52 @@ async function applyPatches() {
       UPDATE animals SET animal_type = 'other'
       WHERE animal_type::text IN ('bird', 'cat', 'dog')
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS device_reference_ranges (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        device_name VARCHAR(255) NOT NULL,
+        device_id UUID REFERENCES device_integrations(id) ON DELETE SET NULL,
+        parameter_code VARCHAR(50) NOT NULL,
+        parameter_name VARCHAR(255),
+        species VARCHAR(50) NOT NULL,
+        unit VARCHAR(50),
+        low_value DECIMAL(14,4) NOT NULL,
+        high_value DECIMAL(14,4) NOT NULL,
+        source VARCHAR(50) DEFAULT 'device',
+        last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_device_ref_ranges_unique
+      ON device_reference_ranges (device_name, parameter_code, species, COALESCE(unit, ''))
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_device_ref_ranges_species
+      ON device_reference_ranges (species, parameter_code)
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS device_reference_range_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        device_reference_range_id UUID REFERENCES device_reference_ranges(id) ON DELETE SET NULL,
+        device_name VARCHAR(255) NOT NULL,
+        parameter_code VARCHAR(50) NOT NULL,
+        species VARCHAR(50) NOT NULL,
+        unit VARCHAR(50),
+        old_low_value DECIMAL(14,4),
+        old_high_value DECIMAL(14,4),
+        new_low_value DECIMAL(14,4) NOT NULL,
+        new_high_value DECIMAL(14,4) NOT NULL,
+        change_reason VARCHAR(50) DEFAULT 'device_sync',
+        message_id UUID REFERENCES device_messages(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_device_ref_logs_created
+      ON device_reference_range_logs (created_at DESC)
+    `);
     await syncLabContactInfo(client);
   } finally {
     client.release();

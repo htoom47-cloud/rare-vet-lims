@@ -8,6 +8,7 @@ const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
 const { compareByNormaOrder, filterCbcReportRows, getNormaPanelRow } = require('../utils/norma-cbc-map');
+const { DEVICE_REF_LATERAL_SQL } = require('./device-reference-ranges.service');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -209,13 +210,19 @@ const buildReportData = async (sampleId, opts) => {
             t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.method as test_method,
             tc.code as category_code,
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
-            rv.value, rv.numeric_value, tp.unit, tr.min_value, tr.max_value, rv.flag, rv.is_critical, res.doctor_notes
+            rv.value, rv.numeric_value, tp.unit,
+            COALESCE(dref.low_value, tr.min_value) AS min_value,
+            COALESCE(dref.high_value, tr.max_value) AS max_value,
+            rv.flag, rv.is_critical, res.doctor_notes
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN test_categories tc ON t.category_id = tc.id
      JOIN results res ON res.sample_test_id = st.id AND res.is_validated = true
      JOIN result_values rv ON rv.result_id = res.id
      JOIN test_parameters tp ON rv.parameter_id = tp.id
+     JOIN samples s ON st.sample_id = s.id
+     JOIN animals a ON s.animal_id = a.id
+     ${DEVICE_REF_LATERAL_SQL}
      LEFT JOIN LATERAL (
        SELECT min_value, max_value
        FROM test_reference_ranges

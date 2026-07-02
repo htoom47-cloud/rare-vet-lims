@@ -8,7 +8,11 @@ const {
   mapCbcRowsForDisplay,
 } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
-const { formatNormaReference } = require('../utils/reference-range');
+const {
+  DEVICE_REF_LATERAL_SQL,
+  formatEffectiveReference,
+  getEffectiveRangeForParameter,
+} = require('./device-reference-ranges.service');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
@@ -38,19 +42,14 @@ const getAttachments = async (resultId) => {
 
 const formatCbcResultValues = (rawValues) => mapCbcRowsForDisplay(rawValues);
 
-const resolveResultReference = (row) => {
-  const fromValue = row.rv_notes?.startsWith('Norma:') ? row.rv_notes.slice(6).trim() : null;
-  if (fromValue) return fromValue;
-  const fromRange = row.tr_notes?.startsWith('Norma:') ? row.tr_notes.slice(6).trim() : null;
-  if (fromRange) return fromRange;
-  return formatNormaReference(null, row.min_value, row.max_value);
-};
+const resolveResultReference = (row) => formatEffectiveReference(row);
 
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
     `SELECT r.id AS result_id, r.sample_test_id, r.is_validated, r.doctor_notes, r.technician_notes, r.has_critical,
             rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical, rv.notes AS rv_notes,
             tp.name AS parameter_name, tp.name_ar AS parameter_name_ar, tp.code AS parameter_code, tp.unit, tp.sort_order,
+            dref.low_value AS device_min, dref.high_value AS device_max,
             tr.min_value, tr.max_value, tr.notes AS tr_notes, t.code AS test_code
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
@@ -59,6 +58,7 @@ const getBySampleTest = async (sampleTestId) => {
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN samples s ON st.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
+     ${DEVICE_REF_LATERAL_SQL}
      LEFT JOIN LATERAL (
        SELECT min_value, max_value, notes
        FROM test_reference_ranges
@@ -184,24 +184,23 @@ const enterResults = async (data, userId) => {
       let isCritical = false;
 
       const paramMeta = await client.query(
-        'SELECT unit FROM test_parameters WHERE id = $1',
+        'SELECT unit, code FROM test_parameters WHERE id = $1',
         [val.parameter_id]
       );
       const unit = paramMeta.rows[0]?.unit;
+      const parameterCode = paramMeta.rows[0]?.code;
 
       if (unit === 'qual') {
         const normalized = formatQualValue(raw, unit);
         if (isPositiveQual(normalized)) flag = 'POS';
         else if (isNegativeQual(normalized)) flag = 'NEG';
       } else if (isNumeric) {
-        const rangeResult = await client.query(
-          `SELECT * FROM test_reference_ranges
-           WHERE parameter_id = $1 AND (animal_type = $2 OR animal_type IS NULL)
-           ORDER BY CASE WHEN animal_type = $2 THEN 0 ELSE 1 END
-           LIMIT 1`,
-          [val.parameter_id, animal_type]
-        );
-        const range = rangeResult.rows[0];
+        const range = await getEffectiveRangeForParameter({
+          parameterId: val.parameter_id,
+          parameterCode,
+          species: animal_type,
+          unit,
+        });
         if (range) {
           const evaluated = evaluateFlag(numericValue, range.min_value, range.max_value, range.critical_low, range.critical_high);
           flag = evaluated.flag;

@@ -141,9 +141,7 @@ const importCbcResults = async ({ sampleId, animalType, limsAnimalType, results,
     testCode,
     animalType: refAnimalType,
   });
-  if (refAnimalType === 'camel') {
-    await referenceRangesService.syncNormaProfileForAnimal(testCode, refAnimalType);
-  }
+  await referenceRangesService.syncNormaProfileForAnimal(testCode, refAnimalType);
 
   const values = [];
   const skipped = [];

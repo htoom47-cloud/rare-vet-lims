@@ -20,6 +20,42 @@ router.post('/ingest/:deviceId', authenticateDevice, async (req, res, next) => {
 
 router.use(authenticate);
 
+router.get('/reference-ranges/list', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
+  try {
+    const deviceRefRanges = require('../services/device-reference-ranges.service');
+    const data = await deviceRefRanges.list({
+      device_name: req.query.device_name,
+      species: req.query.species,
+      parameter_code: req.query.parameter_code,
+      search: req.query.search,
+      page: parseInt(req.query.page, 10) || 1,
+      limit: Math.min(parseInt(req.query.limit, 10) || 100, 500),
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reference-ranges/logs', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
+  try {
+    const deviceRefRanges = require('../services/device-reference-ranges.service');
+    const data = await deviceRefRanges.listLogs({
+      limit: Math.min(parseInt(req.query.limit, 10) || 50, 200),
+      device_name: req.query.device_name,
+      parameter_code: req.query.parameter_code,
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/reference-ranges/sync', authorize(PERMISSIONS.DEVICES_MANAGE), async (req, res, next) => {
+  try {
+    const deviceRefRanges = require('../services/device-reference-ranges.service');
+    const hours = parseInt(req.body?.hours, 10) || 24;
+    const data = await deviceRefRanges.syncFromRecentMessages({ hours });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(PERMISSIONS.DEVICES_VIEW), async (req, res, next) => {
   try {
     const data = await service.list();

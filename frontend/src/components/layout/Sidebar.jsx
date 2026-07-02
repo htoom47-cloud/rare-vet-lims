@@ -51,6 +51,7 @@ const navSections = [
       { path: '/inventory', icon: Package, label: 'nav.inventory', permission: 'inventory.view' },
       { path: '/quality', icon: Shield, label: 'nav.quality', permission: 'quality.view' },
       { path: '/devices', icon: Cpu, label: 'nav.devices', permission: 'devices.view' },
+      { path: '/device-reference-ranges', icon: Activity, label: 'nav.deviceRefRanges', permission: 'devices.view' },
     ],
   },
   {

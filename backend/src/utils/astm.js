@@ -1,5 +1,6 @@
 const { parseReferenceRange } = require('./reference-range');
 const { mapNormaCode, resolveNormaResultLimsCode } = require('./norma-cbc-map');
+const { normalizeResultFlag } = require('./device-parsers/normalize');
 
 function parseAstm(raw) {
   const lines = raw.replace(/\r\n/g, '\r').replace(/\n/g, '\r').split('\r').filter(Boolean);
@@ -25,12 +26,13 @@ function parseAstm(raw) {
         results.push({
           code,
           limsCode,
+          parameterName: code,
           value,
           unit,
           reference: refRaw || null,
           referenceMin: ref?.min ?? null,
           referenceMax: ref?.max ?? null,
-          flag: (fields[6] || '').trim() || null,
+          flag: normalizeResultFlag((fields[6] || '').trim()),
         });
       }
     }

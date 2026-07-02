@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../config/logger');
-const { parseHl7 } = require('../utils/hl7');
-const { parseAstm } = require('../utils/astm');
+const { parseDeviceMessage } = require('../utils/device-parsers');
 const deviceImport = require('./device-import.service');
+const deviceRefRanges = require('./device-reference-ranges.service');
 
 const SUPPORTED_DEVICES = [
   { name: 'Norma CBC', model: 'iVet-5 / Icon-5', protocol: 'HL7', connection_type: 'tcp', default_port: 21110 },
@@ -14,13 +14,7 @@ const SUPPORTED_DEVICES = [
 
 const generateApiKey = () => crypto.randomBytes(24).toString('hex');
 
-const parseMessage = (raw, protocol) => {
-  const trimmed = String(raw || '').trim();
-  if (trimmed.startsWith('H|') || trimmed.startsWith('1H|')) return parseAstm(raw);
-  const p = (protocol || '').toUpperCase();
-  if (p === 'ASTM') return parseAstm(raw);
-  return parseHl7(raw);
-};
+const parseMessage = (raw, protocol) => parseDeviceMessage(raw, protocol);
 
 const list = async () => {
   const result = await query('SELECT * FROM device_integrations ORDER BY name');
@@ -120,6 +114,12 @@ const processInboundMessage = async (device, rawMessage) => {
 
   try {
     const imported = await deviceImport.importFromParsed(parsed, device);
+    await deviceRefRanges.syncFromParsedMessage({
+      device,
+      parsed,
+      messageId: msgResult.rows[0].id,
+      species: imported.reference_animal_type || parsed.animalType,
+    });
     await query(
       `UPDATE device_messages SET status = 'imported', parsed_data = $1, sample_id = $2 WHERE id = $3`,
       [JSON.stringify({ ...parsed, import: imported }), imported.sample_id, msgResult.rows[0].id]

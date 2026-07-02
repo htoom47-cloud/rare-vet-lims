@@ -1,6 +1,7 @@
 const { parseReferenceRange } = require('./reference-range');
 const { mapNormaCode, mapNormaIndex, resolveNormaResultLimsCode } = require('./norma-cbc-map');
 const { extractAnimalTypeFromSegments } = require('./norma-species-map');
+const { normalizeResultFlag, parseDeviceTimestamp } = require('./device-parsers/normalize');
 
 const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
 
@@ -98,10 +99,15 @@ function parseHl7(raw) {
   let sampleId = extractFromRaw(raw);
   const animalType = extractAnimalTypeFromSegments(segments);
   const results = [];
+  let observedAt = null;
 
   for (const segment of segments) {
     const fields = segment.split('|');
     const type = fields[0];
+
+    if (type === 'MSH' && fields[6]) {
+      observedAt = observedAt || parseDeviceTimestamp(fields[6]);
+    }
 
     if (type === 'PID') {
       sampleId = sampleId || firstId(
@@ -122,6 +128,12 @@ function parseHl7(raw) {
     }
 
     if (type === 'OBR') {
+      for (const idx of [7, 8, 6]) {
+        if (fields[idx]) {
+          observedAt = parseDeviceTimestamp(fields[idx]) || observedAt;
+          break;
+        }
+      }
       sampleId = sampleId || firstId(
         pickId(fields[2]),
         pickId(fields[3]),
@@ -155,17 +167,24 @@ function parseHl7(raw) {
       const ref = parseReferenceRange(refRaw);
       const limsCode = resolveLimsCodeForObx(limsCodeBase, codeRaw, unit);
       const normalized = limsCode ? normalizeNormaValue(limsCode, rawValue, unit) : { value: rawValue, unit };
+      const obxParts = String(fields[3] || '').split('^');
+      const parameterName = obxParts[1] || obxParts[0] || codeRaw;
+      const resultAt = parseDeviceTimestamp(fields[14])
+        || parseDeviceTimestamp(fields[15])
+        || observedAt;
 
       if (limsCode && rawValue !== '' && !Number.isNaN(numeric)) {
         results.push({
           code: codeRaw,
           limsCode,
+          parameterName,
           value: normalized.value,
           unit: normalized.unit || unit,
           reference: refRaw || null,
           referenceMin: ref?.min ?? null,
           referenceMax: ref?.max ?? null,
-          flag: (fields[8] || '').trim() || null,
+          flag: normalizeResultFlag((fields[8] || '').trim()),
+          observedAt: resultAt,
         });
       }
     }
@@ -175,6 +194,7 @@ function parseHl7(raw) {
     protocol: 'HL7',
     sampleId: normalizeSampleId(sampleId),
     animalType: animalType || null,
+    observedAt,
     results,
     segments: segments.length,
   };
