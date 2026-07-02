@@ -27,6 +27,7 @@ const resolvePortalStaticOtp = () => {
   if (raw === 'off' || raw === 'false' || raw === '0') return null;
   if (raw?.trim()) return raw.trim();
   if (smsEnabled) return null;
+  if (process.env.NODE_ENV === 'production') return null;
   return '1234';
 };
 

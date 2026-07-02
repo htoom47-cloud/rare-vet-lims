@@ -70,13 +70,16 @@ const requestOtp = async (mobile) => {
 
   if (env.portal.staticOtp) {
     logger.warn('Portal static OTP enabled — remove PORTAL_OTP_STATIC when SMS is ready');
-    return {
+    const payload = {
       message: 'Verification code sent',
       message_ar: 'تم إرسال رمز التحقق',
       expiresIn: OTP_TTL_MINUTES * 60,
       customerName: customer.full_name_ar || customer.full_name,
-      debugOtp: env.portal.staticOtp,
     };
+    if (env.nodeEnv !== 'production') {
+      payload.debugOtp = env.portal.staticOtp;
+    }
+    return payload;
   }
 
   const recent = await query(

@@ -43,7 +43,7 @@ const handleUpload = (req, res, next) => {
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
+        return res.status(400).json({ success: false, error: { message: 'Image must be under 20 MB' } });
       }
       return res.status(400).json({
         success: false,
@@ -87,7 +87,7 @@ router.get('/previous/:animalId/:parameterId', authorize(PERMISSIONS.RESULTS_VIE
 
 router.post('/enter', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_EDIT), validate(resultEntrySchema), async (req, res, next) => {
   try {
-    const allowValidatedEdit = req.user.permissions.includes(PERMISSIONS.RESULTS_EDIT)
+    const allowValidatedEdit = req.user.permissions.includes(PERMISSIONS.RESULTS_UNVALIDATE)
       || req.user.role_name === 'admin';
     const data = await service.enterResults(
       { ...req.body, allow_validated_edit: allowValidatedEdit },

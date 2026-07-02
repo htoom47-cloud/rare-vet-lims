@@ -9,6 +9,16 @@ const NOTIFICATION_POLL_MS = 60_000;
 
 const start = async () => {
   try {
+    if (env.nodeEnv === 'production') {
+      if (!process.env.JWT_SECRET || env.jwt.secret === 'dev-secret-change-me') {
+        logger.error('JWT_SECRET must be set in production');
+        process.exit(1);
+      }
+      if (env.portal.staticOtp) {
+        logger.warn('Portal static OTP is enabled in production — set PORTAL_OTP_STATIC=off when SMS is ready');
+      }
+    }
+
     let connected = false;
     for (let attempt = 1; attempt <= 5; attempt++) {
       try {

@@ -103,12 +103,13 @@ const swaggerSpec = swaggerJsdoc({
   apis: ['./src/routes/*.js'],
 });
 
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: `${LAB_NAME_EN} LIMS API Docs`,
-}));
-
-app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+if (env.nodeEnv !== 'production' || process.env.SERVE_API_DOCS === 'true') {
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: `${LAB_NAME_EN} LIMS API Docs`,
+  }));
+  app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+}
 
 app.use('/api', routes);
 

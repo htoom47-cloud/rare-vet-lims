@@ -222,7 +222,6 @@ export const downloadReportPdf = async (pdfUrl, saveAs) => {
 export const reportsAPI = {
   list: (params) => api.get('/reports', { params }),
   getPreview: (id) => api.get(`/reports/${id}/preview`),
-  interpret: (sampleId, language = 'ar') => api.post(`/reports/interpret/${sampleId}`, { language }),
   generate: (sampleId, opts = {}) =>
     api.post(`/reports/generate/${sampleId}`, {
       language: opts.language ?? 'ar',

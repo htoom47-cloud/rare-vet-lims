@@ -1,5 +1,5 @@
 const { query } = require('../config/database');
-const { defaultCritical } = require('../utils/reference-range');
+const { defaultCritical, normaReferenceNote } = require('../utils/reference-range');
 const { getNormaReference } = require('../utils/norma-cbc-references');
 const { DEFAULT_CBC_TEST_CODE, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
 
@@ -93,7 +93,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
 
     const profile = getNormaReference(animalType, limsCode);
     const noteText = fromHl7
-      ? (row.reference ? `Norma: ${row.reference}` : `Norma HL7: ${refMin}-${refMax}`)
+      ? normaReferenceNote(row.reference, refMin, refMax)
       : undefined;
 
     await upsertReferenceRange({
@@ -101,8 +101,8 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
       animalType,
       min: refMin,
       max: refMax,
-      criticalLow: profile?.crit_low,
-      criticalHigh: profile?.crit_high,
+      criticalLow: fromHl7 ? undefined : profile?.crit_low,
+      criticalHigh: fromHl7 ? undefined : profile?.crit_high,
       unit: row.unit || param.rows[0].unit,
       notes: noteText,
       source: fromHl7 ? 'norma-hl7' : 'norma-profile',

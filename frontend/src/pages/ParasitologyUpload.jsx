@@ -8,14 +8,7 @@ import {
   sortParasSampleTests,
   panelI18nKey,
 } from '../utils/parasitologyTests';
-
-const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
-
-const mediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http') || url.startsWith('blob:')) return url;
-  return `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
-};
+import mediaUrl from '../utils/mediaUrl';
 
 const normalizeUploadFile = (file) => {
   if (!file || typeof File === 'undefined') return file;

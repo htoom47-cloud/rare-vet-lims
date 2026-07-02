@@ -8,6 +8,7 @@ const {
   mapCbcRowsForDisplay,
 } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
+const { formatNormaReference } = require('../utils/reference-range');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
@@ -37,12 +38,20 @@ const getAttachments = async (resultId) => {
 
 const formatCbcResultValues = (rawValues) => mapCbcRowsForDisplay(rawValues);
 
+const resolveResultReference = (row) => {
+  const fromValue = row.rv_notes?.startsWith('Norma:') ? row.rv_notes.slice(6).trim() : null;
+  if (fromValue) return fromValue;
+  const fromRange = row.tr_notes?.startsWith('Norma:') ? row.tr_notes.slice(6).trim() : null;
+  if (fromRange) return fromRange;
+  return formatNormaReference(null, row.min_value, row.max_value);
+};
+
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
     `SELECT r.id AS result_id, r.sample_test_id, r.is_validated, r.doctor_notes, r.technician_notes, r.has_critical,
-            rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical,
+            rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical, rv.notes AS rv_notes,
             tp.name AS parameter_name, tp.name_ar AS parameter_name_ar, tp.code AS parameter_code, tp.unit, tp.sort_order,
-            tr.min_value, tr.max_value, t.code AS test_code
+            tr.min_value, tr.max_value, tr.notes AS tr_notes, t.code AS test_code
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
      LEFT JOIN test_parameters tp ON rv.parameter_id = tp.id
@@ -51,7 +60,7 @@ const getBySampleTest = async (sampleTestId) => {
      LEFT JOIN samples s ON st.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
      LEFT JOIN LATERAL (
-       SELECT min_value, max_value
+       SELECT min_value, max_value, notes
        FROM test_reference_ranges
        WHERE parameter_id = tp.id AND (animal_type = a.animal_type OR animal_type IS NULL)
        ORDER BY CASE WHEN animal_type = a.animal_type THEN 0 ELSE 1 END
@@ -82,7 +91,7 @@ const getBySampleTest = async (sampleTestId) => {
       unit: row.unit,
       flag: row.flag,
       is_critical: row.is_critical,
-      reference: row.min_value != null ? `${row.min_value} - ${row.max_value}` : null,
+      reference: resolveResultReference(row),
       sort_order: row.sort_order,
     });
   }
@@ -202,8 +211,8 @@ const enterResults = async (data, userId) => {
       }
 
       await client.query(
-        `INSERT INTO result_values (id, result_id, parameter_id, value, numeric_value, flag, is_critical)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO result_values (id, result_id, parameter_id, value, numeric_value, flag, is_critical, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           uuidv4(),
           resultId,
@@ -212,6 +221,7 @@ const enterResults = async (data, userId) => {
           isNumeric ? numericValue : null,
           flag,
           isCritical,
+          val.notes ?? null,
         ]
       );
     }
@@ -467,8 +477,15 @@ const clearSampleTestResults = async (sampleTestId) => {
   );
   if (!st.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
 
-  const result = await query('SELECT id FROM results WHERE sample_test_id = $1', [sampleTestId]);
+  const result = await query(
+    'SELECT id, is_validated FROM results WHERE sample_test_id = $1',
+    [sampleTestId]
+  );
   const resultId = result.rows[0]?.id;
+
+  if (result.rows[0]?.is_validated) {
+    throw new AppError('Results are approved — unapprove first before clearing', 403, 'VALIDATED_LOCKED');
+  }
 
   if (resultId) {
     const attachments = await query('SELECT id, file_url FROM result_attachments WHERE result_id = $1', [resultId]);

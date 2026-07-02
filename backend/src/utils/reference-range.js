@@ -34,4 +34,17 @@ const defaultCritical = (min, max) => {
   };
 };
 
-module.exports = { parseReferenceRange, defaultCritical };
+/** Prefer Norma OBX-7 text as shown on device; fallback to min-max. */
+const formatNormaReference = (raw, min, max) => {
+  const text = String(raw || '').trim();
+  if (text) return text;
+  if (min != null && max != null) return `${min} - ${max}`;
+  return null;
+};
+
+const normaReferenceNote = (raw, min, max) => {
+  const display = formatNormaReference(raw, min, max);
+  return display ? `Norma: ${display}` : null;
+};
+
+module.exports = { parseReferenceRange, defaultCritical, formatNormaReference, normaReferenceNote };

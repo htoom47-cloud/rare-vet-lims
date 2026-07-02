@@ -113,6 +113,13 @@ check('ASTM R record sets limsCode + refs', () => {
   assert.strictEqual(row.referenceMax, 40);
 });
 
+check('horse species from PID.10', () => {
+  const hl7 = 'PID|1||SMP-TEST||PATIENT^TEST|||20200101|M|||horse\rOBX|1|NM|WBC^WBC^Norma||8.2|10^9/L|5.0-14.0|N';
+  const parsed = parseHl7(hl7);
+  assert.strictEqual(parsed.animalType, 'horse');
+  assert.strictEqual(parsed.results[0].referenceMin, 5);
+});
+
 check('profile refs align with HL7 builder for camel', () => {
   const refs = NORMA_CBC_REFERENCES.camel;
   const hl7 = buildNormaCbcHl7('SMP-VERIFY', buildFullNormaPanelValues(), 'camel');

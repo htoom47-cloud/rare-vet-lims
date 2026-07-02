@@ -17,6 +17,7 @@ export default function TechnicianWorkbench() {
   const [critical, setCritical] = useState([]);
   const [selectedSample, setSelectedSample] = useState(null);
   const [resultForm, setResultForm] = useState({});
+  const [testValidated, setTestValidated] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -58,6 +59,7 @@ export default function TechnicianWorkbench() {
     }
     setSelectedSample({ ...data.data, tests: labTests });
     const form = {};
+    const validated = {};
     for (const test of labTests) {
       const testDetail = await testsAPI.get(test.test_id);
       const isCbc = testDetail.data.data.code === 'CBC-FULL' || test.test_code === 'CBC-FULL';
@@ -66,6 +68,7 @@ export default function TechnicianWorkbench() {
         const res = await resultsAPI.get(test.id);
         existing = res.data.data;
       } catch { /* no results yet */ }
+      validated[test.id] = Boolean(existing?.is_validated);
       form[test.id] = isCbc
         ? buildCbcResultFields(testDetail.data.data.parameters || [], existing)
         : (testDetail.data.data.parameters || []).map((p) => {
@@ -81,6 +84,7 @@ export default function TechnicianWorkbench() {
           };
         });
     }
+    setTestValidated(validated);
     setResultForm(form);
   };
 
@@ -111,9 +115,7 @@ export default function TechnicianWorkbench() {
       setSelectedSample(null);
       load();
     } catch (err) {
-      const msg = err.response?.data?.error?.message
-        || err.response?.data?.error?.details?.[0]?.message
-        || 'Error';
+      const msg = err.response?.data?.error?.message || t('common.error');
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -132,7 +134,7 @@ export default function TechnicianWorkbench() {
       await openResultEntry(selectedSample);
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Error');
+      toast.error(err.response?.data?.error?.message || t('common.error'));
     }
   };
 
@@ -279,10 +281,13 @@ export default function TechnicianWorkbench() {
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
               <div className="flex justify-between items-center mb-3 gap-2">
                 <h4 className="font-semibold">{test.test_name}</h4>
-                {(resultForm[test.id] || []).some((v) => String(v.value ?? '').trim() !== '') && (
+                {!testValidated[test.id] && (resultForm[test.id] || []).some((v) => String(v.value ?? '').trim() !== '') && (
                   <button type="button" onClick={() => clearTestResults(test)} className="text-red-600 text-sm hover:underline">
                     {t('workbench.clearResults')}
                   </button>
+                )}
+                {testValidated[test.id] && (
+                  <span className="text-xs text-green-700 dark:text-green-400">{t('workbench.approvedLocked', { defaultValue: 'Approved — use Vet Review to edit' })}</span>
                 )}
               </div>
               {fields.length === 0 ? (

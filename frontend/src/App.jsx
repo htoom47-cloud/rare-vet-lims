@@ -56,7 +56,7 @@ export default function App() {
           />
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/report-demo" element={<ReportDemo />} />
+            {import.meta.env.DEV && <Route path="/report-demo" element={<ReportDemo />} />}
             <Route path="/report-live/:id" element={<ReportLive />} />
             <Route path="/verify/:code" element={<VerifyReport />} />
             <Route path="/reception-display" element={<ReceptionDisplay />} />

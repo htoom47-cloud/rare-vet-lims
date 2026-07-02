@@ -15,6 +15,7 @@ import {
   PARAS_CATEGORY_CODE,
   MICRO_PANEL_ORDER,
 } from '../utils/parasitologyTests';
+import mediaUrl from '../utils/mediaUrl';
 
 const sortMicroTests = (tests = []) =>
   [...tests].sort((a, b) => {
@@ -49,12 +50,6 @@ const normalizeUploadFile = (file) => {
           : '.jpg';
   const base = (file.name || 'microscope').replace(/\.[^.]+$/, '') || 'microscope';
   return new File([file], `${base}${ext}`, { type, lastModified: file.lastModified });
-};
-
-const mediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http') || url.startsWith('blob:')) return url;
-  return `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
 };
 
 const withRetry = async (fn, { retries = 2, delayMs = 1200 } = {}) => {

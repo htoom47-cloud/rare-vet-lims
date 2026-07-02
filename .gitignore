@@ -10,6 +10,8 @@ bridge/watchdog.log
 .DS_Store
 uploads/*
 !uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
 backups/
 coverage/
 .vscode/

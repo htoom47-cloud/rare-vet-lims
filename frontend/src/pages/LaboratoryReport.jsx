@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { DEMO_REPORT } from '../data/demoReport';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
 import { isSinglePageLayout, isAbnormalFlag, flattenResults } from '../utils/reportLayout';
+import mediaUrl from '../utils/mediaUrl';
 
 import { ANIMAL_TYPES } from '../constants/animalTypes';
 
@@ -50,12 +51,6 @@ const isAbnormal = (flag) => flag && !['NORMAL', 'NEG', 'PENDING'].includes(flag
 const isCritical = (flag, isCrit) => isCrit || flag === 'CRIT_HIGH' || flag === 'CRIT_LOW';
 
 const formatUnit = (unit) => (!unit || unit === 'qual' ? '—' : unit);
-
-const resolveImageUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http') || url.startsWith('data:')) return url;
-  return url.startsWith('/') ? url : `/${url}`;
-};
 
 function groupResults(results) {
   const groups = [];
@@ -467,7 +462,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
                     <div className="lab-rpt-image lab-rpt-image-missing">{t('labReport.imageUnavailable')}</div>
                   ) : (
                     <img
-                      src={resolveImageUrl(att.fileUrl)}
+                      src={mediaUrl(att.fileUrl)}
                       alt={att.caption || (isAr ? att.testNameAr : att.testNameEn) || t('labReport.microscopeImages')}
                       className="lab-rpt-image"
                       crossOrigin="anonymous"

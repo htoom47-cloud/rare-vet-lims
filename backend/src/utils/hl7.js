@@ -1,5 +1,6 @@
 const { parseReferenceRange } = require('./reference-range');
 const { mapNormaCode, mapNormaIndex, resolveNormaResultLimsCode } = require('./norma-cbc-map');
+const { extractAnimalTypeFromSegments } = require('./norma-species-map');
 
 const HL7_VALUE_TYPES = new Set(['NM', 'SN', 'CE', 'ST', 'TX', 'FT', 'IS', 'ED', 'RP', 'DT', 'TM']);
 
@@ -95,6 +96,7 @@ const normalizeNormaValue = (code, rawValue, unit) => {
 function parseHl7(raw) {
   const segments = splitSegments(raw);
   let sampleId = extractFromRaw(raw);
+  const animalType = extractAnimalTypeFromSegments(segments);
   const results = [];
 
   for (const segment of segments) {
@@ -172,6 +174,7 @@ function parseHl7(raw) {
   return {
     protocol: 'HL7',
     sampleId: normalizeSampleId(sampleId),
+    animalType: animalType || null,
     results,
     segments: segments.length,
   };

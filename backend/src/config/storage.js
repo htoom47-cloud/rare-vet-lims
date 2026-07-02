@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const env = require('./env');
 const logger = require('./logger');
@@ -52,6 +53,29 @@ const parseUploadUrl = (url) => {
 };
 
 const uploadUrl = (subdir, filename) => `/uploads/${subdir}/${filename}`;
+
+/** Paths that must not be served without staff JWT (reports, invoices, microscope, internal docs). */
+const PROTECTED_UPLOAD_PREFIXES = ['reports/', 'invoices/', 'microscope/', 'ministry-docs/'];
+
+const isProtectedUploadPath = (rel) =>
+  PROTECTED_UPLOAD_PREFIXES.some((prefix) => rel.startsWith(prefix));
+
+const extractUploadAuthToken = (req) => {
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  if (req.query.access_token) return String(req.query.access_token).trim();
+  return null;
+};
+
+const verifyStaffUploadToken = (token) => {
+  if (!token) return false;
+  try {
+    const payload = jwt.verify(token, env.jwt.secret);
+    return payload?.type !== 'customer' && payload?.userId;
+  } catch {
+    return false;
+  }
+};
 
 const guessMime = (filename) => {
   const ext = path.extname(filename).toLowerCase();
@@ -299,6 +323,10 @@ const deleteFile = async (url) => {
 const serveUploads = async (req, res, next) => {
   const rel = req.path.replace(/^\//, '');
   if (!rel || rel.includes('..')) return next();
+
+  if (isProtectedUploadPath(rel) && !verifyStaffUploadToken(extractUploadAuthToken(req))) {
+    return res.status(401).json({ success: false, error: { message: 'Authentication required' } });
+  }
 
   const url = `/uploads/${rel}`;
   try {

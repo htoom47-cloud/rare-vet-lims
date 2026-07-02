@@ -4,6 +4,8 @@ const resultsService = require('./results.service');
 const referenceRangesService = require('./reference-ranges.service');
 const { mapNormaCode, DEFAULT_CBC_TEST_CODE, NORMA_CBC_PCT_BY_ABS, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
 const { barcodeLookupSql } = require('../utils/barcode-lookup');
+const { normaReferenceNote } = require('../utils/reference-range');
+const logger = require('../config/logger');
 
 const resultLimsCode = (row) => resolveNormaResultLimsCode(row) || row.code;
 
@@ -115,34 +117,63 @@ const resolveParameter = async (testCode, deviceCode) => {
   return result.rows[0] || null;
 };
 
-const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFAULT_CBC_TEST_CODE, deviceName }) => {
+const importCbcResults = async ({ sampleId, animalType, limsAnimalType, results, testCode = DEFAULT_CBC_TEST_CODE, deviceName, normaAnimalType }) => {
   const sampleTest = await findSampleTest(sampleId, testCode);
   if (!sampleTest) {
     throw new AppError(`No ${testCode} test on this sample — add CBC to the invoice first`, 404, 'NO_CBC_TEST');
   }
 
+  const refAnimalType = animalType || limsAnimalType;
+  if (!refAnimalType) {
+    throw new AppError('Animal species is required for Norma reference ranges — link sample to an animal', 400, 'ANIMAL_TYPE_REQUIRED');
+  }
+
+  if (normaAnimalType && limsAnimalType && normaAnimalType !== limsAnimalType) {
+    logger.warn('Norma species differs from LIMS animal — using Norma refs for sync', {
+      norma: normaAnimalType,
+      lims: limsAnimalType,
+      sampleId,
+    });
+  }
+
   const refSync = await referenceRangesService.syncFromParsedResults({
     results,
     testCode,
-    animalType: animalType || 'camel',
+    animalType: refAnimalType,
   });
-  await referenceRangesService.syncNormaProfileForAnimal(testCode, animalType || 'camel');
+  if (refAnimalType === 'camel') {
+    await referenceRangesService.syncNormaProfileForAnimal(testCode, refAnimalType);
+  }
 
   const values = [];
   const skipped = [];
+  const refsByParam = new Map();
 
   for (const row of results) {
-    const param = await resolveParameter(testCode, resultLimsCode(row));
+    const limsCode = resultLimsCode(row);
+    const param = await resolveParameter(testCode, limsCode);
     if (!param) {
       skipped.push(row.code || row.limsCode);
       continue;
     }
-    values.push({ parameter_id: param.id, value: String(row.value) });
+    const refNote = normaReferenceNote(row.reference, row.referenceMin, row.referenceMax);
+    if (refNote) refsByParam.set(param.id, refNote);
+    values.push({
+      parameter_id: param.id,
+      value: String(row.value),
+      notes: refNote || undefined,
+    });
   }
 
   await enrichDiffAbsFromPct(results, values, testCode);
   await enrichPctFromAbs(results, values, testCode);
   await enrichPlcFromPlt(results, values, testCode);
+
+  for (const v of values) {
+    if (!v.notes && refsByParam.has(v.parameter_id)) {
+      v.notes = refsByParam.get(v.parameter_id);
+    }
+  }
 
   if (!values.length) {
     const codes = (results || []).map((r) => r.code).join(', ') || 'none';
@@ -189,6 +220,10 @@ const importCbcResults = async ({ sampleId, animalType, results, testCode = DEFA
     skipped,
     reference_ranges_synced: refSync.updated,
     reference_ranges_skipped: refSync.skipped,
+    reference_animal_type: refAnimalType,
+    norma_animal_type: normaAnimalType || null,
+    lims_animal_type: limsAnimalType || null,
+    species_mismatch: Boolean(normaAnimalType && limsAnimalType && normaAnimalType !== limsAnimalType),
     result: saved,
   };
 };
@@ -201,9 +236,15 @@ const importFromParsed = async (parsed, device) => {
     throw new AppError(`Sample not found for barcode: ${parsed.sampleId}`, 404, 'SAMPLE_NOT_FOUND');
   }
 
+  const normaAnimalType = parsed.animalType || null;
+  const limsAnimalType = sample.animal_type || null;
+  const animalType = normaAnimalType || limsAnimalType;
+
   const importResult = await importCbcResults({
     sampleId: sample.id,
-    animalType: sample.animal_type,
+    animalType,
+    limsAnimalType,
+    normaAnimalType,
     results: parsed.results,
     testCode,
     deviceName: device?.name,

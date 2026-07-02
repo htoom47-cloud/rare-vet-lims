@@ -405,6 +405,7 @@ const resources = {
         cancel: 'Cancel', actions: 'Actions', loading: 'Loading...', noData: 'No data found',
         status: 'Status', date: 'Date', name: 'Name', phone: 'Phone', notes: 'Notes',
         view: 'View', print: 'Print', download: 'Download', filter: 'Filter',
+        accessDenied: 'You do not have permission to access this page',
       },
       dashboard: {
         dailySamples: 'Daily Samples', revenue: 'Revenue', topTests: 'Top Tests',
@@ -1228,6 +1229,7 @@ const resources = {
         cancel: 'إلغاء', actions: 'الإجراءات', loading: 'جاري التحميل...', noData: 'لا توجد بيانات',
         status: 'الحالة', date: 'التاريخ', name: 'الاسم', phone: 'الهاتف', notes: 'ملاحظات',
         view: 'عرض', print: 'طباعة', download: 'تحميل', filter: 'تصفية',
+        accessDenied: 'ليس لديك صلاحية للوصول إلى هذه الصفحة',
       },
       dashboard: {
         dailySamples: 'عينات اليوم', revenue: 'الإيرادات', topTests: 'أكثر الفحوصات',

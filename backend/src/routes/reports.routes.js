@@ -49,7 +49,7 @@ router.post('/generate/:sampleId', authorize(PERMISSIONS.REPORTS_GENERATE), asyn
   } catch (err) { next(err); }
 });
 
-router.post('/:id/approve', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
+router.post('/:id/approve', authorize(PERMISSIONS.REPORTS_GENERATE), async (req, res, next) => {
   try {
     const data = await service.approve(req.params.id, req.user.id, req.user.role_name, req.body.type);
     res.json({ success: true, data });
