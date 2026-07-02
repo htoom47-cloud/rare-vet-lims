@@ -57,8 +57,8 @@ const upsertReferenceRange = async ({
   const noteText = notes ?? (source === 'manual' ? null : `Synced from ${source}`);
 
   const existing = await query(
-    `SELECT id, notes FROM test_reference_ranges
-     WHERE parameter_id = $1 AND animal_type = $2
+    `SELECT id, notes FROM test_reference_ranges trr
+     WHERE trr.parameter_id = $1 AND trr.animal_type = $2
      ORDER BY ${LIMS_REF_PRIORITY_ORDER}
      LIMIT 1`,
     [parameterId, animalType]
