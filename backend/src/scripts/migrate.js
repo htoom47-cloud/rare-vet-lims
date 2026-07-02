@@ -100,6 +100,34 @@ async function ensureLabSpecialistRole(client) {
   await syncRolePermissions(client);
 }
 
+async function ensureUniqueLimsReferenceRanges(client) {
+  await client.query(`
+    WITH ranked AS (
+      SELECT id,
+        ROW_NUMBER() OVER (
+          PARTITION BY parameter_id, animal_type
+          ORDER BY
+            CASE
+              WHEN notes IS NOT NULL
+                AND notes NOT LIKE 'Norma:%'
+                AND notes NOT LIKE 'Synced from%' THEN 0
+              WHEN notes IS NULL OR TRIM(notes) = '' THEN 1
+              ELSE 2
+            END,
+            id DESC
+        ) AS rn
+      FROM test_reference_ranges
+    )
+    DELETE FROM test_reference_ranges tr
+    USING ranked r
+    WHERE tr.id = r.id AND r.rn > 1
+  `);
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_test_reference_ranges_param_species
+    ON test_reference_ranges (parameter_id, animal_type)
+  `);
+}
+
 async function applyPatches() {
   const client = await pool.connect();
   try {
@@ -328,6 +356,7 @@ async function applyPatches() {
         ALTER COLUMN high_value DROP NOT NULL
     `);
     await syncLabContactInfo(client);
+    await ensureUniqueLimsReferenceRanges(client);
   } finally {
     client.release();
   }

@@ -3,6 +3,33 @@ const { defaultCritical, normaReferenceNote } = require('../utils/reference-rang
 const { getNormaReference } = require('../utils/norma-cbc-references');
 const { DEFAULT_CBC_TEST_CODE, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
 
+/** Prefer manually entered LIMS ranges over Norma-synced duplicates. */
+const LIMS_REF_PRIORITY_ORDER = `
+  CASE
+    WHEN trr.notes IS NOT NULL
+      AND trr.notes NOT LIKE 'Norma:%'
+      AND trr.notes NOT LIKE 'Synced from%' THEN 0
+    WHEN trr.notes IS NULL OR TRIM(trr.notes) = '' THEN 1
+    ELSE 2
+  END,
+  trr.id DESC`;
+
+const LIMS_REF_SELECT_SQL = `
+  trr.min_value AS trr_min,
+  trr.max_value AS trr_max,
+  trr.critical_low AS trr_critical_low,
+  trr.critical_high AS trr_critical_high,
+  trr.notes AS trr_notes`;
+
+const limsRefLateralJoin = (paramExpr = 'tp.id', speciesExpr = 'a.animal_type') => `
+  LEFT JOIN LATERAL (
+    SELECT min_value, max_value, critical_low, critical_high, notes
+    FROM test_reference_ranges trr
+    WHERE trr.parameter_id = ${paramExpr} AND trr.animal_type = ${speciesExpr}
+    ORDER BY ${LIMS_REF_PRIORITY_ORDER}
+    LIMIT 1
+  ) trr ON true`;
+
 const upsertReferenceRange = async ({
   parameterId,
   animalType,
@@ -20,10 +47,13 @@ const upsertReferenceRange = async ({
   const crit = defaultCritical(min, max);
   const cLow = criticalLow ?? crit.crit_low;
   const cHigh = criticalHigh ?? crit.crit_high;
-  const noteText = notes || `Synced from ${source}`;
+  const noteText = notes ?? (source === 'manual' ? null : `Synced from ${source}`);
 
   const existing = await query(
-    `SELECT id, notes FROM test_reference_ranges WHERE parameter_id = $1 AND animal_type = $2`,
+    `SELECT id, notes FROM test_reference_ranges
+     WHERE parameter_id = $1 AND animal_type = $2
+     ORDER BY ${LIMS_REF_PRIORITY_ORDER}
+     LIMIT 1`,
     [parameterId, animalType]
   );
 
@@ -147,13 +177,14 @@ const syncNormaProfileForAnimal = async (testCode, animalType) => {
   return { updated };
 };
 
-/** Manual LIMS reference range for a parameter + animal type (إبل، خيل، غنم، ماعز). */
+/** Manual LIMS reference range for a parameter + animal type. */
 const getLimsReferenceRange = async (parameterId, animalType) => {
   if (!parameterId || !animalType) return null;
   const result = await query(
     `SELECT min_value, max_value, critical_low, critical_high, unit, notes
-     FROM test_reference_ranges
-     WHERE parameter_id = $1 AND animal_type = $2
+     FROM test_reference_ranges trr
+     WHERE trr.parameter_id = $1 AND trr.animal_type = $2
+     ORDER BY ${LIMS_REF_PRIORITY_ORDER}
      LIMIT 1`,
     [parameterId, animalType]
   );
@@ -172,4 +203,12 @@ const formatLimsRange = (range) => {
   return `${fmt(range.min_value)}-${fmt(range.max_value)}`;
 };
 
-module.exports = { upsertReferenceRange, syncFromParsedResults, syncNormaProfileForAnimal, getLimsReferenceRange, formatLimsRange };
+module.exports = {
+  upsertReferenceRange,
+  syncFromParsedResults,
+  syncNormaProfileForAnimal,
+  getLimsReferenceRange,
+  formatLimsRange,
+  LIMS_REF_SELECT_SQL,
+  limsRefLateralJoin,
+};

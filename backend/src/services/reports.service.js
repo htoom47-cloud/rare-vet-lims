@@ -9,6 +9,7 @@ const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
 const { compareByNormaOrder, filterCbcReportRows, getNormaPanelRow } = require('../utils/norma-cbc-map');
 const { resolveReportReferenceBounds, resolveReportReferenceDisplay } = require('../utils/reference-range');
+const { LIMS_REF_SELECT_SQL, limsRefLateralJoin } = require('./reference-ranges.service');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -212,9 +213,7 @@ const buildReportData = async (sampleId, opts) => {
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
             rv.value, rv.numeric_value, rv.notes AS rv_notes, tp.unit,
             rv.flag, rv.is_critical, res.doctor_notes,
-            trr.min_value AS trr_min, trr.max_value AS trr_max,
-            trr.critical_low AS trr_critical_low, trr.critical_high AS trr_critical_high,
-            trr.notes AS trr_notes
+            ${LIMS_REF_SELECT_SQL}
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN test_categories tc ON t.category_id = tc.id
@@ -223,7 +222,7 @@ const buildReportData = async (sampleId, opts) => {
      JOIN test_parameters tp ON rv.parameter_id = tp.id
      JOIN samples s ON st.sample_id = s.id
      JOIN animals a ON s.animal_id = a.id
-     LEFT JOIN test_reference_ranges trr ON trr.parameter_id = tp.id AND trr.animal_type = a.animal_type
+     ${limsRefLateralJoin()}
      WHERE st.sample_id = $1
      ORDER BY tp.sort_order, tp.id`,
     [sampleId]

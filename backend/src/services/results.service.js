@@ -9,7 +9,7 @@ const {
 } = require('../utils/norma-cbc-map');
 const { evaluateFlag } = require('../utils/helpers');
 const { resolveLimsReferenceDisplay } = require('../utils/reference-range');
-const { getLimsReferenceRange } = require('./reference-ranges.service');
+const { getLimsReferenceRange, LIMS_REF_SELECT_SQL, limsRefLateralJoin } = require('./reference-ranges.service');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
@@ -41,31 +41,21 @@ const formatCbcResultValues = (rawValues) => mapCbcRowsForDisplay(rawValues);
 
 const resolveResultReference = (row) => resolveLimsReferenceDisplay(row) || null;
 
-const LIMS_REF_RANGE_SQL = `
-  trr.min_value AS trr_min,
-  trr.max_value AS trr_max,
-  trr.critical_low AS trr_critical_low,
-  trr.critical_high AS trr_critical_high,
-  trr.notes AS trr_notes`;
-
-const LIMS_REF_JOIN_SQL = `
-  JOIN samples s ON st.sample_id = s.id
-  JOIN animals a ON s.animal_id = a.id
-  LEFT JOIN test_reference_ranges trr ON trr.parameter_id = tp.id AND trr.animal_type = a.animal_type`;
-
 const getBySampleTest = async (sampleTestId) => {
   const result = await query(
     `SELECT r.id AS result_id, r.sample_test_id, r.is_validated, r.doctor_notes, r.technician_notes, r.has_critical,
             rv.parameter_id, rv.value, rv.numeric_value, rv.flag, rv.is_critical, rv.notes AS rv_notes,
             tp.name AS parameter_name, tp.name_ar AS parameter_name_ar, tp.code AS parameter_code, tp.unit, tp.sort_order,
             t.code AS test_code,
-            ${LIMS_REF_RANGE_SQL}
+            ${LIMS_REF_SELECT_SQL}
      FROM results r
      LEFT JOIN result_values rv ON r.id = rv.result_id
      LEFT JOIN test_parameters tp ON rv.parameter_id = tp.id
      LEFT JOIN sample_tests st ON r.sample_test_id = st.id
      JOIN tests t ON st.test_id = t.id
-     ${LIMS_REF_JOIN_SQL}
+     JOIN samples s ON st.sample_id = s.id
+     JOIN animals a ON s.animal_id = a.id
+     ${limsRefLateralJoin()}
      WHERE r.sample_test_id = $1
      ORDER BY tp.sort_order, tp.id`,
     [sampleTestId]

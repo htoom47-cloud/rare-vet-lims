@@ -2,6 +2,7 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 const { buildCbcDisplayParameters, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
+const { upsertReferenceRange } = require('./reference-ranges.service');
 
 const listCategories = async ({ includeInactive } = {}) => {
   const where = includeInactive ? '' : 'WHERE is_active = true';
@@ -193,14 +194,18 @@ const deleteParameter = async (parameterId) => {
   return { deleted: true };
 };
 
-const addReferenceRange = async (parameterId, range) => {
-  const result = await query(
-    `INSERT INTO test_reference_ranges (parameter_id, animal_type, min_value, max_value, critical_low, critical_high, unit, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [parameterId, range.animal_type, range.min_value, range.max_value, range.critical_low, range.critical_high, range.unit, range.notes]
-  );
-  return result.rows[0];
-};
+const addReferenceRange = async (parameterId, range) => upsertReferenceRange({
+  parameterId,
+  animalType: range.animal_type,
+  min: range.min_value,
+  max: range.max_value,
+  criticalLow: range.critical_low,
+  criticalHigh: range.critical_high,
+  unit: range.unit,
+  notes: range.notes ?? null,
+  source: 'manual',
+  onlyIfMissing: false,
+});
 
 const deleteTest = async (id) => {
   await getById(id);
