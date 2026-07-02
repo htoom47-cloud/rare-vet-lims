@@ -152,6 +152,15 @@ check('resolveReportReferenceBounds uses LIMS min/max', () => {
   assert.strictEqual(bounds.max, 15);
 });
 
+check('LYMP maps to LYM_PCT with ref', () => {
+  const lims = resolveNormaResultLimsCode({ code: 'LYMP', unit: '%', referenceMin: 19.8, referenceMax: 58.9 });
+  assert.strictEqual(lims, 'LYM_PCT');
+});
+
+check('MONP maps to MON_PCT', () => {
+  assert.strictEqual(resolveNormaResultLimsCode({ code: 'MONP', unit: '%' }), 'MON_PCT');
+});
+
 check('PDF fmtRef prefers reference over min/max formatting', () => {
   const fmtRef = (row) => {
     const verbatim = row.reference && row.reference !== '-' ? String(row.reference).trim() : null;
