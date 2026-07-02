@@ -127,6 +127,7 @@ async function main() {
       results: entry.parsed.results,
       testCode: DEFAULT_TEST_CODE,
       animalType: species,
+      overwriteNorma: true,
     });
 
     totalUpdated += sync.updated;

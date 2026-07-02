@@ -134,4 +134,12 @@ router.post('/parameters/:parameterId/ranges', authorize(PERMISSIONS.TESTS_MANAG
   } catch (err) { next(err); }
 });
 
+router.post('/reference-ranges/sync-from-sample/:sampleId', authorize(PERMISSIONS.TESTS_MANAGE), async (req, res, next) => {
+  try {
+    const { syncLimsRefsFromSample } = require('../services/reference-ranges.service');
+    const data = await syncLimsRefsFromSample(req.params.sampleId, { force: req.body?.force === true });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

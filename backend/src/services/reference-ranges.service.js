@@ -14,6 +14,12 @@ const LIMS_REF_PRIORITY_ORDER = `
   END,
   trr.id DESC`;
 
+const isManualLimsNotes = (notes) => {
+  const n = String(notes || '').trim();
+  if (!n) return false;
+  return !n.startsWith('Norma:') && !n.startsWith('Synced from');
+};
+
 const LIMS_REF_SELECT_SQL = `
   trr.min_value AS trr_min,
   trr.max_value AS trr_max,
@@ -41,6 +47,7 @@ const upsertReferenceRange = async ({
   notes,
   source = 'norma',
   onlyIfMissing = false,
+  force = false,
 }) => {
   if (parameterId == null || !animalType || min == null || max == null) return null;
 
@@ -58,6 +65,9 @@ const upsertReferenceRange = async ({
   );
 
   if (existing.rows[0] && onlyIfMissing) return existing.rows[0];
+  if (existing.rows[0] && isManualLimsNotes(existing.rows[0].notes) && !force) {
+    return { ...existing.rows[0], skipped_manual: true };
+  }
 
   if (existing.rows[0]) {
     const result = await query(
@@ -79,12 +89,19 @@ const upsertReferenceRange = async ({
   return result.rows[0];
 };
 
-const syncFromParsedResults = async ({ results, testCode, animalType }) => {
-  if (!results?.length || !animalType) return { updated: 0, skipped: 0 };
+const syncFromParsedResults = async ({
+  results,
+  testCode,
+  animalType,
+  overwriteNorma = false,
+  force = false,
+}) => {
+  if (!results?.length || !animalType) return { updated: 0, skipped: 0, protected: 0 };
 
   const code = testCode || DEFAULT_CBC_TEST_CODE;
   let updated = 0;
   let skipped = 0;
+  let protectedManual = 0;
 
   for (const row of results) {
     const limsCode = resolveNormaResultLimsCode(row);
@@ -105,7 +122,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
       }
     }
 
-    if (refMin == null || refMax == null) {
+    if (refMin == null || refMax == null || (refMin === 0 && refMax === 0)) {
       skipped += 1;
       continue;
     }
@@ -124,7 +141,7 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
     const profile = getNormaReference(animalType, limsCode);
     const noteText = fromHl7 ? normaReferenceNote(row.reference) : undefined;
 
-    await upsertReferenceRange({
+    const saved = await upsertReferenceRange({
       parameterId: param.rows[0].id,
       animalType,
       min: refMin,
@@ -134,12 +151,57 @@ const syncFromParsedResults = async ({ results, testCode, animalType }) => {
       unit: row.unit || param.rows[0].unit,
       notes: noteText,
       source: fromHl7 ? 'norma-hl7' : 'norma-profile',
-      onlyIfMissing: true,
+      onlyIfMissing: !overwriteNorma && !fromHl7,
+      force,
     });
-    updated += 1;
+    if (saved?.skipped_manual) protectedManual += 1;
+    else updated += 1;
   }
 
-  return { updated, skipped };
+  return { updated, skipped, protected: protectedManual };
+};
+
+/** Copy Norma OBX-7 from a sample import into LIMS test_reference_ranges for its animal type. */
+const syncLimsRefsFromSample = async (sampleId, opts = {}) => {
+  const { AppError } = require('../middleware/errorHandler');
+  const sample = await query(
+    `SELECT s.id, a.animal_type, s.sample_code
+     FROM samples s
+     JOIN animals a ON s.animal_id = a.id
+     WHERE s.id = $1`,
+    [sampleId]
+  );
+  if (!sample.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');
+  const { animal_type: animalType, sample_code: sampleCode } = sample.rows[0];
+
+  const msg = await query(
+    `SELECT id, parsed_data FROM device_messages
+     WHERE sample_id = $1 AND status = 'imported' AND parsed_data IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [sampleId]
+  );
+  if (!msg.rows[0]) throw new AppError('No Norma import found for this sample', 404, 'NOT_FOUND');
+
+  const parsed = typeof msg.rows[0].parsed_data === 'object'
+    ? msg.rows[0].parsed_data
+    : JSON.parse(msg.rows[0].parsed_data);
+  if (!parsed?.results?.length) throw new AppError('Norma message has no parsed results', 400, 'INVALID');
+
+  const sync = await syncFromParsedResults({
+    results: parsed.results,
+    testCode: opts.testCode,
+    animalType,
+    overwriteNorma: true,
+    force: opts.force === true,
+  });
+
+  return {
+    sampleId,
+    sampleCode,
+    animalType,
+    messageId: msg.rows[0].id,
+    ...sync,
+  };
 };
 
 /** Seed missing Norma profile reference ranges (does not overwrite HL7-synced values). */
@@ -207,8 +269,10 @@ module.exports = {
   upsertReferenceRange,
   syncFromParsedResults,
   syncNormaProfileForAnimal,
+  syncLimsRefsFromSample,
   getLimsReferenceRange,
   formatLimsRange,
   LIMS_REF_SELECT_SQL,
   limsRefLateralJoin,
+  isManualLimsNotes,
 };
