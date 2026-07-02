@@ -17,6 +17,7 @@ services:
     buildCommand: npm run build:cloud
     startCommand: npm run start:cloud
     healthCheckPath: /api/health
+    # Pin Node 20 LTS for consistent native deps (canvas/sharp) on Linux builds.
     disk:
       name: lims-uploads
       mountPath: /var/data
@@ -25,6 +26,8 @@ services:
       - lims.rarevetcare.com
       - portal.rarevetcare.com
     envVars:
+      - key: NODE_VERSION
+        value: "20"
       - key: NODE_ENV
         value: production
       - key: SERVE_FRONTEND

@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  build: {
+    sourcemap: false,
+    reportCompressedSize: false,
+    minify: 'esbuild',
+    rollupOptions: { maxParallelFileOps: 2 },
+  },
   plugins: [
     react(),
     VitePWA({

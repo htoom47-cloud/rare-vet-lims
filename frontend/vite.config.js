@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    sourcemap: false,
+    reportCompressedSize: false,
+    minify: 'esbuild',
+    rollupOptions: { maxParallelFileOps: 2 },
+  },
   server: {
     port: 5173,
     host: true,

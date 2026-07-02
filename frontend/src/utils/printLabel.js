@@ -75,7 +75,8 @@ export async function printSampleLabel(sample) {
   }
 
   if (jobs.length > 1) {
-    toast.success(      i18n.t('samples.zebraPrintMultipleOk', { count: zebraPrinted, printer: lastDevice })
+    toast.success(
+      i18n.t('samples.zebraPrintMultipleOk', { count: zebraPrinted, printer: lastDevice })
     );
   } else {
     toast.success(
