@@ -74,7 +74,7 @@ const resolveLimsReferenceBounds = (row) => ({
 const formatLimsRangeDisplay = (row) => {
   if (!hasLimsReferenceRow(row)) return null;
   const note = row?.trr_notes != null ? String(row.trr_notes).trim() : '';
-  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:')) return note;
+  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:') && !/^LIMS /i.test(note)) return note;
   const fmt = (n) => {
     const num = Number(n);
     if (Number.isNaN(num)) return String(n);

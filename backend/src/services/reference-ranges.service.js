@@ -256,7 +256,7 @@ const getLimsReferenceRange = async (parameterId, animalType) => {
 const formatLimsRange = (range) => {
   if (!range || range.min_value == null || range.max_value == null) return null;
   const note = range.notes != null ? String(range.notes).trim() : '';
-  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:')) return note;
+  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:') && !/^LIMS /i.test(note)) return note;
   const fmt = (n) => {
     const num = Number(n);
     if (Number.isNaN(num)) return String(n);
