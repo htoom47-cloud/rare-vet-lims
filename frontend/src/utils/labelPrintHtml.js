@@ -1,16 +1,11 @@
-import { buildLabelLines } from './labelPanel';
+import { buildThermalLabelContent } from './labelPanel';
+import { thermalScanDigits } from './zebraPrint';
 
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
-
-const truncate = (text, max) => {
-  const s = String(text || '').trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
-};
 
 const LABEL_PRINT_STYLES = `
   @page { size: 50mm 25mm; margin: 0; }
@@ -22,55 +17,82 @@ const LABEL_PRINT_STYLES = `
   }
   .label-50x25 {
     width: 50mm; height: 25mm; max-height: 25mm; box-sizing: border-box;
-    padding: 0.5mm 1.2mm 0.4mm;
+    padding: 0.4mm 1mm 0.3mm;
     display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     font-family: Arial, Helvetica, sans-serif; color: #000;
     overflow: hidden;
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .label-50x25 svg { max-width: 100%; max-height: 11mm; height: auto; display: block; }
-  .label-50x25-line {
-    margin: 0.2mm 0 0; padding: 0; font-size: 8pt; line-height: 1.12;
-    text-align: center; max-width: 100%; overflow: hidden;
-    white-space: nowrap; text-overflow: ellipsis;
+  .label-50x25-barcode-wrap {
+    width: 100%; flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
+    line-height: 0;
   }
-  .label-50x25 svg text { font-size: 10pt !important; font-weight: 600; }
-  .label-50x25-tests { font-weight: 600; }
+  .label-50x25-barcode-wrap svg { max-width: 100%; max-height: 10.5mm; height: auto; display: block; }
+  .label-50x25-digits {
+    margin: 0.15mm 0 0; padding: 0;
+    font-size: 7.5pt; font-weight: 700; line-height: 1.05;
+    text-align: center; letter-spacing: 0.02em;
+  }
+  .label-50x25-line {
+    margin: 0.12mm 0 0; padding: 0;
+    font-size: 6.5pt; line-height: 1.1;
+    text-align: center; max-width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 600;
+  }
+  .label-50x25-line.label-50x25-meta { font-weight: 500; }
+  .label-50x25-line.label-50x25-test { font-weight: 700; }
   .label-50x25-error { font-size: 7pt; color: #c00; text-align: center; }
 `;
 
-export const labelMetaFromSample = (sample, isArabic = false) => {
-  const meta = buildLabelLines(sample, { isArabic, panelKey: sample?.panelKey });
-  return {
-    barcode: meta.barcode,
-    panelLine: truncate(meta.panelLine, 24),
-    animalLine: truncate(meta.animalLine, 28),
-    testLine: truncate(meta.testLine, 30),
-  };
+export const labelMetaFromSample = (sample, isArabic = false) => (
+  buildThermalLabelContent(sample, { isArabic })
+);
+
+const labelBodyInner = (content) => {
+  const encodeValue = content.barcode ? thermalScanDigits(content.barcode) : '';
+  return `
+    <div class="label-50x25-barcode-wrap">
+      ${encodeValue
+    ? `<svg class="sample-barcode" data-code="${escapeHtml(encodeValue)}"></svg>`
+    : '<p class="label-50x25-error">No barcode</p>'}
+      ${content.barcodeDigits
+    ? `<p class="label-50x25-digits">${escapeHtml(content.barcodeDigits)}</p>`
+    : ''}
+    </div>
+    ${content.sampleLine ? `<p class="label-50x25-line" title="${escapeHtml(content.sampleLine)}">${escapeHtml(content.sampleLine)}</p>` : ''}
+    ${content.animalLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalLine)}">${escapeHtml(content.animalLine)}</p>` : ''}
+    ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}`;
 };
 
-/** Standalone 50×25 mm print page — never includes modal UI. */
-export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = false } = {}) => {
-  const { barcode, panelLine, animalLine } = labelMetaFromSample(sample, isArabic);
-  const barcodeJson = JSON.stringify(barcode || 'NO-BARCODE');
+const renderBarcodeScript = (autoPrint) => {
   const autoPrintScript = autoPrint ? `
       window.onload = function () {
         setTimeout(function () { window.focus(); window.print(); }, 150);
       };
       window.onafterprint = function () { window.close(); };
-  ` : `
-      window.renderLabel = function () {
-        var code = ${barcodeJson};
-        if (code && document.getElementById('sample-barcode')) {
-          JsBarcode('#sample-barcode', code, {
-            format: 'CODE128', width: 1.05, height: 22, displayValue: true,
-            fontSize: 10, margin: 0, background: '#ffffff', lineColor: '#000000'
-          });
-        }
-      };
-      window.renderLabel();
+  ` : '';
+
+  return `
+    (function () {
+      document.querySelectorAll('svg.sample-barcode').forEach(function (el, idx) {
+        var code = el.getAttribute('data-code');
+        if (!code) return;
+        el.id = 'sample-barcode-' + idx;
+        JsBarcode('#sample-barcode-' + idx, code, {
+          format: 'CODE128', width: 1.05, height: 20, displayValue: false,
+          margin: 0, background: '#ffffff', lineColor: '#000000'
+        });
+      });
+      ${autoPrintScript}
+    })();
   `;
+};
+
+/** Standalone 50×25 mm print page — never includes modal UI. */
+export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = false } = {}) => {
+  const content = labelMetaFromSample(sample, isArabic);
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -82,34 +104,16 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
 </head>
 <body>
   <div class="label-50x25">
-    ${barcode ? '<svg id="sample-barcode"></svg>' : '<p class="label-50x25-error">No barcode</p>'}
-    ${panelLine ? `<p class="label-50x25-line label-50x25-tests">${escapeHtml(panelLine)}</p>` : ''}
-    ${animalLine ? `<p class="label-50x25-line">${escapeHtml(animalLine)}</p>` : ''}
+    ${labelBodyInner(content)}
   </div>
-  <script>
-    (function () {
-      var code = ${barcodeJson};
-      if (code && document.getElementById('sample-barcode')) {
-        JsBarcode('#sample-barcode', code, {
-          format: 'CODE128', width: 1.05, height: 20, displayValue: true,
-          fontSize: 9, margin: 0, background: '#ffffff', lineColor: '#000000'
-        });
-      }
-      ${autoPrintScript}
-    })();
-  <\/script>
+  <script>${renderBarcodeScript(autoPrint)}<\/script>
 </body>
 </html>`;
 };
 
 const labelBodyHtml = (sample, isArabic) => {
-  const { barcode, panelLine, animalLine } = labelMetaFromSample(sample, isArabic);
-  return `
-  <div class="label-50x25 label-page">
-    ${barcode ? `<svg class="sample-barcode" data-code="${escapeHtml(barcode)}"></svg>` : '<p class="label-50x25-error">No barcode</p>'}
-    ${panelLine ? `<p class="label-50x25-line label-50x25-tests">${escapeHtml(panelLine)}</p>` : ''}
-    ${animalLine ? `<p class="label-50x25-line">${escapeHtml(animalLine)}</p>` : ''}
-  </div>`;
+  const content = labelMetaFromSample(sample, isArabic);
+  return `<div class="label-50x25 label-page">${labelBodyInner(content)}</div>`;
 };
 
 /** One print job — one label per test tube (package expands to multiple pages). */
@@ -149,20 +153,7 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
 </head>
 <body>
   ${pages}
-  <script>
-    (function () {
-      document.querySelectorAll('svg.sample-barcode').forEach(function (el, idx) {
-        var code = el.getAttribute('data-code');
-        if (!code) return;
-        el.id = 'sample-barcode-' + idx;
-        JsBarcode('#sample-barcode-' + idx, code, {
-          format: 'CODE128', width: 1.05, height: 20, displayValue: true,
-          fontSize: 9, margin: 0, background: '#ffffff', lineColor: '#000000'
-        });
-      });
-      ${autoPrintScript}
-    })();
-  <\/script>
+  <script>${renderBarcodeScript(autoPrint)}<\/script>
 </body>
 </html>`;
 };

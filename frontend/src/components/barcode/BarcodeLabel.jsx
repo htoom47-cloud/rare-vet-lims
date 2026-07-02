@@ -1,13 +1,8 @@
 import Barcode from 'react-barcode';
 import QRCode from 'react-qr-code';
 import { useTranslation } from 'react-i18next';
-import { panelCode } from '../../utils/labelPanel';
-
-const truncate = (text, max) => {
-  const s = String(text || '').trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
-};
+import { buildThermalLabelContent } from '../../utils/labelPanel';
+import { thermalScanDigits } from '../../utils/zebraPrint';
 
 /**
  * Sample label — default layout fits Zebra ZD421 direct thermal 50×25 mm rolls.
@@ -17,67 +12,69 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
   const { i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
 
-  const testLabel = sample.panelKey
-    ? panelCode(sample.panelKey)
-    : (sample.tests || [])
-      .map((t) => (isArabic ? t.test_name_ar : t.test_name) || t.test_name || t.test_code)
-      .filter(Boolean)
-      .join(' · ');
-
-  const data = {
-    sampleId: sample.sample_code,
-    clientName: sample.customer_name,
-    animalId: sample.animal_code,
-    animalName: sample.animal_name,
-    testTypes: testLabel,
-    date: new Date(sample.collection_date).toLocaleDateString(),
-  };
-
-  const barcodeText = String(sample.barcode || sample.sample_code || '').trim();
+  const content = buildThermalLabelContent(sample, { isArabic });
+  const barcodeEncode = content.barcode ? thermalScanDigits(content.barcode) : '';
   const isThermal = size === 'thermal-50x25';
-
-  const animalLine = [data.animalId, data.animalName].filter(Boolean).join(' · ');
 
   if (isThermal) {
     return (
       <div className="label-preview label-50x25 bg-white text-black">
         {format === 'qr' ? (
           <div className="label-50x25-qr">
-            <QRCode value={barcodeText || data.sampleId} size={56} />
+            <QRCode value={content.barcode || content.sampleCode} size={56} />
           </div>
-        ) : barcodeText ? (
-          <div className="label-50x25-barcode">
-            <Barcode
-              value={barcodeText}
-              format="CODE128"
-              width={1.05}
-              height={20}
-              fontSize={9}
-              margin={0}
-              displayValue
-              background="#ffffff"
-              lineColor="#000000"
-            />
+        ) : barcodeEncode ? (
+          <div className="label-50x25-barcode-wrap">
+            <div className="label-50x25-barcode">
+              <Barcode
+                value={barcodeEncode}
+                format="CODE128"
+                width={1.05}
+                height={20}
+                fontSize={0}
+                margin={0}
+                displayValue={false}
+                background="#ffffff"
+                lineColor="#000000"
+              />
+            </div>
+            {content.barcodeDigits && (
+              <p className="label-50x25-digits">{content.barcodeDigits}</p>
+            )}
           </div>
         ) : (
           <p className="label-50x25-error">No barcode</p>
         )}
 
         <div className="label-50x25-details">
-          {data.testTypes && (
-            <p className="label-50x25-line label-50x25-tests" title={data.testTypes}>
-              {truncate(data.testTypes, 30)}
+          {content.sampleLine && (
+            <p className="label-50x25-line" title={content.sampleLine}>
+              {content.sampleLine}
             </p>
           )}
-          {animalLine && (
-            <p className="label-50x25-line" title={animalLine}>
-              {truncate(animalLine, 28)}
+          {content.animalLine && (
+            <p className="label-50x25-line label-50x25-meta" title={content.animalLine}>
+              {content.animalLine}
+            </p>
+          )}
+          {content.testLine && (
+            <p className="label-50x25-line label-50x25-test" title={content.testLine}>
+              {content.testLine}
             </p>
           )}
         </div>
       </div>
     );
   }
+
+  const data = {
+    sampleId: content.sampleCode,
+    clientName: sample.customer_name,
+    animalId: sample.animal_code,
+    animalName: content.animalName,
+    testTypes: content.testsSummary,
+    date: new Date(sample.collection_date).toLocaleDateString(),
+  };
 
   return (
     <div className="label-preview label-full bg-white p-4 text-black">
@@ -90,10 +87,10 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
         <div className="flex justify-center">
           <QRCode value={JSON.stringify(data)} size={120} />
         </div>
-      ) : barcodeText ? (
+      ) : content.barcode ? (
         <div className="flex justify-center my-3 min-h-[70px]">
           <Barcode
-            value={barcodeText}
+            value={content.barcode}
             format="CODE128"
             width={1.8}
             height={56}
@@ -111,7 +108,7 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
       <div className="mt-2 text-xs space-y-0.5">
         <p><strong>Sample:</strong> {data.sampleId}</p>
         <p><strong>Client:</strong> {data.clientName}</p>
-        <p><strong>Animal:</strong> {animalLine || data.animalId}</p>
+        <p><strong>Animal:</strong> {data.animalName || data.animalId}</p>
         {data.testTypes && <p><strong>Tests:</strong> {data.testTypes}</p>}
       </div>
     </div>

@@ -165,6 +165,26 @@
   flex-shrink: 0;
 }
 
+.label-50x25-barcode-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.label-50x25-digits {
+  margin: 0.15mm 0 0;
+  padding: 0;
+  font-size: 7.5pt;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: #000;
+}
+
 .label-50x25-barcode svg {
   max-width: 100%;
   height: auto;
@@ -184,14 +204,23 @@
 .label-50x25-line {
   margin: 0;
   padding: 0;
-  font-size: 8pt;
-  line-height: 1.12;
+  font-size: 6.5pt;
+  line-height: 1.1;
   text-align: center;
   font-family: Arial, Helvetica, sans-serif;
   color: #000;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.label-50x25-line.label-50x25-meta {
+  font-weight: 500;
+}
+
+.label-50x25-line.label-50x25-test {
+  font-weight: 700;
 }
 
 .label-50x25-barcode svg text {
@@ -200,7 +229,7 @@
 }
 
 .label-50x25-tests {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .label-50x25-meta {

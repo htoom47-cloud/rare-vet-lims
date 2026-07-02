@@ -1,4 +1,4 @@
-import { buildLabelLines, panelCode } from './labelPanel';
+import { buildThermalLabelContent } from './labelPanel';
 
 const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
 
@@ -99,7 +99,7 @@ const getDefaultDeviceSdk = () => new Promise((resolve, reject) => {
     .then((BrowserPrint) => {
       BrowserPrint.getDefaultDevice('printer', (device) => {
         if (device) resolve(device);
-        else reject(new ZebraPrintError('No default Zebra printer', SERVICE_UNAVAILABLE));
+        else reject(new ZebraPrintError('No default printer', SERVICE_UNAVAILABLE));
       }, (err) => {
         reject(new ZebraPrintError(typeof err === 'string' ? err : 'BrowserPrint device lookup failed', SERVICE_UNAVAILABLE));
       });
@@ -129,22 +129,20 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
+/** Vertical layout — barcode size unchanged; text rows below. */
 const LAYOUT = {
-  barcodeTextY: 82,
-  panelY: 104,
-  animalY: 126,
+  barcodeY: 8,
+  barcodeHeight: 68,
+  digitsY: 80,
+  sampleY: 96,
+  animalY: 112,
+  testY: 128,
 };
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
   .replace(/\^/g, '\\^')
   .replace(/~/g, '\\~');
-
-const truncate = (text, max) => {
-  const s = String(text || '').trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
-};
 
 /** Digits-only for compact Code128-C on 50 mm (scanner reads numbers; LIMS matches full BC-/SMP-). */
 export const thermalScanDigits = (barcode) => {
@@ -160,8 +158,8 @@ const code128CModules = (digits) => {
 
 const zplLandscapeHeader = () => [
   '^XA',
-  '^FX LIMS label v4 numeric',
-  '^CI0',
+  '^FX LIMS label v5 professional',
+  '^CI28',
   '^MTD',
   '^MD35',
   '^MNW',
@@ -177,46 +175,47 @@ const zplLandscapeHeader = () => [
 
 const field = (zpl) => `^FWN${zpl}`;
 
-const TEXT_LINE = '^A0N,17,15';
-const textLine = (y, value) => field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${TEXT_LINE}^FD${zplEscape(value)}^FS`);
+const FONT_DIGITS = '^A0N,16,15';
+const FONT_LINE = '^A0N,13,12';
+const FONT_LINE_BOLD = '^A0N,13,13';
 
-/** Thick Code128-C — fits 50 mm, readable by 1D USB scanners. */
+const textLine = (y, value, font = FONT_LINE) => (
+  field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
+);
+
+/** Thick Code128-C — fits 50 mm, readable by 1D USB scanners (size unchanged). */
 const barcodeField = (barcode) => {
   const digits = thermalScanDigits(barcode);
   const moduleWidth = 3;
-  const barHeight = 68;
+  const barHeight = LAYOUT.barcodeHeight;
   const w = code128CModules(digits) * moduleWidth;
   const x = Math.max(10, Math.floor((LABEL_WIDTH - w) / 2));
-  return field(`^FO${x},8^BY${moduleWidth},3,${barHeight}^BCN,${barHeight},N,N,N^FD>;>8${digits}^FS`);
+  return field(`^FO${x},${LAYOUT.barcodeY}^BY${moduleWidth},3,${barHeight}^BCN,${barHeight},N,N,N^FD>;>8${digits}^FS`);
 };
 
 export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
-  buildLabelLines(sample, { isArabic, panelKey: sample?.panelKey })
+  buildThermalLabelContent(sample, { isArabic })
 );
 
-/** ZPL for Zebra ZD421 50×25 mm — horizontal barcode and text. */
+/** ZPL for Zebra ZD421 50×25 mm — professional lab layout. */
 export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
-  const { barcode, panelKey } = buildLabelLines(sample, {
-    isArabic,
-    panelKey: sample.panelKey,
-  });
-
-  const panelZpl = panelCode(panelKey);
-  const animal = truncate(String(sample?.animal_code || '').trim(), 24);
-
+  const content = buildThermalLabelContent(sample, { isArabic });
   const lines = [...zplLandscapeHeader()];
 
-  if (barcode) {
-    lines.push(barcodeField(barcode));
-    lines.push(textLine(LAYOUT.barcodeTextY, truncate(barcode, 24)));
-  }
-
-  if (panelZpl) {
-    lines.push(textLine(LAYOUT.panelY, panelZpl));
-  }
-
-  if (animal) {
-    lines.push(textLine(LAYOUT.animalY, animal));
+  if (content.barcode) {
+    lines.push(barcodeField(content.barcode));
+    if (content.barcodeDigits) {
+      lines.push(textLine(LAYOUT.digitsY, content.barcodeDigits, FONT_DIGITS));
+    }
+    if (content.sampleLine) {
+      lines.push(textLine(LAYOUT.sampleY, content.sampleLine, FONT_LINE_BOLD));
+    }
+    if (content.animalLine) {
+      lines.push(textLine(LAYOUT.animalY, content.animalLine, FONT_LINE));
+    }
+    if (content.testLine) {
+      lines.push(textLine(LAYOUT.testY, content.testLine, FONT_LINE_BOLD));
+    }
   }
 
   lines.push('^XZ');

@@ -89,3 +89,65 @@ export const buildLabelLines = (sample, { isArabic = false, panelKey = null } = 
     secondaryLine: animalLine,
   };
 };
+
+/** Digits printed under barcode (human-readable; no Code128-C odd padding). */
+export const barcodeDisplayDigits = (barcode) => String(barcode || '').replace(/\D/g, '');
+
+/** Truncate with ... suffix for 50 mm thermal labels. */
+export const truncateLabel = (text, max) => {
+  const s = String(text || '').trim();
+  if (s.length <= max) return s;
+  return `${s.slice(0, Math.max(1, max - 3))}...`;
+};
+
+const PANEL_FRIENDLY_EN = {
+  CBC: 'CBC',
+  CHEM: 'Chemistry',
+  MICRO: 'Parasitology',
+  PARAS: 'Parasitology',
+  HORM: 'Hormones',
+  ELISA: 'ELISA',
+  SERO: 'Serology',
+  PCR: 'PCR',
+  CULT: 'Culture',
+  OTHER: 'Lab',
+};
+
+export const panelFriendlyName = (panelKey, isArabic = false) => {
+  const key = String(panelKey || 'OTHER').toUpperCase();
+  if (isArabic) return panelDisplayName(key, true);
+  return PANEL_FRIENDLY_EN[key] || panelCode(key);
+};
+
+/** Join panel names for label test line — e.g. "CBC + Chemistry". */
+export const formatTestsForLabel = (sample, { isArabic = false } = {}) => {
+  const tests = sample?.tests?.filter(Boolean) || [];
+  if (!tests.length) {
+    return panelFriendlyName(sample?.panelKey, isArabic);
+  }
+  const keys = sortPanelKeys([...new Set(tests.map((t) => resolvePanelKey(t)))]);
+  return keys.map((k) => panelFriendlyName(k, isArabic)).join(' + ');
+};
+
+/** Full thermal label text blocks (Zebra + HTML preview). */
+export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => {
+  const barcode = String(sample?.barcode || '').trim();
+  const sampleCode = String(sample?.sample_code || '').trim();
+  const animalName = String(sample?.animal_name || sample?.name_tag || '').trim();
+  const testsSummary = formatTestsForLabel(sample, { isArabic });
+
+  const samplePrefix = isArabic ? 'رقم العينة:' : 'Sample:';
+  const animalPrefix = isArabic ? 'اسم الحيوان:' : 'Animal:';
+  const testPrefix = isArabic ? 'نوع الفحص:' : 'Test:';
+
+  return {
+    barcode,
+    barcodeDigits: barcodeDisplayDigits(barcode),
+    sampleLine: truncateLabel(`${samplePrefix} ${sampleCode}`, 34),
+    animalLine: truncateLabel(`${animalPrefix} ${animalName}`, 34),
+    testLine: truncateLabel(`${testPrefix} ${testsSummary}`, 34),
+    testsSummary,
+    sampleCode,
+    animalName,
+  };
+};
