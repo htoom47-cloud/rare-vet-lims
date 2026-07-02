@@ -5,7 +5,7 @@
 const { query } = require('../config/database');
 const logger = require('../config/logger');
 const { resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
-const { mapNormaSpeciesToLims } = require('../utils/norma-species-map');
+const { mapNormaSpeciesToRefSpecies } = require('../utils/norma-species-map');
 const { normaReferenceNote } = require('../utils/reference-range');
 const referenceRangesService = require('./reference-ranges.service');
 
@@ -20,7 +20,7 @@ const resolveSpecies = (parsed, fallbackSpecies) => {
     fallbackSpecies,
   ];
   for (const raw of candidates) {
-    const mapped = mapNormaSpeciesToLims(raw) || raw;
+    const mapped = mapNormaSpeciesToRefSpecies(raw) || raw;
     if (mapped && mapped !== 'other') return mapped;
   }
   return fallbackSpecies || 'camel';

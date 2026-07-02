@@ -8,6 +8,7 @@ const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
 const { compareByNormaOrder, filterCbcReportRows, getNormaPanelRow } = require('../utils/norma-cbc-map');
+const { resolveReportReferenceBounds } = require('../utils/reference-range');
 const { DEVICE_REF_LATERAL_SQL } = require('./device-reference-ranges.service');
 
 const INSTRUMENT_BY_CATEGORY = {
@@ -210,7 +211,7 @@ const buildReportData = async (sampleId, opts) => {
             t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.method as test_method,
             tc.code as category_code,
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
-            rv.value, rv.numeric_value, tp.unit,
+            rv.value, rv.numeric_value, rv.notes AS rv_notes, tp.unit,
             COALESCE(dref.low_value, tr.min_value) AS min_value,
             COALESCE(dref.high_value, tr.max_value) AS max_value,
             rv.flag, rv.is_critical, res.doctor_notes
@@ -266,6 +267,7 @@ const buildReportData = async (sampleId, opts) => {
 
   const results = uniqueByParameter.map((r) => {
     const panelRow = getNormaPanelRow(r.parameter_code);
+    const { min: minValue, max: maxValue } = resolveReportReferenceBounds(r);
     return {
     code: r.parameter_code,
     testCode: r.test_code,
@@ -279,10 +281,10 @@ const buildReportData = async (sampleId, opts) => {
     ),
     numericValue: r.numeric_value != null ? Number(r.numeric_value) : null,
     unit: r.unit,
-    minValue: r.min_value != null ? Number(r.min_value) : null,
-    maxValue: r.max_value != null ? Number(r.max_value) : null,
-    reference: r.min_value != null
-      ? `${formatNumber(r.min_value)} - ${formatNumber(r.max_value)}`
+    minValue,
+    maxValue,
+    reference: minValue != null
+      ? `${formatNumber(minValue)} - ${formatNumber(maxValue)}`
       : '-',
     flag: r.flag,
     isCritical: r.is_critical,
@@ -650,4 +652,4 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, getPreview, generate, approve, verify, servePdf, regeneratePdfById };
+module.exports = { list, getPreview, generate, approve, verify, servePdf, regeneratePdfById, buildReportData };

@@ -26,8 +26,31 @@ const NORMA_SPECIES_ALIASES = {
   ],
 };
 
+/** Species keys for device_reference_ranges (includes cattle/dog/cat beyond LIMS animal_type). */
+const NORMA_REF_SPECIES_ALIASES = {
+  ...NORMA_SPECIES_ALIASES,
+  cattle: [
+    'cattle', 'bovine', 'cow', 'bull', 'calf', 'bos',
+    'بقر', 'بقرة', 'عجل',
+  ],
+  dog: [
+    'dog', 'canine', 'puppy', 'hound',
+    'كلب', 'كلاب',
+  ],
+  cat: [
+    'cat', 'feline', 'kitten',
+    'قطة', 'قط', 'هر',
+  ],
+};
+
 const aliasIndex = Object.fromEntries(
   Object.entries(NORMA_SPECIES_ALIASES).flatMap(([code, aliases]) =>
+    aliases.map((a) => [normalizeSpeciesKey(a), code])
+  )
+);
+
+const refAliasIndex = Object.fromEntries(
+  Object.entries(NORMA_REF_SPECIES_ALIASES).flatMap(([code, aliases]) =>
     aliases.map((a) => [normalizeSpeciesKey(a), code])
   )
 );
@@ -55,6 +78,20 @@ function mapNormaSpeciesToLims(raw) {
     if (key.includes(alias) || alias.includes(key)) return code;
   }
   return null;
+}
+
+/** Map Norma species text → device_reference_ranges.species key (7 species + other). */
+function mapNormaSpeciesToRefSpecies(raw) {
+  if (raw == null || raw === '') return null;
+  const key = normalizeSpeciesKey(raw);
+  if (!key) return null;
+  if (refAliasIndex[key]) return refAliasIndex[key];
+
+  for (const [alias, code] of Object.entries(refAliasIndex)) {
+    if (alias.length < 3 || key.length < 3) continue;
+    if (key.includes(alias) || alias.includes(key)) return code;
+  }
+  return mapNormaSpeciesToLims(raw);
 }
 
 /** Extract species from HL7 PID/SPM/OBR fields (CWE ^code^name^). */
@@ -89,6 +126,7 @@ function extractAnimalTypeFromSegments(segments) {
 
 module.exports = {
   mapNormaSpeciesToLims,
+  mapNormaSpeciesToRefSpecies,
   extractAnimalTypeFromSegments,
   normalizeSpeciesKey,
 };

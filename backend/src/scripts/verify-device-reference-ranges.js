@@ -89,5 +89,18 @@ check('profile keys are unique per limsCode', () => {
   assert.strictEqual(codes.length, new Set(codes).size);
 });
 
+console.log('\n=== Parser: segment order independence ===');
+check('shuffled OBX segments yield same refs', () => {
+  const { splitSegments } = require('../utils/hl7');
+  const segments = splitSegments(fixtureHl7);
+  const header = segments.filter((s) => !s.startsWith('OBX|'));
+  const obx = segments.filter((s) => s.startsWith('OBX|'));
+  const shuffled = [...header, ...obx.reverse()].join('\r');
+  const a = parseHl7(fixtureHl7).results.find((r) => r.limsCode === 'WBC');
+  const b = parseHl7(shuffled).results.find((r) => r.limsCode === 'WBC');
+  assert.strictEqual(a.referenceMin, b.referenceMin);
+  assert.strictEqual(a.referenceMax, b.referenceMax);
+});
+
 console.log(`\n=== Result: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

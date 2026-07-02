@@ -47,4 +47,25 @@ const normaReferenceNote = (raw, min, max) => {
   return display ? `Norma: ${display}` : null;
 };
 
-module.exports = { parseReferenceRange, defaultCritical, formatNormaReference, normaReferenceNote };
+/** Snapshot stored on result_values.notes at import time — frozen for historical reports. */
+const referenceFromResultNotes = (notes) => {
+  if (!notes || !String(notes).startsWith('Norma:')) return null;
+  return parseReferenceRange(String(notes).slice(6).trim());
+};
+
+const resolveReportReferenceBounds = (row) => {
+  const snap = referenceFromResultNotes(row.rv_notes);
+  return {
+    min: snap?.min ?? (row.min_value != null ? Number(row.min_value) : null),
+    max: snap?.max ?? (row.max_value != null ? Number(row.max_value) : null),
+  };
+};
+
+module.exports = {
+  parseReferenceRange,
+  defaultCritical,
+  formatNormaReference,
+  normaReferenceNote,
+  referenceFromResultNotes,
+  resolveReportReferenceBounds,
+};

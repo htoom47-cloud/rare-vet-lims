@@ -181,7 +181,7 @@ const importCbcResults = async ({ sampleId, animalType, limsAnimalType, results,
   let mergedValues = values;
   try {
     const existingRaw = await query(
-      `SELECT rv.parameter_id, rv.value
+      `SELECT rv.parameter_id, rv.value, rv.notes
        FROM results r
        JOIN result_values rv ON rv.result_id = r.id
        WHERE r.sample_test_id = $1
@@ -190,10 +190,23 @@ const importCbcResults = async ({ sampleId, animalType, limsAnimalType, results,
     );
     if (existingRaw.rows.length) {
       const byParam = new Map(
-        existingRaw.rows.map((row) => [row.parameter_id, String(row.value)])
+        existingRaw.rows.map((row) => [
+          row.parameter_id,
+          { value: String(row.value), notes: row.notes || null },
+        ])
       );
-      for (const v of values) byParam.set(v.parameter_id, v.value);
-      mergedValues = [...byParam.entries()].map(([parameter_id, value]) => ({ parameter_id, value }));
+      for (const v of values) {
+        const prev = byParam.get(v.parameter_id);
+        byParam.set(v.parameter_id, {
+          value: v.value,
+          notes: v.notes || prev?.notes || null,
+        });
+      }
+      mergedValues = [...byParam.entries()].map(([parameter_id, { value, notes }]) => ({
+        parameter_id,
+        value,
+        ...(notes ? { notes } : {}),
+      }));
     }
   } catch {
     /* first import */
