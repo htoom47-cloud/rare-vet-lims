@@ -57,11 +57,11 @@ const MIN_QUIET_ZONE = 10;
 const LAYOUT = {
   barcodeY: 2,
   barcodeHeight: 52,
-  digitsY: 58,
+  digitsY: 56,
   customerY: 76,
-  animalY: 94,
-  dateY: 112,
-  testY: 130,
+  animalY: 86,
+  dateY: 110,
+  testY: 134,
 };
 
 const zplEscape = (value) => String(value ?? '')
@@ -246,7 +246,7 @@ const zplHeader = (opts) => {
   const h = opts.labelHeightDots || LABEL_HEIGHT;
   return [
     '^XA',
-    '^FX LIMS Barcode Engine v1 English ZPL',
+    '^FX LIMS Barcode Engine v1 English ZPL larger text',
     '^CI0',
     '^MTD',
     `^MD${opts.darkness ?? DEFAULT_PRINTER.darkness}`,
@@ -264,8 +264,9 @@ const zplHeader = (opts) => {
 
 const field = (zpl) => `^FWN${zpl}`;
 
-const FONT_DIGITS = '^A0N,22,20';
-const FONT_LINE = '^A0N,15,13';
+const FONT_DIGITS = '^A0N,28,26';
+const FONT_LINE = '^A0N,22,20';
+const FONT_TEST = '^A0N,22,22';
 
 const textLine = (y, value, width, font = FONT_LINE) => (
   field(`^FO0,${y}^FB${width},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
@@ -345,8 +346,9 @@ const buildZplLabel = (payload, options = {}) => {
 
   const zplLines = buildZplTextLines(payload);
   const yByKey = { animal: LAYOUT.animalY, date: LAYOUT.dateY, test: LAYOUT.testY };
+  const fontByKey = { animal: FONT_LINE, date: FONT_LINE, test: FONT_TEST };
   for (const line of zplLines) {
-    lines.push(textLine(yByKey[line.key], line.text, labelW));
+    lines.push(textLine(yByKey[line.key], line.text, labelW, fontByKey[line.key] || FONT_LINE));
   }
 
   lines.push('^XZ');

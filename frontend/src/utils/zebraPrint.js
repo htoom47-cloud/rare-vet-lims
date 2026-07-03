@@ -130,15 +130,15 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
-/** Vertical layout v6 — English ZPL text + 12-digit ID; barcode tuned for 50 mm. */
+/** Vertical layout v8 — larger English text; barcode unchanged (50×25 mm). */
 const LAYOUT = {
   barcodeY: 2,
   barcodeHeight: 52,
-  digitsY: 58,
+  digitsY: 56,
   customerY: 76,
-  animalY: 94,
-  dateY: 112,
-  testY: 130,
+  animalY: 86,
+  dateY: 110,
+  testY: 134,
 };
 
 const zplEscape = (value) => String(value ?? '')
@@ -156,7 +156,7 @@ const code128CModules = (digits) => {
 
 const zplLandscapeHeader = () => [
   '^XA',
-  '^FX LIMS label v7 English ZPL',
+  '^FX LIMS label v8 larger text',
   '^CI0',
   '^MTD',
   '^MD35',
@@ -173,9 +173,9 @@ const zplLandscapeHeader = () => [
 
 const field = (zpl) => `^FWN${zpl}`;
 
-const FONT_DIGITS = '^A0N,24,22';
-const FONT_LINE = '^A0N,16,14';
-const FONT_LINE_BOLD = '^A0N,16,16';
+const FONT_DIGITS = '^A0N,28,26';
+const FONT_LINE = '^A0N,22,20';
+const FONT_LINE_BOLD = '^A0N,22,22';
 
 const textLine = (y, value, font = FONT_LINE) => (
   field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
