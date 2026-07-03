@@ -425,6 +425,26 @@ async function applyPatches() {
       CREATE INDEX IF NOT EXISTS idx_ref_range_audit_created
       ON reference_range_audit_logs (created_at DESC)
     `);
+    await client.query(`
+      ALTER TABLE device_parameter_mappings
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0
+    `);
+    await client.query(`
+      ALTER TABLE test_parameters
+        ADD COLUMN IF NOT EXISTS device_code VARCHAR(80),
+        ADD COLUMN IF NOT EXISTS short_code VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS show_in_report BOOLEAN DEFAULT true,
+        ADD COLUMN IF NOT EXISTS value_type VARCHAR(20) DEFAULT 'numeric',
+        ADD COLUMN IF NOT EXISTS category VARCHAR(50)
+    `);
+    await client.query(`
+      UPDATE test_parameters tp
+      SET device_code = dpm.device_parameter_code
+      FROM device_parameter_mappings dpm
+      WHERE dpm.system_parameter_id = tp.id
+        AND dpm.is_active = true
+        AND (tp.device_code IS NULL OR TRIM(tp.device_code) = '')
+    `);
     const { seedNormaCbcMappings } = require('../services/device-parameter-mappings.service');
     await seedNormaCbcMappings(client);
     await syncLabContactInfo(client);

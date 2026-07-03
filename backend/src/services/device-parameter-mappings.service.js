@@ -53,11 +53,36 @@ const resolveLimsCode = async ({ deviceId, deviceName, deviceParameterCode, unit
 const upsert = async (data, userId) => {
   const {
     device_id, device_name, device_parameter_code, system_parameter_id,
-    display_name_ar, display_name_en, unit, value_type,
+    display_name_ar, display_name_en, unit, value_type, sort_order,
   } = data;
 
   if (!device_parameter_code || !system_parameter_id) {
     throw new AppError('Device parameter code and system parameter required', 400, 'VALIDATION');
+  }
+
+  if (data.id) {
+    const byId = await query('SELECT id FROM device_parameter_mappings WHERE id = $1', [data.id]);
+    if (byId.rows[0]) {
+      const updated = await query(
+        `UPDATE device_parameter_mappings
+         SET device_id = COALESCE($1, device_id),
+             device_name = COALESCE($2, device_name),
+             device_parameter_code = COALESCE($3, device_parameter_code),
+             system_parameter_id = COALESCE($4, system_parameter_id),
+             display_name_ar = COALESCE($5, display_name_ar),
+             display_name_en = COALESCE($6, display_name_en),
+             unit = COALESCE($7, unit),
+             value_type = COALESCE($8, value_type),
+             sort_order = COALESCE($9, sort_order),
+             updated_at = NOW()
+         WHERE id = $10 RETURNING *`,
+        [
+          device_id ?? null, device_name, device_parameter_code, system_parameter_id,
+          display_name_ar, display_name_en, unit, value_type, sort_order, data.id,
+        ]
+      );
+      return updated.rows[0];
+    }
   }
 
   const existing = await query(
@@ -72,11 +97,12 @@ const upsert = async (data, userId) => {
     const updated = await query(
       `UPDATE device_parameter_mappings
        SET system_parameter_id = $1, display_name_ar = $2, display_name_en = $3,
-           unit = $4, value_type = $5, device_name = COALESCE($6, device_name),
+           unit = $4, value_type = $5, sort_order = COALESCE($6, sort_order),
+           device_name = COALESCE($7, device_name),
            updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
+       WHERE id = $8 RETURNING *`,
       [system_parameter_id, display_name_ar, display_name_en, unit, value_type,
-        device_name, existing.rows[0].id]
+        sort_order, device_name, existing.rows[0].id]
     );
     return updated.rows[0];
   }
@@ -84,10 +110,11 @@ const upsert = async (data, userId) => {
   const inserted = await query(
     `INSERT INTO device_parameter_mappings
        (device_id, device_name, device_parameter_code, system_parameter_id,
-        display_name_ar, display_name_en, unit, value_type, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        display_name_ar, display_name_en, unit, value_type, sort_order, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [device_id || null, device_name || 'Norma CBC', device_parameter_code,
-      system_parameter_id, display_name_ar, display_name_en, unit, value_type || 'numeric', userId]
+      system_parameter_id, display_name_ar, display_name_en, unit, value_type || 'numeric',
+      sort_order ?? 0, userId]
   );
   return inserted.rows[0];
 };

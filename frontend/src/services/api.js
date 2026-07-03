@@ -63,6 +63,16 @@ export const referenceRangesAPI = {
   update: (id, data) => api.put(`/reference-ranges/${id}`, data),
   delete: (id) => api.delete(`/reference-ranges/${id}`),
   logs: (id) => api.get(`/reference-ranges/${id}/logs`),
+  qualityAudit: (params) => api.get('/reference-ranges/quality-audit', { params }),
+};
+
+export const reportMasteringAPI = {
+  listParameters: (params) => api.get('/report-mastering/parameters', { params }),
+  updateParameter: (id, data) => api.put(`/report-mastering/parameters/${id}`, data),
+  listMappings: (params) => api.get('/report-mastering/device-mappings', { params }),
+  upsertMapping: (data) => api.post('/report-mastering/device-mappings', data),
+  deactivateMapping: (id) => api.delete(`/report-mastering/device-mappings/${id}`),
+  qualityAudit: (params) => api.get('/report-mastering/quality-audit', { params }),
 };
 
 export const animalsAPI = {

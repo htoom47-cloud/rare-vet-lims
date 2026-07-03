@@ -27,6 +27,7 @@ import Settings from './pages/Settings';
 import Devices from './pages/Devices';
 import DeviceReferenceRanges from './pages/DeviceReferenceRanges';
 import ReferenceRanges from './pages/ReferenceRanges';
+import ReportMastering from './pages/ReportMastering';
 import AnimalTrends from './pages/AnimalTrends';
 import NormaRefDebug from './pages/NormaRefDebug';
 import TechnicianWorkbench from './pages/TechnicianWorkbench';
@@ -89,6 +90,7 @@ export default function App() {
               <Route path="devices" element={<ProtectedRoute permission="devices.view"><Devices /></ProtectedRoute>} />
               <Route path="device-reference-ranges" element={<ProtectedRoute permission="devices.view"><DeviceReferenceRanges /></ProtectedRoute>} />
               <Route path="reference-ranges" element={<ProtectedRoute permission="reference_ranges.manage"><ReferenceRanges /></ProtectedRoute>} />
+              <Route path="report-mastering" element={<ProtectedRoute permission="reference_ranges.manage"><ReportMastering /></ProtectedRoute>} />
               <Route path="animal-trends" element={<ProtectedRoute permission="results.view"><AnimalTrends /></ProtectedRoute>} />
               <Route path="norma-ref-debug" element={<ProtectedRoute permission="devices.view"><NormaRefDebug /></ProtectedRoute>} />
             </Route>

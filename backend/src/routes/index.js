@@ -40,6 +40,7 @@ router.use('/audit', auditRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/devices', devicesRoutes);
 router.use('/reference-ranges', require('./reference-ranges.routes'));
+router.use('/report-mastering', require('./report-mastering.routes'));
 router.use('/settings', settingsRoutes);
 router.use('/portal', portalRoutes);
 

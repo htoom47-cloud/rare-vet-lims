@@ -262,11 +262,22 @@ const buildReportData = async (sampleId, opts) => {
 
   const isArabic = language === 'ar';
 
-  const results = uniqueByParameter.map((r) => resultEngine.buildReportResultRow(r, {
-    language,
-    isArabic,
-    instrumentResolver: resolveInstrument,
-  }));
+  let displayContext = {};
+  try {
+    const mastering = require('./parameter-mastering.service');
+    displayContext = await mastering.loadReportDisplayContext();
+  } catch (err) {
+    logger.warn('Report display context load skipped', { error: err.message });
+  }
+
+  const results = uniqueByParameter
+    .filter((r) => displayContext.showInReportMap?.[r.parameter_id] !== false)
+    .map((r) => resultEngine.buildReportResultRow(r, {
+      language,
+      isArabic,
+      instrumentResolver: resolveInstrument,
+      displayContext,
+    }));
 
   const attachmentsResult = await query(
     `SELECT ra.file_url, ra.caption, ra.include_in_report,

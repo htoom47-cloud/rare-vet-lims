@@ -467,7 +467,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
                     <tr key={`${row.code}-${idx}`} className={cn(abnormal && 'row-abnormal')}>
                       <td className="col-test">
                         <span className="test-name-ar">{row.nameAr}</span>
-                        <span className="test-name-en">{row.nameEn}</span>
+                        <span className="test-name-en">{row.deviceCode || row.code}</span>
                       </td>
                       <td className={cn('col-result', abnormal && 'val-abnormal')}>{row.value}</td>
                       <td className="col-unit">{formatUnit(row.unit)}</td>
@@ -497,7 +497,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
                       <tr key={`${group.testCode}-${row.code}-${idx}`} className={cn(abnormal && 'row-abnormal')}>
                         <td className="col-test">
                           <span className="test-name-ar">{row.nameAr}</span>
-                          <span className="test-name-en">{row.nameEn}</span>
+                          <span className="test-name-en">{row.deviceCode || row.code}</span>
                         </td>
                         <td className={cn('col-result', abnormal && 'val-abnormal')}>{row.value}</td>
                         <td className="col-unit">{formatUnit(row.unit)}</td>

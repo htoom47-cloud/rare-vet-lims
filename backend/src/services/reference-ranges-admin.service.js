@@ -2,6 +2,7 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { defaultCritical } = require('../utils/reference-range');
 const { paginate, buildPagination } = require('../utils/helpers');
+const { validateMinMax } = require('./parameter-display.utils');
 
 const logChange = async (rangeId, userId, action, oldValue, newValue) => {
   await query(
@@ -11,10 +12,10 @@ const logChange = async (rangeId, userId, action, oldValue, newValue) => {
   );
 };
 
-const list = async ({ species, test_id, parameter_id, search, page, limit }) => {
+const list = async ({ species, test_id, parameter_id, search, device_id, page, limit, include_inactive }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
-  const where = ['trr.is_active = true'];
+  const where = include_inactive === 'true' || include_inactive === true ? [] : ['trr.is_active = true'];
 
   if (species) {
     params.push(species);
@@ -28,10 +29,16 @@ const list = async ({ species, test_id, parameter_id, search, page, limit }) => 
     params.push(parameter_id);
     where.push(`trr.parameter_id = $${params.length}`);
   }
+  if (device_id) {
+    params.push(device_id);
+    where.push(`trr.device_id = $${params.length}`);
+  }
   if (search) {
     params.push(`%${search}%`);
-    where.push(`(tp.code ILIKE $${params.length} OR tp.name ILIKE $${params.length})`);
+    where.push(`(tp.code ILIKE $${params.length} OR tp.name ILIKE $${params.length} OR di.name ILIKE $${params.length})`);
   }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   params.push(l, offset);
   const result = await query(
@@ -42,7 +49,7 @@ const list = async ({ species, test_id, parameter_id, search, page, limit }) => 
      JOIN test_parameters tp ON tp.id = trr.parameter_id
      JOIN tests t ON t.id = tp.test_id
      LEFT JOIN device_integrations di ON di.id = trr.device_id
-     WHERE ${where.join(' AND ')}
+     ${whereSql}
      ORDER BY t.code, tp.sort_order, trr.animal_type
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
@@ -53,7 +60,7 @@ const list = async ({ species, test_id, parameter_id, search, page, limit }) => 
     `SELECT COUNT(*)::int AS total
      FROM test_reference_ranges trr
      JOIN test_parameters tp ON tp.id = trr.parameter_id
-     WHERE ${where.join(' AND ')}`,
+     ${whereSql}`,
     countParams
   );
 
@@ -69,6 +76,9 @@ const create = async (body, userId) => {
   if (!parameter_id || !animal_type) {
     throw new AppError('Parameter and species required', 400, 'VALIDATION');
   }
+
+  const rangeError = validateMinMax(min_value, max_value);
+  if (rangeError) throw new AppError(rangeError, 400, 'INVALID_RANGE');
 
   const dup = await query(
     `SELECT id FROM test_reference_ranges
@@ -101,6 +111,11 @@ const create = async (body, userId) => {
 const update = async (id, body, userId) => {
   const existing = await query('SELECT * FROM test_reference_ranges WHERE id = $1', [id]);
   if (!existing.rows[0]) throw new AppError('Reference range not found', 404, 'NOT_FOUND');
+
+  const minVal = body.min_value ?? existing.rows[0].min_value;
+  const maxVal = body.max_value ?? existing.rows[0].max_value;
+  const rangeError = validateMinMax(minVal, maxVal);
+  if (rangeError) throw new AppError(rangeError, 400, 'INVALID_RANGE');
 
   const crit = defaultCritical(body.min_value ?? existing.rows[0].min_value, body.max_value ?? existing.rows[0].max_value);
   const result = await query(

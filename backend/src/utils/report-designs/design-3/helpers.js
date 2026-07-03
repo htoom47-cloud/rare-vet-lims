@@ -28,7 +28,7 @@ const formatDateTime = (date) => {
   return `${formatDate(d)} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
 };
 
-const formatRef = (row) => {
+const formatRef = (row, lang = 'ar') => {
   if (row.minValue != null && row.maxValue != null) {
     const fmt = (n) => {
       const num = Number(n);
@@ -37,7 +37,9 @@ const formatRef = (row) => {
     };
     return `${fmt(row.minValue)} – ${fmt(row.maxValue)}`;
   }
-  return row.reference && row.reference !== '-' ? row.reference : '-';
+  const ref = row.reference;
+  if (ref && ref !== '-' && ref !== 'N/A' && ref !== 'غير متوفر') return ref;
+  return lang === 'ar' ? 'غير متوفر' : 'N/A';
 };
 
 const flagMeta = (flag) => {
@@ -60,9 +62,9 @@ const renderResultCell = (row) => {
 };
 
 const renderTestCell = (row, lang) => {
-  const code = escapeHtml(row.code || row.nameEn || '-');
+  const code = escapeHtml(row.deviceCode || row.code || row.nameEn || '-');
   if (lang === 'ar' && row.nameAr) {
-    return `<div class="test-name"><span class="test-name__primary">${escapeHtml(row.nameAr)}</span><span class="test-name__code">(${code})</span></div>`;
+    return `<div class="test-name"><span class="test-name__primary">${escapeHtml(row.nameAr)}</span><span class="test-name__code">${code}</span></div>`;
   }
   const nameEn = row.nameEn && row.nameEn !== row.code ? escapeHtml(row.nameEn) : '';
   if (nameEn) {

@@ -70,6 +70,10 @@ export default function ReferenceRanges() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.min_value !== '' && form.max_value !== '' && Number(form.min_value) > Number(form.max_value)) {
+      toast.error(isAr ? 'الحد الأدنى أكبر من الأعلى' : 'Min cannot be greater than Max');
+      return;
+    }
     const payload = {
       ...form,
       min_value: form.min_value !== '' ? Number(form.min_value) : null,

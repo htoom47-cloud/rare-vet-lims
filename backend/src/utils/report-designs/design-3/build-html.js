@@ -129,7 +129,7 @@ const buildResultsTable = (results, lang, sectionTitle) => {
       <td class="col-test">${renderTestCell(row, lang)}</td>
       <td class="col-result">${renderResultCell(row)}</td>
       <td class="col-unit">${escapeHtml(row.unit || '-')}</td>
-      <td class="col-ref"><span class="ref-badge">${escapeHtml(formatRef(row))}</span></td>
+      <td class="col-ref"><span class="ref-badge">${escapeHtml(formatRef(row, lang))}</span></td>
     </tr>`).join('');
   const titleBlock = sectionTitle
     ? `<div class="section__head section__head--panel">${escapeHtml(sectionTitle)}</div>`

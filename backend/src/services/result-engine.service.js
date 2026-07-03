@@ -7,6 +7,13 @@
 const { getNormaPanelRow } = require('../utils/norma-cbc-map');
 const mappingEngine = require('./device-mapping-engine.service');
 const refEngine = require('./reference-range-engine.service');
+const {
+  formatReferenceForReport,
+  resolveDisplayCode,
+  resolveDisplayNameAr,
+  resolveDisplayNameEn,
+  flagForReport,
+} = require('./parameter-display.utils');
 
 const VALUE_TYPES = {
   COUNT: 'count',
@@ -281,45 +288,65 @@ const qualDisplayLabel = (displayValue, flag, isArabic) => {
   return displayValue;
 };
 
-const reportFlagFromEvaluation = (evaluated) => {
-  if (evaluated.flag === RESULT_FLAGS.CRITICAL) {
-    return evaluated.detailFlag || RESULT_FLAGS.CRIT_HIGH;
-  }
-  if (evaluated.flag === RESULT_FLAGS.NORMAL_WITHOUT_REF) return RESULT_FLAGS.NONE;
-  if (evaluated.flag === RESULT_FLAGS.MISSING) return RESULT_FLAGS.NONE;
-  return evaluated.detailFlag || evaluated.flag || RESULT_FLAGS.NONE;
-};
+const reportFlagFromEvaluation = (evaluated) => flagForReport(evaluated);
 
 /**
  * Build one report result object (same shape as reports.service — PDF design unchanged).
  */
 const buildReportResultRow = (row = {}, context = {}) => {
   const isArabic = context.language === 'ar' || context.isArabic;
-  const evaluated = evaluateResult(row, context);
+  const displayCtx = context.displayContext || {};
+  const evaluated = evaluateResult(row, {
+    ...context,
+    value_type: displayCtx.valueTypeMap?.[row.parameter_id] || context.value_type,
+  });
   const panelRow = getNormaPanelRow(row.parameter_code);
   const refRange = evaluated.referenceRange;
   const instrument = context.instrumentResolver
     ? context.instrumentResolver(row.category_code, row.test_code)
-    : (context.instrument || '-');
+    : (context.instrument || '');
 
   const displayNum = formatNumber(evaluated.numericValue ?? evaluated.displayValue ?? row.value);
+  const deviceCode = resolveDisplayCode({
+    parameterId: row.parameter_id,
+    parameterCode: row.parameter_code,
+    deviceCode: row.device_code,
+    shortCode: row.short_code,
+    deviceCodeMap: displayCtx.deviceCodeMap || {},
+  });
+
+  const nameAr = resolveDisplayNameAr({
+    parameterId: row.parameter_id,
+    parameterNameAr: panelRow?.name_ar || row.parameter_name_ar,
+    parameterName: row.parameter_name || row.test_name_ar || row.test_name,
+    displayNameArMap: displayCtx.displayNameArMap || {},
+  });
+
+  const nameEn = resolveDisplayNameEn({
+    parameterId: row.parameter_id,
+    parameterName: panelRow?.symbol || row.parameter_name || row.test_name,
+    displayNameEnMap: displayCtx.displayNameEnMap || {},
+  });
 
   return {
-    code: row.parameter_code,
+    code: deviceCode || row.parameter_code,
+    deviceCode: deviceCode || row.parameter_code,
+    systemCode: row.parameter_code,
     testCode: row.test_code,
-    nameAr: panelRow?.name_ar || row.parameter_name_ar || row.parameter_name || row.test_name_ar || row.test_name,
-    nameEn: panelRow?.symbol || row.parameter_name || row.test_name,
+    nameAr,
+    nameEn,
     testNameAr: row.test_name_ar || row.test_name,
     testNameEn: row.test_name,
-    value: qualDisplayLabel(displayNum ?? '-', evaluated.flag, isArabic),
+    value: qualDisplayLabel(displayNum ?? (isArabic ? '—' : 'N/A'), evaluated.flag, isArabic),
     numericValue: evaluated.numericValue,
-    unit: row.unit,
+    unit: row.unit && row.unit !== 'qual' ? row.unit : (isArabic ? '—' : 'N/A'),
     minValue: refRange?.min_value ?? null,
     maxValue: refRange?.max_value ?? null,
-    reference: evaluated.reference || '-',
+    reference: formatReferenceForReport(evaluated.reference, evaluated.hasReference, isArabic),
+    hasReference: evaluated.hasReference,
     flag: reportFlagFromEvaluation(evaluated),
-    isCritical: evaluated.isCritical,
-    method: row.test_method || '-',
+    isCritical: evaluated.hasReference ? evaluated.isCritical : false,
+    method: row.test_method || '',
     instrument,
     categoryCode: row.category_code || null,
   };

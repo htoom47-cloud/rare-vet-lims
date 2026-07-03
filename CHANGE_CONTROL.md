@@ -301,6 +301,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Staff button renamed to **تحديث التقرير**. When enabled, system tracks whether official PDF matches source data (results, validation, sample/animal/customer, attachments, approvals, reference ranges). Update action regenerates PDF, bumps `version`, clears `needs_update`. Portal continues to use `pdf_url` only (no update UI).
 
+### 2026-07-03 — Phase 12: Report & Reference Mastering
+
+| Field | Value |
+|-------|-------|
+| **Category** | feature (report display + admin reference/parameter mastering) |
+| **Risk** | low–medium — additive columns; admin UI behind flag; bugfixes always on |
+| **Backup taken** | Recommended before prod deploy |
+| **Migration** | **Yes** — `test_parameters`: `device_code`, `short_code`, `show_in_report`, `value_type`, `category`; `device_parameter_mappings.sort_order` (`ADD COLUMN IF NOT EXISTS`) |
+| **Checklist** | `node backend/src/scripts/verify-report-reference-mastering.js` + `verify-report-preview-pdf-consistency.js` |
+| **Files** | `parameter-display.utils.js`, `parameter-mastering.service.js`, `reference-quality.service.js`, `report-mastering.routes.js`, `result-engine.service.js`, `reports.service.js`, design-3 PDF, `ReportMastering.jsx`, `ReferenceRanges.jsx`, `REFERENCE_QUALITY_REPORT.md` |
+| **Env** | `REPORT_MASTERING_ENABLED=true` for admin mastering screens/API |
+| **Rollback** | Set flag `false`; N/A + no-flag-without-range bugfixes are safe to keep |
+
+**Summary:** Unified report data via `report.sections` + display context from device mappings. Admin manages parameter names, device codes, reference ranges, and quality audit. Preview/PDF/Portal share the same section builder. HIGH/LOW suppressed without reference; missing range shows N/A.
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

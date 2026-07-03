@@ -99,6 +99,7 @@ const env = {
   },
   features: {
     smartReportLifecycle: process.env.SMART_REPORT_LIFECYCLE_ENABLED === 'true',
+    reportMastering: process.env.REPORT_MASTERING_ENABLED === 'true',
   },
   backup: {
     uploads: {
