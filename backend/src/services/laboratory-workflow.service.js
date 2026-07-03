@@ -117,17 +117,17 @@ const loadSampleSnapshot = async (sampleId) => {
     `SELECT s.id, s.sample_code, s.barcode, s.status, s.customer_id, s.animal_id,
             s.created_at, s.completed_date,
             inv.id AS invoice_id, inv.invoice_number,
-            (SELECT COUNT(*)::int FROM sample_tests st WHERE st.sample_id = s.id) AS test_count,
-            (SELECT COUNT(*)::int FROM results r
+            (SELECT COUNT(DISTINCT st.test_id)::int FROM sample_tests st WHERE st.sample_id = s.id) AS test_count,
+            (SELECT COUNT(DISTINCT st.test_id)::int FROM results r
              JOIN sample_tests st ON st.id = r.sample_test_id WHERE st.sample_id = s.id) AS results_count,
-            (SELECT COUNT(*)::int FROM results r
+            (SELECT COUNT(DISTINCT st.test_id)::int FROM results r
              JOIN sample_tests st ON st.id = r.sample_test_id
              WHERE st.sample_id = s.id AND r.is_validated = false
                AND EXISTS (SELECT 1 FROM result_values rv WHERE rv.result_id = r.id)) AS pending_validation_count,
-            (SELECT COUNT(*)::int FROM sample_tests st
+            (SELECT COUNT(DISTINCT st.test_id)::int FROM sample_tests st
              JOIN results r ON r.sample_test_id = st.id
              WHERE st.sample_id = s.id AND r.is_validated = true) AS validated_test_count,
-            (SELECT COUNT(*)::int FROM sample_tests st WHERE st.sample_id = s.id) AS total_tests,
+            (SELECT COUNT(DISTINCT st.test_id)::int FROM sample_tests st WHERE st.sample_id = s.id) AS total_tests,
             (SELECT COUNT(*)::int FROM reports rep WHERE rep.sample_id = s.id) AS reports_count,
             (SELECT COUNT(*)::int FROM notification_queue nq
              WHERE nq.metadata::jsonb->>'sample_id' = s.id::text
@@ -531,11 +531,11 @@ const getWorkflowDashboardCounts = async () => {
       `SELECT COUNT(*)::int AS n FROM samples s
        WHERE s.status = 'completed'
          OR (
-           (SELECT COUNT(*) FROM sample_tests st WHERE st.sample_id = s.id) > 0
-           AND (SELECT COUNT(*) FROM sample_tests st
+           (SELECT COUNT(DISTINCT st.test_id) FROM sample_tests st WHERE st.sample_id = s.id) > 0
+           AND (SELECT COUNT(DISTINCT st.test_id) FROM sample_tests st
                 JOIN results r ON r.sample_test_id = st.id
                 WHERE st.sample_id = s.id AND r.is_validated = true)
-             = (SELECT COUNT(*) FROM sample_tests st WHERE st.sample_id = s.id)
+             = (SELECT COUNT(DISTINCT st.test_id) FROM sample_tests st WHERE st.sample_id = s.id)
          )`
     ),
     query(

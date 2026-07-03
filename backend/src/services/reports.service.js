@@ -213,14 +213,17 @@ const buildReportData = async (sampleId, opts) => {
   const sample = sampleResult.rows[0];
 
   const orderedTestsResult = await query(
-    `SELECT t.id AS test_id, t.code AS test_code, t.name AS test_name, t.name_ar AS test_name_ar,
-            tc.code AS category_code
+    `SELECT DISTINCT ON (t.id) t.id AS test_id, t.code AS test_code, t.name AS test_name, t.name_ar AS test_name_ar,
+            tc.code AS category_code, tc.sort_order AS cat_sort, t.sort_order AS test_sort
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN test_categories tc ON t.category_id = tc.id
      WHERE st.sample_id = $1
-     ORDER BY tc.sort_order NULLS LAST, t.sort_order, t.name`,
+     ORDER BY t.id, st.created_at DESC`,
     [sampleId]
+  );
+  orderedTestsResult.rows.sort((a, b) =>
+    (a.cat_sort ?? 999) - (b.cat_sort ?? 999) || (a.test_sort ?? 0) - (b.test_sort ?? 0) || a.test_name.localeCompare(b.test_name)
   );
 
   const resultsData = await query(

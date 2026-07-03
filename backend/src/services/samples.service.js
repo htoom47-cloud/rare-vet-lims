@@ -43,7 +43,7 @@ const list = async ({ status, search, awaiting_validation, page, limit }) => {
     `SELECT s.*, c.full_name as customer_name, c.mobile as customer_mobile,
             a.animal_code, a.animal_type, a.name_tag as animal_name,
             u.full_name as technician_name,
-            (SELECT COUNT(*) FROM sample_tests st WHERE st.sample_id = s.id) as test_count,
+            (SELECT COUNT(DISTINCT st.test_id) FROM sample_tests st WHERE st.sample_id = s.id) as test_count,
             (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id) as reports_count,
             (SELECT COUNT(*) FROM notification_queue nq
              WHERE nq.metadata::jsonb->>'sample_id' = s.id::text) as notifications_count
@@ -63,9 +63,9 @@ const getById = async (id) => {
     `SELECT s.*, c.full_name as customer_name, c.mobile as customer_mobile,
             a.animal_code, a.animal_type, a.name_tag as animal_name,
             inv.id as invoice_id, inv.invoice_number, inv.status as invoice_status, inv.total as invoice_total,
-            (SELECT COUNT(*) FROM results r
+            (SELECT COUNT(DISTINCT st.test_id) FROM results r
              JOIN sample_tests st ON r.sample_test_id = st.id WHERE st.sample_id = s.id) as results_count,
-            (SELECT COUNT(*) FROM results r
+            (SELECT COUNT(DISTINCT st.test_id) FROM results r
              JOIN sample_tests st ON r.sample_test_id = st.id
              WHERE st.sample_id = s.id AND r.is_validated = true) as validated_results_count,
             (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id) as reports_count,
@@ -81,14 +81,15 @@ const getById = async (id) => {
   if (!result.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');
 
   const tests = await query(
-    `SELECT st.*, t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.price,
+    `SELECT DISTINCT ON (st.test_id) st.*, t.name as test_name, t.name_ar as test_name_ar, t.code as test_code, t.price,
             t.label_copies, tc.code as category_code,
             EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id) as has_results,
             EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id AND r.is_validated = true) as is_validated
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN test_categories tc ON t.category_id = tc.id
-     WHERE st.sample_id = $1`,
+     WHERE st.sample_id = $1
+     ORDER BY st.test_id, st.created_at DESC`,
     [id]
   );
 
@@ -170,7 +171,8 @@ const create = async (data, userId) => {
     for (const testId of resolvedTestIds) {
       const testPrice = await client.query('SELECT price FROM tests WHERE id = $1', [testId]);
       await client.query(
-        `INSERT INTO sample_tests (id, sample_id, test_id, price, status) VALUES ($1, $2, $3, $4, 'pending')`,
+        `INSERT INTO sample_tests (id, sample_id, test_id, price, status) VALUES ($1, $2, $3, $4, 'pending')
+         ON CONFLICT (sample_id, test_id) DO NOTHING`,
         [uuidv4(), sample.id, testId, testPrice.rows[0]?.price || 0]
       );
     }

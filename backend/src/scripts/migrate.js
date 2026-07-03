@@ -128,6 +128,84 @@ async function ensureUniqueLimsReferenceRanges(client) {
   `);
 }
 
+/**
+ * P0 Hotfix: Remove duplicate sample_tests with the same (sample_id, test_id).
+ * Keeps the one with validated results, or the one with result values, or the newest.
+ * Removes duplicates only when safe (no validated results on the duplicate).
+ */
+async function fixDuplicateSampleTests(client) {
+  const dupes = await client.query(`
+    SELECT sample_id, test_id, COUNT(*) AS cnt
+    FROM sample_tests
+    GROUP BY sample_id, test_id
+    HAVING COUNT(*) > 1
+  `);
+
+  if (!dupes.rows.length) return;
+  logger.info(`Found ${dupes.rows.length} sample_test duplicate groups — fixing`);
+
+  for (const { sample_id, test_id } of dupes.rows) {
+    const entries = await client.query(
+      `SELECT st.id,
+              EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id AND r.is_validated = true) AS has_validated,
+              EXISTS (SELECT 1 FROM results r JOIN result_values rv ON rv.result_id = r.id WHERE r.sample_test_id = st.id) AS has_values,
+              EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id) AS has_results,
+              st.created_at
+       FROM sample_tests st
+       WHERE st.sample_id = $1 AND st.test_id = $2
+       ORDER BY
+         (EXISTS (SELECT 1 FROM results r WHERE r.sample_test_id = st.id AND r.is_validated = true)) DESC,
+         (EXISTS (SELECT 1 FROM results r JOIN result_values rv ON rv.result_id = r.id WHERE r.sample_test_id = st.id)) DESC,
+         st.created_at DESC`,
+      [sample_id, test_id]
+    );
+
+    const keep = entries.rows[0];
+    const toRemove = entries.rows.slice(1);
+
+    for (const dup of toRemove) {
+      if (dup.has_validated) {
+        logger.warn(`Skipping duplicate ${dup.id} — has validated results (sample=${sample_id}, test=${test_id})`);
+        continue;
+      }
+      // Delete result_values → results → sample_test
+      if (dup.has_results) {
+        await client.query(
+          `DELETE FROM result_values WHERE result_id IN (SELECT id FROM results WHERE sample_test_id = $1)`,
+          [dup.id]
+        );
+        await client.query(`DELETE FROM results WHERE sample_test_id = $1`, [dup.id]);
+      }
+      await client.query(`DELETE FROM sample_tests WHERE id = $1`, [dup.id]);
+      logger.info(`Removed duplicate sample_test ${dup.id} (kept ${keep.id}) for sample=${sample_id}`);
+    }
+  }
+
+  // Reconcile sample statuses for affected samples
+  await client.query(`
+    UPDATE samples s SET
+      status = 'completed',
+      completed_date = COALESCE(s.completed_date, NOW()),
+      updated_at = NOW()
+    WHERE s.id IN (SELECT DISTINCT sample_id FROM sample_tests)
+      AND s.status IN ('received', 'running')
+      AND NOT EXISTS (
+        SELECT 1 FROM sample_tests st
+        WHERE st.sample_id = s.id
+          AND NOT EXISTS (
+            SELECT 1 FROM results r WHERE r.sample_test_id = st.id AND r.is_validated = true
+          )
+      )
+  `);
+
+  // Add unique constraint to prevent recurrence
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_sample_tests_sample_test
+    ON sample_tests (sample_id, test_id)
+  `);
+  logger.info('Unique constraint on sample_tests(sample_id, test_id) ensured');
+}
+
 async function applyPatches() {
   const client = await pool.connect();
   try {
@@ -449,6 +527,7 @@ async function applyPatches() {
     await seedNormaCbcMappings(client);
     await syncLabContactInfo(client);
     await ensureUniqueLimsReferenceRanges(client);
+    await fixDuplicateSampleTests(client);
   } finally {
     client.release();
   }
