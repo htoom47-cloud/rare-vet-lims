@@ -55,6 +55,8 @@ export const customersAPI = {
   create: (data) => api.post('/customers', data),
   update: (id, data) => api.put(`/customers/${id}`, data),
   delete: (id) => api.delete(`/customers/${id}`),
+  readyReports: (id) => api.get(`/customers/${id}/ready-reports`),
+  sendReadyReports: (id, body) => api.post(`/customers/${id}/send-ready-reports`, body),
 };
 
 export const referenceRangesAPI = {

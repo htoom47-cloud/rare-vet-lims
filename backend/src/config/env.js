@@ -118,6 +118,7 @@ const env = {
     whatsapp: process.env.WHATSAPP_ENABLED === 'true',
     sms: process.env.SMS_ENABLED === 'true',
     email: process.env.EMAIL_ENABLED === 'true',
+    sendReal: process.env.SEND_REAL_NOTIFICATIONS === 'true',
     msegat: {
       username: process.env.MSEGAT_USERNAME || '',
       apiKey: process.env.MSEGAT_API_KEY || '',

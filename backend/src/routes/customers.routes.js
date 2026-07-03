@@ -1,5 +1,6 @@
 const express = require('express');
 const service = require('../services/customers.service');
+const reportNotify = require('../services/customer-report-notifications.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { customerSchema } = require('../validators/schemas');
@@ -13,6 +14,28 @@ router.get('/', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next) =>
   try {
     const data = await service.list(req.query);
     res.json({ success: true, ...data });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT), async (req, res, next) => {
+  try {
+    const data = await reportNotify.listReadyReports(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/send-ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT), async (req, res, next) => {
+  try {
+    const data = await reportNotify.sendReadyReports(
+      req.params.id,
+      {
+        reportIds: req.body.reportIds,
+        channel: req.body.channel,
+        forceResend: req.body.forceResend === true,
+      },
+      req.user.id
+    );
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

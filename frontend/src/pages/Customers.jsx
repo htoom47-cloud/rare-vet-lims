@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route, Receipt, CreditCard, Pencil } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -18,6 +18,7 @@ export default function Customers() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('customers.update');
+  const canSendReports = hasPermission('notifications.send_report');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -26,6 +27,12 @@ export default function Customers() {
   const [selected, setSelected] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm());
+  const [sendOpen, setSendOpen] = useState(false);
+  const [readyReports, setReadyReports] = useState([]);
+  const [readyLoading, setReadyLoading] = useState(false);
+  const [selectedReportIds, setSelectedReportIds] = useState([]);
+  const [sendingReports, setSendingReports] = useState(false);
+  const [sendChannel, setSendChannel] = useState('whatsapp');
 
   const load = () => {
     setLoading(true);
@@ -87,6 +94,57 @@ export default function Customers() {
     const { data } = await customersAPI.get(customer.id);
     setSelected(data.data);
     setProfileOpen(true);
+  };
+
+  const openSendReports = async () => {
+    if (!selected?.id) return;
+    setSendOpen(true);
+    setReadyLoading(true);
+    setSelectedReportIds([]);
+    try {
+      const { data } = await customersAPI.readyReports(selected.id);
+      const reports = data.data?.reports || [];
+      setReadyReports(reports);
+      setSelectedReportIds(reports.filter((r) => !r.previously_sent).map((r) => r.id));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+      setSendOpen(false);
+    } finally {
+      setReadyLoading(false);
+    }
+  };
+
+  const toggleReportSelection = (reportId) => {
+    setSelectedReportIds((prev) => (
+      prev.includes(reportId) ? prev.filter((id) => id !== reportId) : [...prev, reportId]
+    ));
+  };
+
+  const sendSelectedReports = async (forceResend = false) => {
+    if (!selected?.id || selectedReportIds.length === 0) {
+      toast.error(t('customers.selectReportsToSend'));
+      return;
+    }
+    setSendingReports(true);
+    try {
+      await customersAPI.sendReadyReports(selected.id, {
+        reportIds: selectedReportIds,
+        channel: sendChannel,
+        forceResend,
+      });
+      toast.success(t('customers.reportsSentSuccess'));
+      setSendOpen(false);
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      if (code === 'ALREADY_SENT' && !forceResend) {
+        const confirmed = window.confirm(t('customers.reportsAlreadySentConfirm'));
+        if (confirmed) await sendSelectedReports(true);
+      } else {
+        toast.error(err.response?.data?.error?.message || t('common.error'));
+      }
+    } finally {
+      setSendingReports(false);
+    }
   };
 
   const columns = [
@@ -302,6 +360,102 @@ export default function Customers() {
             >
               <Route size={16} /> {t('workflow.startCase')}
             </Link>
+            {canSendReports && (
+              <button
+                type="button"
+                onClick={openSendReports}
+                className="btn-secondary inline-flex items-center gap-2 text-sm mt-2 ms-2"
+              >
+                <Send size={16} /> {t('customers.sendReadyReports')}
+              </button>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={sendOpen}
+        onClose={() => setSendOpen(false)}
+        title={t('customers.sendReadyReports')}
+        size="lg"
+      >
+        {readyLoading ? (
+          <p className="text-sm text-gray-500">{t('common.loading')}</p>
+        ) : readyReports.length === 0 ? (
+          <p className="text-sm text-gray-500">{t('customers.noReadyReports')}</p>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">{t('customers.sendReadyReportsHint')}</p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <label className="text-sm font-medium">{t('customers.sendChannel')}:</label>
+              <select
+                value={sendChannel}
+                onChange={(e) => setSendChannel(e.target.value)}
+                className="input-field w-auto text-sm"
+              >
+                <option value="whatsapp">WhatsApp</option>
+                <option value="sms">SMS</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSelectedReportIds(readyReports.filter((r) => !r.previously_sent).map((r) => r.id))}
+                className="text-primary-600 text-xs hover:underline"
+              >
+                {t('customers.selectAllUnsent')}
+              </button>
+            </div>
+            <div className="border rounded-lg overflow-x-auto max-h-72 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b text-start sticky top-0">
+                    <th className="p-2 w-10" />
+                    <th className="p-2 font-medium">{t('reports.reportNo')}</th>
+                    <th className="p-2 font-medium">{t('customers.animal')}</th>
+                    <th className="p-2 font-medium">{t('reports.tests')}</th>
+                    <th className="p-2 font-medium">{t('common.date')}</th>
+                    <th className="p-2 font-medium">{t('common.status')}</th>
+                    <th className="p-2 font-medium">{t('customers.sentBefore')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {readyReports.map((report) => (
+                    <tr key={report.id} className="border-b">
+                      <td className="p-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedReportIds.includes(report.id)}
+                          onChange={() => toggleReportSelection(report.id)}
+                        />
+                      </td>
+                      <td className="p-2 font-medium">{report.report_number}</td>
+                      <td className="p-2">{report.animal_name || '—'}</td>
+                      <td className="p-2">{report.test_names || '—'}</td>
+                      <td className="p-2">{new Date(report.created_at).toLocaleDateString()}</td>
+                      <td className="p-2">{report.status}</td>
+                      <td className="p-2">
+                        {report.previously_sent ? (
+                          <span className="text-green-700">{t('common.yes')}</span>
+                        ) : (
+                          <span className="text-gray-500">{t('common.no')}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button type="button" onClick={() => setSendOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
+              <button
+                type="button"
+                onClick={() => sendSelectedReports(false)}
+                disabled={sendingReports || selectedReportIds.length === 0}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <MessageCircle size={16} />
+                {sendingReports ? t('common.loading') : t('customers.sendOneMessage')}
+              </button>
+            </div>
           </div>
         )}
       </Modal>

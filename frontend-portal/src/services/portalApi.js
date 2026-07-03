@@ -58,7 +58,7 @@ export const portalAnimalsAPI = {
 
 export const portalReportsAPI = {
   list: (params) => portalApi.get('/reports', { params }),
-  getPreview: (id) => portalApi.get(`/reports/${id}/preview`),
+  getPreview: (id) => portalApi.get(`/reports/${id}/preview`, { params: { _: Date.now() } }),
   openPdf: async (pdfUrl) => {
     const filename = pdfUrl?.split('/').pop();
     if (!filename) throw new Error('Missing report file');

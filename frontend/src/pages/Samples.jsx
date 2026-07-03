@@ -37,7 +37,7 @@ export default function Samples() {
 
   const navigate = useNavigate();
   const { hasPermission, hasAnyPermission } = useAuth();
-  const canSendSmsToCustomer = hasPermission('notifications.send_report');
+  const canSendSmsToCustomer = false;
   const canGenerateReport = hasPermission('reports.generate');
   const canReviewResults = hasAnyPermission(
     'results.validate', 'results.edit', 'results.unvalidate', 'results.enter'

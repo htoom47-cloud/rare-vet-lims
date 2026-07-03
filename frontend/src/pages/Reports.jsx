@@ -81,7 +81,7 @@ export default function Reports() {
 
   const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
   const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
-  const canSendSmsToCustomer = hasPermission('notifications.send_report');
+  const canSendSmsToCustomer = user?.role === 'admin' && hasPermission('notifications.send_report');
   const canRegeneratePdf = hasPermission('reports.generate');
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)

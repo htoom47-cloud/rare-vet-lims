@@ -316,6 +316,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Unified report data via `report.sections` + display context from device mappings. Admin manages parameter names, device codes, reference ranges, and quality audit. Preview/PDF/Portal share the same section builder. HIGH/LOW suppressed without reference; missing range shows N/A.
 
+### 2026-07-03 — Phase 13: Customer Portal Sync + Consolidated Notifications
+
+| Field | Value |
+|-------|-------|
+| **Category** | feature (portal sync fix + customer notification batching) |
+| **Risk** | medium — touches customer messaging; dry-run default |
+| **Backup taken** | Recommended before prod deploy |
+| **Migration** | **None** — uses existing `notification_queue.metadata` JSONB |
+| **Checklist** | `node backend/src/scripts/verify-customer-report-notifications.js` |
+| **Files** | `portal-sync.service.js`, `customer-report-notifications.*`, `customers.routes.js`, `notifications.service.js`, `Customers.jsx`, `Reports.jsx`, `Samples.jsx`, portal `portalApi.js` |
+| **Env** | `SEND_REAL_NOTIFICATIONS=true` to send live SMS/WhatsApp (default **false**) |
+| **Rollback** | `git revert`; portal visibility tightening is safe to keep |
+
+**Summary:** Portal shows approved/published reports with official PDF only. Staff sends one consolidated message per customer from Customer Profile. Duplicate sends tracked in `notification_queue`. Send removed from Reports/Samples lists (admin override on Reports only).
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

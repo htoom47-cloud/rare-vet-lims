@@ -38,6 +38,21 @@ const queue = async ({ channel, recipient, subject, body, metadata }) => {
 };
 
 const dispatchOne = async (notification) => {
+  if (!env.notifications.sendReal) {
+    await query(
+      `UPDATE notification_queue SET status = 'sent', sent_at = NOW(),
+       metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+       WHERE id = $1`,
+      [notification.id, JSON.stringify({ provider_result: { provider: 'dry-run', dryRun: true } })]
+    );
+    logger.info('Notification dry-run (not sent)', {
+      id: notification.id,
+      channel: notification.channel,
+      recipient: notification.recipient,
+    });
+    return { ...notification, status: 'sent', provider_result: { provider: 'dry-run', dryRun: true } };
+  }
+
   assertChannelEnabled(notification.channel);
 
   const result = await provider.send({

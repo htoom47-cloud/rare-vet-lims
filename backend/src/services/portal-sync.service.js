@@ -39,26 +39,32 @@ const resolveReportLifecycle = (reportRow, context = {}) => {
   return LIFECYCLE.DRAFT;
 };
 
-const isPortalVisible = (lifecycle, options = {}) => {
+const isPortalVisible = (lifecycle, reportRow = {}, options = {}) => {
+  if (!reportRow?.pdf_url) return false;
+  if (lifecycle === LIFECYCLE.DRAFT || lifecycle === LIFECYCLE.RESULTS_ENTERED) return false;
+
   const showReviewed = options.showReviewed ?? env.portal?.showReviewed ?? false;
   if (lifecycle === LIFECYCLE.PUBLISHED || lifecycle === LIFECYCLE.APPROVED) return true;
   if (lifecycle === LIFECYCLE.REVIEWED && showReviewed) return true;
   return false;
 };
 
-/** SQL fragment — reports visible to portal customers (no duplicate report building). */
+/** SQL fragment — reports visible to portal customers (approved/published + official PDF). */
 const portalVisibilitySql = (reportAlias = 'r') => {
   const r = reportAlias;
-  const approvedOrPublished = `(
-    (${r}.is_final IS NOT FALSE AND ${r}.pdf_url IS NOT NULL)
-    OR ${r}.lab_specialist_approved_by IS NOT NULL
-    OR ${r}.vet_approved_by IS NOT NULL
+  const ready = `(
+    ${r}.pdf_url IS NOT NULL
+    AND (
+      ${r}.lab_specialist_approved_by IS NOT NULL
+      OR ${r}.vet_approved_by IS NOT NULL
+      OR ${r}.is_final IS NOT FALSE
+    )
   )`;
 
-  if (!env.portal?.showReviewed) return approvedOrPublished;
+  if (!env.portal?.showReviewed) return ready;
 
   return `(
-    ${approvedOrPublished}
+    ${ready}
     OR (
       ${r}.pdf_url IS NOT NULL
       AND ${r}.lab_specialist_approved_by IS NULL
@@ -123,7 +129,7 @@ const buildUnifiedReportView = (preview = {}, reportRow = null, context = {}) =>
     pdf_url: pdfUrl,
     lifecycle,
     reportStatus: lifecycle,
-    portalVisible: isPortalVisible(lifecycle, context),
+    portalVisible: isPortalVisible(lifecycle, reportRow, context),
     summary,
     flags,
     sections: preview.sections || [],
