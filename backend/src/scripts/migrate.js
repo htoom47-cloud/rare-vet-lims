@@ -527,6 +527,10 @@ async function applyPatches() {
     await seedNormaCbcMappings(client);
     await syncLabContactInfo(client);
     await ensureUniqueLimsReferenceRanges(client);
+    await client.query(`
+      ALTER TABLE sample_tests
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()
+    `);
     await fixDuplicateSampleTests(client);
   } finally {
     client.release();
