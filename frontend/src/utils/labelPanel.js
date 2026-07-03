@@ -137,7 +137,51 @@ export const formatTestsForLabel = (sample, { isArabic = false } = {}) => {
   return keys.map((k) => panelFriendlyName(k, isArabic)).join(' + ');
 };
 
-/** Full thermal label text blocks (Zebra + HTML preview) — matches barcode-engine.service.js */
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+
+/** Strip non-Latin text — Zebra ^A0N cannot render Arabic reliably. */
+export const asciiLabelText = (text) => {
+  const s = String(text || '').trim();
+  if (!s || ARABIC_RE.test(s)) return '';
+  return s;
+};
+
+/**
+ * English-only label content for Zebra ZPL (thermal printer).
+ * Barcode / Code128 unchanged; no Arabic sent to the printer.
+ */
+export const buildZebraThermalLabelContent = (sample) => {
+  const id = displaySampleId(sample?.sample_code || sample?.barcode);
+  const animalType = animalTypeLabel(sample?.animal_type, false);
+  const animalCode = asciiLabelText(sample?.animal_code);
+  const testsSummary = formatTestsForLabel(sample, { isArabic: false });
+
+  let sampleDate = '';
+  if (sample?.collection_date) {
+    const d = new Date(sample.collection_date);
+    if (!Number.isNaN(d.getTime())) {
+      sampleDate = d.toLocaleDateString('en-GB', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+      });
+    }
+  }
+
+  const animalLine = animalType
+    ? (animalCode ? `Type: ${animalType} · ${animalCode}` : `Type: ${animalType}`)
+    : (animalCode ? `ID: ${animalCode}` : '');
+
+  return {
+    barcode: id,
+    barcodeDigits: id,
+    barcodeEncode: encodeCode128C(id),
+    customerLine: '',
+    animalLine: animalLine ? truncateLabel(animalLine, 36) : '',
+    dateLine: sampleDate ? truncateLabel(`Date: ${sampleDate}`, 36) : '',
+    testLine: testsSummary ? truncateLabel(`Test: ${testsSummary}`, 36) : '',
+  };
+};
+
+/** Full thermal label text blocks (HTML preview) — matches barcode-engine.service.js */
 export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => {
   const id = displaySampleId(sample?.sample_code || sample?.barcode);
   const samplePrefix = isArabic ? 'رقم العينة' : 'Sample ID';
@@ -149,7 +193,8 @@ export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => {
 
   const customerName = String(sample?.customer_name_ar || sample?.customer_name || '').trim();
   const animalName = String(sample?.animal_name || sample?.name_tag || '').trim();
-  const animalType = animalTypeLabel(sample?.animal_type, isArabic);  const testsSummary = formatTestsForLabel(sample, { isArabic });
+  const animalType = animalTypeLabel(sample?.animal_type, isArabic);
+  const testsSummary = formatTestsForLabel(sample, { isArabic });
 
   let sampleDate = '';
   if (sample?.collection_date) {

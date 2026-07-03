@@ -1,9 +1,9 @@
 /**
- * Barcode Engine — Code128 sample ID in barcode; Arabic text outside barcode only.
+ * Barcode Engine — Code128 sample ID in barcode; human text English-only on ZPL.
  *
  * Rules:
  * - barcodeValue = unified sample digits (Norma / USB scanner compatible)
- * - human-readable lines may include Arabic customer / animal names
+ * - ZPL text lines = English ASCII only (Zebra ^A0N / ^CI0)
  * - ZPL ^BC ^FD contains digits only (Code128-C)
  */
 const {
@@ -177,6 +177,12 @@ const buildBarcodePayload = (sample = {}, context = {}) => {
     normaSampleId: normalizeSampleScanId(barcodeValue) || barcodeValue,
     humanReadable,
     textLines,
+    meta: {
+      animal_type: sample.animal_type,
+      animal_code: sample.animal_code,
+      collection_date: sample.collection_date || sample.date,
+      tests: sample.tests || [],
+    },
   };
 };
 
@@ -240,8 +246,8 @@ const zplHeader = (opts) => {
   const h = opts.labelHeightDots || LABEL_HEIGHT;
   return [
     '^XA',
-    '^FX LIMS Barcode Engine v1',
-    '^CI28',
+    '^FX LIMS Barcode Engine v1 English ZPL',
+    '^CI0',
     '^MTD',
     `^MD${opts.darkness ?? DEFAULT_PRINTER.darkness}`,
     '^MNW',
@@ -282,6 +288,40 @@ const barcodeField = (payload, opts) => {
   };
 };
 
+const asciiLabelText = (text) => {
+  const s = String(text || '').trim();
+  if (!s || ARABIC_RE.test(s)) return '';
+  return s;
+};
+
+/** English-only lines for ZPL — Zebra ^A0N does not render Arabic reliably. */
+const buildZplTextLines = (payload) => {
+  const animalType = animalTypeLabel(payload.meta?.animal_type, false);
+  const animalCode = asciiLabelText(payload.meta?.animal_code);
+  const sampleDate = formatSampleDate(payload.meta?.collection_date, false);
+  const testsSummary = formatTestsForLabel(
+    { tests: payload.meta?.tests || [] },
+    false
+  );
+
+  const lines = [];
+  if (animalType) {
+    const animalBit = animalCode
+      ? `Type: ${animalType} · ${animalCode}`
+      : `Type: ${animalType}`;
+    lines.push({ key: 'animal', text: truncateLabel(animalBit) });
+  } else if (animalCode) {
+    lines.push({ key: 'animal', text: truncateLabel(`ID: ${animalCode}`) });
+  }
+  if (sampleDate) {
+    lines.push({ key: 'date', text: truncateLabel(`Date: ${sampleDate}`) });
+  }
+  if (testsSummary) {
+    lines.push({ key: 'test', text: truncateLabel(`Test: ${testsSummary}`) });
+  }
+  return lines;
+};
+
 /**
  * Build ZPL for Zebra 50×25 mm direct thermal label.
  */
@@ -300,14 +340,14 @@ const buildZplLabel = (payload, options = {}) => {
   const bc = barcodeField(payload, opts);
   lines.push(bc.zpl);
 
-  const lineMap = Object.fromEntries((payload.textLines || []).map((l) => [l.key, l.text]));
-  const sampleText = lineMap.sampleId || payload.humanReadable?.sampleId || payload.barcodeValue;
-  lines.push(textLine(LAYOUT.digitsY, sampleText.replace(/^[^:]*:\s*/, ''), labelW, FONT_DIGITS));
+  const sampleDigits = payload.barcodeValue || payload.humanReadable?.sampleId || '';
+  lines.push(textLine(LAYOUT.digitsY, sampleDigits, labelW, FONT_DIGITS));
 
-  if (lineMap.customer) lines.push(textLine(LAYOUT.customerY, lineMap.customer, labelW));
-  if (lineMap.animal) lines.push(textLine(LAYOUT.animalY, lineMap.animal, labelW));
-  if (lineMap.date) lines.push(textLine(LAYOUT.dateY, lineMap.date, labelW));
-  if (lineMap.test) lines.push(textLine(LAYOUT.testY, lineMap.test, labelW));
+  const zplLines = buildZplTextLines(payload);
+  const yByKey = { animal: LAYOUT.animalY, date: LAYOUT.dateY, test: LAYOUT.testY };
+  for (const line of zplLines) {
+    lines.push(textLine(yByKey[line.key], line.text, labelW));
+  }
 
   lines.push('^XZ');
   const zpl = lines.join('\n');
@@ -330,6 +370,15 @@ const validateZplQuietZone = (zpl, options = {}) => {
 
   if (!src.includes('^XA') || !src.includes('^XZ')) {
     errors.push('ZPL must contain ^XA and ^XZ');
+  }
+
+  const textFds = src.match(/\^FD([\s\S]*?)\^FS/g) || [];
+  for (const block of textFds) {
+    const fdMatch = block.match(/\^FD([\s\S]*?)\^FS/);
+    const fdVal = fdMatch ? fdMatch[1] : '';
+    if (ARABIC_RE.test(fdVal)) {
+      errors.push('Arabic text found in ZPL ^FD field');
+    }
   }
 
   const bcBlocks = src.match(/\^FO(\d+),\d+\^BY[\s\S]*?\^BC[\s\S]*?\^FS/g) || [];
