@@ -2,6 +2,24 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../config/database');
 const env = require('../config/env');
 const { AppError } = require('./errorHandler');
+const { normalizeMobileDigits } = require('../utils/helpers');
+
+const resolvePortalCustomerIds = async (customer) => {
+  if (!customer?.mobile) return [customer.id];
+  const digits = normalizeMobileDigits(customer.mobile);
+  if (digits.length < 9) return [customer.id];
+
+  const result = await query(
+    `SELECT id FROM customers
+     WHERE is_active = true
+       AND regexp_replace(mobile, '[^0-9]', '', 'g') LIKE $1`,
+    [`%${digits.slice(-9)}`]
+  );
+
+  const ids = result.rows.map((r) => r.id);
+  if (!ids.includes(customer.id)) ids.unshift(customer.id);
+  return ids;
+};
 
 const authenticateCustomer = async (req, res, next) => {
   try {
@@ -27,6 +45,7 @@ const authenticateCustomer = async (req, res, next) => {
     }
 
     req.customer = result.rows[0];
+    req.portalCustomerIds = await resolvePortalCustomerIds(result.rows[0]);
     next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {

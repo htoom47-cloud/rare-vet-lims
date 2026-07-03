@@ -331,6 +331,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Portal shows approved/published reports with official PDF only. Staff sends one consolidated message per customer from Customer Profile. Duplicate sends tracked in `notification_queue`. Send removed from Reports/Samples lists (admin override on Reports only).
 
+### 2026-07-03 — Phase 13b: Portal Mobile Aggregation + Duplicate Customer Guard
+
+| Field | Value |
+|-------|-------|
+| **Category** | fix (portal data aggregation + data integrity guard) |
+| **Risk** | low — read-path aggregation; guard is additive with admin override |
+| **Backup taken** | Recommended before prod deploy |
+| **Migration** | **None** |
+| **Checklist** | `node backend/src/scripts/verify-portal-mobile-aggregation.js` + `verify-customer-report-notifications.js` |
+| **Files** | `portal.service.js`, `portal.routes.js`, `customerAuth.js`, `customers.service.js`, `customers.routes.js` |
+| **Env** | None new |
+| **Rollback** | `git revert`; safe — changes are backward compatible |
+
+**Summary:** Portal now aggregates reports across all customer records sharing the same normalized mobile number (fixes invisible reports when duplicate customer records exist). Middleware resolves `portalCustomerIds` array from authenticated customer's mobile; all portal queries use `ANY($1::uuid[])`. Reception is blocked from creating duplicate customers with the same mobile; Admin/Manager can override. 46 unit tests + 18 Phase 13 tests pass.
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

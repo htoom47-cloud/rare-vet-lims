@@ -24,6 +24,8 @@ const OTP_TTL_MINUTES = 10;
 const OTP_COOLDOWN_SECONDS = 60;
 const OTP_MAX_ATTEMPTS = 5;
 
+const asArray = (v) => (Array.isArray(v) ? v : [v]);
+
 const generateOtp = () => env.portal.staticOtp || String(Math.floor(10 ** (OTP_LENGTH - 1) + Math.random() * 9 * 10 ** (OTP_LENGTH - 1)));
 
 const issuePortalToken = (customer) => {
@@ -186,12 +188,13 @@ const verifyOtp = async (mobile, otp) => {
   return issuePortalToken(customer);
 };
 
-const assertReportOwnership = async (reportId, customerId) => {
+const assertReportOwnership = async (reportId, customerIds) => {
+  const ids = asArray(customerIds);
   const result = await query(
     `SELECT r.id FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE r.id = $1 AND s.customer_id = $2`,
-    [reportId, customerId]
+     WHERE r.id = $1 AND s.customer_id = ANY($2::uuid[])`,
+    [reportId, ids]
   );
   if (!result.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
 };
@@ -204,11 +207,12 @@ const sanitizePortalPreview = (preview) => portalSync.sanitizeForPortal(preview)
 
 const portalReportFilter = portalSync.portalVisibilitySql('r');
 
-const listReports = async (customerId, { page, limit, animalId }) => {
+const listReports = async (customerIds, { page, limit, animalId }) => {
+  const ids = asArray(customerIds);
   const { offset, page: p, limit: l } = paginate(page, limit);
 
-  const filters = ['s.customer_id = $1', portalReportFilter];
-  const params = [customerId];
+  const filters = ['s.customer_id = ANY($1::uuid[])', portalReportFilter];
+  const params = [ids];
   if (animalId) {
     params.push(animalId);
     filters.push(`a.id = $${params.length}`);
@@ -242,21 +246,23 @@ const listReports = async (customerId, { page, limit, animalId }) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
-const assertAnimalOwnership = async (animalId, customerId) => {
+const assertAnimalOwnership = async (animalId, customerIds) => {
+  const ids = asArray(customerIds);
   const result = await query(
     `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age, a.color, a.rfid_chip,
             c.full_name as owner_name, c.full_name_ar as owner_name_ar, c.farm_company
      FROM animals a
      JOIN customers c ON a.owner_id = c.id
-     WHERE a.id = $1 AND a.owner_id = $2 AND a.is_active = true`,
-    [animalId, customerId]
+     WHERE a.id = $1 AND a.owner_id = ANY($2::uuid[]) AND a.is_active = true`,
+    [animalId, ids]
   );
   if (!result.rows[0]) throw new AppError('Animal not found', 404, 'NOT_FOUND');
   return result.rows[0];
 };
 
-const fetchAnimalReports = async (customerId, animalId, limit = 20) => {
-  const params = [customerId, animalId];
+const fetchAnimalReports = async (customerIds, animalId, limit = 20) => {
+  const ids = asArray(customerIds);
+  const params = [ids, animalId];
   let limitClause = '';
   if (limit) {
     params.push(limit);
@@ -268,7 +274,7 @@ const fetchAnimalReports = async (customerId, animalId, limit = 20) => {
             s.sample_code, s.collection_date
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1 AND s.animal_id = $2 AND ${portalReportFilter}
+     WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}
      ORDER BY r.created_at DESC
      ${limitClause}`,
     params
@@ -276,10 +282,11 @@ const fetchAnimalReports = async (customerId, animalId, limit = 20) => {
   return result.rows;
 };
 
-const latestResultsForAnimal = async (customerId, animalId) => {
-  const reports = await fetchAnimalReports(customerId, animalId, 1);
+const latestResultsForAnimal = async (customerIds, animalId) => {
+  const ids = asArray(customerIds);
+  const reports = await fetchAnimalReports(ids, animalId, 1);
   if (!reports[0]) return { results: [], report: null };
-  await assertReportOwnership(reports[0].id, customerId);
+  await assertReportOwnership(reports[0].id, ids);
   const preview = await reportsService.getPreview(reports[0].id);
   const safe = sanitizePortalPreview(preview);
   return {
@@ -296,7 +303,8 @@ const buildPanels = (results) => buildPanelDetails(results);
 const countCriticalFlags = (results) =>
   (results || []).filter((r) => flagSeverity(r.flag) >= 3).length;
 
-const listAnimals = async (customerId) => {
+const listAnimals = async (customerIds) => {
+  const ids = asArray(customerIds);
   const result = await query(
     `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age,
             COUNT(DISTINCT r.id)::int AS report_count,
@@ -304,16 +312,17 @@ const listAnimals = async (customerId) => {
      FROM animals a
      JOIN samples s ON s.animal_id = a.id
      JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
-     WHERE a.owner_id = $1 AND a.is_active = true
+     WHERE a.owner_id = ANY($1::uuid[]) AND a.is_active = true
      GROUP BY a.id
      ORDER BY latest_report_at DESC NULLS LAST, a.animal_code`,
-    [customerId]
+    [ids]
   );
   return result.rows;
 };
 
-const getComparison = async (customerId, animalId, reportIds = []) => {
-  const animal = await assertAnimalOwnership(animalId, customerId);
+const getComparison = async (customerIds, animalId, reportIds = []) => {
+  const ids = asArray(customerIds);
+  const animal = await assertAnimalOwnership(animalId, ids);
 
   let reportsQuery;
   let reportsParams;
@@ -322,19 +331,19 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
       SELECT r.id, r.report_number, r.created_at, s.sample_code
       FROM reports r
       JOIN samples s ON r.sample_id = s.id
-      WHERE s.customer_id = $1 AND s.animal_id = $2 AND r.id = ANY($3::uuid[])
+      WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND r.id = ANY($3::uuid[])
         AND ${portalReportFilter}
       ORDER BY r.created_at ASC`;
-    reportsParams = [customerId, animalId, reportIds];
+    reportsParams = [ids, animalId, reportIds];
   } else {
     reportsQuery = `
       SELECT r.id, r.report_number, r.created_at, s.sample_code
       FROM reports r
       JOIN samples s ON r.sample_id = s.id
-      WHERE s.customer_id = $1 AND s.animal_id = $2 AND ${portalReportFilter}
+      WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}
       ORDER BY r.created_at DESC
       LIMIT 5`;
-    reportsParams = [customerId, animalId];
+    reportsParams = [ids, animalId];
   }
 
   const reportsResult = await query(reportsQuery, reportsParams);
@@ -348,7 +357,7 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
 
   const previews = await Promise.all(
     reports.map(async (row) => {
-      await assertReportOwnership(row.id, customerId);
+      await assertReportOwnership(row.id, ids);
       const preview = await reportsService.getPreview(row.id);
       const safe = sanitizePortalPreview(preview);
       return {
@@ -425,7 +434,7 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
     en: buildInterpretation(parameters, panels, false),
   };
 
-  logPortalAccess(customerId, 'animal_compare', animalId);
+  logPortalAccess(ids[0], 'animal_compare', animalId);
 
   return {
     animal: {
@@ -449,10 +458,13 @@ const getComparison = async (customerId, animalId, reportIds = []) => {
   };
 };
 
-const getDashboard = async (customerId) => {
+const getDashboard = async (customerIds) => {
+  const ids = asArray(customerIds);
+  const primaryId = ids[0];
+
   const customerResult = await query(
     `SELECT id, full_name, full_name_ar, mobile, city, farm_company FROM customers WHERE id = $1`,
-    [customerId]
+    [primaryId]
   );
   const customer = customerResult.rows[0];
 
@@ -465,15 +477,15 @@ const getDashboard = async (customerId) => {
      LEFT JOIN samples s ON s.customer_id = c.id
      LEFT JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
      LEFT JOIN animals a ON a.owner_id = c.id AND a.is_active = true
-     WHERE c.id = $1`,
-    [customerId]
+     WHERE c.id = ANY($1::uuid[])`,
+    [ids]
   );
   const stats = statsResult.rows[0] || { report_count: 0, animal_count: 0, new_reports_7d: 0 };
 
-  const animals = await listAnimals(customerId);
+  const animals = await listAnimals(ids);
   const animalSummaries = await Promise.all(
     animals.slice(0, 12).map(async (row) => {
-      const { results } = await latestResultsForAnimal(customerId, row.id);
+      const { results } = await latestResultsForAnimal(ids, row.id);
       const panels = buildPanels(results);
       const panelSummary = summarizeResults(results);
       const abnormalPanels = panels.filter((p) => p.status === 'abnormal').length;
@@ -495,7 +507,7 @@ const getDashboard = async (customerId) => {
     })
   );
 
-  const recent = await listReports(customerId, { page: 1, limit: 6 });
+  const recent = await listReports(ids, { page: 1, limit: 6 });
 
   const alerts = [];
   if (parseInt(stats.new_reports_7d, 10) > 0) {
@@ -520,7 +532,7 @@ const getDashboard = async (customerId) => {
     });
   }
 
-  logPortalAccess(customerId, 'dashboard');
+  logPortalAccess(primaryId, 'dashboard');
 
   return {
     customer,
@@ -538,10 +550,11 @@ const getDashboard = async (customerId) => {
   };
 };
 
-const getAnimalDashboard = async (customerId, animalId) => {
-  const animal = await assertAnimalOwnership(animalId, customerId);
-  const reports = await fetchAnimalReports(customerId, animalId, 20);
-  const { results, report: latestReport } = await latestResultsForAnimal(customerId, animalId);
+const getAnimalDashboard = async (customerIds, animalId) => {
+  const ids = asArray(customerIds);
+  const animal = await assertAnimalOwnership(animalId, ids);
+  const reports = await fetchAnimalReports(ids, animalId, 20);
+  const { results, report: latestReport } = await latestResultsForAnimal(ids, animalId);
   const panels = buildPanels(results);
   const summary = summarizeResults(results);
 
@@ -552,7 +565,7 @@ const getAnimalDashboard = async (customerId, animalId) => {
 
   if (reports.length >= 2) {
     try {
-      comparison = await getComparison(customerId, animalId, []);
+      comparison = await getComparison(ids, animalId, []);
       keyParameters = (comparison.parameters || [])
         .filter((p) => p.comparable && p.current != null)
         .sort((a, b) => flagSeverity(b.latestFlag) - flagSeverity(a.latestFlag))
@@ -571,7 +584,7 @@ const getAnimalDashboard = async (customerId, animalId) => {
       .map((r) => r.code);
   }
 
-  logPortalAccess(customerId, 'animal_dashboard', animalId);
+  logPortalAccess(ids[0], 'animal_dashboard', animalId);
 
   return {
     animal: {
@@ -618,18 +631,19 @@ const getAnimalDashboard = async (customerId, animalId) => {
   };
 };
 
-const getTrends = async (customerId, animalId, parameterCode, limit = 15) => {
-  await assertAnimalOwnership(animalId, customerId);
+const getTrends = async (customerIds, animalId, parameterCode, limit = 15) => {
+  const ids = asArray(customerIds);
+  await assertAnimalOwnership(animalId, ids);
   const capped = Math.min(Math.max(parseInt(limit, 10) || 15, 5), 20);
 
   const reportsResult = await query(
     `SELECT r.id, r.report_number, r.created_at
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1 AND s.animal_id = $2 AND ${portalReportFilter}
+     WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}
      ORDER BY r.created_at ASC
      LIMIT $3`,
-    [customerId, animalId, capped]
+    [ids, animalId, capped]
   );
 
   const reports = reportsResult.rows;
@@ -641,7 +655,7 @@ const getTrends = async (customerId, animalId, parameterCode, limit = 15) => {
   let meta = null;
 
   for (const row of reports) {
-    await assertReportOwnership(row.id, customerId);
+    await assertReportOwnership(row.id, ids);
     const preview = await reportsService.getPreview(row.id);
     const safe = sanitizePortalPreview(preview);
     const results = safe.results || [];
@@ -666,14 +680,15 @@ const getTrends = async (customerId, animalId, parameterCode, limit = 15) => {
     });
   }
 
-  logPortalAccess(customerId, 'animal_trends', animalId);
+  logPortalAccess(ids[0], 'animal_trends', animalId);
 
   return { parameterCode, meta, points };
 };
 
-const listDocuments = async (customerId, { animalId, type } = {}) => {
-  const filters = ['s.customer_id = $1'];
-  const params = [customerId];
+const listDocuments = async (customerIds, { animalId, type } = {}) => {
+  const ids = asArray(customerIds);
+  const filters = ['s.customer_id = ANY($1::uuid[])'];
+  const params = [ids];
   if (animalId) {
     params.push(animalId);
     filters.push(`s.animal_id = $${params.length}`);
@@ -692,8 +707,8 @@ const listDocuments = async (customerId, { animalId, type } = {}) => {
     params
   );
 
-  const attachFilters = ['s.customer_id = $1'];
-  const attachParams = [customerId];
+  const attachFilters = ['s.customer_id = ANY($1::uuid[])'];
+  const attachParams = [ids];
   if (animalId) {
     attachParams.push(animalId);
     attachFilters.push(`s.animal_id = $${attachParams.length}`);
@@ -756,12 +771,13 @@ const listDocuments = async (customerId, { animalId, type } = {}) => {
 
   docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  logPortalAccess(customerId, 'documents');
+  logPortalAccess(ids[0], 'documents');
 
   return docs;
 };
 
-const searchPortal = async (customerId, q) => {
+const searchPortal = async (customerIds, q) => {
+  const ids = asArray(customerIds);
   const term = String(q || '').trim();
   if (term.length < 2) return { animals: [], reports: [] };
 
@@ -769,11 +785,11 @@ const searchPortal = async (customerId, q) => {
   const animals = await query(
     `SELECT DISTINCT a.id, a.animal_code, a.name_tag, a.animal_type, a.rfid_chip
      FROM animals a
-     WHERE a.owner_id = $1 AND a.is_active = true
+     WHERE a.owner_id = ANY($1::uuid[]) AND a.is_active = true
        AND (a.animal_code ILIKE $2 OR a.name_tag ILIKE $2 OR a.rfid_chip ILIKE $2)
      ORDER BY a.animal_code
      LIMIT 8`,
-    [customerId, like]
+    [ids, like]
   );
 
   const reports = await query(
@@ -781,43 +797,46 @@ const searchPortal = async (customerId, q) => {
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE s.customer_id = $1
+     WHERE s.customer_id = ANY($1::uuid[])
        AND (r.report_number ILIKE $2 OR s.sample_code ILIKE $2)
        AND ${portalReportFilter}
      ORDER BY r.created_at DESC
      LIMIT 8`,
-    [customerId, like]
+    [ids, like]
   );
 
   return { animals: animals.rows, reports: reports.rows };
 };
 
-const getReportPreview = async (reportId, customerId) => {
-  await assertReportOwnership(reportId, customerId);
-  logPortalAccess(customerId, 'report_preview', reportId);
+const getReportPreview = async (reportId, customerIds) => {
+  const ids = asArray(customerIds);
+  await assertReportOwnership(reportId, ids);
+  logPortalAccess(ids[0], 'report_preview', reportId);
   const preview = await reportsService.getPreview(reportId);
   portalSync.assertPortalReportVisible(preview);
   return sanitizePortalPreview(preview);
 };
 
-const serveReportPdf = async (filename, customerId, res) => {
+const serveReportPdf = async (filename, customerIds, res) => {
+  const ids = asArray(customerIds);
   const report = await query(
     `SELECT r.id, r.pdf_url FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = $1 AND r.pdf_url LIKE $2 AND ${portalReportFilter}`,
-    [customerId, `%${filename}`]
+     WHERE s.customer_id = ANY($1::uuid[]) AND r.pdf_url LIKE $2 AND ${portalReportFilter}`,
+    [ids, `%${filename}`]
   );
 
   if (!report.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
-  logPortalAccess(customerId, 'report_pdf', report.rows[0].id);
+  logPortalAccess(ids[0], 'report_pdf', report.rows[0].id);
   return reportsService.servePdf(filename, res);
 };
 
-const listInvoices = async (customerId, { page, limit } = {}) => {
+const listInvoices = async (customerIds, { page, limit } = {}) => {
+  const ids = asArray(customerIds);
   const { offset, page: p, limit: l } = paginate(page, limit);
   const countResult = await query(
-    'SELECT COUNT(*) FROM invoices WHERE customer_id = $1 AND status NOT IN (\'cancelled\', \'refunded\')',
-    [customerId]
+    'SELECT COUNT(*) FROM invoices WHERE customer_id = ANY($1::uuid[]) AND status NOT IN (\'cancelled\', \'refunded\')',
+    [ids]
   );
   const total = parseInt(countResult.rows[0].count, 10);
 
@@ -827,23 +846,24 @@ const listInvoices = async (customerId, { page, limit } = {}) => {
             GREATEST(i.total - COALESCE(p.paid, 0), 0) AS balance_due
      FROM invoices i
      LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments GROUP BY invoice_id) p ON p.invoice_id = i.id
-     WHERE i.customer_id = $1 AND i.status NOT IN ('cancelled', 'refunded')
+     WHERE i.customer_id = ANY($1::uuid[]) AND i.status NOT IN ('cancelled', 'refunded')
      ORDER BY i.created_at DESC
      LIMIT $2 OFFSET $3`,
-    [customerId, l, offset]
+    [ids, l, offset]
   );
 
-  logPortalAccess(customerId, 'invoices_list');
+  logPortalAccess(ids[0], 'invoices_list');
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
-const serveInvoicePdf = async (invoiceId, customerId, res) => {
+const serveInvoicePdf = async (invoiceId, customerIds, res) => {
+  const ids = asArray(customerIds);
   const invoice = await query(
-    'SELECT id FROM invoices WHERE id = $1 AND customer_id = $2',
-    [invoiceId, customerId]
+    'SELECT id FROM invoices WHERE id = $1 AND customer_id = ANY($2::uuid[])',
+    [invoiceId, ids]
   );
   if (!invoice.rows[0]) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
-  logPortalAccess(customerId, 'invoice_pdf', invoiceId);
+  logPortalAccess(ids[0], 'invoice_pdf', invoiceId);
   return billingService.serveInvoicePdf(invoiceId, res);
 };
 

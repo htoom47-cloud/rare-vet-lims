@@ -35,35 +35,35 @@ router.get('/me', (req, res) => {
 
 router.get('/reports', async (req, res, next) => {
   try {
-    const data = await portalService.listReports(req.customer.id, req.query);
+    const data = await portalService.listReports(req.portalCustomerIds, req.query);
     res.json({ success: true, ...data });
   } catch (err) { next(err); }
 });
 
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const data = await portalService.getDashboard(req.customer.id);
+    const data = await portalService.getDashboard(req.portalCustomerIds);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
 router.get('/search', async (req, res, next) => {
   try {
-    const data = await portalService.searchPortal(req.customer.id, req.query.q);
+    const data = await portalService.searchPortal(req.portalCustomerIds, req.query.q);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
 router.get('/documents', async (req, res, next) => {
   try {
-    const data = await portalService.listDocuments(req.customer.id, req.query);
+    const data = await portalService.listDocuments(req.portalCustomerIds, req.query);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
 router.get('/animals/:animalId/dashboard', async (req, res, next) => {
   try {
-    const data = await portalService.getAnimalDashboard(req.customer.id, req.params.animalId);
+    const data = await portalService.getAnimalDashboard(req.portalCustomerIds, req.params.animalId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -71,7 +71,7 @@ router.get('/animals/:animalId/dashboard', async (req, res, next) => {
 router.get('/animals/:animalId/trends/:parameterCode', async (req, res, next) => {
   try {
     const data = await portalService.getTrends(
-      req.customer.id,
+      req.portalCustomerIds,
       req.params.animalId,
       req.params.parameterCode,
       req.query.limit
@@ -82,7 +82,7 @@ router.get('/animals/:animalId/trends/:parameterCode', async (req, res, next) =>
 
 router.get('/animals', async (req, res, next) => {
   try {
-    const data = await portalService.listAnimals(req.customer.id);
+    const data = await portalService.listAnimals(req.portalCustomerIds);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -94,7 +94,7 @@ router.get('/animals/:animalId/compare', async (req, res, next) => {
       .map((s) => s.trim())
       .filter(Boolean);
     const data = await portalService.getComparison(
-      req.customer.id,
+      req.portalCustomerIds,
       req.params.animalId,
       reportIds
     );
@@ -104,27 +104,27 @@ router.get('/animals/:animalId/compare', async (req, res, next) => {
 
 router.get('/reports/:id/preview', async (req, res, next) => {
   try {
-    const data = await portalService.getReportPreview(req.params.id, req.customer.id);
+    const data = await portalService.getReportPreview(req.params.id, req.portalCustomerIds);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
 router.get('/reports/download/:filename', async (req, res, next) => {
   try {
-    await portalService.serveReportPdf(req.params.filename, req.customer.id, res);
+    await portalService.serveReportPdf(req.params.filename, req.portalCustomerIds, res);
   } catch (err) { next(err); }
 });
 
 router.get('/invoices', async (req, res, next) => {
   try {
-    const data = await portalService.listInvoices(req.customer.id, req.query);
+    const data = await portalService.listInvoices(req.portalCustomerIds, req.query);
     res.json({ success: true, ...data });
   } catch (err) { next(err); }
 });
 
 router.get('/invoices/:id/pdf', async (req, res, next) => {
   try {
-    await portalService.serveInvoicePdf(req.params.id, req.customer.id, res);
+    await portalService.serveInvoicePdf(req.params.id, req.portalCustomerIds, res);
   } catch (err) { next(err); }
 });
 

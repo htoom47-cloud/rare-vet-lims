@@ -65,7 +65,37 @@ const getProfile = async (id) => {
   };
 };
 
-const create = async (data, userId) => {
+const checkDuplicateMobile = async (mobile) => {
+  if (!mobile || !mobile.trim()) return null;
+  const digits = normalizeMobileDigits(mobile);
+  if (digits.length < 9) return null;
+
+  const result = await query(
+    `SELECT id, full_name, mobile
+     FROM customers
+     WHERE is_active = true
+       AND regexp_replace(mobile, '[^0-9]', '', 'g') LIKE $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [`%${digits.slice(-9)}`]
+  );
+  return result.rows[0] || null;
+};
+
+const create = async (data, userId, { role } = {}) => {
+  const existing = await checkDuplicateMobile(data.mobile);
+  if (existing) {
+    const isOverride = role === 'admin' || role === 'manager';
+    if (!isOverride) {
+      throw new AppError(
+        `Customer with this mobile already exists: ${existing.full_name}`,
+        409,
+        'DUPLICATE_MOBILE',
+        { existingCustomerId: existing.id, existingName: existing.full_name }
+      );
+    }
+  }
+
   const result = await query(
     `INSERT INTO customers (id, full_name, full_name_ar, mobile, city, farm_company, notes, credit_limit, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,

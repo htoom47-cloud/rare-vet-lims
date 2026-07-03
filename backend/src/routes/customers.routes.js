@@ -48,7 +48,7 @@ router.get('/:id', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next)
 
 router.post('/', authorize(PERMISSIONS.CUSTOMERS_CREATE), validate(customerSchema), auditLog('create', 'customers'), async (req, res, next) => {
   try {
-    const data = await service.create(req.body, req.user.id);
+    const data = await service.create(req.body, req.user.id, { role: req.user.role });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 });
