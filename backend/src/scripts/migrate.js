@@ -146,6 +146,9 @@ async function applyPatches() {
     await client.query(
       'ALTER TABLE tests ADD COLUMN IF NOT EXISTS label_copies INTEGER NOT NULL DEFAULT 1'
     );
+    await client.query(
+      'ALTER TABLE tests ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0'
+    );
     await client.query(`
       CREATE TABLE IF NOT EXISTS result_attachments (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
