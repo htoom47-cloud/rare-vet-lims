@@ -1,5 +1,6 @@
 const express = require('express');
 const service = require('../services/samples.service');
+const testMgmt = require('../services/sample-test-management.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { sampleSchema } = require('../validators/schemas');
@@ -83,6 +84,43 @@ router.patch('/:id/status', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog('upd
   try {
     const data = await service.updateStatus(req.params.id, req.body.status, req.body);
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// --- Sample Test Management ---
+
+router.delete('/:id/tests/:testId', authorize(PERMISSIONS.SAMPLE_TESTS_REMOVE), async (req, res, next) => {
+  try {
+    const data = await testMgmt.removeTest(req.params.id, req.params.testId, req.user.id, { role: req.user.role_name });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.patch('/:id/tests/:testId/cancel', authorize(PERMISSIONS.SAMPLE_TESTS_CANCEL), async (req, res, next) => {
+  try {
+    const data = await testMgmt.cancelTest(req.params.id, req.params.testId, req.user.id, { reason: req.body.reason });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.patch('/:id/tests/:testId/reactivate', authorize(PERMISSIONS.SAMPLE_TESTS_REACTIVATE), async (req, res, next) => {
+  try {
+    const data = await testMgmt.reactivateTest(req.params.id, req.params.testId, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/tests/:testId/history', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
+  try {
+    const data = await testMgmt.getTestHistory(req.params.testId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/duplicate-tests', authorize(PERMISSIONS.SAMPLES_VIEW), async (req, res, next) => {
+  try {
+    const data = await testMgmt.checkDuplicateTests(req.params.id);
+    res.json({ success: true, data, hasDuplicates: data.length > 0 });
   } catch (err) { next(err); }
 });
 

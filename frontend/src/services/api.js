@@ -111,6 +111,11 @@ export const samplesAPI = {
   parasitologyQueue: () => api.get('/samples/queue/parasitology'),
   scan: (barcode) => api.get(`/samples/scan/${barcode}`),
   getBarcode: (id, format) => api.get(`/samples/${id}/barcode`, { params: { format } }),
+  removeTest: (sampleId, testId) => api.delete(`/samples/${sampleId}/tests/${testId}`),
+  cancelTest: (sampleId, testId, reason) => api.patch(`/samples/${sampleId}/tests/${testId}/cancel`, { reason }),
+  reactivateTest: (sampleId, testId) => api.patch(`/samples/${sampleId}/tests/${testId}/reactivate`),
+  testHistory: (sampleId, testId) => api.get(`/samples/${sampleId}/tests/${testId}/history`),
+  duplicateTests: (sampleId) => api.get(`/samples/${sampleId}/duplicate-tests`),
 };
 
 export const testsAPI = {

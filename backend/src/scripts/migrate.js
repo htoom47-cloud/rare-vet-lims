@@ -532,6 +532,17 @@ async function applyPatches() {
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
     `);
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'cancelled'
+            AND enumtypid = 'sample_status'::regtype
+        ) THEN
+          ALTER TYPE sample_status ADD VALUE 'cancelled';
+        END IF;
+      END $$
+    `);
     await fixDuplicateSampleTests(client);
   } finally {
     client.release();

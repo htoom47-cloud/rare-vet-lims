@@ -94,6 +94,7 @@ const getById = async (id) => {
   );
 
   const row = result.rows[0];
+  const activeTests = tests.rows.filter((t) => t.status !== 'cancelled');
   const payload = {
     ...row,
     tests: tests.rows,
@@ -102,7 +103,7 @@ const getById = async (id) => {
       has_barcode: !!row.barcode,
       delivered: row.status !== 'pending',
       has_results: parseInt(row.results_count, 10) > 0,
-      all_validated: tests.rows.length > 0 && tests.rows.every((t) => t.is_validated),
+      all_validated: activeTests.length > 0 && activeTests.every((t) => t.is_validated),
       has_report: parseInt(row.reports_count, 10) > 0,
       sent_to_customer: parseInt(row.notifications_count, 10) > 0,
     },

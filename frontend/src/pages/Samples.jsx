@@ -292,7 +292,78 @@ export default function Samples() {
     return hasReport && !sent;
   };
 
+  const canRemoveTest = hasAnyPermission('sample_tests.remove', 'samples.delete');
+  const canCancelTest = hasAnyPermission('sample_tests.cancel', 'samples.update');
+  const canReactivateTest = hasAnyPermission('sample_tests.reactivate');
 
+  const [testMenuId, setTestMenuId] = useState(null);
+  const [historyModal, setHistoryModal] = useState(null);
+  const [duplicates, setDuplicates] = useState([]);
+
+  const refreshDetail = async () => {
+    if (!detailSample) return;
+    try {
+      const { data } = await samplesAPI.get(detailSample.id);
+      setDetailSample(data.data);
+      const { data: dupData } = await samplesAPI.duplicateTests(detailSample.id);
+      setDuplicates(dupData.data || []);
+    } catch { /* */ }
+  };
+
+  const handleRemoveTest = async (test) => {
+    if (!window.confirm(t('samples.testActions.confirmRemove'))) return;
+    try {
+      await samplesAPI.removeTest(detailSample.id, test.id);
+      toast.success(t('samples.testActions.removed'));
+      refreshDetail();
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('samples.testActions.reportLocked'));
+    }
+  };
+
+  const handleCancelTest = async (test) => {
+    if (!window.confirm(t('samples.testActions.confirmCancel'))) return;
+    try {
+      await samplesAPI.cancelTest(detailSample.id, test.id);
+      toast.success(t('samples.testActions.cancelled'));
+      refreshDetail();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('samples.testActions.reportLocked'));
+    }
+  };
+
+  const handleReactivateTest = async (test) => {
+    const msg = test.has_results
+      ? `${t('samples.testActions.warnReactivateResults')}\n\n${t('samples.testActions.confirmReactivate')}`
+      : t('samples.testActions.confirmReactivate');
+    if (!window.confirm(msg)) return;
+    try {
+      await samplesAPI.reactivateTest(detailSample.id, test.id);
+      toast.success(t('samples.testActions.reactivated'));
+      refreshDetail();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const handleViewHistory = async (test) => {
+    try {
+      const { data } = await samplesAPI.testHistory(detailSample.id, test.id);
+      setHistoryModal({ test, entries: data.data || [] });
+    } catch { setHistoryModal({ test, entries: [] }); }
+  };
+
+  useEffect(() => {
+    if (detailSample) {
+      samplesAPI.duplicateTests(detailSample.id)
+        .then(({ data }) => setDuplicates(data.data || []))
+        .catch(() => setDuplicates([]));
+    } else {
+      setDuplicates([]);
+      setTestMenuId(null);
+    }
+  }, [detailSample?.id]);
 
   const columns = [
 
@@ -550,18 +621,35 @@ export default function Samples() {
 
 
 
+            {duplicates.length > 0 && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
+                <strong>⚠ {t('samples.testActions.duplicateWarning')}</strong>
+                <p className="text-xs mt-1">{t('samples.testActions.duplicateHint')}</p>
+                <ul className="mt-1 list-disc list-inside text-xs">
+                  {duplicates.map((d) => (
+                    <li key={d.test_id}>{d.test_name} ({d.count}x)</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div>
 
               <h4 className="font-medium mb-2">{t('samples.selectTests')}</h4>
 
               {detailSample.tests?.map((test) => (
 
-                <div key={test.id} className="flex justify-between items-center gap-2 text-sm py-1 border-b">
+                <div key={test.id} className={`flex justify-between items-center gap-2 text-sm py-1.5 border-b ${test.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}>
 
-                  <span>{test.test_name}</span>
+                  <span className="flex items-center gap-1.5">
+                    {test.test_name}
+                    {test.status === 'cancelled' && (
+                      <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded no-underline inline-block">{t('samples.statuses.cancelled')}</span>
+                    )}
+                  </span>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span>{fmtCatalog(test.price)} — <StatusBadge status={test.status} /></span>
+                    <span className="no-underline">{fmtCatalog(test.price)} — <StatusBadge status={test.status} label={t(`samples.statuses.${test.status}`)} /></span>
                     {test.is_validated && hasPermission('results.unvalidate') && (
                       <button
                         type="button"
@@ -570,13 +658,12 @@ export default function Samples() {
                           try {
                             await resultsAPI.unvalidate(test.id);
                             toast.success(t('resultValidation.unvalidated'));
-                            const { data } = await samplesAPI.get(detailSample.id);
-                            setDetailSample(data.data);
+                            refreshDetail();
                           } catch (err) {
                             toast.error(err.response?.data?.error?.message || 'خطأ');
                           }
                         }}
-                        className="text-xs text-amber-700 hover:underline"
+                        className="text-xs text-amber-700 hover:underline no-underline"
                       >
                         {t('resultValidation.unvalidate')}
                       </button>
@@ -588,11 +675,52 @@ export default function Samples() {
                           setDetailSample(null);
                           navigate(`/vet-review?sample=${detailSample.id}`);
                         }}
-                        className="text-xs text-primary-600 hover:underline"
+                        className="text-xs text-primary-600 hover:underline no-underline"
                       >
                         {t('resultValidation.editResults')}
                       </button>
                     )}
+
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTestMenuId(testMenuId === test.id ? null : test.id)}
+                        className="text-gray-400 hover:text-gray-700 px-1 no-underline"
+                        title={t('common.actions')}
+                      >⋮</button>
+                      {testMenuId === test.id && (
+                        <div className="absolute right-0 top-6 z-50 bg-white dark:bg-gray-800 border rounded-lg shadow-lg py-1 min-w-[160px] text-xs no-underline" style={{ textDecoration: 'none' }}>
+                          {test.status === 'pending' && !test.has_results && canRemoveTest && (
+                            <button onClick={() => { setTestMenuId(null); handleRemoveTest(test); }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 no-underline" style={{ textDecoration: 'none' }}>
+                              {t('samples.testActions.remove')}
+                            </button>
+                          )}
+                          {test.status !== 'cancelled' && (test.has_results || test.status !== 'pending') && canCancelTest && (
+                            <button onClick={() => { setTestMenuId(null); handleCancelTest(test); }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-amber-600 no-underline" style={{ textDecoration: 'none' }}>
+                              {t('samples.testActions.cancel')}
+                            </button>
+                          )}
+                          {test.status !== 'cancelled' && !test.has_results && test.status === 'pending' && canCancelTest && (
+                            <button onClick={() => { setTestMenuId(null); handleCancelTest(test); }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-amber-600 no-underline" style={{ textDecoration: 'none' }}>
+                              {t('samples.testActions.cancel')}
+                            </button>
+                          )}
+                          {test.status === 'cancelled' && canReactivateTest && (
+                            <button onClick={() => { setTestMenuId(null); handleReactivateTest(test); }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-green-600 no-underline" style={{ textDecoration: 'none' }}>
+                              {t('samples.testActions.reactivate')}
+                            </button>
+                          )}
+                          <button onClick={() => { setTestMenuId(null); handleViewHistory(test); }}
+                            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 no-underline" style={{ textDecoration: 'none' }}>
+                            {t('samples.testActions.history')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                 </div>
@@ -666,6 +794,27 @@ export default function Samples() {
       </Modal>
 
 
+
+      <Modal isOpen={!!historyModal} onClose={() => setHistoryModal(null)} title={`${t('samples.testActions.history')} — ${historyModal?.test?.test_name || ''}`}>
+        {historyModal && (
+          historyModal.entries.length > 0 ? (
+            <div className="space-y-2 max-h-80 overflow-y-auto text-sm">
+              {historyModal.entries.map((e) => (
+                <div key={e.id} className="border rounded p-2">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>{e.user_name || 'System'}</span>
+                    <span>{new Date(e.created_at).toLocaleString('ar-SA')}</span>
+                  </div>
+                  <div className="font-medium mt-1">{e.action}</div>
+                  {e.old_values?.reason && <div className="text-xs text-gray-600 mt-0.5">{e.old_values.reason}</div>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">{t('samples.testActions.noHistory')}</p>
+          )
+        )}
+      </Modal>
 
       {printSample && (
 
