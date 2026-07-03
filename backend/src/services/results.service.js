@@ -230,6 +230,11 @@ const enterResults = async (data, userId) => {
 
     await client.query('COMMIT');
     committed = true;
+    const stRow2 = await client.query('SELECT sample_id FROM sample_tests WHERE id = $1', [data.sample_test_id]);
+    if (stRow2.rows[0]?.sample_id) {
+      const lifecycle = require('./report-lifecycle.service');
+      await lifecycle.markReportsNeedsUpdateBySampleId(stRow2.rows[0].sample_id, 'RESULTS');
+    }
     return getBySampleTest(data.sample_test_id);
   } catch (err) {
     if (!committed) {
@@ -269,6 +274,9 @@ const validateResults = async (sampleTestId, userId, doctorNotes, values) => {
     await query(`UPDATE samples SET status = 'completed', completed_date = NOW(), updated_at = NOW() WHERE id = $1`, [sampleId]);
     await autoInvoice.tryAutoInvoice(sampleId, userId, 'validation');
   }
+
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateBySampleId(sampleId, 'VALIDATION');
 
   return getBySampleTest(sampleTestId);
 };
@@ -466,6 +474,20 @@ const updateAttachment = async (attachmentId, { caption, include_in_report }) =>
      WHERE id = $3 RETURNING *`,
     [caption, include_in_report, attachmentId]
   );
+
+  const sampleRow = await query(
+    `SELECT st.sample_id
+     FROM result_attachments ra
+     JOIN results res ON res.id = ra.result_id
+     JOIN sample_tests st ON st.id = res.sample_test_id
+     WHERE ra.id = $1`,
+    [attachmentId]
+  );
+  if (sampleRow.rows[0]?.sample_id) {
+    const lifecycle = require('./report-lifecycle.service');
+    await lifecycle.markReportsNeedsUpdateBySampleId(sampleRow.rows[0].sample_id, 'ATTACHMENTS');
+  }
+
   return result.rows[0];
 };
 

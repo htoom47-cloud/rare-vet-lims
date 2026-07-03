@@ -65,8 +65,18 @@ router.post('/:id/regenerate-pdf', authorize(PERMISSIONS.REPORTS_GENERATE), asyn
         id: data.id,
         report_number: data.report_number,
         pdf_url: data.pdf_url,
+        version: data.version,
+        last_generated_at: data.last_generated_at,
+        needs_update: data.needs_update,
       },
     });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/lifecycle', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res, next) => {
+  try {
+    const data = await service.getLifecycleStatus(req.params.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

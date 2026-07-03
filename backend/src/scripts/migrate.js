@@ -142,6 +142,18 @@ async function applyPatches() {
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS lab_specialist_approved_at TIMESTAMPTZ');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_by UUID REFERENCES users(id)');
     await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS vet_approved_at TIMESTAMPTZ');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS last_generated_at TIMESTAMPTZ');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS last_source_updated_at TIMESTAMPTZ');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS needs_update BOOLEAN DEFAULT false');
+    await client.query('ALTER TABLE reports ADD COLUMN IF NOT EXISTS update_reason TEXT');
+    await client.query(`
+      UPDATE reports
+      SET version = COALESCE(version, 1),
+          last_generated_at = COALESCE(last_generated_at, created_at),
+          needs_update = COALESCE(needs_update, false)
+      WHERE last_generated_at IS NULL OR version IS NULL
+    `);
     await ensureLabSpecialistRole(client);
     await client.query(
       'ALTER TABLE tests ADD COLUMN IF NOT EXISTS label_copies INTEGER NOT NULL DEFAULT 1'

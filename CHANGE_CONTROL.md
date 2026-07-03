@@ -286,6 +286,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Removed resetToken from forgot-password API. Device API keys bcrypt-hashed in config JSON with lazy legacy upgrade. Production DB SSL defaults to rejectUnauthorized=true. Login rate limit 5/15min. Uploads backup script (opt-in).
 
+### 2026-07-03 — Phase 11: Smart Report Lifecycle
+
+| Field | Value |
+|-------|-------|
+| **Category** | feature (report lifecycle + staff UI) |
+| **Risk** | low–medium — additive columns; default flag **off** |
+| **Backup taken** | Recommended before prod deploy |
+| **Migration** | **Yes** — `reports.version`, `last_generated_at`, `last_source_updated_at`, `needs_update`, `update_reason` (`ADD COLUMN IF NOT EXISTS`) |
+| **Checklist** | `node backend/src/scripts/verify-smart-report-lifecycle.js` + staff preview/PDF on one real report |
+| **Files** | `report-lifecycle.service.js` (new), `reports.service.js`, `reports.routes.js`, `migrate.js`, `env.js`, `portal-sync.service.js`, hooks in results/samples/animals/customers/reference-ranges, `LaboratoryReport.jsx`, `Reports.jsx`, i18n |
+| **Env** | `SMART_REPORT_LIFECYCLE_ENABLED=true` to activate status bars + stale detection |
+| **Rollback** | Set flag `false` or `git revert`; columns are harmless when unused |
+
+**Summary:** Staff button renamed to **تحديث التقرير**. When enabled, system tracks whether official PDF matches source data (results, validation, sample/animal/customer, attachments, approvals, reference ranges). Update action regenerates PDF, bumps `version`, clears `needs_update`. Portal continues to use `pdf_url` only (no update UI).
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

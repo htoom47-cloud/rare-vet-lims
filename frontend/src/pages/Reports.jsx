@@ -137,7 +137,7 @@ export default function Reports() {
     setRegeneratingId(report.id);
     try {
       await reportsAPI.regenerateAndOpen(report.id, report.pdf_url);
-      toast.success(t('reports.regenerateDone'));
+      toast.success(t('reports.updateReportDone'));
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('reports.regenerateFailed'));
@@ -279,7 +279,7 @@ export default function Reports() {
                   disabled={regeneratingId === r.id}
                   className="text-amber-700 flex items-center gap-1 text-sm disabled:opacity-50"
                 >
-                  <RotateCcw size={14} /> {regeneratingId === r.id ? t('common.loading') : t('reports.regeneratePdf')}
+                  <RotateCcw size={14} /> {regeneratingId === r.id ? t('common.loading') : t('reports.updateReport')}
                 </button>
               )}
             </>

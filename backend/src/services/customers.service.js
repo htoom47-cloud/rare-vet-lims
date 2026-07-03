@@ -81,6 +81,8 @@ const update = async (id, data) => {
      notes=$6, credit_limit=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
     [data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit, id]
   );
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateByCustomerId(id, 'CUSTOMER');
   return result.rows[0];
 };
 

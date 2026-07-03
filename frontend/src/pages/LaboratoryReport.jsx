@@ -261,8 +261,24 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     toast.dismiss();
     try {
       const updated = await reportsAPI.regenerateAndOpen(id, report.pdfUrl);
-      setReport((prev) => (prev ? { ...prev, pdfUrl: updated.pdf_url } : prev));
-      toast.success(t('reports.regenerateDone'));
+      setReport((prev) => (prev ? {
+        ...prev,
+        pdfUrl: updated.pdf_url,
+        smartLifecycle: prev.smartLifecycle?.enabled
+          ? {
+            ...prev.smartLifecycle,
+            isUpToDate: true,
+            needsUpdate: false,
+            reason: null,
+            version: updated.version ?? ((prev.smartLifecycle.version || 1) + 1),
+            lastGeneratedAt: updated.last_generated_at || new Date().toISOString(),
+          }
+          : prev.smartLifecycle,
+      } : prev));
+      toast.success(t('reports.updateReportDone'));
+      if (report?.smartLifecycle?.enabled) {
+        await load();
+      }
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('reports.regenerateFailed'));
     } finally {
@@ -288,9 +304,36 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   const labName = isAr ? report.lab.nameAr : report.lab.name;
   const statusLabel = report.status === 'final' ? t('labReport.final') : t('labReport.preliminary');
+  const lifecycle = report?.smartLifecycle;
+  const fmtLifecycleDate = (value) => fmtDate(value, locale);
 
   return (
     <div className="lab-report-page" dir={dir}>
+      {lifecycle?.enabled && (
+        <div
+          className={cn(
+            'no-print mb-3 rounded-lg border px-4 py-3 text-sm',
+            lifecycle.isUpToDate
+              ? 'border-green-200 bg-green-50 text-green-900'
+              : 'border-amber-200 bg-amber-50 text-amber-950'
+          )}
+        >
+          <p className="font-semibold">
+            {lifecycle.isUpToDate ? t('reports.reportUpToDate') : t('reports.reportNeedsUpdate')}
+          </p>
+          {lifecycle.lastGeneratedAt && (
+            <p className="mt-1 text-xs opacity-90">
+              {t('reports.lastUpdated')}: {fmtLifecycleDate(lifecycle.lastGeneratedAt)}
+              {lifecycle.version ? ` · ${t('reports.versionLabel')}: ${lifecycle.version}` : ''}
+            </p>
+          )}
+          {!lifecycle.isUpToDate && lifecycle.reason && (
+            <p className="mt-1 text-xs">
+              {t('reports.updateReason')}: {lifecycle.reason}
+            </p>
+          )}
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -300,11 +343,15 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           <ArrowLeft size={14} /> {t('labReport.back')}
         </Button>
         <div className="flex flex-wrap gap-1.5">
-          <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>
           {report.pdfUrl && (
             <Button variant="secondary" size="sm" onClick={handleOpenOfficialPdf} className="gap-1.5 h-8 text-xs">
               <FileText size={14} />{t('labReport.openOfficialPdf')}
             </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-1.5 h-8 text-xs"><Download size={14} />{exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}</Button>
+          {!hideShareActions && (
+            <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
           )}
           {canRegeneratePdf && report.pdfUrl && (
             <Button
@@ -312,16 +359,10 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
               size="sm"
               onClick={handleRegenerateOfficialPdf}
               disabled={regeneratingPdf}
-              className="gap-1.5 h-8 text-xs text-amber-800"
+              className="gap-1.5 h-8 text-xs text-amber-800 border-amber-200"
             >
-              <RotateCcw size={14} />{regeneratingPdf ? t('common.loading') : t('labReport.regeneratePdf')}
+              <RotateCcw size={14} />{regeneratingPdf ? t('common.loading') : t('labReport.updateReport')}
             </Button>
-          )}
-          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-1.5 h-8 text-xs"><Download size={14} />{exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}</Button>
-          {!hideShareActions && (
-            <>
-              <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
-            </>
           )}
         </div>
       </motion.div>

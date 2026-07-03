@@ -238,6 +238,8 @@ const updateStatus = async (id, status, extra = {}) => {
     `UPDATE samples SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING *`,
     params
   );
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateBySampleId(id, 'SAMPLE');
   return result.rows[0];
 };
 

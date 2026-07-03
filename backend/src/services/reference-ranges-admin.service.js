@@ -93,6 +93,8 @@ const create = async (body, userId) => {
   );
 
   await logChange(result.rows[0].id, userId, 'create', null, result.rows[0]);
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateByParameterId(parameter_id, 'REFERENCE');
   return result.rows[0];
 };
 
@@ -124,6 +126,8 @@ const update = async (id, body, userId) => {
   );
 
   await logChange(id, userId, 'update', existing.rows[0], result.rows[0]);
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateByParameterId(existing.rows[0].parameter_id, 'REFERENCE');
   return result.rows[0];
 };
 
@@ -136,6 +140,8 @@ const deactivate = async (id, userId) => {
     [userId, id]
   );
   await logChange(id, userId, 'deactivate', existing.rows[0], { is_active: false });
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateByParameterId(existing.rows[0].parameter_id, 'REFERENCE');
   return { deleted: true };
 };
 

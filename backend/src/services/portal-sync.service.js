@@ -139,6 +139,7 @@ const sanitizeForPortal = (unified = {}) => {
   const {
     sampleId,
     generatedBy,
+    smartLifecycle,
     customer,
     ...rest
   } = unified;

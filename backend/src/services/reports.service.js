@@ -15,6 +15,7 @@ const {
 const resultEngine = require('./result-engine.service');
 const { buildReportSections, filterReportableAttachments, buildApprovalSection } = require('./report-builder.service');
 const portalSync = require('./portal-sync.service');
+const reportLifecycle = require('./report-lifecycle.service');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -422,6 +423,10 @@ const regeneratePdf = async (reportRow) => {
 const regeneratePdfById = async (reportId) => {
   const reportRow = await getById(reportId);
   const pdfUrl = await regeneratePdf(reportRow);
+  if (reportLifecycle.isEnabled()) {
+    await reportLifecycle.recordOfficialGeneration(reportId);
+    return getById(reportId);
+  }
   return { ...reportRow, pdf_url: pdfUrl };
 };
 
@@ -499,6 +504,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
     ]
   );
 
+  await reportLifecycle.recordInitialGeneration(result.rows[0].id);
   return getById(result.rows[0].id);
   } catch (err) {
     if (err.isOperational) throw err;
@@ -546,6 +552,10 @@ const approve = async (reportId, userId, userRole, type) => {
 
   const updated = await getById(reportId);
   await regeneratePdf(updated);
+  if (reportLifecycle.isEnabled()) {
+    await reportLifecycle.recordOfficialGeneration(reportId);
+    return getById(reportId);
+  }
   return updated;
 };
 
@@ -587,7 +597,7 @@ const getPreview = async (id) => {
   const isArabic = reportRow.language === 'ar';
   const verifyUrl = `${env.appUrl}/verify/${reportRow.qr_verification_code}`;
 
-  return portalSync.buildUnifiedReportView({
+  const unified = portalSync.buildUnifiedReportView({
     id: reportRow.id,
     sampleId: reportRow.sample_id,
     pdfUrl: reportRow.pdf_url,
@@ -651,6 +661,20 @@ const getPreview = async (id) => {
     },
     generatedBy: reportRow.generated_by_name,
   }, reportRow, { hasValidatedResults: true });
+
+  if (reportLifecycle.isEnabled()) {
+    unified.smartLifecycle = await reportLifecycle.getReportLifecycleStatus(
+      reportRow,
+      reportRow.language || 'ar'
+    );
+  }
+
+  return unified;
+};
+
+const getLifecycleStatus = async (id) => {
+  const reportRow = await getById(id);
+  return reportLifecycle.getReportLifecycleStatus(reportRow, reportRow.language || 'ar');
 };
 
 const verify = async (code) => {
@@ -673,4 +697,6 @@ const verify = async (code) => {
   };
 };
 
-module.exports = { list, getPreview, generate, approve, verify, servePdf, regeneratePdfById, buildReportData };
+module.exports = {
+  list, getPreview, getLifecycleStatus, generate, approve, verify, servePdf, regeneratePdfById, buildReportData,
+};

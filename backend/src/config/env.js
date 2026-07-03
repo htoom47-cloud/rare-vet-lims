@@ -97,6 +97,9 @@ const env = {
   workflow: {
     enabled: process.env.WORKFLOW_ENGINE_ENABLED === 'true',
   },
+  features: {
+    smartReportLifecycle: process.env.SMART_REPORT_LIFECYCLE_ENABLED === 'true',
+  },
   backup: {
     uploads: {
       enabled: process.env.UPLOAD_BACKUP_ENABLED === 'true',

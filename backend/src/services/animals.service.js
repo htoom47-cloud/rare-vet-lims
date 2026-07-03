@@ -75,12 +75,16 @@ const update = async (id, data) => {
      rfid_chip=$8, owner_id=$9, medical_history=$10, updated_at=NOW() WHERE id=$11 RETURNING *`,
     [data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, id]
   );
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateByAnimalId(id, 'ANIMAL');
   return result.rows[0];
 };
 
 const updateImage = async (id, imageUrl) => {
   await getById(id);
   const result = await query('UPDATE animals SET image_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *', [imageUrl, id]);
+  const lifecycle = require('./report-lifecycle.service');
+  await lifecycle.markReportsNeedsUpdateByAnimalId(id, 'ANIMAL');
   return result.rows[0];
 };
 
