@@ -37,6 +37,8 @@ const start = async () => {
       logger.info(`${LAB_NAME_EN} LIMS API running on port ${env.port}`);
       if (env.serveFrontend) logger.info('Serving frontend from /frontend/dist');
 
+      notificationsService.validateConfigOnStartup();
+
       if (env.notifications.sms || env.notifications.whatsapp || env.notifications.email) {
         setInterval(() => {
           notificationsService.processPending().catch((err) => {

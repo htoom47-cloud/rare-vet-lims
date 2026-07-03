@@ -271,15 +271,24 @@ export default function Samples() {
     if (!target?.id) return;
     setSending(true);
     try {
-      await notificationsAPI.sendReport(target.id, 'sms', target.customer_mobile);
-      toast.success(t('workflow.sentToCustomer'));
+      const { data: resp } = await notificationsAPI.sendReport(target.id, 'sms', target.customer_mobile);
+      if (resp.dryRun) {
+        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 5000 });
+      } else {
+        toast.success(t('workflow.sentToCustomer'));
+      }
       if (detailSample?.id === target.id) {
         viewDetail(target);
       } else {
         load();
       }
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      const code = err.response?.data?.error?.code;
+      if (code === 'CHANNEL_DISABLED') {
+        toast.error(t('notifications.channelDisabled'));
+      } else {
+        toast.error(err.response?.data?.error?.message || 'خطأ');
+      }
     } finally {
       setSending(false);
     }

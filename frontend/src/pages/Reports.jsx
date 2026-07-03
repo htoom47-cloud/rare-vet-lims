@@ -116,10 +116,19 @@ export default function Reports() {
   const sendToCustomer = async (report) => {
     setSendingId(report.id);
     try {
-      await notificationsAPI.sendReport(report.sample_id, 'sms');
-      toast.success(t('workflow.sentToCustomer'));
+      const { data: resp } = await notificationsAPI.sendReport(report.sample_id, 'sms');
+      if (resp.dryRun) {
+        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 5000 });
+      } else {
+        toast.success(t('workflow.sentToCustomer'));
+      }
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      const code = err.response?.data?.error?.code;
+      if (code === 'CHANNEL_DISABLED') {
+        toast.error(t('notifications.channelDisabled'));
+      } else {
+        toast.error(err.response?.data?.error?.message || 'خطأ');
+      }
     } finally {
       setSendingId(null);
     }

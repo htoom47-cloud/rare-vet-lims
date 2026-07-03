@@ -40,7 +40,7 @@ const queue = async ({ channel, recipient, subject, body, metadata }) => {
 const dispatchOne = async (notification) => {
   if (!env.notifications.sendReal) {
     await query(
-      `UPDATE notification_queue SET status = 'sent', sent_at = NOW(),
+      `UPDATE notification_queue SET status = 'dry_run', sent_at = NOW(),
        metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
        WHERE id = $1`,
       [notification.id, JSON.stringify({ provider_result: { provider: 'dry-run', dryRun: true } })]
@@ -50,7 +50,14 @@ const dispatchOne = async (notification) => {
       channel: notification.channel,
       recipient: notification.recipient,
     });
-    return { ...notification, status: 'sent', provider_result: { provider: 'dry-run', dryRun: true } };
+    return {
+      ...notification,
+      status: 'dry_run',
+      dryRun: true,
+      provider_result: { provider: 'dry-run', dryRun: true },
+      userMessage: 'النظام يعمل في وضع الاختبار (Dry Run)، ولم يتم إرسال رسالة فعلية.',
+      userMessageEn: 'System is in test mode (Dry Run). No real message was sent.',
+    };
   }
 
   assertChannelEnabled(notification.channel);
@@ -186,6 +193,83 @@ const processPending = async () => {
   return { processed: pending.rows.length, sent, failed };
 };
 
+const validateConfigOnStartup = () => {
+  const n = env.notifications;
+  const issues = [];
+
+  if (!n.sendReal) {
+    logger.warn('SEND_REAL_NOTIFICATIONS is not enabled — all notifications will be DRY-RUN only');
+    issues.push('SEND_REAL_NOTIFICATIONS=false');
+  }
+
+  if (!n.sms && !n.whatsapp) {
+    logger.warn('Both SMS and WhatsApp are disabled — no notification channel is available');
+    issues.push('No channel enabled');
+  }
+
+  if (n.sendReal && n.sms && n.provider === 'msegat') {
+    const { username, apiKey, sender } = n.msegat;
+    if (!username || !apiKey || !sender) {
+      logger.error('SEND_REAL_NOTIFICATIONS=true with SMS enabled but Msegat credentials are missing!', {
+        hasUsername: !!username, hasApiKey: !!apiKey, hasSender: !!sender,
+      });
+      issues.push('Msegat credentials incomplete');
+    }
+  }
+
+  if (n.sendReal && n.whatsapp) {
+    const { accountSid, authToken, whatsappFrom } = n.twilio;
+    if (!accountSid || !authToken || !whatsappFrom) {
+      logger.error('SEND_REAL_NOTIFICATIONS=true with WhatsApp enabled but Twilio credentials are missing!', {
+        hasSid: !!accountSid, hasToken: !!authToken, hasFrom: !!whatsappFrom,
+      });
+      issues.push('Twilio credentials incomplete');
+    }
+  }
+
+  if (issues.length === 0) {
+    logger.info('Notification config OK', {
+      sendReal: n.sendReal, sms: n.sms, whatsapp: n.whatsapp, provider: n.provider,
+    });
+  }
+
+  return issues;
+};
+
+const getConfigStatus = () => {
+  const n = env.notifications;
+  const msegatOk = !!(n.msegat.username && n.msegat.apiKey && n.msegat.sender);
+  const twilioOk = !!(n.twilio.accountSid && n.twilio.authToken);
+  return {
+    sendReal: n.sendReal,
+    smsEnabled: n.sms,
+    whatsappEnabled: n.whatsapp,
+    emailEnabled: n.email,
+    provider: n.provider,
+    defaultChannel: n.defaultChannel,
+    msegatConfigured: msegatOk,
+    twilioConfigured: twilioOk,
+  };
+};
+
+const getDailyStats = async () => {
+  const tz = 'Asia/Riyadh';
+  const today = `(created_at AT TIME ZONE '${tz}')::date = (NOW() AT TIME ZONE '${tz}')::date`;
+  const result = await query(`
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'sent' AND ${today})::int AS sent_today,
+      COUNT(*) FILTER (WHERE status = 'failed' AND ${today})::int AS failed_today,
+      COUNT(*) FILTER (WHERE status = 'dry_run' AND ${today})::int AS dry_run_today,
+      COUNT(*) FILTER (WHERE status = 'pending' AND ${today})::int AS pending_today,
+      COUNT(*) FILTER (WHERE ${today})::int AS total_today,
+      COUNT(*) FILTER (WHERE status = 'sent')::int AS sent_all,
+      COUNT(*) FILTER (WHERE status = 'dry_run')::int AS dry_run_all,
+      COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_all
+    FROM notification_queue
+  `);
+  return result.rows[0] || {};
+};
+
 module.exports = {
   queue,
   list,
@@ -193,4 +277,7 @@ module.exports = {
   sendReportNotification,
   processPending,
   dispatchOne,
+  validateConfigOnStartup,
+  getConfigStatus,
+  getDailyStats,
 };

@@ -127,18 +127,24 @@ export default function Customers() {
     }
     setSendingReports(true);
     try {
-      await customersAPI.sendReadyReports(selected.id, {
+      const { data: resp } = await customersAPI.sendReadyReports(selected.id, {
         reportIds: selectedReportIds,
         channel: sendChannel,
         forceResend,
       });
-      toast.success(t('customers.reportsSentSuccess'));
+      if (resp.dryRun) {
+        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 5000 });
+      } else {
+        toast.success(t('customers.reportsSentSuccess'));
+      }
       setSendOpen(false);
     } catch (err) {
       const code = err.response?.data?.error?.code;
       if (code === 'ALREADY_SENT' && !forceResend) {
         const confirmed = window.confirm(t('customers.reportsAlreadySentConfirm'));
         if (confirmed) await sendSelectedReports(true);
+      } else if (code === 'CHANNEL_DISABLED') {
+        toast.error(t('notifications.channelDisabled'));
       } else {
         toast.error(err.response?.data?.error?.message || t('common.error'));
       }

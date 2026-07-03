@@ -35,7 +35,14 @@ router.post('/:id/send-ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_
       },
       req.user.id
     );
-    res.json({ success: true, data });
+    res.json({
+      success: true,
+      data,
+      dryRun: data.dryRun === true,
+      userMessage: data.dryRun
+        ? 'النظام يعمل في وضع الاختبار (Dry Run)، ولم يتم إرسال رسالة فعلية.'
+        : undefined,
+    });
   } catch (err) { next(err); }
 });
 

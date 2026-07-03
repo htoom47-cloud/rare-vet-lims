@@ -273,6 +273,9 @@ export const reportsAPI = {
 export const notificationsAPI = {
   sendReport: (sampleId, channel, recipient) =>
     api.post(`/notifications/send-report/${sampleId}`, { channel, recipient }),
+  configStatus: () => api.get('/notifications/config-status'),
+  stats: () => api.get('/notifications/stats'),
+  testSend: (channel, recipient) => api.post('/notifications/test-send', { channel, recipient }),
 };
 
 export const billingAPI = {

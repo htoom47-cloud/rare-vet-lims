@@ -346,6 +346,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Portal now aggregates reports across all customer records sharing the same normalized mobile number (fixes invisible reports when duplicate customer records exist). Middleware resolves `portalCustomerIds` array from authenticated customer's mobile; all portal queries use `ANY($1::uuid[])`. Reception is blocked from creating duplicate customers with the same mobile; Admin/Manager can override. 46 unit tests + 18 Phase 13 tests pass.
 
+### 2026-07-03 — Hotfix: Notification Configuration Validation
+
+| Field | Value |
+|-------|-------|
+| **Category** | hotfix (UX clarity + operational diagnostics) |
+| **Risk** | low — no schema changes; improves feedback only |
+| **Backup taken** | N/A |
+| **Migration** | **None** — `notification_queue.status` is VARCHAR(20), `dry_run` fits |
+| **Checklist** | `node backend/src/scripts/verify-notification-configuration.js` |
+| **Files** | `notifications.service.js`, `notifications.routes.js`, `customers.routes.js`, `index.js`, `customer-report-notifications.service.js`, `Dashboard.jsx`, `Settings.jsx`, `Samples.jsx`, `Customers.jsx`, `Reports.jsx`, `api.js`, `i18n/index.js` |
+| **Env** | `SEND_REAL_NOTIFICATIONS`, `SMS_ENABLED`, `WHATSAPP_ENABLED`, `MSEGAT_*` |
+| **Rollback** | `git revert`; safe — purely additive |
+
+**Summary:** System now clearly communicates notification status: dry-run sends return explicit Arabic/English warnings instead of "Sent successfully". Startup validates notification config and logs ERRORs for missing Msegat credentials when real sending is enabled. Settings page shows live 🟢/🔴 status for SMS, WhatsApp, Real Sending, and Msegat connection with admin test-send button. Dashboard displays daily notification counts (sent/failed/dry-run/pending). 21 verification tests pass.
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

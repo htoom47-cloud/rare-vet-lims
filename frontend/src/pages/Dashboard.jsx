@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { m } from 'framer-motion';
-import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers } from 'lucide-react';
+import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers, Bell } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import StatCard from '../components/ui/StatCard';
@@ -10,7 +10,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { staggerContainer, staggerItem } from '../components/motion/AnimatedPage';
-import { dashboardAPI } from '../services/api';
+import { dashboardAPI, notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const COLORS = ['#4A3728', '#C5A059', '#A88644', '#D9C48A', '#3D2E22'];
@@ -36,12 +36,16 @@ export default function Dashboard() {
   const { user, hasPermission, hasAnyPermission } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notifStats, setNotifStats] = useState(null);
 
   useEffect(() => {
     dashboardAPI.stats()
       .then(({ data }) => setStats(data.data))
       .catch(() => toast.error(t('common.error')))
       .finally(() => setLoading(false));
+    notificationsAPI.stats()
+      .then(({ data }) => setNotifStats(data.data))
+      .catch(() => {});
   }, [t]);
 
   if (loading) return <DashboardSkeleton />;
@@ -254,6 +258,43 @@ export default function Dashboard() {
               <button type="button" onClick={() => navigate('/invoice-settings')} className="btn-primary shrink-0">
                 {t('invoiceSettings.open')}
               </button>
+            </CardContent>
+          </Card>
+        </m.div>
+      )}
+
+      {notifStats && (
+        <m.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.11 }}
+        >
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell size={16} /> {t('notifications.todayStats')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                  <p className="text-gray-500">{t('notifications.sent')}</p>
+                  <p className="font-bold text-green-600 text-xl">{notifStats.sent_today || 0}</p>
+                </div>
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                  <p className="text-gray-500">{t('notifications.failed')}</p>
+                  <p className="font-bold text-red-600 text-xl">{notifStats.failed_today || 0}</p>
+                </div>
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-center">
+                  <p className="text-gray-500">{t('notifications.dryRun')}</p>
+                  <p className="font-bold text-yellow-600 text-xl">{notifStats.dry_run_today || 0}</p>
+                </div>
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+                  <p className="text-gray-500">{t('notifications.pending')}</p>
+                  <p className="font-bold text-blue-600 text-xl">{notifStats.pending_today || 0}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </m.div>

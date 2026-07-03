@@ -41,7 +41,7 @@ const loadSentBatches = async (customerId) => {
   const result = await query(
     `SELECT id, metadata, sent_at, channel, status
      FROM notification_queue
-     WHERE status IN ('sent', 'pending')
+     WHERE status IN ('sent', 'pending', 'dry_run')
        AND metadata->>'customer_id' = $1
        AND (
          metadata->>'type' = $2
