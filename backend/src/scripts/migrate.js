@@ -529,7 +529,8 @@ async function applyPatches() {
     await ensureUniqueLimsReferenceRanges(client);
     await client.query(`
       ALTER TABLE sample_tests
-        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
     `);
     await fixDuplicateSampleTests(client);
   } finally {
