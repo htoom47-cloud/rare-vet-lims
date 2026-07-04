@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { m } from 'framer-motion';
-import { FlaskConical, DollarSign, AlertTriangle, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers, Bell } from 'lucide-react';
+import { FlaskConical, DollarSign, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers, Bell } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import StatCard from '../components/ui/StatCard';
@@ -79,7 +79,7 @@ export default function Dashboard() {
       <div>
         <PageHeader title={t('nav.dashboard')} subtitle={t('dashboard.labOverview')} />
         <m.div
-          className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
           variants={staggerContainer}
           initial="hidden"
           animate="show"
@@ -89,9 +89,6 @@ export default function Dashboard() {
           </m.div>
           <m.div variants={staggerItem}>
             <StatCard title={t('dashboard.running')} value={stats?.running_count || 0} icon={Activity} color="primary" />
-          </m.div>
-          <m.div variants={staggerItem}>
-            <StatCard title={t('dashboard.critical')} value={stats?.critical_alerts || 0} icon={AlertTriangle} color="red" />
           </m.div>
         </m.div>
 
