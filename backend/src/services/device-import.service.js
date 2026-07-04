@@ -8,39 +8,13 @@ const {
 const mappingEngine = require('./device-mapping-engine.service');
 const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
 const { normalizeSampleScanId } = require('../utils/barcode-scan');
-const { normaReferenceNote } = require('../utils/reference-range');
 const { mapNormaSpeciesToRefSpeciesExact, normalizeSpeciesKey } = require('../utils/norma-species-map');
-const normaRefDebug = require('./norma-ref-debug.service');
 const logger = require('../config/logger');
 
 const resultLimsCode = (row) => (
   mappingEngine.resolveSystemParameterCodeSync(row) || row.code
 );
 
-/** Copy Norma OBX-7 notes onto enriched rows that lack them (computed % / #). */
-const attachNormaNotesFromResults = (results, values, paramIdToCode) => {
-  const noteByCode = new Map();
-  for (const row of results) {
-    const note = normaReferenceNote(row.reference);
-    if (note) noteByCode.set(resultLimsCode(row), note);
-  }
-
-  for (const v of values) {
-    if (v.notes) continue;
-    const code = paramIdToCode.get(v.parameter_id);
-    if (!code) continue;
-
-    let note = noteByCode.get(code);
-    if (!note && NORMA_CBC_PCT_BY_ABS[code]) {
-      note = noteByCode.get(NORMA_CBC_PCT_BY_ABS[code]);
-    }
-    if (!note) {
-      const absCode = Object.entries(NORMA_CBC_PCT_BY_ABS).find(([, pct]) => pct === code)?.[0];
-      if (absCode) note = noteByCode.get(absCode);
-    }
-    if (note) v.notes = note;
-  }
-};
 
 const enrichPctFromAbs = async (results, values, testCode) => {
   const byCode = Object.fromEntries(results.map((r) => [resultLimsCode(r), r]));
@@ -204,8 +178,6 @@ const importCbcResults = async ({
     });
   }
 
-  normaRefDebug.logImportDebug(results, species, speciesRaw);
-
   const values = [];
   const skipped = [];
   const mappingWarnings = [];
@@ -239,19 +211,15 @@ const importCbcResults = async ({
       continue;
     }
     paramIdToCode.set(param.id, limsCode);
-    const refNote = normaReferenceNote(row.reference);
     values.push({
       parameter_id: param.id,
       value: String(row.value),
-      notes: refNote || undefined,
-      device_flag: row.flag || undefined,
     });
   }
 
   await enrichDiffAbsFromPct(results, values, testCode);
   await enrichPctFromAbs(results, values, testCode);
   await enrichPlcFromPlt(results, values, testCode);
-  attachNormaNotesFromResults(results, values, paramIdToCode);
 
   if (!values.length) {
     const codes = (results || []).map((r) => r.code).join(', ') || 'none';
@@ -280,14 +248,12 @@ const importCbcResults = async ({
         byParam.set(v.parameter_id, {
           value: v.value,
           notes: v.notes != null ? v.notes : (prev?.notes ?? null),
-          device_flag: v.device_flag,
         });
       }
-      mergedValues = [...byParam.entries()].map(([parameter_id, { value, notes, device_flag }]) => ({
+      mergedValues = [...byParam.entries()].map(([parameter_id, { value, notes }]) => ({
         parameter_id,
         value,
         ...(notes ? { notes } : {}),
-        ...(device_flag ? { device_flag } : {}),
       }));
     }
   } catch {
@@ -298,7 +264,6 @@ const importCbcResults = async ({
     sample_test_id: sampleTest.id,
     technician_notes: `Imported from ${deviceName || 'Norma CBC'} (${new Date().toISOString()})`,
     values: mergedValues,
-    from_norma: true,
   }, null);
 
   await query(
@@ -314,8 +279,6 @@ const importCbcResults = async ({
     skipped,
     mapping_warnings: mappingWarnings,
     reference_animal_type: species,
-    norma_animal_type: species,
-    norma_species_raw: speciesRaw,
     species_exact_match: exactMatch,
     lims_animal_type: limsAnimalType,
     species_mismatch: Boolean(speciesRaw && limsAnimalType && species !== limsAnimalType),

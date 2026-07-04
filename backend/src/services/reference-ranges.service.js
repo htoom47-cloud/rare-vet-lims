@@ -1,7 +1,5 @@
 const { query } = require('../config/database');
-const { defaultCritical, normaReferenceNote } = require('../utils/reference-range');
-const { getNormaReference } = require('../utils/norma-cbc-references');
-const { DEFAULT_CBC_TEST_CODE, resolveNormaResultLimsCode } = require('../utils/norma-cbc-map');
+const { defaultCritical } = require('../utils/reference-range');
 const engine = require('./reference-range-engine.service');
 
 const {
@@ -64,156 +62,6 @@ const upsertReferenceRange = async ({
   return result.rows[0];
 };
 
-const syncFromParsedResults = async ({
-  results,
-  testCode,
-  animalType,
-  overwriteNorma = false,
-  force = false,
-}) => {
-  if (!results?.length || !animalType) return { updated: 0, skipped: 0, protected: 0 };
-
-  const code = testCode || DEFAULT_CBC_TEST_CODE;
-  let updated = 0;
-  let skipped = 0;
-  let protectedManual = 0;
-
-  for (const row of results) {
-    const limsCode = resolveNormaResultLimsCode(row);
-    if (!limsCode) {
-      skipped += 1;
-      continue;
-    }
-
-    const fromHl7 = row.referenceMin != null && row.referenceMax != null;
-    let refMin = row.referenceMin;
-    let refMax = row.referenceMax;
-
-    if (!fromHl7) {
-      const profile = getNormaReference(animalType, limsCode);
-      if (profile) {
-        refMin = profile.min;
-        refMax = profile.max;
-      }
-    }
-
-    if (refMin == null || refMax == null || (refMin === 0 && refMax === 0)) {
-      skipped += 1;
-      continue;
-    }
-
-    const param = await query(
-      `SELECT tp.id, tp.unit FROM test_parameters tp
-       JOIN tests t ON tp.test_id = t.id
-       WHERE t.code = $1 AND tp.code = $2 LIMIT 1`,
-      [code, limsCode]
-    );
-    if (!param.rows[0]) {
-      skipped += 1;
-      continue;
-    }
-
-    const profile = getNormaReference(animalType, limsCode);
-    const noteText = fromHl7 ? normaReferenceNote(row.reference) : undefined;
-
-    const saved = await upsertReferenceRange({
-      parameterId: param.rows[0].id,
-      animalType,
-      min: refMin,
-      max: refMax,
-      criticalLow: fromHl7 ? undefined : profile?.crit_low,
-      criticalHigh: fromHl7 ? undefined : profile?.crit_high,
-      unit: row.unit || param.rows[0].unit,
-      notes: noteText,
-      source: fromHl7 ? 'norma-hl7' : 'norma-profile',
-      onlyIfMissing: !overwriteNorma && !fromHl7,
-      force,
-    });
-    if (saved?.skipped_manual) protectedManual += 1;
-    else updated += 1;
-  }
-
-  return { updated, skipped, protected: protectedManual };
-};
-
-/** Copy Norma OBX-7 from a sample import into LIMS test_reference_ranges for its animal type. */
-const syncLimsRefsFromSample = async (sampleId, opts = {}) => {
-  const { AppError } = require('../middleware/errorHandler');
-  const sample = await query(
-    `SELECT s.id, a.animal_type, s.sample_code
-     FROM samples s
-     JOIN animals a ON s.animal_id = a.id
-     WHERE s.id = $1`,
-    [sampleId]
-  );
-  if (!sample.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');
-  const { animal_type: animalType, sample_code: sampleCode } = sample.rows[0];
-
-  const msg = await query(
-    `SELECT id, parsed_data FROM device_messages
-     WHERE sample_id = $1 AND status = 'imported' AND parsed_data IS NOT NULL
-     ORDER BY created_at DESC LIMIT 1`,
-    [sampleId]
-  );
-  if (!msg.rows[0]) throw new AppError('No Norma import found for this sample', 404, 'NOT_FOUND');
-
-  const parsed = typeof msg.rows[0].parsed_data === 'object'
-    ? msg.rows[0].parsed_data
-    : JSON.parse(msg.rows[0].parsed_data);
-  if (!parsed?.results?.length) throw new AppError('Norma message has no parsed results', 400, 'INVALID');
-
-  const sync = await syncFromParsedResults({
-    results: parsed.results,
-    testCode: opts.testCode,
-    animalType,
-    overwriteNorma: true,
-    force: opts.force === true,
-  });
-
-  return {
-    sampleId,
-    sampleCode,
-    animalType,
-    messageId: msg.rows[0].id,
-    ...sync,
-  };
-};
-
-/** Seed missing Norma profile reference ranges (does not overwrite HL7-synced values). */
-const syncNormaProfileForAnimal = async (testCode, animalType) => {
-  const { NORMA_CBC_REFERENCES } = require('../utils/norma-cbc-references');
-  const ranges = NORMA_CBC_REFERENCES[animalType];
-  if (!ranges) return { updated: 0 };
-
-  const test = await query('SELECT id FROM tests WHERE code = $1 LIMIT 1', [testCode]);
-  if (!test.rows[0]) return { updated: 0 };
-
-  const params = await query(
-    'SELECT id, code, unit FROM test_parameters WHERE test_id = $1',
-    [test.rows[0].id]
-  );
-  const byCode = Object.fromEntries(params.rows.map((p) => [p.code, p]));
-
-  let updated = 0;
-  for (const [code, ref] of Object.entries(ranges)) {
-    const param = byCode[code];
-    if (!param) continue;
-    await upsertReferenceRange({
-      parameterId: param.id,
-      animalType,
-      min: ref.min,
-      max: ref.max,
-      criticalLow: ref.crit_low,
-      criticalHigh: ref.crit_high,
-      unit: param.unit,
-      source: 'norma-profile',
-      onlyIfMissing: true,
-    });
-    updated += 1;
-  }
-  return { updated };
-};
-
 /** Manual LIMS reference range for a parameter + animal type (via Reference Range Engine). */
 const getLimsReferenceRange = async (parameterId, animalType, extras = {}) => {
   const resolved = await engine.resolveReferenceRange({
@@ -221,7 +69,7 @@ const getLimsReferenceRange = async (parameterId, animalType, extras = {}) => {
     animal_type: animalType,
     ...extras,
   });
-  if (!resolved || resolved.source === engine.RANGE_SOURCES.DEVICE) return null;
+  if (!resolved) return null;
   return {
     min_value: resolved.min_value,
     max_value: resolved.max_value,
@@ -235,7 +83,7 @@ const getLimsReferenceRange = async (parameterId, animalType, extras = {}) => {
 const formatLimsRange = (range) => {
   if (!range || range.min_value == null || range.max_value == null) return null;
   const note = range.notes != null ? String(range.notes).trim() : '';
-  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:') && !/^LIMS /i.test(note)) return note;
+  if (note) return note;
   const fmt = (n) => {
     const num = Number(n);
     if (Number.isNaN(num)) return String(n);
@@ -246,9 +94,6 @@ const formatLimsRange = (range) => {
 
 module.exports = {
   upsertReferenceRange,
-  syncFromParsedResults,
-  syncNormaProfileForAnimal,
-  syncLimsRefsFromSample,
   getLimsReferenceRange,
   formatLimsRange,
   LIMS_REF_SELECT_SQL,

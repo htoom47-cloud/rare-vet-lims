@@ -1,4 +1,4 @@
-/** Parse reference range strings from Norma HL7/ASTM OBX-7 — bounds optional, raw always kept. */
+/** Parse reference range strings — bounds optional, raw always kept. */
 const parseReferenceRange = (raw) => {
   if (raw == null || raw === '') return null;
   const original = String(raw).trim();
@@ -38,25 +38,6 @@ const defaultCritical = (min, max) => {
   };
 };
 
-/** Verbatim OBX-7 text only — never synthesize from parsed min/max. */
-const normaReferenceNote = (raw) => {
-  const text = String(raw ?? '').trim();
-  return text ? `Norma: ${text}` : null;
-};
-
-/** Display text from frozen result_values.notes (verbatim Norma OBX-7). */
-const verbatimFromResultNotes = (notes) => {
-  if (!notes || !String(notes).startsWith('Norma:')) return null;
-  return String(notes).slice(6).trim() || null;
-};
-
-/** Parse bounds from frozen notes only (for flag math). */
-const referenceFromResultNotes = (notes) => {
-  const text = verbatimFromResultNotes(notes);
-  if (!text) return null;
-  return parseReferenceRange(text);
-};
-
 const LIMS_ANIMAL_TYPES = new Set(['camel', 'horse', 'sheep', 'goat']);
 
 const hasLimsReferenceRow = (row) => (
@@ -75,7 +56,7 @@ const formatLimsRangeDisplay = (row) => {
   if (row?.trr_text_reference) return String(row.trr_text_reference).trim();
   if (!hasLimsReferenceRow(row)) return null;
   const note = row?.trr_notes != null ? String(row.trr_notes).trim() : '';
-  if (note && !note.startsWith('Synced from') && !note.startsWith('Norma:') && !/^LIMS /i.test(note)) return note;
+  if (note) return note;
   const fmt = (n) => {
     const num = Number(n);
     if (Number.isNaN(num)) return String(n);
@@ -97,20 +78,13 @@ const resolveReportReferenceDisplay = (row) => (
   require('../services/reference-range-engine.service').resolveReportReferenceDisplay(row)
 );
 
-/** @deprecated use resolveLimsReferenceDisplay — kept for imports that expect the old name */
-const resolveNormaReferenceOnly = (row) => resolveLimsReferenceDisplay(row);
-
 module.exports = {
   parseReferenceRange,
   defaultCritical,
-  normaReferenceNote,
-  verbatimFromResultNotes,
-  referenceFromResultNotes,
   LIMS_ANIMAL_TYPES,
   hasLimsReferenceRow,
   resolveLimsReferenceBounds,
   resolveLimsReferenceDisplay,
   resolveReportReferenceBounds,
   resolveReportReferenceDisplay,
-  resolveNormaReferenceOnly,
 };

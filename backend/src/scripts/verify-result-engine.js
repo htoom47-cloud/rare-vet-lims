@@ -4,7 +4,6 @@
  */
 const assert = require('assert');
 const engine = require('../services/result-engine.service');
-const refEngine = require('../services/reference-range-engine.service');
 
 let passed = 0;
 let failed = 0;
@@ -129,8 +128,6 @@ check('Notes only — no LIMS range — reference null', () => {
   const ev = engine.evaluateResult(row);
   assert.strictEqual(ev.reference, null);
   assert.strictEqual(ev.flag, engine.RESULT_FLAGS.NORMAL_WITHOUT_REF);
-  const legacy = refEngine.extractLegacyNormaReference(row.rv_notes);
-  assert.ok(legacy);
 });
 
 check('buildReportResultRow preserves PDF shape', () => {

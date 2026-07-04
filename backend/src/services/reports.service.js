@@ -321,29 +321,6 @@ const buildReportData = async (sampleId, opts) => {
     vetApproval: vetApproval ?? { approved: false },
   });
 
-  const normaMsg = await query(
-    `SELECT parsed_data->>'animalType' AS norma_animal_type,
-            parsed_data->>'animalTypeRaw' AS norma_animal_type_raw
-     FROM device_messages
-     WHERE sample_id = $1 AND status = 'imported'
-     ORDER BY created_at DESC
-     LIMIT 1`,
-    [sampleId]
-  ).catch(() => ({ rows: [] }));
-
-  const normaAnimalType = normaMsg.rows[0]?.norma_animal_type || null;
-  const normaAnimalTypeRaw = normaMsg.rows[0]?.norma_animal_type_raw || null;
-
-  try {
-    const normaRefDebug = require('./norma-ref-debug.service');
-    await normaRefDebug.auditReportBuild(sampleId, sample, uniqueByParameter, {
-      normaAnimalType,
-      normaAnimalTypeRaw,
-    });
-  } catch (err) {
-    logger.warn('Norma reference audit skipped', { sampleId, error: err.message });
-  }
-
   return {
     reportNumber,
     sampleCode: sample.sample_code,
@@ -358,9 +335,6 @@ const buildReportData = async (sampleId, opts) => {
     nationalId: '-',
     animalCode: sample.animal_code,
     animalType: sample.animal_type,
-    normaAnimalType,
-    normaAnimalTypeRaw,
-    normaSpeciesMatch: !normaAnimalType || String(sample.animal_type) === String(normaAnimalType),
     animalName: sample.animal_name,
     animalGender: sample.animal_gender,
     animalChip: sample.animal_chip,

@@ -85,7 +85,7 @@ const fmtResult = (row) => {
   return { text: v, tone: 'normal' };
 };
 
-const { resolveReportReferenceDisplay, verbatimFromResultNotes } = require('./reference-range');
+const { resolveReportReferenceDisplay } = require('./reference-range');
 
 const fmtRef = (row) => {
   const verbatim = row.reference && row.reference !== '-' ? String(row.reference).trim() : null;

@@ -203,15 +203,7 @@ const replaySampleImport = async (device, sampleCode) => {
   logger.info('Replaying Norma HL7 import', { sample: sample.sample_code, messageId: msg.rows[0].id });
   const result = await processInboundMessage(device, msg.rows[0].raw_message);
 
-  let audit = null;
-  try {
-    const normaRefDebug = require('./norma-ref-debug.service');
-    audit = await normaRefDebug.analyzeSample(sample.id);
-  } catch (err) {
-    logger.warn('Norma replay audit skipped', { error: err.message });
-  }
-
-  return { ...result, audit };
+  return result;
 };
 
 const receiveMessage = async (deviceId, rawMessage, direction = 'inbound', device = null) => {

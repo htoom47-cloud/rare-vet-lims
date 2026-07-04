@@ -70,7 +70,6 @@ if (process.env.RUN_SEED === 'true') {
 }
 
 bootScripts.push('src/scripts/ensure-admin.js');
-bootScripts.push('src/scripts/sync-device-reference-ranges.js');
 
 (async () => {
   try {

@@ -2,30 +2,24 @@
  * Reference Range Engine — single source for range selection, display, and flags.
  *
  * Priority (LIMS test_reference_ranges only — Admin Reference Ranges):
- *   1. manual active (notes not Norma:/Synced from)
- *   2. species-specific (animal_type match, non-manual)
+ *   1. manual active
+ *   2. species-specific (animal_type match)
  *   3. general fallback (animal_type = 'other' for same parameter)
  *
- * device_reference_ranges — DISABLED by default (ALLOW_DEVICE_REFERENCE_FALLBACK=false).
- * result_values.notes (Norma: …) is legacy metadata only — never used for bounds/display.
  * When no Admin range exists: returns null → report shows N/A, no HIGH/LOW flag.
  */
 const { query } = require('../config/database');
-const env = require('../config/env');
 const { evaluateFlag } = require('../utils/helpers');
-const { parseReferenceRange } = require('../utils/reference-range');
 
 const RANGE_SOURCES = {
   LIMS_MANUAL: 'lims-manual',
   LIMS_SPECIES: 'lims-species',
   LIMS_GENERAL: 'lims-general',
-  DEVICE: 'device',
 };
 
 const isManualLimsNotes = (notes) => {
   const n = String(notes || '').trim();
-  if (!n) return false;
-  return !n.startsWith('Norma:') && !n.startsWith('Synced from');
+  return !!n;
 };
 
 const isActiveRange = (row) => row?.is_active !== false;
@@ -113,28 +107,6 @@ const normalizeLimsRow = (row, source) => ({
   notes: row.notes,
 });
 
-const normalizeDeviceRow = (row) => ({
-  source: RANGE_SOURCES.DEVICE,
-  id: row.id,
-  parameter_code: row.parameter_code,
-  species: row.species,
-  min_value: row.low_value != null ? Number(row.low_value) : null,
-  max_value: row.high_value != null ? Number(row.high_value) : null,
-  critical_low: null,
-  critical_high: null,
-  text_reference: row.reference_text,
-  unit: row.unit,
-  notes: null,
-});
-
-/** Legacy Norma snapshot from result_values.notes — informational only. */
-const extractLegacyNormaReference = (notes) => {
-  if (!notes || !String(notes).startsWith('Norma:')) return null;
-  const text = String(notes).slice(6).trim();
-  if (!text) return null;
-  const parsed = parseReferenceRange(text);
-  return { verbatim: text, parsed };
-};
 
 /**
  * SQL ORDER BY tier: manual → species → general; then demographic specificity.
@@ -142,9 +114,7 @@ const extractLegacyNormaReference = (notes) => {
  */
 const RANGE_PRIORITY_ORDER = `
   CASE
-    WHEN trr.notes IS NOT NULL
-      AND trr.notes NOT LIKE 'Norma:%'
-      AND trr.notes NOT LIKE 'Synced from%' THEN 0
+    WHEN trr.notes IS NOT NULL AND TRIM(trr.notes) <> '' THEN 0
     WHEN trr.animal_type IS NOT NULL AND trr.animal_type::text <> 'other' THEN 1
     ELSE 2
   END,
@@ -270,56 +240,18 @@ const fetchLimsCandidates = async (context) => {
   return result.rows;
 };
 
-const fetchDeviceRange = async (context) => {
-  const {
-    parameter_code,
-    animal_type,
-    species,
-    device_id,
-    device_name,
-  } = context;
-  const sp = animal_type || species;
-  if (!parameter_code || !sp) return null;
-
-  const params = [parameter_code, sp];
-  let deviceFilter = '';
-  if (device_id) {
-    deviceFilter = ' AND (drr.device_id IS NULL OR drr.device_id = $3)';
-    params.push(device_id);
-  } else if (device_name) {
-    deviceFilter = ' AND drr.device_name ILIKE $3';
-    params.push(`%${device_name}%`);
-  }
-
-  const result = await query(
-    `SELECT drr.*
-     FROM device_reference_ranges drr
-     WHERE drr.parameter_code = $1
-       AND drr.species = $2
-       ${deviceFilter}
-     ORDER BY drr.last_synced_at DESC
-     LIMIT 1`,
-    params
-  );
-  if (!result.rows[0]) return null;
-  return normalizeDeviceRow(result.rows[0]);
-};
 
 /**
  * Resolve range from a SQL row (lateral join prefixes trr_*).
- * @param {object} context — { row, legacyNotes? }
  */
 const resolveReferenceRangeFromRow = (context = {}) => {
-  const { row, legacyNotes } = context;
+  const { row } = context;
   const limsRaw = rowFromLimsPrefixes(row);
   if (limsRaw) {
     const tier = classifyLimsTier(limsRaw);
     if (tier && sexMatchesRange(row?.gender || row?.animal_gender, limsRaw)
       && ageMatchesRange(parseAnimalAgeYears(row?.age || row?.animal_age), limsRaw)) {
-      return {
-        ...normalizeLimsRow(limsRaw, tier),
-        legacy: extractLegacyNormaReference(legacyNotes ?? row?.rv_notes),
-      };
+      return normalizeLimsRow(limsRaw, tier);
     }
   }
   return null;
@@ -334,7 +266,6 @@ const resolveReferenceRangeFromRow = (context = {}) => {
  * @param {string} [context.sex] — male/female
  * @param {string|number} [context.age]
  * @param {string} [context.device_id]
- * @param {string} [context.parameter_code] — for device fallback
  * @param {object} [context.row] — if set, uses sync path first
  */
 const resolveReferenceRange = async (context = {}) => {
@@ -345,24 +276,7 @@ const resolveReferenceRange = async (context = {}) => {
 
   const limsRows = await fetchLimsCandidates(context);
   const lims = pickBestLimsRow(limsRows, context);
-  if (lims?.source === RANGE_SOURCES.LIMS_MANUAL) {
-    return { ...lims, legacy: extractLegacyNormaReference(context.legacyNotes) };
-  }
-  if (lims) {
-    return { ...lims, legacy: extractLegacyNormaReference(context.legacyNotes) };
-  }
-
-  if (env.features.allowDeviceReferenceFallback) {
-    const hasManual = limsRows.some((r) => isManualLimsNotes(r.notes) && isActiveRange(r));
-    if (!hasManual) {
-      const device = await fetchDeviceRange(context);
-      if (device) {
-        return { ...device, legacy: extractLegacyNormaReference(context.legacyNotes) };
-      }
-    }
-  }
-
-  return null;
+  return lims || null;
 };
 
 const formatReferenceRange = (range) => {
@@ -417,7 +331,6 @@ module.exports = {
   engineRefLateralJoin,
   limsRefLateralJoin,
   isManualLimsNotes,
-  extractLegacyNormaReference,
   resolveReferenceRange,
   resolveReferenceRangeFromRow,
   formatReferenceRange,

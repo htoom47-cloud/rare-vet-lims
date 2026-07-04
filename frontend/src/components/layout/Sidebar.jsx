@@ -51,11 +51,9 @@ const navSections = [
       { path: '/inventory', icon: Package, label: 'nav.inventory', permission: 'inventory.view' },
       { path: '/quality', icon: Shield, label: 'nav.quality', permission: 'quality.view' },
       { path: '/devices', icon: Cpu, label: 'nav.devices', permission: 'devices.view' },
-      { path: '/device-reference-ranges', icon: Activity, label: 'nav.deviceRefRanges', permission: 'devices.view' },
       { path: '/reference-ranges', icon: Activity, label: 'nav.referenceRanges', permission: 'reference_ranges.manage' },
       { path: '/report-mastering', icon: GitCompare, label: 'nav.reportMastering', permission: 'reference_ranges.manage' },
       { path: '/animal-trends', icon: TrendingUp, label: 'nav.animalTrends', permission: 'results.view' },
-      { path: '/norma-ref-debug', icon: GitCompare, label: 'nav.normaRefDebug', permission: 'devices.view' },
     ],
   },
   {

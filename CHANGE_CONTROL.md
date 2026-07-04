@@ -391,6 +391,22 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Two regressions fixed: (1) Samples with cancelled tests were never marked `completed` because the cancelled status wasn't excluded from completion checks in both `validateResults` and `reconcileSampleStatuses` — fixed to use `NOT IN ('completed', 'cancelled')`. Report generation now also calls `reconcileSampleStatuses` before checking sample status. Report `buildReportData` queries now exclude cancelled tests. (2) Report notes (treatment recommendations) had no update endpoint — added `PATCH /reports/:id` with `updateNotes` service method. LaboratoryReport page now has an "Edit Notes" button to save notes to DB and marks report for update.
 
+### 2026-07-04 — Phase 15: Reference Range Simplification
+
+| Field | Value |
+|-------|-------|
+| **Category** | refactor (reference range architecture) |
+| **Risk** | medium — removes device reference fallback permanently; deletes pages/services |
+| **Backup taken** | N/A |
+| **Migration** | **None** — `device_reference_ranges` table kept for audit; data untouched |
+| **Checklist** | `node backend/src/scripts/verify-reference-source.js` (65 assertions) |
+| **Files deleted** | `DeviceReferenceRanges.jsx`, `NormaRefDebug.jsx`, `device-reference-ranges.service.js`, `norma-ref-debug.service.js`, `norma-ref-extract.js`, `norma-device-reference-ranges.md`, 11 dead scripts |
+| **Files modified** | `App.jsx`, `Sidebar.jsx`, `api.js`, `i18n/index.js`, `devices.routes.js`, `tests.routes.js`, `reference-range-engine.service.js`, `reference-ranges.service.js`, `device-import.service.js`, `reports.service.js`, `devices.service.js`, `result-engine.service.js`, `reference-range.js`, `pdf-results-table.js`, `env.js`, `cloud-start.js`, `verify-result-engine.js` |
+| **Env** | Removed `ALLOW_DEVICE_REFERENCE_FALLBACK` |
+| **Rollback** | `git revert`; restore deleted files from git history |
+
+**Summary:** LIMS (Admin → Reference Ranges) is now the **sole source** for reference ranges. Removed: Device Reference Ranges page, Norma Ref Debug page, all device reference CRUD routes/APIs, Norma reference sync routes, `norma-ref-debug.service.js`, `device-reference-ranges.service.js`, device fallback in Reference Range Engine, legacy Norma extraction (`extractLegacyNormaReference`), `ALLOW_DEVICE_REFERENCE_FALLBACK` feature flag, `normaReferenceNote` utility, Norma audit calls from reports and device replay. Device imports now only store Value/Code/Unit — no reference notes or flags. Reports no longer query `normaAnimalType` or run Norma audit. HIGH/LOW flags come strictly from `test_reference_ranges`; missing ranges show N/A. 65 verification assertions + 13 result-engine tests pass.
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

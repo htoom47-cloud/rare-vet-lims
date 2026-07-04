@@ -376,20 +376,6 @@ const validateResultBeforeApproval = (result = {}, context = {}) => {
     }
   }
 
-  const notesRef = refEngine.extractLegacyNormaReference(result.rv_notes);
-  if (notesRef && !evaluated.referenceRange) {
-    if (evaluated.reference) {
-      errors.push('Reference must not be derived from result_values.notes');
-    }
-  }
-
-  if (notesRef && evaluated.referenceRange) {
-    const notesDisplay = notesRef.verbatim;
-    if (evaluated.reference === notesDisplay && !hasNumericReference(evaluated.referenceRange)) {
-      errors.push('Reference display must come from LIMS ranges, not Norma notes snapshot');
-    }
-  }
-
   if (evaluated.isMissing && (evaluated.flag === RESULT_FLAGS.LOW || evaluated.flag === RESULT_FLAGS.HIGH)) {
     errors.push('Missing value must not produce HIGH/LOW flag');
   }

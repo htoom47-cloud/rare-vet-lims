@@ -447,14 +447,6 @@ export const devicesAPI = {
   update: (id, data) => api.put(`/devices/${id}`, data),
   regenerateKey: (id) => api.post(`/devices/${id}/regenerate-key`),
   messages: (id) => api.get(`/devices/${id}/messages`),
-  referenceRanges: (params) => api.get('/devices/reference-ranges/list', { params }),
-  referenceRangeLogs: (params) => api.get('/devices/reference-ranges/logs', { params }),
-  createReferenceRange: (data) => api.post('/devices/reference-ranges', data),
-  updateReferenceRange: (id, data) => api.put(`/devices/reference-ranges/${id}`, data),
-  deleteAllReferenceRanges: () => api.delete('/devices/reference-ranges/all'),
-  refDebugMessage: (messageId) => api.get(`/devices/ref-debug/message/${messageId}`),
-  refDebugSample: (sampleId) => api.get(`/devices/ref-debug/sample/${sampleId}`),
-  refDebugSpeciesAudit: () => api.get('/devices/ref-debug/species-audit'),
 };
 
 export const settingsAPI = {
