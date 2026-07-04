@@ -260,7 +260,7 @@ const reconcileSampleStatuses = async () => {
           EXISTS (SELECT 1 FROM sample_tests st WHERE st.sample_id = s.id)
           AND NOT EXISTS (
             SELECT 1 FROM sample_tests st
-            WHERE st.sample_id = s.id AND st.status != 'completed'
+            WHERE st.sample_id = s.id AND st.status NOT IN ('completed', 'cancelled')
           )
         )
         OR (
@@ -268,6 +268,7 @@ const reconcileSampleStatuses = async () => {
           AND NOT EXISTS (
             SELECT 1 FROM sample_tests st
             WHERE st.sample_id = s.id
+              AND st.status != 'cancelled'
               AND NOT EXISTS (
                 SELECT 1 FROM results r
                 WHERE r.sample_test_id = st.id AND r.is_validated = true

@@ -376,6 +376,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** Reports now use reference ranges exclusively from Admin → Reference Ranges (`test_reference_ranges`). Device reference ranges (`device_reference_ranges`) and `result_values.notes` (Norma OBX-7 snapshots) are no longer used for report bounds or HIGH/LOW flags. When no admin range exists, the report shows N/A with no flag. A feature flag `ALLOW_DEVICE_REFERENCE_FALLBACK` (default `false`) is available for opt-in if needed. Norma CBC value mapping is unaffected. 27 verification tests pass.
 
+### 2026-07-04 — P0 Hotfix: Restore Report Extraction + Save Report Notes
+
+| Field | Value |
+|-------|-------|
+| **Category** | hotfix (report generation + notes persistence) |
+| **Risk** | low — fixes regression; no schema changes |
+| **Backup taken** | N/A |
+| **Migration** | **None** |
+| **Checklist** | Manual: extract results → report appears; save notes → notes persist |
+| **Files** | `samples.service.js`, `results.service.js`, `reports.service.js`, `reports.routes.js`, `samples.routes.js`, `api.js`, `LaboratoryReport.jsx`, `i18n/index.js` |
+| **Env** | None new |
+| **Rollback** | `git revert`; safe — backward compatible |
+
+**Summary:** Two regressions fixed: (1) Samples with cancelled tests were never marked `completed` because the cancelled status wasn't excluded from completion checks in both `validateResults` and `reconcileSampleStatuses` — fixed to use `NOT IN ('completed', 'cancelled')`. Report generation now also calls `reconcileSampleStatuses` before checking sample status. Report `buildReportData` queries now exclude cancelled tests. (2) Report notes (treatment recommendations) had no update endpoint — added `PATCH /reports/:id` with `updateNotes` service method. LaboratoryReport page now has an "Edit Notes" button to save notes to DB and marks report for update.
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*

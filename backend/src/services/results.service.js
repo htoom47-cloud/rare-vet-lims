@@ -266,7 +266,7 @@ const validateResults = async (sampleTestId, userId, doctorNotes, values) => {
   const st = await query('SELECT sample_id FROM sample_tests WHERE id = $1', [sampleTestId]);
   const sampleId = st.rows[0].sample_id;
   const pending = await query(
-    `SELECT COUNT(*) FROM sample_tests WHERE sample_id = $1 AND status != 'completed'`,
+    `SELECT COUNT(*) FROM sample_tests WHERE sample_id = $1 AND status NOT IN ('completed', 'cancelled')`,
     [sampleId]
   );
 

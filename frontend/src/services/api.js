@@ -258,6 +258,7 @@ export const reportsAPI = {
       approve_vet: opts.approve_vet ?? false,
     }, { timeout: 120000 }),
   approve: (reportId, type) => api.post(`/reports/${reportId}/approve`, { type }),
+  updateNotes: (reportId, data) => api.patch(`/reports/${reportId}`, data),
   regeneratePdf: (reportId) => api.post(`/reports/${reportId}/regenerate-pdf`, {}, { timeout: 120000 }),
   getLifecycle: (reportId) => api.get(`/reports/${reportId}/lifecycle`),
   verify: (code) => api.get(`/reports/verify/${code}`),

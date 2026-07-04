@@ -12,6 +12,9 @@ router.use(authenticate);
 
 router.get('/', authorize(PERMISSIONS.SAMPLES_VIEW, PERMISSIONS.RESULTS_UPLOAD_IMAGES), async (req, res, next) => {
   try {
+    if (req.query.status === 'completed') {
+      await service.reconcileSampleStatuses();
+    }
     const data = await service.list(req.query);
     res.json({ success: true, ...data });
   } catch (err) { next(err); }

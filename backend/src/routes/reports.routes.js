@@ -93,4 +93,14 @@ router.get('/:id/preview', authorize(PERMISSIONS.REPORTS_VIEW), async (req, res,
   } catch (err) { next(err); }
 });
 
+router.patch('/:id', authorize(PERMISSIONS.REPORTS_GENERATE), async (req, res, next) => {
+  try {
+    const data = await service.updateNotes(req.params.id, {
+      treatment_recommendations: req.body.treatment_recommendations,
+      ai_interpretation: req.body.ai_interpretation,
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

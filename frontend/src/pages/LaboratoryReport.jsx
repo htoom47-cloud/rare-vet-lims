@@ -115,6 +115,9 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const [loading, setLoading] = useState(!demoMode && !initialReport);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [regeneratingPdf, setRegeneratingPdf] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   const canRegeneratePdf = !demoMode && hasPermission('reports.generate');
 
@@ -286,6 +289,26 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     }
   };
 
+  const handleEditNotes = () => {
+    setNotesValue(report?.recommendations || '');
+    setEditingNotes(true);
+  };
+
+  const handleSaveNotes = async () => {
+    if (!id) return;
+    setSavingNotes(true);
+    try {
+      await reportsAPI.updateNotes(id, { treatment_recommendations: notesValue });
+      setReport((prev) => prev ? { ...prev, recommendations: notesValue || null } : prev);
+      setEditingNotes(false);
+      toast.success(t('labReport.notesSaved'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
   const handleWhatsApp = () => {
     const text = encodeURIComponent(`${isAr ? 'تقرير' : 'Report'}: ${report.reportNumber}\n${report.verifyUrl}`);
     window.open(`https://wa.me/${(report.customer.mobile || '').replace(/\D/g, '')}?text=${text}`, '_blank');
@@ -366,6 +389,33 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           )}
         </div>
       </motion.div>
+
+      {canRegeneratePdf && !demoMode && (
+        <div className="no-print max-w-[210mm] mx-auto mb-4">
+          {editingNotes ? (
+            <div className="border rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3">
+              <label className="text-sm font-medium">{t('reports.treatmentSection')}</label>
+              <textarea
+                value={notesValue}
+                onChange={(e) => setNotesValue(e.target.value)}
+                dir={isAr ? 'rtl' : 'ltr'}
+                className="input-field w-full min-h-[100px]"
+                placeholder={t('reports.treatmentPlaceholder')}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setEditingNotes(false)}>{t('common.cancel')}</Button>
+                <Button size="sm" onClick={handleSaveNotes} disabled={savingNotes}>
+                  {savingNotes ? t('common.loading') : t('common.save')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleEditNotes} className="text-xs">
+              {t('labReport.editNotes')}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div
         ref={reportRef}

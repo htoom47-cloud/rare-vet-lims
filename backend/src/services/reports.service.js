@@ -218,7 +218,7 @@ const buildReportData = async (sampleId, opts) => {
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
      LEFT JOIN test_categories tc ON t.category_id = tc.id
-     WHERE st.sample_id = $1
+     WHERE st.sample_id = $1 AND st.status != 'cancelled'
      ORDER BY t.id, st.created_at DESC`,
     [sampleId]
   );
@@ -243,7 +243,7 @@ const buildReportData = async (sampleId, opts) => {
      JOIN samples s ON st.sample_id = s.id
      JOIN animals a ON s.animal_id = a.id
      ${limsRefLateralJoin()}
-     WHERE st.sample_id = $1
+     WHERE st.sample_id = $1 AND st.status != 'cancelled'
      ORDER BY tp.sort_order, tp.id`,
     [sampleId]
   );
@@ -453,6 +453,9 @@ const ensurePdfFile = async (reportRow) => {
 
 const generate = async (sampleId, userId, userRole, language = 'ar', options = {}) => {
   try {
+  const { reconcileSampleStatuses } = require('./samples.service');
+  await reconcileSampleStatuses();
+
   const sampleResult = await query(
     'SELECT id FROM samples WHERE id = $1 AND status = $2',
     [sampleId, 'completed']
@@ -711,6 +714,36 @@ const verify = async (code) => {
   };
 };
 
+const updateNotes = async (reportId, { treatment_recommendations, ai_interpretation } = {}) => {
+  const report = await getById(reportId);
+  const fields = [];
+  const params = [];
+  let idx = 1;
+
+  if (treatment_recommendations !== undefined) {
+    fields.push(`treatment_recommendations = $${idx++}`);
+    params.push(treatment_recommendations || null);
+  }
+  if (ai_interpretation !== undefined) {
+    fields.push(`ai_interpretation = $${idx++}`);
+    params.push(ai_interpretation || null);
+  }
+
+  if (fields.length === 0) return report;
+
+  params.push(reportId);
+  await query(
+    `UPDATE reports SET ${fields.join(', ')} WHERE id = $${idx}`,
+    params
+  );
+
+  if (reportLifecycle.isEnabled()) {
+    await reportLifecycle.markReportNeedsUpdate(reportId, 'Report notes updated');
+  }
+
+  return getById(reportId);
+};
+
 module.exports = {
-  list, getPreview, getLifecycleStatus, generate, approve, verify, servePdf, regeneratePdfById, buildReportData,
+  list, getPreview, getLifecycleStatus, generate, approve, verify, servePdf, regeneratePdfById, buildReportData, updateNotes,
 };
