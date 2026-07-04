@@ -1,15 +1,17 @@
 /**
  * Reference Range Engine — single source for range selection, display, and flags.
  *
- * Priority (LIMS test_reference_ranges):
+ * Priority (LIMS test_reference_ranges only — Admin Reference Ranges):
  *   1. manual active (notes not Norma:/Synced from)
  *   2. species-specific (animal_type match, non-manual)
  *   3. general fallback (animal_type = 'other' for same parameter)
- *   4. device_reference_ranges — only when no manual LIMS range exists
  *
+ * device_reference_ranges — DISABLED by default (ALLOW_DEVICE_REFERENCE_FALLBACK=false).
  * result_values.notes (Norma: …) is legacy metadata only — never used for bounds/display.
+ * When no Admin range exists: returns null → report shows N/A, no HIGH/LOW flag.
  */
 const { query } = require('../config/database');
+const env = require('../config/env');
 const { evaluateFlag } = require('../utils/helpers');
 const { parseReferenceRange } = require('../utils/reference-range');
 
@@ -350,11 +352,13 @@ const resolveReferenceRange = async (context = {}) => {
     return { ...lims, legacy: extractLegacyNormaReference(context.legacyNotes) };
   }
 
-  const hasManual = limsRows.some((r) => isManualLimsNotes(r.notes) && isActiveRange(r));
-  if (!hasManual) {
-    const device = await fetchDeviceRange(context);
-    if (device) {
-      return { ...device, legacy: extractLegacyNormaReference(context.legacyNotes) };
+  if (env.features.allowDeviceReferenceFallback) {
+    const hasManual = limsRows.some((r) => isManualLimsNotes(r.notes) && isActiveRange(r));
+    if (!hasManual) {
+      const device = await fetchDeviceRange(context);
+      if (device) {
+        return { ...device, legacy: extractLegacyNormaReference(context.legacyNotes) };
+      }
     }
   }
 

@@ -361,6 +361,21 @@ Full detail: [BACKUP_AND_ROLLBACK.md](./BACKUP_AND_ROLLBACK.md)
 
 **Summary:** System now clearly communicates notification status: dry-run sends return explicit Arabic/English warnings instead of "Sent successfully". Startup validates notification config and logs ERRORs for missing Msegat credentials when real sending is enabled. Settings page shows live 🟢/🔴 status for SMS, WhatsApp, Real Sending, and Msegat connection with admin test-send button. Dashboard displays daily notification counts (sent/failed/dry-run/pending). 21 verification tests pass.
 
+### 2026-07-04 — P0 Hotfix: Admin Reference Ranges Only
+
+| Field | Value |
+|-------|-------|
+| **Category** | hotfix (report correctness — reference range source) |
+| **Risk** | low — disables fallback; no data changes; no schema migration |
+| **Backup taken** | N/A |
+| **Migration** | **None** |
+| **Checklist** | `node backend/src/scripts/verify-admin-reference-only.js` |
+| **Files** | `reference-range-engine.service.js`, `env.js` |
+| **Env** | `ALLOW_DEVICE_REFERENCE_FALLBACK=false` (default, opt-in only) |
+| **Rollback** | Set `ALLOW_DEVICE_REFERENCE_FALLBACK=true` to restore device fallback; or `git revert` |
+
+**Summary:** Reports now use reference ranges exclusively from Admin → Reference Ranges (`test_reference_ranges`). Device reference ranges (`device_reference_ranges`) and `result_values.notes` (Norma OBX-7 snapshots) are no longer used for report bounds or HIGH/LOW flags. When no admin range exists, the report shows N/A with no flag. A feature flag `ALLOW_DEVICE_REFERENCE_FALLBACK` (default `false`) is available for opt-in if needed. Norma CBC value mapping is unaffected. 27 verification tests pass.
+
 ---
 
 *Phase 0 — documentation only. No operational code was modified to create this file.*
