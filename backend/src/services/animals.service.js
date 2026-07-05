@@ -2,6 +2,7 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { generateRandomAnimalCode, ANIMAL_CODE_LOCK, paginate, buildPagination } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
+const speciesService = require('./animal-species.service');
 
 const list = async ({ search, owner_id, animal_type, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -59,6 +60,7 @@ const getHistory = async (id) => {
 };
 
 const create = async (data, userId) => {
+  const speciesCode = await speciesService.assertActiveSpecies(data.animal_type);
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -67,7 +69,7 @@ const create = async (data, userId) => {
     const result = await client.query(
       `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip, owner_id, medical_history, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [uuidv4(), animalCode, data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId]
+      [uuidv4(), animalCode, speciesCode, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId]
     );
     await client.query('COMMIT');
     return result.rows[0];
@@ -81,10 +83,11 @@ const create = async (data, userId) => {
 
 const update = async (id, data) => {
   await getById(id);
+  const speciesCode = await speciesService.assertActiveSpecies(data.animal_type);
   const result = await query(
     `UPDATE animals SET animal_type=$1, name_tag=$2, age=$3, gender=$4, weight=$5, color=$6, breed=$7,
      rfid_chip=$8, owner_id=$9, medical_history=$10, updated_at=NOW() WHERE id=$11 RETURNING *`,
-    [data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, id]
+    [speciesCode, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, id]
   );
   const lifecycle = require('./report-lifecycle.service');
   await lifecycle.markReportsNeedsUpdateByAnimalId(id, 'ANIMAL');

@@ -5,8 +5,8 @@ import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { animalsAPI, customersAPI } from '../services/api';
+import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 
-import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
 const GENDERS = ['male', 'female', 'unknown'];
 
 const EMPTY_FORM = {
@@ -23,7 +23,9 @@ const EMPTY_FORM = {
 };
 
 export default function Animals() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { codes, label } = useAnimalSpecies();
+  const isAr = i18n.language === 'ar';
   const [animals, setAnimals] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +60,7 @@ export default function Animals() {
 
   const columns = [
     { key: 'animal_code', label: t('animals.animalId') },
-    { key: 'animal_type', label: t('animals.type'), render: (r) => t(`animals.types.${r.animal_type}`) },
+    { key: 'animal_type', label: t('animals.type'), render: (r) => label(r.animal_type, isAr) },
     { key: 'name_tag', label: t('animals.name') },
     { key: 'breed', label: t('animals.breed') },
     { key: 'gender', label: t('animals.gender'), render: (r) => t(`animals.genders.${r.gender}`, { defaultValue: r.gender }) },
@@ -96,7 +98,7 @@ export default function Animals() {
           <div>
             <label className="block text-sm font-medium mb-1">{t('animals.type')}</label>
             <select value={form.animal_type} onChange={(e) => setField('animal_type', e.target.value)} className="input-field">
-              {ANIMAL_TYPE_CODES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
+              {codes.map((type) => <option key={type} value={type}>{label(type, isAr)}</option>)}
             </select>
           </div>
 

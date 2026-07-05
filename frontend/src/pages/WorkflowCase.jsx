@@ -33,9 +33,9 @@ import {
   buildFieldVisitInvoiceItem,
 } from '../utils/fieldVisitService';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
+import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 import printThermalInvoice from '../utils/thermalInvoicePrint';
 
-import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
 
 const EMPTY_ANIMAL = {
   animal_type: 'camel',
@@ -82,7 +82,7 @@ export default function WorkflowCase() {
   const [creating, setCreating] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewAnimal, setShowNewAnimal] = useState(false);
-  const [testSearch, setTestSearch] = useState('');
+  const { codes: speciesCodes, label: speciesLabel } = useAnimalSpecies();
 
   useEffect(() => {
     testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
@@ -113,7 +113,7 @@ export default function WorkflowCase() {
     sample: samples[0] || null,
   };
 
-  const animalLabel = (a) => (a ? `${a.animal_code} — ${a.name_tag} (${t(`animals.types.${a.animal_type}`)})` : '');
+  const animalLabel = (a) => (a ? `${a.animal_code} — ${a.name_tag} (${speciesLabel(a.animal_type, i18n.language === 'ar')})` : '');
   const testLabel = (test) => (i18n.language === 'ar' && test.name_ar ? test.name_ar : test.name);
   const categoryGroupLabel = (group) => {
     const { category } = group;
@@ -571,7 +571,7 @@ export default function WorkflowCase() {
                   <div>
                     <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.type')}</label>
                     <select value={newAnimal.animal_type} onChange={(e) => setNewAnimal({ ...newAnimal, animal_type: e.target.value })} className="input-field">
-                      {ANIMAL_TYPE_CODES.map((type) => <option key={type} value={type}>{t(`animals.types.${type}`)}</option>)}
+                      {speciesCodes.map((type) => <option key={type} value={type}>{speciesLabel(type, i18n.language === 'ar')}</option>)}
                     </select>
                   </div>
                   <div>

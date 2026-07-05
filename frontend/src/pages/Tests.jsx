@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import { fmtCatalog } from '../utils/vat';
 
-import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
+import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 
 const emptyTestForm = () => ({
   code: '', name: '', name_ar: '', category_id: '', description: '', price: 0,
@@ -35,6 +35,8 @@ const emptyPackageForm = () => ({
 
 export default function Tests() {
   const { t, i18n } = useTranslation();
+  const { codes: speciesCodes, label: speciesLabel } = useAnimalSpecies();
+  const isAr = i18n.language === 'ar';
   const { hasPermission } = useAuth();
   const canManage = hasPermission('tests.manage');
 
@@ -1080,7 +1082,7 @@ export default function Tests() {
                             <tbody>
                               {rangesForParam(param.id).map((range) => (
                                 <tr key={range.id} className="border-b dark:border-gray-700/50">
-                                  <td className="py-1.5">{t(`animals.types.${range.animal_type}`)}</td>
+                                  <td className="py-1.5">{speciesLabel(range.animal_type, isAr)}</td>
                                   <td className="py-1.5">{range.min_value ?? '—'}</td>
                                   <td className="py-1.5">{range.max_value ?? '—'}</td>
                                   <td className="py-1.5 text-amber-600">{range.critical_low ?? '—'}</td>
@@ -1180,8 +1182,8 @@ export default function Tests() {
               required
               disabled={!!editingRangeId}
             >
-              {ANIMAL_TYPE_CODES.map((type) => (
-                <option key={type} value={type}>{t(`animals.types.${type}`)}</option>
+              {speciesCodes.map((type) => (
+                <option key={type} value={type}>{speciesLabel(type, isAr)}</option>
               ))}
             </select>
           </div>

@@ -87,6 +87,8 @@ const list = async ({ species, test_id, parameter_id, search, device_id, page, l
   };
 };
 
+const speciesService = require('./animal-species.service');
+
 const create = async (body, userId) => {
   const {
     parameter_id, animal_type, min_value, max_value, critical_low, critical_high,
@@ -97,6 +99,8 @@ const create = async (body, userId) => {
     throw new AppError('Parameter and species required', 400, 'VALIDATION');
   }
 
+  const speciesCode = await speciesService.assertActiveSpecies(animal_type);
+
   const rangeError = validateMinMax(min_value, max_value);
   if (rangeError) throw new AppError(rangeError, 400, 'INVALID_RANGE');
 
@@ -106,7 +110,7 @@ const create = async (body, userId) => {
        AND COALESCE(sex, '') = COALESCE($3, '')
        AND COALESCE(device_id::text, '') = COALESCE($4::text, '')
        AND is_active = true`,
-    [parameter_id, animal_type, sex || null, device_id || null]
+    [parameter_id, speciesCode, sex || null, device_id || null]
   );
   if (dup.rows[0]) throw new AppError('Duplicate reference range', 409, 'DUPLICATE');
 
@@ -117,7 +121,7 @@ const create = async (body, userId) => {
         unit, notes, text_reference, sex, age_min, age_max, age_unit, device_id,
         created_by, updated_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) RETURNING *`,
-    [parameter_id, animal_type, min_value, max_value,
+    [parameter_id, speciesCode, min_value, max_value,
       critical_low ?? crit.crit_low, critical_high ?? crit.crit_high,
       unit, notes, text_reference, sex || null, age_min, age_max, age_unit, device_id || null, userId]
   );

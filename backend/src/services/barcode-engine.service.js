@@ -93,10 +93,9 @@ const formatSampleDate = (value, isArabic) => {
   });
 };
 
-const animalTypeLabel = (type, isArabic) => {
-  const entry = ANIMAL_TYPES[String(type || '').toLowerCase()];
-  return entry ? (isArabic ? entry.ar : entry.en) : (type || '');
-};
+const speciesService = require('./animal-species.service');
+
+const animalTypeLabel = (type, isArabic) => speciesService.speciesLabel(type, isArabic);
 
 const resolvePanelKey = (test) => {
   const cat = String(test?.category_code || '').toUpperCase();

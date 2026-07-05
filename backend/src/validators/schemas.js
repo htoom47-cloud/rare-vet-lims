@@ -28,7 +28,7 @@ const customerSchema = Joi.object({
 const { ANIMAL_TYPE_CODES } = require('../constants/animal-types');
 
 const animalSchema = Joi.object({
-  animal_type: Joi.string().valid(...ANIMAL_TYPE_CODES).required(),
+  animal_type: Joi.string().max(50).required(),
   name_tag: Joi.string().allow('', null),
   age: Joi.string().allow('', null),
   gender: Joi.string().valid('male', 'female', 'unknown').default('unknown'),

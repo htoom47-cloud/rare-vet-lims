@@ -571,6 +571,55 @@ async function applyPatches() {
         ADD COLUMN IF NOT EXISTS field_visit_discount_amount DECIMAL(12,2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS field_visit_discount_percent DECIMAL(5,2) DEFAULT 0
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS animal_species (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        code VARCHAR(50) UNIQUE NOT NULL,
+        name_en VARCHAR(100) NOT NULL,
+        name_ar VARCHAR(100),
+        sort_order INTEGER DEFAULT 50,
+        is_system BOOLEAN DEFAULT false,
+        is_active BOOLEAN DEFAULT true,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      INSERT INTO animal_species (code, name_en, name_ar, sort_order, is_system) VALUES
+        ('camel', 'Camel', 'إبل', 1, true),
+        ('sheep', 'Sheep', 'غنم', 2, true),
+        ('horse', 'Horse', 'خيل', 3, true),
+        ('goat', 'Goat', 'ماعز', 4, true),
+        ('other', 'Other', 'أخرى', 99, true)
+      ON CONFLICT (code) DO NOTHING
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'animals'
+            AND column_name = 'animal_type' AND udt_name = 'animal_type'
+        ) THEN
+          ALTER TABLE animals ALTER COLUMN animal_type TYPE VARCHAR(50) USING animal_type::text;
+        END IF;
+      END $$
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'test_reference_ranges'
+            AND column_name = 'animal_type' AND udt_name = 'animal_type'
+        ) THEN
+          ALTER TABLE test_reference_ranges ALTER COLUMN animal_type TYPE VARCHAR(50) USING animal_type::text;
+        END IF;
+      END $$
+    `);
+    try {
+      const speciesService = require('../services/animal-species.service');
+      await speciesService.refreshLabelCache();
+    } catch (_) { /* optional on first boot */ }
   } finally {
     client.release();
   }

@@ -31,7 +31,14 @@ const start = async () => {
         else throw err;
       }
     }
-    if (connected) logger.info('Database connected');
+    if (connected) {
+      logger.info('Database connected');
+      try {
+        await require('./services/animal-species.service').refreshLabelCache();
+      } catch (err) {
+        logger.warn('Animal species cache warmup skipped', { error: err.message });
+      }
+    }
 
     app.listen(env.port, '0.0.0.0', () => {
       logger.info(`${LAB_NAME_EN} LIMS API running on port ${env.port}`);

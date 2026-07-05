@@ -68,6 +68,13 @@ export const referenceRangesAPI = {
   qualityAudit: (params) => api.get('/reference-ranges/quality-audit', { params }),
 };
 
+export const animalSpeciesAPI = {
+  list: () => api.get('/animal-species'),
+  create: (data) => api.post('/animal-species', data),
+  update: (code, data) => api.put(`/animal-species/${code}`, data),
+  deactivate: (code) => api.delete(`/animal-species/${code}`),
+};
+
 export const reportMasteringAPI = {
   listParameters: (params) => api.get('/report-mastering/parameters', { params }),
   updateParameter: (id, data) => api.put(`/report-mastering/parameters/${id}`, data),
