@@ -175,8 +175,12 @@ export default function Reports() {
   const handleApprove = async (reportId, type) => {
     setApprovingKey(`${reportId}-${type}`);
     try {
-      await reportsAPI.approve(reportId, type);
+      const { data } = await reportsAPI.approve(reportId, type);
       toast.success(t('reports.approvalDone'));
+      const alert = data.data?.customerReadyAlert;
+      if (alert?.customerName) {
+        toast(t('customers.reportReadyToSend', { name: alert.customerName }), { icon: '📤', duration: 6000 });
+      }
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('reports.approvalFailed'));
@@ -300,11 +304,6 @@ export default function Reports() {
                 </button>
               )}
             </>
-          )}
-          {canSendSmsToCustomer && (
-            <button onClick={() => sendToCustomer(r)} disabled={sendingId === r.id} className="text-green-600 text-sm">
-              {t('workflow.sendToCustomer')}
-            </button>
           )}
         </div>
       ),

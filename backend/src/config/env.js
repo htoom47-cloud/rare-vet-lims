@@ -101,6 +101,12 @@ const env = {
   features: {
     smartReportLifecycle: process.env.SMART_REPORT_LIFECYCLE_ENABLED === 'true',
     reportMastering: process.env.REPORT_MASTERING_ENABLED === 'true',
+    /** Block barcode print/register until invoice issued or credit allowed */
+    requireInvoiceBeforeBarcode: process.env.REQUIRE_INVOICE_BEFORE_BARCODE === 'true',
+    /** Samples appear in lab queue only after explicit handover */
+    requireLabHandover: process.env.REQUIRE_LAB_HANDOVER === 'true',
+    /** Lock results/tests/customer/animal edits after report approval */
+    lockApprovedReports: process.env.LOCK_APPROVED_REPORTS === 'true',
   },
   backup: {
     uploads: {

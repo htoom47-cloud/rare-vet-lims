@@ -777,9 +777,10 @@ const listDocuments = async (customerIds, { animalId, type } = {}) => {
        FROM result_attachments ra
        JOIN results res ON ra.result_id = res.id
        JOIN samples s ON res.sample_id = s.id
-       JOIN reports r ON r.sample_id = s.id
+       JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
        LEFT JOIN animals a ON s.animal_id = a.id
        WHERE ${attachWhere}
+         AND ${portalReportFilter}
        ORDER BY ra.created_at DESC`,
       attachParams
     );

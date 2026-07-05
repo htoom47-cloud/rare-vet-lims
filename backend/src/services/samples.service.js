@@ -8,7 +8,58 @@ const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
 const { resolveSampleTestIds } = require('../utils/packageTests');
 const autoInvoice = require('./auto-invoice.service');
 const workflowEngine = require('./laboratory-workflow.service');
+const env = require('../config/env');
+const { assertSampleNotReportLocked } = require('./report-lock.service');
 const { uuidv4 } = require('../utils/uuid');
+
+const sampleHasBillableInvoice = async (sampleId, customerId, animalId) => {
+  const bySample = await query(
+    `SELECT id FROM invoices
+     WHERE sample_id = $1 AND status NOT IN ('cancelled', 'refunded')
+     LIMIT 1`,
+    [sampleId]
+  );
+  if (bySample.rows[0]) return true;
+
+  const byAnimal = await query(
+    `SELECT i.id FROM invoices i
+     JOIN invoice_items ii ON ii.invoice_id = i.id
+     WHERE i.customer_id = $1 AND ii.animal_id = $2
+       AND i.status NOT IN ('cancelled', 'refunded')
+     LIMIT 1`,
+    [customerId, animalId]
+  );
+  if (byAnimal.rows[0]) return true;
+
+  const credit = await query(
+    'SELECT credit_limit FROM customers WHERE id = $1',
+    [customerId]
+  );
+  return parseFloat(credit.rows[0]?.credit_limit || 0) > 0;
+};
+
+const assertInvoiceAllowsBarcode = async (sampleRow) => {
+  if (!env.features?.requireInvoiceBeforeBarcode) return;
+  const ok = await sampleHasBillableInvoice(
+    sampleRow.id,
+    sampleRow.customer_id,
+    sampleRow.animal_id
+  );
+  if (!ok) {
+    throw new AppError(
+      'Issue invoice or grant credit before printing barcode',
+      403,
+      'INVOICE_REQUIRED'
+    );
+  }
+};
+
+const queueStatusWhere = () => {
+  if (!env.features?.requireLabHandover) {
+    return `s.status IN ('received', 'running')`;
+  }
+  return `s.lab_handover_at IS NOT NULL AND s.status IN ('pending', 'received', 'running')`;
+};
 
 const list = async ({ status, search, awaiting_validation, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -292,7 +343,7 @@ const WORKBENCH_PENDING = `
 
 const getQueue = async (technicianId) => {
   const params = [PARAS_CATEGORY_CODE];
-  let where = `WHERE s.status IN ('received', 'running')`;
+  let where = `WHERE ${queueStatusWhere()}`;
 
   if (technicianId) {
     params.push(technicianId);
@@ -346,7 +397,7 @@ const getParasitologyQueue = async () => {
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE s.status IN ('received', 'running')
+     WHERE ${queueStatusWhere()}
        AND EXISTS (
          SELECT 1 FROM sample_tests st
          JOIN tests t ON st.test_id = t.id
@@ -360,6 +411,7 @@ const getParasitologyQueue = async () => {
 
 const getBarcode = async (id, format = 'code128') => {
   const sample = await getById(id);
+  await assertInvoiceAllowsBarcode(sample);
   const barcodeImage = await generateSampleBarcode({
     sample_code: sample.sample_code,
     customer_name: sample.customer_name,
@@ -370,7 +422,17 @@ const getBarcode = async (id, format = 'code128') => {
   return { barcode: sample.barcode, sample_code: sample.sample_code, image: barcodeImage };
 };
 
-const reassignAnimal = async (sampleId, animalId) => {
+const MANAGER_ROLES = ['admin', 'manager'];
+
+const reassignAnimal = async (sampleId, animalId, userId, userRole, auditCtx = {}) => {
+  if (!MANAGER_ROLES.includes(userRole)) {
+    throw new AppError(
+      'Admin or manager required to reassign sample animal',
+      403,
+      'FORBIDDEN'
+    );
+  }
+  await assertSampleNotReportLocked(sampleId);
   const sample = await getById(sampleId);
   const animalResult = await query(
     `SELECT id, owner_id, animal_code, name_tag FROM animals
@@ -397,6 +459,27 @@ const reassignAnimal = async (sampleId, animalId) => {
     [animalId, sampleId]
   );
 
+  await query(
+    `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
+     VALUES ($1, $2, 'reassign_animal', 'samples', 'sample', $3, $4, $5, $6, $7)`,
+    [
+      uuidv4(),
+      userId,
+      sampleId,
+      JSON.stringify({
+        animal_id: previousAnimalId,
+        animal_code: sample.animal_code,
+      }),
+      JSON.stringify({
+        animal_id: animalId,
+        animal_code: animalResult.rows[0].animal_code,
+        name_tag: animalResult.rows[0].name_tag,
+      }),
+      auditCtx.ip || null,
+      auditCtx.userAgent || null,
+    ]
+  );
+
   const reportLifecycle = require('./report-lifecycle.service');
   await reportLifecycle.markReportsNeedsUpdateBySampleId(sampleId, 'ANIMAL');
   if (previousAnimalId) {
@@ -407,6 +490,30 @@ const reassignAnimal = async (sampleId, animalId) => {
   return getById(sampleId);
 };
 
+const recordLabHandover = async (sampleId, userId, auditCtx = {}) => {
+  const sample = await getById(sampleId);
+  if (sample.lab_handover_at) {
+    return sample;
+  }
+  await query(
+    `UPDATE samples SET lab_handover_at = NOW(), lab_handover_by = $1, updated_at = NOW() WHERE id = $2`,
+    [userId, sampleId]
+  );
+  await query(
+    `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, new_values, ip_address, user_agent)
+     VALUES ($1, $2, 'lab_handover', 'samples', 'sample', $3, $4, $5, $6)`,
+    [
+      uuidv4(),
+      userId,
+      sampleId,
+      JSON.stringify({ sample_code: sample.sample_code, lab_handover_at: new Date().toISOString() }),
+      auditCtx.ip || null,
+      auditCtx.userAgent || null,
+    ]
+  );
+  return getById(sampleId);
+};
+
 module.exports = {
   list,
   getById,
@@ -414,10 +521,13 @@ module.exports = {
   create,
   updateStatus,
   reassignAnimal,
+  recordLabHandover,
   reconcileSampleStatuses,
   getQueue,
   getParasitologyQueue,
   getBarcode,
+  sampleHasBillableInvoice,
+  assertInvoiceAllowsBarcode,
   getWorkflowSummary: (id) => workflowEngine.getWorkflowSummary(id),
   advanceWorkflow: (id, action, ctx) => workflowEngine.moveToNextStep(id, action, ctx),
 };

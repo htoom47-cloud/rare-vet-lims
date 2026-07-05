@@ -2,23 +2,11 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../config/database');
 const env = require('../config/env');
 const { AppError } = require('./errorHandler');
-const { normalizeMobileDigits, mobileEqualsSql } = require('../utils/helpers');
+const { resolveCustomerIdsByMobile } = require('../utils/customer-scope');
 
 const resolvePortalCustomerIds = async (customer) => {
-  if (!customer?.mobile) return [customer.id];
-  const digits = normalizeMobileDigits(customer.mobile);
-  if (digits.length < 9) return [customer.id];
-
-  const result = await query(
-    `SELECT id FROM customers
-     WHERE is_active = true AND ${mobileEqualsSql('mobile', 1)}`,
-    [digits]
-  );
-
-  const ids = result.rows.map((r) => r.id);
-  if (!ids.length) return [customer.id];
-  if (!ids.includes(customer.id)) ids.unshift(customer.id);
-  return ids;
+  if (!customer?.id) return [];
+  return resolveCustomerIdsByMobile(customer.id);
 };
 
 const authenticateCustomer = async (req, res, next) => {

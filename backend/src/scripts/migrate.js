@@ -556,6 +556,11 @@ async function applyPatches() {
       ON reports (sample_id)
       WHERE sample_id IS NOT NULL
     `);
+    await client.query(`
+      ALTER TABLE samples
+        ADD COLUMN IF NOT EXISTS lab_handover_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS lab_handover_by UUID REFERENCES users(id)
+    `);
   } finally {
     client.release();
   }

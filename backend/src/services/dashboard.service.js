@@ -1,6 +1,9 @@
 const { query } = require('../config/database');
 const { reconcileSampleStatuses } = require('./samples.service');
 const workflowEngine = require('./laboratory-workflow.service');
+const env = require('../config/env');
+const portalSync = require('./portal-sync.service');
+const reportNotify = require('./customer-report-notifications.service');
 
 /** Lab calendar day (Saudi Arabia) for dashboard “today” metrics. */
 const LAB_TZ = 'Asia/Riyadh';
@@ -8,6 +11,92 @@ const todayMatch = (column) =>
   `(${column} AT TIME ZONE '${LAB_TZ}')::date = (NOW() AT TIME ZONE '${LAB_TZ}')::date`;
 const monthMatch = (column) =>
   `(${column} AT TIME ZONE '${LAB_TZ}')::date >= ((NOW() AT TIME ZONE '${LAB_TZ}')::date - INTERVAL '30 days')`;
+
+const portalVisible = portalSync.portalVisibilitySql('r');
+
+const getOperationsStats = async () => {
+  const invoiceRequiredFilter = env.features?.requireInvoiceBeforeBarcode
+    ? `AND NOT EXISTS (
+         SELECT 1 FROM invoices i
+         WHERE i.sample_id = s.id AND i.status NOT IN ('cancelled', 'refunded')
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM invoices i
+         JOIN invoice_items ii ON ii.invoice_id = i.id
+         WHERE i.customer_id = s.customer_id AND ii.animal_id = s.animal_id
+           AND i.status NOT IN ('cancelled', 'refunded')
+       )
+       AND COALESCE((SELECT credit_limit FROM customers c WHERE c.id = s.customer_id), 0) <= 0`
+    : '';
+
+  const handoverPendingFilter = env.features?.requireLabHandover
+    ? ' AND s.lab_handover_at IS NULL'
+    : '';
+
+  const [
+    awaitingInvoice,
+    awaitingBarcodePrint,
+    inLab,
+    pendingApproval,
+    readyToSend,
+    failedMessages,
+    dataErrors,
+  ] = await Promise.all([
+    query(
+      `SELECT COUNT(*)::int AS count FROM samples s
+       WHERE s.status = 'pending' ${invoiceRequiredFilter}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS count FROM samples s
+       WHERE s.status = 'pending' ${handoverPendingFilter}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS count FROM samples s
+       WHERE s.status IN ('received', 'running')
+         ${env.features?.requireLabHandover ? 'AND s.lab_handover_at IS NOT NULL' : ''}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS count FROM reports r
+       WHERE r.pdf_url IS NOT NULL
+         AND r.lab_specialist_approved_by IS NULL
+         AND r.vet_approved_by IS NULL
+         AND r.is_final IS NOT TRUE`
+    ),
+    query(
+      `SELECT COUNT(DISTINCT c.id)::int AS count
+       FROM customers c
+       JOIN samples s ON s.customer_id = c.id
+       JOIN reports r ON r.sample_id = s.id AND ${portalVisible}
+       WHERE c.is_active = true
+         AND NOT EXISTS (
+           SELECT 1 FROM notification_queue nq
+           WHERE nq.status = 'sent'
+             AND nq.metadata->>'customer_id' = c.id::text
+             AND nq.metadata->'report_ids' ? r.id::text
+         )`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS count FROM notification_queue
+       WHERE status = 'failed'
+         AND created_at >= NOW() - INTERVAL '7 days'`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS count FROM samples s
+       JOIN animals a ON a.id = s.animal_id
+       WHERE a.owner_id IS DISTINCT FROM s.customer_id`
+    ),
+  ]);
+
+  return {
+    awaiting_invoice: awaitingInvoice.rows[0]?.count || 0,
+    awaiting_barcode_print: awaitingBarcodePrint.rows[0]?.count || 0,
+    in_lab: inLab.rows[0]?.count || 0,
+    pending_approval: pendingApproval.rows[0]?.count || 0,
+    ready_to_send: readyToSend.rows[0]?.count || 0,
+    failed_messages: failedMessages.rows[0]?.count || 0,
+    data_errors: dataErrors.rows[0]?.count || 0,
+  };
+};
 
 const getStats = async () => {
   await reconcileSampleStatuses();
@@ -119,6 +208,8 @@ const getStats = async () => {
       date: r.date,
       revenue: parseFloat(r.revenue || 0),
     })),
+    operations: await getOperationsStats(),
+    customers_ready_to_send: await reportNotify.listCustomersReadyToSend(10),
     ...(workflowEngine.isEnabled()
       ? { workflow: await workflowEngine.getWorkflowDashboardCounts() }
       : {}),

@@ -43,32 +43,39 @@ const isPortalVisible = (lifecycle, reportRow = {}, options = {}) => {
   if (!reportRow?.pdf_url) return false;
   if (lifecycle === LIFECYCLE.DRAFT || lifecycle === LIFECYCLE.RESULTS_ENTERED) return false;
 
+  const approved = Boolean(
+    reportRow.lab_specialist_approved_by || reportRow.vet_approved_by
+  );
+  const published = reportRow.is_final === true;
+
+  if (approved || published) return true;
+
   const showReviewed = options.showReviewed ?? env.portal?.showReviewed ?? false;
-  if (lifecycle === LIFECYCLE.PUBLISHED || lifecycle === LIFECYCLE.APPROVED) return true;
   if (lifecycle === LIFECYCLE.REVIEWED && showReviewed) return true;
   return false;
 };
 
-/** SQL fragment — reports visible to portal customers (approved/published + official PDF). */
+/** SQL fragment — portal-visible reports: PDF + explicit approval or is_final=true. */
 const portalVisibilitySql = (reportAlias = 'r') => {
   const r = reportAlias;
-  const ready = `(
+  const approved = `(
     ${r}.pdf_url IS NOT NULL
     AND (
       ${r}.lab_specialist_approved_by IS NOT NULL
       OR ${r}.vet_approved_by IS NOT NULL
-      OR ${r}.is_final IS NOT FALSE
+      OR ${r}.is_final = true
     )
   )`;
 
-  if (!env.portal?.showReviewed) return ready;
+  if (!env.portal?.showReviewed) return approved;
 
   return `(
-    ${ready}
+    ${approved}
     OR (
       ${r}.pdf_url IS NOT NULL
       AND ${r}.lab_specialist_approved_by IS NULL
       AND ${r}.vet_approved_by IS NULL
+      AND ${r}.is_final IS NOT TRUE
       AND EXISTS (
         SELECT 1 FROM results res
         JOIN sample_tests st ON st.id = res.sample_test_id

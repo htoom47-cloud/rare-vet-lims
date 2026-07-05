@@ -4,6 +4,7 @@ const { validate } = require('../middleware/validate');
 const { loginSchema } = require('../validators/schemas');
 const { authenticate } = require('../middleware/auth');
 const { loginRateLimit } = require('../middleware/loginRateLimit');
+const { getStaffFeatures } = require('../utils/staff-features');
 
 const router = express.Router();
 
@@ -17,7 +18,11 @@ const router = express.Router();
 router.post('/login', loginRateLimit, validate(loginSchema), async (req, res, next) => {
   try {
     const data = await authService.login(req.body.username, req.body.password);
-    res.json({ success: true, data });
+    const features = getStaffFeatures();
+    res.json({
+      success: true,
+      data: { ...data, user: { ...data.user, features }, features },
+    });
   } catch (err) { next(err); }
 });
 
@@ -50,7 +55,10 @@ router.post('/reset-password', async (req, res, next) => {
 });
 
 router.get('/me', authenticate, async (req, res) => {
-  res.json({ success: true, data: req.user });
+  res.json({
+    success: true,
+    data: { ...req.user, features: getStaffFeatures() },
+  });
 });
 
 module.exports = router;

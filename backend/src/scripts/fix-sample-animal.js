@@ -40,7 +40,16 @@ if (!sampleCode || !animalCode) {
   console.log('From:', sample.rows[0].current_animal_code, sample.rows[0].name_tag || '');
   console.log('To:', animal.rows[0].animal_code, animal.rows[0].name_tag || '');
 
-  const updated = await samplesService.reassignAnimal(sample.rows[0].id, animal.rows[0].id);
+  const admin = await query(`SELECT id FROM users u JOIN roles r ON r.id = u.role_id WHERE r.name = 'admin' LIMIT 1`);
+  const userId = admin.rows[0]?.id || null;
+
+  const updated = await samplesService.reassignAnimal(
+    sample.rows[0].id,
+    animal.rows[0].id,
+    userId,
+    'admin',
+    { ip: '127.0.0.1' }
+  );
   console.log('OK — linked to', updated.animal_code, updated.animal_name || '');
   await pool.end();
 })().catch((e) => {

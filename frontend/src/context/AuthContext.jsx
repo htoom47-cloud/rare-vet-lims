@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     }
     try {
       const { data } = await authAPI.me();
-      setUser(data.data);
+      setUser({ ...data.data, features: data.data.features });
     } catch {
       if (!silent) localStorage.clear();
     } finally {
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
     const { data } = await authAPI.login(username, password);
     localStorage.setItem('accessToken', data.data.accessToken);
     localStorage.setItem('refreshToken', data.data.refreshToken);
-    setUser(data.data.user);
+    setUser({ ...data.data.user, features: data.data.features || data.data.user?.features });
     return data.data.user;
   };
 

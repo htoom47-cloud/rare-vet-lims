@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { m } from 'framer-motion';
-import { FlaskConical, DollarSign, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers, Bell } from 'lucide-react';
+import { FlaskConical, DollarSign, Activity, TrendingUp, Receipt, BarChart3, CreditCard, Tags, Layers, Bell, FileCheck, Send, AlertTriangle, Printer } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import StatCard from '../components/ui/StatCard';
@@ -191,6 +191,26 @@ export default function Dashboard() {
           />
         </m.div>
       </m.div>
+
+      {stats?.operations && (
+        <m.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.06 }}
+        >
+          <h2 className="text-lg font-semibold mb-3">{t('dashboard.opsTitle')}</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            <StatCard title={t('dashboard.awaitingInvoice')} value={stats.operations.awaiting_invoice || 0} icon={Receipt} color="orange" />
+            <StatCard title={t('dashboard.awaitingBarcodePrint')} value={stats.operations.awaiting_barcode_print || 0} icon={Printer} color="blue" />
+            <StatCard title={t('dashboard.inLab')} value={stats.operations.in_lab || 0} icon={FlaskConical} color="primary" />
+            <StatCard title={t('dashboard.pendingApproval')} value={stats.operations.pending_approval || 0} icon={FileCheck} color="orange" />
+            <StatCard title={t('dashboard.readyToSend')} value={stats.operations.ready_to_send || 0} icon={Send} color="green" />
+            <StatCard title={t('dashboard.failedMessages')} value={stats.operations.failed_messages || 0} icon={Bell} color="orange" />
+            <StatCard title={t('dashboard.dataErrors')} value={stats.operations.data_errors || 0} icon={AlertTriangle} color="orange" />
+          </div>
+        </m.div>
+      )}
 
       {hasAnyPermission('price_list.view', 'tests.view') && (
         <m.div

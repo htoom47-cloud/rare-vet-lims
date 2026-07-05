@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus, Package, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, ChevronDown, ChevronUp, Plus, Package, MapPin, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/WorkflowStepper';
 import CustomerSearch from '../components/customers/CustomerSearch';
@@ -32,6 +32,7 @@ import {
   calcFieldVisitPrice,
 } from '../utils/fieldVisitService';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
+import printThermalInvoice from '../utils/thermalInvoicePrint';
 
 import { ANIMAL_TYPE_CODES } from '../constants/animalTypes';
 
@@ -47,6 +48,7 @@ const EMPTY_ANIMAL = {
 export default function WorkflowCase() {
   const { t, i18n } = useTranslation();
   const { user, hasPermission } = useAuth();
+  const features = user?.features || {};
   const receptionMode = isReception(user);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -363,12 +365,52 @@ export default function WorkflowCase() {
 
   const openPrintLabel = async (row) => {
     try {
+      if (features.requireInvoiceBeforeBarcode) {
+        await samplesAPI.getBarcode(row.id);
+      }
       const { data } = await samplesAPI.get(row.id);
       setPrintSample(data.data);
       setPrintOpen(true);
-    } catch {
+    } catch (err) {
+      if (err.response?.data?.error?.code === 'INVOICE_REQUIRED') {
+        toast.error(t('workflow.invoiceRequiredForBarcode'));
+        return;
+      }
       setPrintSample(row);
       setPrintOpen(true);
+    }
+  };
+
+  const printThermalReceipt = async () => {
+    if (!invoiceId) return;
+    try {
+      const { data } = await billingAPI.getInvoice(invoiceId);
+      await printThermalInvoice(
+        data.data,
+        {
+          name: 'AL NAWADER VETERINARY CARE CENTER',
+          nameAr: 'مركز رعاية النوادر البيطري',
+          phone: '0115007257',
+          vatNumber: '311042487300003',
+        },
+        { isArabic: i18n.language === 'ar' },
+      );
+    } catch (err) {
+      if (err.message === 'POPUP_BLOCKED') {
+        toast.error(t('workflow.popupBlocked'));
+      } else {
+        toast.error(t('workflow.thermalPrintFailed'));
+      }
+    }
+  };
+
+  const handoverSample = async (sampleId) => {
+    try {
+      const { data } = await samplesAPI.labHandover(sampleId);
+      setSamples((prev) => prev.map((s) => (s.id === sampleId ? { ...s, ...data.data } : s)));
+      toast.success(t('workflow.labHandoverDone'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
     }
   };
 
@@ -527,6 +569,13 @@ export default function WorkflowCase() {
                 <p className="text-sm text-primary-600">
                   {t('workflow.invoiceAnimals', { count: selectedAnimalIds.length })} — {invoiceTotal().toFixed(0)} {t('reception.sar')}
                 </p>
+                <button
+                  type="button"
+                  onClick={printThermalReceipt}
+                  className="btn-secondary w-full mt-3 py-2 flex items-center justify-center gap-2"
+                >
+                  <Printer size={16} /> {t('workflow.printThermalInvoice')}
+                </button>
               </div>
             ) : (
               <>
@@ -659,13 +708,24 @@ export default function WorkflowCase() {
                         <p className="font-medium">{s.sample_code}</p>
                         <p className="text-xs text-primary-500">{animalLabel(animal)}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => openPrintLabel(s)}
-                        className="btn-secondary text-xs py-1 px-2"
-                      >
-                        {t('samples.printLabel')}
-                      </button>
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openPrintLabel(s)}
+                          className="btn-secondary text-xs py-1 px-2"
+                        >
+                          {t('samples.printLabel')}
+                        </button>
+                        {features.requireLabHandover && !s.lab_handover_at && (
+                          <button
+                            type="button"
+                            onClick={() => handoverSample(s.id)}
+                            className="btn-primary text-xs py-1 px-2"
+                          >
+                            {t('workflow.labHandover')}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

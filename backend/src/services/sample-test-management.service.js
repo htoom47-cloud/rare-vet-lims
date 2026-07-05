@@ -3,6 +3,9 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../config/logger');
 const { uuidv4 } = require('../utils/uuid');
 
+const env = require('../config/env');
+const { assertSampleNotReportLocked } = require('./report-lock.service');
+
 const LOCKED_INVOICE_STATUSES = ['paid', 'cancelled', 'refunded'];
 
 const logAudit = async (client, { userId, action, sampleId, sampleTestId, reason, oldValues, newValues }) => {
@@ -17,18 +20,7 @@ const logAudit = async (client, { userId, action, sampleId, sampleTestId, reason
 };
 
 const assertNoBlockingReport = async (sampleId) => {
-  const rep = await query(
-    `SELECT id FROM reports
-     WHERE sample_id = $1
-       AND (is_final = true OR lab_specialist_approved_by IS NOT NULL OR vet_approved_by IS NOT NULL)`,
-    [sampleId]
-  );
-  if (rep.rows.length) {
-    throw new AppError(
-      'لا يمكن تعديل فحص بعد اعتماد التقرير. يمكن إصدار نسخة محدثة فقط.',
-      403, 'REPORT_LOCKED'
-    );
-  }
+  await assertSampleNotReportLocked(sampleId);
 };
 
 const fetchSampleTest = async (sampleId, sampleTestId) => {

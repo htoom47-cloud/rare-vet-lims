@@ -92,7 +92,24 @@ router.patch('/:id/status', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog('upd
 
 router.patch('/:id/animal', authorize(PERMISSIONS.SAMPLES_UPDATE), validate(sampleReassignAnimalSchema), auditLog('reassign_animal', 'samples'), async (req, res, next) => {
   try {
-    const data = await service.reassignAnimal(req.params.id, req.body.animal_id);
+    const data = await service.reassignAnimal(
+      req.params.id,
+      req.body.animal_id,
+      req.user.id,
+      req.user.role_name,
+      { ip: req.ip, userAgent: req.get('user-agent') }
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/lab-handover', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog('lab_handover', 'samples'), async (req, res, next) => {
+  try {
+    const data = await service.recordLabHandover(
+      req.params.id,
+      req.user.id,
+      { ip: req.ip, userAgent: req.get('user-agent') }
+    );
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

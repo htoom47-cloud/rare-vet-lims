@@ -578,9 +578,36 @@ const approve = async (reportId, userId, userRole, type) => {
   await regeneratePdf(updated);
   if (reportLifecycle.isEnabled()) {
     await reportLifecycle.recordOfficialGeneration(reportId);
-    return getById(reportId);
+    return buildApproveResponse(await getById(reportId));
   }
-  return updated;
+  return buildApproveResponse(updated);
+};
+
+const buildApproveResponse = async (report) => {
+  const customerRow = await query(
+    `SELECT c.id, c.full_name, c.full_name_ar
+     FROM samples s
+     JOIN customers c ON c.id = s.customer_id
+     WHERE s.id = $1`,
+    [report.sample_id]
+  );
+  const customer = customerRow.rows[0];
+  return {
+    ...report,
+    customerReadyAlert: customer && report.pdf_url && (
+      report.lab_specialist_approved_by || report.vet_approved_by
+    )
+      ? {
+        customerId: customer.id,
+        customerName: customer.full_name_ar || customer.full_name,
+      }
+      : null,
+  };
+};
+
+const reopen = async (reportId, userId, userRole, auditCtx = {}) => {
+  const reportLock = require('./report-lock.service');
+  return reportLock.reopenReport(reportId, userId, userRole, auditCtx);
 };
 
 const servePdf = async (filename, res) => {
@@ -752,5 +779,5 @@ const updateNotes = async (reportId, { treatment_recommendations, ai_interpretat
 };
 
 module.exports = {
-  list, getPreview, getLifecycleStatus, generate, approve, verify, servePdf, regeneratePdfById, buildReportData, updateNotes,
+  list, getPreview, getLifecycleStatus, generate, approve, reopen, verify, servePdf, regeneratePdfById, buildReportData, updateNotes,
 };

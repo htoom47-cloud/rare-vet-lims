@@ -13,6 +13,7 @@ const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
 const autoInvoice = require('./auto-invoice.service');
+const { assertSampleNotReportLocked } = require('./report-lock.service');
 
 const formatQualValue = (value, unit) => {
   if (unit !== 'qual' || !value) return value;
@@ -125,6 +126,8 @@ const enterResults = async (data, userId) => {
     );
 
     if (!stResult.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
+
+    await assertSampleNotReportLocked(stResult.rows[0].sample_id);
 
     const { animal_type, gender, age } = stResult.rows[0];
     let hasCritical = false;
