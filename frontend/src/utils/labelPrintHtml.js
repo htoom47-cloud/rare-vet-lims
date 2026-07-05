@@ -122,10 +122,13 @@ const autoPrintScript = () => `
         return;
       }
     }
-    window.focus();
-    window.print();
-    window.onafterprint = function () { window.close(); };
-  }
+  window.__limsLabelReady = true;
+  window.focus();
+  window.print();
+  window.onafterprint = function () {
+    try { window.close(); } catch (e) { /* ignore */ }
+  };
+}
   if (document.readyState === 'complete') setTimeout(finishPrint, 350);
   else window.addEventListener('load', function () { setTimeout(finishPrint, 350); });
 `;
@@ -233,15 +236,21 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   });
 };
 
-/** Open standalone print page — same pattern as thermal invoice (document.write, not blob URL). */
+/** Open standalone print page and run window.print() from inline script when autoPrint. */
 export function openPrintDocumentWindow(html) {
   if (!html) return false;
-  const win = window.open('', 'lims-label-print', 'width=420,height=380,menubar=no,toolbar=no,location=no');
+  const win = window.open('about:blank', '_blank', 'width=420,height=420,menubar=no,toolbar=no,location=no');
   if (!win) return false;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  return true;
+  try {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    return true;
+  } catch {
+    win.close();
+    return false;
+  }
 }
 
 export function openLabelPrintWindow(sample, { isArabic = false, samples = null } = {}) {
@@ -254,7 +263,7 @@ export function openLabelPrintWindow(sample, { isArabic = false, samples = null 
   return openPrintDocumentWindow(html);
 }
 
-/** Print labels already visible in the open modal — no popup, uses printing-sample-label CSS. */
+/** Print labels already visible in the open modal — must call window.print() synchronously from click handler. */
 export function printSampleLabelInPlace() {
   const area = document.querySelector('[role="dialog"] .label-print-area');
   const previews = area
@@ -276,12 +285,10 @@ export function printSampleLabelInPlace() {
   };
   window.addEventListener('afterprint', onAfterPrint);
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      window.print();
-      setTimeout(cleanup, 3000);
-    });
-  });
+  // Force layout so @media print rules apply before print (still sync — user gesture preserved).
+  void document.body.offsetHeight;
+  window.print();
+  setTimeout(cleanup, 5000);
 
   return true;
 }
@@ -299,7 +306,7 @@ const getPrintFrame = () => {
   return iframe;
 };
 
-export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
+export function printLabelsViaIframeSync(samples, { isArabic = false } = {}) {
   const list = Array.isArray(samples) ? samples.filter(Boolean) : (samples ? [samples] : []);
   if (!list.length) return false;
 
@@ -308,13 +315,37 @@ export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
   doc.open();
   doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: false }));
   doc.close();
+  void iframe.contentDocument?.body?.offsetHeight;
+  iframe.contentWindow.focus();
+  iframe.contentWindow.print();
+  return true;
+}
+
+export async function printLabelsViaIframe(samples, { isArabic = false, autoPrint = false } = {}) {
+  const list = Array.isArray(samples) ? samples.filter(Boolean) : (samples ? [samples] : []);
+  if (!list.length) return false;
+
+  if (!autoPrint) {
+    return printLabelsViaIframeSync(samples, { isArabic });
+  }
+
+  const iframe = getPrintFrame();
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: true }));
+  doc.close();
 
   await new Promise((resolve) => {
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      resolve(true);
-    }, 400);
+    const win = iframe.contentWindow;
+    const started = Date.now();
+    const tick = () => {
+      if (win.__limsLabelReady || Date.now() - started > 6000) {
+        resolve(true);
+        return;
+      }
+      setTimeout(tick, 80);
+    };
+    setTimeout(tick, 400);
   });
   return true;
 }

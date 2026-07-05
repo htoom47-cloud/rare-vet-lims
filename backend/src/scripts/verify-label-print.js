@@ -110,6 +110,8 @@ ok('printLabel tries Zebra before browser', async () => {
   const path = require('path');
   const src = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/printLabel.js'), 'utf8');
   if (src.includes('preferBrowser')) fail('preferBrowser should be removed');
+  if (!src.includes('printSampleLabelWithDialogSync')) fail('printSampleLabelWithDialogSync missing');
+  if (!src.includes('showDialog')) fail('showDialog option missing');
   if (!src.includes('printToZebra')) fail('printToZebra missing');
   return true;
 });

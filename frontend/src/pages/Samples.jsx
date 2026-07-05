@@ -898,7 +898,7 @@ export default function Samples() {
             ))}
           </div>
 
-          <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+          <button type="button" onClick={() => printSampleLabel(printSample, { showDialog: true })} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
 
         </Modal>
 
