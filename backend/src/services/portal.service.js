@@ -3,7 +3,7 @@ const { query } = require('../config/database');
 const env = require('../config/env');
 const logger = require('../config/logger');
 const { AppError } = require('../middleware/errorHandler');
-const { hashToken, normalizeMobileDigits, paginate, buildPagination } = require('../utils/helpers');
+const { hashToken, normalizeMobileDigits, paginate, buildPagination, mobileEqualsSql } = require('../utils/helpers');
 const { formatToE164 } = require('../utils/phone');
 const reportsService = require('./reports.service');
 const portalSync = require('./portal-sync.service');
@@ -52,23 +52,46 @@ const findCustomerByMobile = async (mobile) => {
   const digits = normalizeMobileDigits(mobile);
   if (digits.length < 9) return null;
 
-  const result = await query(
+  const active = await query(
     `SELECT id, full_name, full_name_ar, mobile, city, farm_company
      FROM customers
-     WHERE is_active = true
-       AND regexp_replace(mobile, '[^0-9]', '', 'g') = $1
+     WHERE is_active = true AND ${mobileEqualsSql('mobile', 1)}
      ORDER BY created_at DESC
      LIMIT 1`,
     [digits]
   );
+  if (active.rows[0]) return active.rows[0];
 
-  return result.rows[0] || null;
+  const inactive = await query(
+    `SELECT id, full_name, full_name_ar, mobile, city, farm_company
+     FROM customers
+     WHERE is_active = false AND ${mobileEqualsSql('mobile', 1)}
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [digits]
+  );
+  if (inactive.rows[0]) return { ...inactive.rows[0], inactive: true };
+
+  return null;
 };
 
 const requestOtp = async (mobile) => {
   const customer = await findCustomerByMobile(mobile);
   if (!customer) {
-    throw new AppError('No account found for this mobile number', 404, 'CUSTOMER_NOT_FOUND');
+    throw new AppError(
+      'No account found for this mobile number',
+      404,
+      'CUSTOMER_NOT_FOUND',
+      { message_ar: 'لا يوجد حساب مسجّل بهذا الجوال — تواصل مع المختبر لتسجيل رقمك' }
+    );
+  }
+  if (customer.inactive) {
+    throw new AppError(
+      'Account is inactive — contact the laboratory',
+      403,
+      'CUSTOMER_INACTIVE',
+      { message_ar: 'الحساب غير مفعّل — تواصل مع المختبر' }
+    );
   }
 
   if (env.portal.staticOtp) {
@@ -128,6 +151,19 @@ const requestOtp = async (mobile) => {
 
   if (!sent && env.nodeEnv !== 'production') {
     logger.info('Portal OTP (dev)', { mobile: customer.mobile, otp });
+  }
+
+  if (!sent && env.nodeEnv === 'production') {
+    logger.error('Portal OTP not delivered — enable SMS or configure Msegat', {
+      customerId: customer.id,
+      mobile: customer.mobile,
+    });
+    throw new AppError(
+      'Verification code could not be sent — contact the laboratory',
+      503,
+      'OTP_DELIVERY_FAILED',
+      { message_ar: 'تعذّر إرسال رمز التحقق — تواصل مع المختبر' }
+    );
   }
 
   const response = {

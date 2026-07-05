@@ -60,6 +60,16 @@ const normalizeMobileDigits = (mobile = '') => {
   return digits;
 };
 
+/** SQL: normalize stored mobile to 9-digit local (5xxxxxxxx) for reliable portal lookup */
+const sqlNormalizeMobileDigits = (column = 'mobile') => {
+  const d = `regexp_replace(${column}, '[^0-9]', '', 'g')`;
+  return `(CASE WHEN ${d} LIKE '966%' AND length(${d}) >= 12 THEN substring(${d} from 4) WHEN ${d} LIKE '0%' AND length(${d}) >= 10 THEN substring(${d} from 2) ELSE ${d} END)`;
+};
+
+const mobileEqualsSql = (column, paramIndex) => (
+  `${sqlNormalizeMobileDigits(column)} = $${paramIndex}`
+);
+
 module.exports = {
   generateCode,
   generateAnimalCode,
@@ -71,4 +81,6 @@ module.exports = {
   buildPagination,
   evaluateFlag,
   normalizeMobileDigits,
+  sqlNormalizeMobileDigits,
+  mobileEqualsSql,
 };

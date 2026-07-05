@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../config/database');
 const env = require('../config/env');
 const { AppError } = require('./errorHandler');
-const { normalizeMobileDigits } = require('../utils/helpers');
+const { normalizeMobileDigits, mobileEqualsSql } = require('../utils/helpers');
 
 const resolvePortalCustomerIds = async (customer) => {
   if (!customer?.mobile) return [customer.id];
@@ -11,8 +11,7 @@ const resolvePortalCustomerIds = async (customer) => {
 
   const result = await query(
     `SELECT id FROM customers
-     WHERE is_active = true
-       AND regexp_replace(mobile, '[^0-9]', '', 'g') = $1`,
+     WHERE is_active = true AND ${mobileEqualsSql('mobile', 1)}`,
     [digits]
   );
 

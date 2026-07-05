@@ -44,6 +44,10 @@ export default function PortalLogin() {
       const code = err.response?.data?.error?.code;
       if (status === 404 || code === 'CUSTOMER_NOT_FOUND') {
         toast.error(t('portal.mobileNotFound'));
+      } else if (code === 'CUSTOMER_INACTIVE') {
+        toast.error(t('portal.accountInactive'));
+      } else if (code === 'OTP_DELIVERY_FAILED' || status === 503) {
+        toast.error(t('portal.otpDeliveryFailed'));
       } else if (status === 429) {
         toast.error(t('portal.otpCooldown'));
       } else {
