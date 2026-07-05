@@ -12,7 +12,7 @@ import { printSampleLabel, autoPrintSampleLabels } from '../utils/printLabel';
 import { expandSampleLabelJobs, totalLabelCountForSample, totalLabelCountForSamples } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
-import { fmtCatalog, fmtNet } from '../utils/vat';
+import { fmtCatalog, fmtNet, VAT_RATE } from '../utils/vat';
 import DiscountField from '../components/billing/DiscountField';
 import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload } from '../utils/discount';
 import {
@@ -238,6 +238,8 @@ export default function WorkflowCase() {
       discountValue,
       fieldVisitDiscountType,
       fieldVisitDiscountValue,
+      VAT_RATE,
+      { catalogPrices: true },
     ),
     [workflowInvoiceItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
   );
@@ -331,6 +333,7 @@ export default function WorkflowCase() {
 
       const discountFields = buildSplitDiscountPayload(
         items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+        { catalogPrices: true },
       );
       const { data } = await billingAPI.createInvoice({
         customer_id: customerId,

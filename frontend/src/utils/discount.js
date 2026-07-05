@@ -1,4 +1,4 @@
-import { VAT_RATE } from './vat';
+import { VAT_RATE, grossToNet } from './vat';
 import { isFieldVisitItem } from './fieldVisitService';
 
 export const DISCOUNT_TYPES = {
@@ -16,11 +16,22 @@ export function resolveDiscountAmount(subtotal, type, value) {
   return 0;
 }
 
-export function splitLineSubtotals(items = []) {
+const lineNetTotal = (item, catalogPrices, taxRate = VAT_RATE) => {
+  const unit = parseFloat(item.unit_price) || 0;
+  const qty = parseInt(item.quantity, 10) || 1;
+  const netUnit = catalogPrices ? grossToNet(unit, taxRate) : unit;
+  return netUnit * qty;
+};
+
+/**
+ * Split line subtotals (excl. VAT) for services vs field visit.
+ * @param {boolean} catalogPrices — true when unit_price is VAT-inclusive (catalog / new quote lines)
+ */
+export function splitLineSubtotals(items = [], { catalogPrices = false, taxRate = VAT_RATE } = {}) {
   let serviceSubtotal = 0;
   let fieldVisitSubtotal = 0;
   for (const item of items) {
-    const line = (parseFloat(item.unit_price) || 0) * (parseInt(item.quantity, 10) || 1);
+    const line = lineNetTotal(item, catalogPrices, taxRate);
     if (isFieldVisitItem(item)) fieldVisitSubtotal += line;
     else serviceSubtotal += line;
   }
@@ -34,8 +45,10 @@ export function calcSplitTotals(
   fieldVisitDiscountType,
   fieldVisitDiscountValue,
   taxRate = VAT_RATE,
+  options = {},
 ) {
-  const { serviceSubtotal, fieldVisitSubtotal, subtotal } = splitLineSubtotals(items);
+  const { catalogPrices = false } = options;
+  const { serviceSubtotal, fieldVisitSubtotal, subtotal } = splitLineSubtotals(items, { catalogPrices, taxRate });
   const discountAmount = resolveDiscountAmount(serviceSubtotal, serviceDiscountType, serviceDiscountValue);
   const fieldVisitDiscountAmount = resolveDiscountAmount(fieldVisitSubtotal, fieldVisitDiscountType, fieldVisitDiscountValue);
   const taxable = Math.max(0, serviceSubtotal - discountAmount) + Math.max(0, fieldVisitSubtotal - fieldVisitDiscountAmount);
@@ -60,8 +73,9 @@ export function buildDiscountPayload(subtotal, type, value) {
 }
 
 /** Build API payload with separate service and field-visit discounts. */
-export function buildSplitDiscountPayload(items, serviceType, serviceValue, fvType, fvValue) {
-  const { serviceSubtotal, fieldVisitSubtotal } = splitLineSubtotals(items);
+export function buildSplitDiscountPayload(items, serviceType, serviceValue, fvType, fvValue, options = {}) {
+  const { catalogPrices = true } = options;
+  const { serviceSubtotal, fieldVisitSubtotal } = splitLineSubtotals(items, { catalogPrices });
   const discount_amount = resolveDiscountAmount(serviceSubtotal, serviceType, serviceValue);
   const discount_percent = serviceType === DISCOUNT_TYPES.PERCENT ? (parseFloat(serviceValue) || 0) : 0;
   const field_visit_discount_amount = resolveDiscountAmount(fieldVisitSubtotal, fvType, fvValue);
@@ -111,6 +125,7 @@ export function calcInvoiceTotals(
       options.fvDiscountType || DISCOUNT_TYPES.NONE,
       options.fvDiscountValue || '',
       taxRate,
+      { catalogPrices: options.catalogPrices === true },
     );
     const paid = parseFloat(alreadyPaid) || 0;
     return { ...totals, balanceDue: Math.max(0, totals.total - paid) };

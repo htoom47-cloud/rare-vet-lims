@@ -11,7 +11,7 @@ import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals } from '../utils/discount';
-import { fmtCatalog, fmtNet, fmtGross } from '../utils/vat';
+import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import { billingAPI, testsAPI } from '../services/api';
 import {
   FIELD_VISIT_CODE,
@@ -156,6 +156,7 @@ export default function Billing() {
     try {
       const discountFields = buildSplitDiscountPayload(
         invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+        { catalogPrices: true },
       );
       await billingAPI.createInvoice({ ...invoiceForm, ...discountFields });
       toast.success('تم إنشاء الفاتورة');
@@ -180,6 +181,7 @@ export default function Billing() {
         paymentDiscountValue,
         paymentFieldVisitDiscountType,
         paymentFieldVisitDiscountValue,
+        { catalogPrices: false },
       );
       await billingAPI.recordPayment({
         invoice_id: selectedInvoice.id,
@@ -225,6 +227,7 @@ export default function Billing() {
       items: inv.items || [],
       fvDiscountType: fv.type,
       fvDiscountValue: fv.value,
+      catalogPrices: false,
     });
     setPaymentForm({
       amount: String(preview.balanceDue.toFixed(2)),
@@ -248,6 +251,7 @@ export default function Billing() {
         items: selectedInvoice.items || [],
         fvDiscountType: paymentFieldVisitDiscountType,
         fvDiscountValue: paymentFieldVisitDiscountValue,
+        catalogPrices: false,
       },
     );
   }, [
@@ -301,10 +305,11 @@ export default function Billing() {
     )},
   ];
 
-  const lineSubtotals = useMemo(() => splitLineSubtotals(invoiceForm.items), [invoiceForm.items]);
+  const lineSubtotals = useMemo(() => splitLineSubtotals(invoiceForm.items, { catalogPrices: true }), [invoiceForm.items]);
   const invoiceTotals = useMemo(
     () => calcSplitTotals(
       invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+      VAT_RATE, { catalogPrices: true },
     ),
     [invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
   );

@@ -10,7 +10,7 @@ import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals } from '../utils/discount';
-import { fmtCatalog, fmtNet, fmtGross } from '../utils/vat';
+import { fmtCatalog, fmtNet, fmtGross, catalogLinesGrossTotal, VAT_RATE } from '../utils/vat';
 import toast from 'react-hot-toast';
 import {
   FIELD_VISIT_CODE,
@@ -30,7 +30,7 @@ const defaultValidUntil = () => {
 };
 
 const calcTotals = (items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue) => (
-  calcSplitTotals(items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue)
+  calcSplitTotals(items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue, VAT_RATE, { catalogPrices: true })
 );
 
 const newLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -134,7 +134,7 @@ export default function PriceList() {
     });
   }, [filtered, categories, i18n.language]);
 
-  const lineSubtotals = useMemo(() => splitLineSubtotals(lineItems), [lineItems]);
+  const lineSubtotals = useMemo(() => splitLineSubtotals(lineItems, { catalogPrices: true }), [lineItems]);
   const totals = useMemo(
     () => calcTotals(lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue),
     [lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
@@ -248,6 +248,7 @@ export default function PriceList() {
     try {
       const discountFields = buildSplitDiscountPayload(
         lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+        { catalogPrices: true },
       );
       const payload = {
         customer_id: customerId || null,
@@ -543,6 +544,12 @@ export default function PriceList() {
             </div>
 
             <div className="bg-primary-50 rounded-lg p-4 space-y-1 text-sm max-w-xs ms-auto">
+              {catalogLinesGrossTotal(lineItems) > 0 && (
+                <div className="flex justify-between text-primary-700">
+                  <span>{t('priceList.catalogTotalIncl')}</span>
+                  <span>{fmtGross(catalogLinesGrossTotal(lineItems))}</span>
+                </div>
+              )}
               <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(totals.subtotal)}</span></div>
               {totals.discountAmount > 0 && (
                 <div className="flex justify-between text-red-600"><span>{t('priceList.servicesDiscount')}</span><span>- {fmtNet(totals.discountAmount)}</span></div>
@@ -640,6 +647,7 @@ export default function PriceList() {
                     <p className="font-semibold">{pkg.name}</p>
                     {pkg.description && <p className="text-xs text-gray-500 mt-1">{pkg.description}</p>}
                     <p className="text-xl font-bold text-primary-600 mt-2">{fmt(pkg.price)}</p>
+                    <p className="text-xs text-gray-500">{t('priceList.priceIncl')}</p>
                     {parseFloat(pkg.discount_percent) > 0 && (
                       <p className="text-xs text-red-600 mt-1">
                         {t('billing.discountPercent')}: {pkg.discount_percent}%

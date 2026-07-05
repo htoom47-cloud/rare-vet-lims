@@ -202,6 +202,7 @@ export default function AccountingReports() {
       items: inv.items || [],
       fvDiscountType: fv.type,
       fvDiscountValue: fv.value,
+      catalogPrices: false,
     });
     setPaymentForm({
       amount: String(preview.balanceDue.toFixed(2)),
@@ -225,6 +226,7 @@ export default function AccountingReports() {
         items: selectedInvoice.items || [],
         fvDiscountType: paymentFieldVisitDiscountType,
         fvDiscountValue: paymentFieldVisitDiscountValue,
+        catalogPrices: false,
       },
     );
   }, [
@@ -249,6 +251,7 @@ export default function AccountingReports() {
         paymentDiscountValue,
         paymentFieldVisitDiscountType,
         paymentFieldVisitDiscountValue,
+        { catalogPrices: false },
       );
       await billingAPI.recordPayment({
         invoice_id: selectedInvoice.id,
