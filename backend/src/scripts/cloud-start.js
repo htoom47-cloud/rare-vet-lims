@@ -61,6 +61,7 @@ const bootScripts = [
   'src/scripts/sync-lab-contact.js',
   'src/scripts/sync-cbc-params.js',
   'src/scripts/ensure-cbc-reference-ranges.js',
+  'src/scripts/reconcile-cbc-reference-codes.js',
   'src/scripts/ensure-result-attachments.js',
   'src/scripts/ensure-parasitology.js',
 ];

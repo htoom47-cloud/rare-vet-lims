@@ -3,6 +3,12 @@ const { AppError } = require('../middleware/errorHandler');
 const { defaultCritical } = require('../utils/reference-range');
 const { paginate, buildPagination } = require('../utils/helpers');
 const { validateMinMax } = require('./parameter-display.utils');
+const { DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
+const {
+  cbcReferenceDisplayCode,
+  CBC_ABS_DIFF_CODES,
+  isPercentLikeRange,
+} = require('../utils/cbc-reference-params');
 
 const logChange = async (rangeId, userId, action, oldValue, newValue) => {
   await query(
@@ -64,7 +70,21 @@ const list = async ({ species, test_id, parameter_id, search, device_id, page, l
     countParams
   );
 
-  return { rows: result.rows, pagination: buildPagination(count.rows[0]?.total || 0, p, l) };
+  return {
+    rows: result.rows.map((row) => {
+      const isCbc = row.test_code === DEFAULT_CBC_TEST_CODE;
+      const display = isCbc ? cbcReferenceDisplayCode(row.parameter_code) : row.parameter_code;
+      const misplaced = isCbc
+        && CBC_ABS_DIFF_CODES.has(row.parameter_code)
+        && isPercentLikeRange(row.min_value, row.max_value, row.unit);
+      return {
+        ...row,
+        parameter_display: display,
+        parameter_misplaced: misplaced,
+      };
+    }),
+    pagination: buildPagination(count.rows[0]?.total || 0, p, l),
+  };
 };
 
 const create = async (body, userId) => {

@@ -5,11 +5,10 @@ const {
   compareByNormaOrder,
   getNormaPanelRow,
   DEFAULT_CBC_TEST_CODE,
-  mapCbcRowsForDisplay,
-  NORMA_CBC_PCT_BY_ABS,
 } = require('../utils/norma-cbc-map');
 const resultEngine = require('./result-engine.service');
 const { getLimsReferenceRange, LIMS_REF_SELECT_SQL, limsRefLateralJoin } = require('./reference-ranges.service');
+const { mapRawRowsToCbcDisplay, enrichCbcPctReferences } = require('./cbc-result-display.service');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
@@ -33,63 +32,11 @@ const getAttachments = async (resultId) => {
   return result.rows;
 };
 
-const formatCbcResultValues = (rawValues) => mapCbcRowsForDisplay(rawValues);
-
-const CBC_PCT_CODES = new Set(Object.values(NORMA_CBC_PCT_BY_ABS));
+const formatCbcResultValues = (rawValues) => mapRawRowsToCbcDisplay(rawValues);
 
 const resolveResultReference = (row) => {
   const evaluated = resultEngine.evaluateResult(row);
   return evaluated.reference || null;
-};
-
-const reevaluateRowWithRange = (row, range) => {
-  const evaluated = resultEngine.evaluateResult(
-    { value: row.value, unit: row.unit, parameter_code: row.parameter_code },
-    {
-      referenceRange: {
-        source: 'lims',
-        min_value: range.min_value,
-        max_value: range.max_value,
-        critical_low: range.critical_low,
-        critical_high: range.critical_high,
-        text_reference: range.text_reference,
-        notes: range.notes,
-      },
-    }
-  );
-  const storeFlag = evaluated.flag === resultEngine.RESULT_FLAGS.CRITICAL
-    ? (evaluated.detailFlag || resultEngine.RESULT_FLAGS.CRIT_HIGH)
-    : (evaluated.detailFlag || evaluated.flag || '');
-  return {
-    ...row,
-    reference: evaluated.reference || row.reference,
-    flag: storeFlag || row.flag,
-    is_critical: evaluated.isCritical ?? row.is_critical,
-  };
-};
-
-/** Attach LYM_PCT / MON_PCT / … references when CBC screen shows % rows. */
-const enrichCbcPctReferences = async (rows, { animal_type, gender, age }) => {
-  const needsRef = rows.filter((r) => CBC_PCT_CODES.has(r.parameter_code) && !r.reference);
-  if (!needsRef.length || !animal_type) return rows;
-
-  const codes = [...new Set(needsRef.map((r) => r.parameter_code))];
-  const paramResult = await query(
-    `SELECT tp.id, tp.code FROM test_parameters tp
-     JOIN tests t ON tp.test_id = t.id
-     WHERE t.code = $1 AND tp.code = ANY($2)`,
-    [DEFAULT_CBC_TEST_CODE, codes]
-  );
-  const paramIdByCode = Object.fromEntries(paramResult.rows.map((p) => [p.code, p.id]));
-
-  return Promise.all(rows.map(async (row) => {
-    if (!CBC_PCT_CODES.has(row.parameter_code) || row.reference) return row;
-    const parameterId = paramIdByCode[row.parameter_code] || row.parameter_id;
-    if (!parameterId) return row;
-    const range = await getLimsReferenceRange(parameterId, animal_type, { sex: gender, age });
-    if (!range) return row;
-    return reevaluateRowWithRange({ ...row, parameter_id: parameterId }, range);
-  }));
 };
 
 const getBySampleTest = async (sampleTestId) => {

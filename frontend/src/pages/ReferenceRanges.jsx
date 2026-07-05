@@ -7,6 +7,21 @@ import Modal from '../components/ui/Modal';
 import { referenceRangesAPI, testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ANIMAL_TYPE_CODES, animalTypeLabel } from '../constants/animalTypes';
+import { NORMA_CBC_PCT_BY_ABS } from '../constants/normaCbcPanel';
+
+const PCT_LABEL = Object.fromEntries(
+  Object.entries(NORMA_CBC_PCT_BY_ABS).map(([abs, pct]) => [pct, `${abs}%`])
+);
+
+const cbcRefParameterId = (p) => p.pct_parameter_id || p.id;
+
+const cbcRefParameterLabel = (p, isAr) => {
+  if (p.pct_code) {
+    const sym = PCT_LABEL[p.pct_code] || p.pct_code.replace('_PCT', '%');
+    return `${sym} — ${isAr ? (p.name_ar || p.norma_symbol) : (p.norma_symbol || p.name)}`;
+  }
+  return `${p.norma_symbol || p.code} — ${isAr ? (p.name_ar || p.name) : p.name}`;
+};
 
 const emptyForm = () => ({
   parameter_id: '', animal_type: 'camel', min_value: '', max_value: '',
@@ -111,9 +126,30 @@ export default function ReferenceRanges() {
     }
   };
 
+  const selectedTest = tests.find((tst) => tst.id === filters.test_id);
+  const isCbcTest = selectedTest?.code === 'CBC-FULL';
+
+  const parameterOptions = isCbcTest
+    ? parameters.map((p) => ({ id: cbcRefParameterId(p), label: cbcRefParameterLabel(p, isAr), code: p.pct_code || p.code }))
+    : parameters.map((p) => ({ id: p.id, label: `${p.code} — ${isAr ? (p.name_ar || p.name) : p.name}`, code: p.code }));
+
   const columns = [
     { key: 'test_code', label: isAr ? 'الفحص' : 'Test' },
-    { key: 'parameter_code', label: isAr ? 'المعامل' : 'Parameter' },
+    {
+      key: 'parameter_code',
+      label: isAr ? 'المعامل' : 'Parameter',
+      render: (r) => {
+        const label = r.parameter_display || r.parameter_code;
+        if (r.parameter_misplaced) {
+          return (
+            <span className="text-amber-700" title={isAr ? 'النطاق على معامل العدد — يُعرض كـ % في النتائج' : 'Range on count param — results show as %'}>
+              {label} ⚠
+            </span>
+          );
+        }
+        return label;
+      },
+    },
     { key: 'animal_type', label: isAr ? 'النوع' : 'Species', render: (r) => animalTypeLabel(r.animal_type, isAr) },
     { key: 'min_value', label: isAr ? 'Min' : 'Min' },
     { key: 'max_value', label: isAr ? 'Max' : 'Max' },
@@ -178,8 +214,15 @@ export default function ReferenceRanges() {
               </select>
               <select className="input-field" value={form.parameter_id} onChange={(e) => setForm({ ...form, parameter_id: e.target.value })} required>
                 <option value="">{isAr ? 'المعامل' : 'Parameter'}</option>
-                {parameters.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+                {parameterOptions.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
+              {isCbcTest && (
+                <p className="text-xs text-primary-500">
+                  {isAr
+                    ? 'تفاضل كريات الدم البيضاء: اختر LYM% / NEU% … وليس LYM / NEU (#)'
+                    : 'WBC differential: use LYM% / NEU% … not absolute LYM / NEU (#)'}
+                </p>
+              )}
             </>
           )}
           <select className="input-field" value={form.animal_type} onChange={(e) => setForm({ ...form, animal_type: e.target.value })} required disabled={!!editingId}>
