@@ -59,9 +59,9 @@ const LAYOUT = {
   barcodeY: 24,
   barcodeHeight: 40,
   digitsY: 68,
-  sampleY: 86,
-  testY: 106,
-  animalY: 126,
+  sampleY: 102,
+  testY: 138,
+  animalY: 174,
 };
 
 const zplEscape = (value) => String(value ?? '')

@@ -44,17 +44,17 @@ const LABEL_PRINT_STYLES = `
     max-width: 100%; max-height: 11mm; height: auto; display: block;
   }
   .label-50x25-digits {
-    margin: 0.15mm 0 0; padding: 0;
+    margin: 0.15mm 0 2mm; padding: 0;
     font-size: 11pt; font-weight: 800; line-height: 1.05;
     text-align: center; letter-spacing: 0.08em;
     font-family: Consolas, 'Courier New', monospace;
   }
   .label-50x25-details {
-    width: 100%; margin-top: 0.2mm; flex: 1;
-    display: flex; flex-direction: column; justify-content: center; gap: 0.1mm; min-height: 0;
+    width: 100%; margin-top: 0; flex: 1;
+    display: flex; flex-direction: column; justify-content: center; gap: 2mm; min-height: 0;
   }
   .label-50x25-line {
-    margin: 0.1mm 0 0; padding: 0;
+    margin: 0; padding: 0;
     font-size: 9pt; line-height: 1.12;
     text-align: center; max-width: 100%;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

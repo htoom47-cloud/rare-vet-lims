@@ -143,14 +143,14 @@ const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
 const TOP_MARGIN_DOTS = 24; // 3 mm @ 203 dpi (1 mm base + 2 mm lower)
 
-/** Vertical layout v11 — 50×25 mm, centered ASCII text only. */
+/** Vertical layout v12 — +2 mm spacing between text lines (16 dots @ 203 dpi). */
 const LAYOUT = {
   barcodeY: TOP_MARGIN_DOTS,
   barcodeHeight: 40,
   digitsY: 68,
-  sampleY: 86,
-  testY: 106,
-  animalY: 126,
+  sampleY: 102,
+  testY: 138,
+  animalY: 174,
 };
 
 const zplEscape = (value) => String(value ?? '')
