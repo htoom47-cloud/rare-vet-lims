@@ -889,7 +889,7 @@ export default function Samples() {
               {t('samples.labelCopiesHint', { count: totalLabelCountForSample(printSample) })}
             </p>
           )}
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="label-print-area space-y-3 max-h-96 overflow-y-auto">
             {expandSampleLabelJobs(printSample).map((job, idx) => (
               <BarcodeLabel
                 key={job.panelKey || idx}
@@ -898,7 +898,7 @@ export default function Samples() {
             ))}
           </div>
 
-          <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+          <button type="button" onClick={() => printSampleLabel(printSample, { preferBrowser: true })} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
 
         </Modal>
 

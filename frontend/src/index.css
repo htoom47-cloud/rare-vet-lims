@@ -260,52 +260,77 @@
 }
 
 @media print {
-  /* ── Barcode label printing (50×25 mm) ── */
-  body:not(.printing-lab-report) {
+  /* ── Barcode label printing (50×25 mm) — modal / in-app ── */
+  body.printing-sample-label {
     @page {
       size: 50mm 25mm;
       margin: 0;
     }
   }
 
-  body:not(.printing-lab-report) * {
+  body.printing-sample-label * {
     visibility: hidden !important;
   }
 
-  body:not(.printing-lab-report) .label-preview,
-  body:not(.printing-lab-report) .label-preview * {
+  body.printing-sample-label .label-print-area,
+  body.printing-sample-label .label-print-area *,
+  body.printing-sample-label .label-preview,
+  body.printing-sample-label .label-preview * {
     visibility: visible !important;
   }
 
-  body:not(.printing-lab-report) .label-preview {
-    position: absolute;
-    left: 0;
-    top: 0;
+  body.printing-sample-label .label-print-area {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 50mm !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
-  body:not(.printing-lab-report) .no-print,
-  body:not(.printing-lab-report) .no-print-root,
-  body:not(.printing-lab-report) .no-print-root *:not(.label-preview):not(.label-preview *) {
+  body.printing-sample-label [role="dialog"] {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  body.printing-sample-label .no-print,
+  body.printing-sample-label .no-print * {
     display: none !important;
     visibility: hidden !important;
   }
 
-  body:not(.printing-lab-report) html,
-  body:not(.printing-lab-report) body {
+  body.printing-sample-label html,
+  body.printing-sample-label body {
     margin: 0 !important;
     padding: 0 !important;
-    width: 50mm;
-    height: 25mm;
+    width: 50mm !important;
+    height: auto !important;
+    background: #fff !important;
   }
 
-  body:not(.printing-lab-report) .print-only,
-  body:not(.printing-lab-report) .label-preview {
-    display: block !important;
-  }
-
-  body:not(.printing-lab-report) .label-50x25 {
+  body.printing-sample-label .label-50x25 {
     page-break-after: always;
     page-break-inside: avoid;
+    break-after: page;
+  }
+
+  body.printing-sample-label .label-50x25:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
 
   /* ── Laboratory report printing (A4) ── */

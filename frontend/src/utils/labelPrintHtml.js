@@ -1,3 +1,4 @@
+import JsBarcode from 'jsbarcode';
 import { buildThermalLabelContent, barcodeEncodeDigits } from './labelPanel';
 
 const escapeHtml = (value) => String(value ?? '')
@@ -12,7 +13,7 @@ const LABEL_PRINT_STYLES = `
     margin: 0; padding: 0;
     width: 50mm; min-height: 25mm;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    background: #fff;
+    background: #fff; color: #000;
   }
   .label-50x25 {
     width: 50mm; height: 25mm; max-height: 25mm; box-sizing: border-box;
@@ -56,19 +57,37 @@ const LABEL_PRINT_STYLES = `
   .label-50x25-error { font-size: 7pt; color: #c00; text-align: center; }
 `;
 
-const PRINT_WINDOW_NAME = 'lims-label-print';
-
 export const labelMetaFromSample = (sample, isArabic = false) => (
   buildThermalLabelContent(sample, { isArabic })
 );
 
+/** Render Code128 SVG synchronously — no CDN / no async race. */
+export const renderBarcodeSvgHtml = (encodeValue) => {
+  const code = String(encodeValue || '').trim();
+  if (!code) return '';
+  try {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    JsBarcode(svg, code, {
+      format: 'CODE128',
+      width: 1.05,
+      height: 20,
+      displayValue: false,
+      margin: 0,
+      background: '#ffffff',
+      lineColor: '#000000',
+    });
+    return svg.outerHTML;
+  } catch {
+    return '';
+  }
+};
+
 const labelBodyInner = (content) => {
   const encodeValue = content.barcodeEncode || barcodeEncodeDigits(content.barcode);
+  const svgHtml = encodeValue ? renderBarcodeSvgHtml(encodeValue) : '';
   return `
     <div class="label-50x25-barcode-wrap">
-      ${encodeValue
-    ? `<svg class="sample-barcode" data-code="${escapeHtml(encodeValue)}"></svg>`
-    : '<p class="label-50x25-error">No barcode</p>'}
+      ${svgHtml || (encodeValue ? '<p class="label-50x25-error">Barcode error</p>' : '<p class="label-50x25-error">No barcode</p>')}
       ${content.barcodeDigits
     ? `<p class="label-50x25-digits">${escapeHtml(content.barcodeDigits)}</p>`
     : ''}
@@ -82,75 +101,22 @@ const labelBodyInnerWithImage = (content, barcodeImg) => `
       ${barcodeImg
     ? `<img class="label-50x25-barcode-img" src="${barcodeImg}" alt="" />`
     : '<p class="label-50x25-error">No barcode</p>'}
-      ${content.barcodeDigits && !barcodeImg
-    ? `<p class="label-50x25-digits">${escapeHtml(content.barcodeDigits)}</p>`
-    : ''}
     </div>
     ${content.animalLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalLine)}">${escapeHtml(content.animalLine)}</p>` : ''}
     ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}`;
 
-const staticAutoPrintScript = (autoPrint) => {
-  if (!autoPrint) {
-    return 'window.__limsLabelReady = true;';
+const autoPrintScript = () => `
+  window.__limsLabelReady = true;
+  function finishPrint() {
+    window.focus();
+    window.print();
+    window.onafterprint = function () { window.close(); };
   }
-  return `
-    window.__limsLabelReady = true;
-    function finishPrint() {
-      window.focus();
-      window.print();
-      window.onafterprint = function () { window.close(); };
-    }
-    if (document.readyState === 'complete') setTimeout(finishPrint, 180);
-    else window.addEventListener('load', function () { setTimeout(finishPrint, 180); });
-  `;
-};
+  if (document.readyState === 'complete') setTimeout(finishPrint, 200);
+  else window.addEventListener('load', function () { setTimeout(finishPrint, 200); });
+`;
 
-const renderBarcodeScript = (autoPrint) => {
-  const afterRender = autoPrint ? `
-      window.__limsLabelReady = true;
-      setTimeout(function () {
-        window.focus();
-        window.print();
-        window.onafterprint = function () { window.close(); };
-      }, 120);` : `
-      window.__limsLabelReady = true;`;
-
-  return `
-    function renderSampleBarcodes() {
-      if (typeof JsBarcode === 'undefined') return false;
-      document.querySelectorAll('svg.sample-barcode').forEach(function (el, idx) {
-        var code = el.getAttribute('data-code');
-        if (!code) return;
-        el.id = 'sample-barcode-' + idx;
-        JsBarcode('#sample-barcode-' + idx, code, {
-          format: 'CODE128', width: 1.05, height: 20, displayValue: false,
-          margin: 0, background: '#ffffff', lineColor: '#000000'
-        });
-      });
-      ${afterRender}
-      return true;
-    }
-    function bootLabelPrint() {
-      if (renderSampleBarcodes()) return;
-      var attempts = 0;
-      var timer = setInterval(function () {
-        attempts += 1;
-        if (renderSampleBarcodes()) {
-          clearInterval(timer);
-          return;
-        }
-        if (attempts > 60) {
-          clearInterval(timer);
-          window.__limsLabelReady = true;
-        }
-      }, 50);
-    }
-    if (document.readyState === 'complete') bootLabelPrint();
-    else window.addEventListener('load', bootLabelPrint);
-  `;
-};
-
-const wrapPrintDocument = ({ title, body, script = '', extraStyles = '' }) => `<!DOCTYPE html>
+const wrapPrintDocument = ({ title, body, autoPrint = false, extraStyles = '' }) => `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
@@ -159,29 +125,18 @@ const wrapPrintDocument = ({ title, body, script = '', extraStyles = '' }) => `<
 </head>
 <body>
   ${body}
-  ${script ? `<script>${script}<\/script>` : ''}
+  ${autoPrint ? `<script>${autoPrintScript()}<\/script>` : ''}
 </body>
 </html>`;
 
-/** Standalone 50×25 mm print page — never includes modal UI. */
+/** Standalone 50×25 mm print page — barcode SVG baked in (no CDN). */
 export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = false } = {}) => {
   const content = labelMetaFromSample(sample, isArabic);
-
-  return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8">
-  <title>Label</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-  <style>${LABEL_PRINT_STYLES}</style>
-</head>
-<body>
-  <div class="label-50x25">
-    ${labelBodyInner(content)}
-  </div>
-  <script>${renderBarcodeScript(autoPrint)}<\/script>
-</body>
-</html>`;
+  return wrapPrintDocument({
+    title: 'Label',
+    body: `<div class="label-50x25">${labelBodyInner(content)}</div>`,
+    autoPrint,
+  });
 };
 
 const labelBodyHtml = (sample, isArabic) => {
@@ -212,22 +167,10 @@ export const buildMultiLabelPrintDocumentWithImage = (samples, barcodeImg, { isA
   return wrapPrintDocument({
     title: 'Labels',
     body: pages,
-    script: staticAutoPrintScript(autoPrint),
+    autoPrint,
     extraStyles,
   });
 };
-
-/** Copy already-rendered preview nodes (react-barcode SVG) into a print window. */
-export const buildPreviewPrintDocument = (previewHtml, { autoPrint = true } = {}) => wrapPrintDocument({
-  title: 'Label',
-  body: previewHtml,
-  script: staticAutoPrintScript(autoPrint),
-  extraStyles: `
-    html, body { width: 50mm; }
-    .label-page, .label-preview { page-break-after: always; break-after: page; }
-    .label-page:last-child, .label-preview:last-child { page-break-after: auto; break-after: auto; }
-  `,
-});
 
 /** One print job — one label per test tube (package expands to multiple pages). */
 export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPrint = false } = {}) => {
@@ -235,45 +178,49 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   if (!list.length) return buildLabelPrintDocument(null, { isArabic, autoPrint });
 
   const pages = list.map((sample) => labelBodyHtml(sample, isArabic)).join('\n');
-
-  return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8">
-  <title>Labels</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-  <style>
-    ${LABEL_PRINT_STYLES}
+  const extraStyles = `
     html, body { width: 50mm; }
     .label-page {
-      width: 50mm;
-      height: 25mm;
-      max-height: 25mm;
-      page-break-after: always;
-      break-after: page;
+      width: 50mm; height: 25mm; max-height: 25mm;
+      page-break-after: always; break-after: page;
     }
-    .label-page:last-child {
-      page-break-after: auto;
-      break-after: auto;
-    }
-  </style>
-</head>
-<body>
-  ${pages}
-  <script>${renderBarcodeScript(autoPrint)}<\/script>
-</body>
-</html>`;
+    .label-page:last-child { page-break-after: auto; break-after: auto; }
+  `;
+
+  return wrapPrintDocument({
+    title: 'Labels',
+    body: pages,
+    autoPrint,
+    extraStyles,
+  });
 };
 
-/** Open a dedicated print window (must not use noopener — document.write needs window ref). */
-export function openPrintDocumentWindow(html) {
-  if (!html) return false;
-  const win = window.open('', PRINT_WINDOW_NAME, 'width=360,height=320,menubar=no,toolbar=no,location=no');
-  if (!win) return false;
+let printBlobUrl = null;
 
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+const revokePrintBlobUrl = () => {
+  if (printBlobUrl) {
+    URL.revokeObjectURL(printBlobUrl);
+    printBlobUrl = null;
+  }
+};
+
+/** Open print HTML via blob URL — reliable across browsers (avoids blank named-window reuse). */
+export function openPrintDocumentWindow(html, { autoPrint = true } = {}) {
+  if (!html) return false;
+  revokePrintBlobUrl();
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  printBlobUrl = URL.createObjectURL(blob);
+  const win = window.open(printBlobUrl, '_blank', 'width=360,height=320,menubar=no,toolbar=no,location=no');
+  if (!win) {
+    revokePrintBlobUrl();
+    return false;
+  }
+
+  win.addEventListener('load', () => {
+    setTimeout(revokePrintBlobUrl, 60000);
+  }, { once: true });
+
   return true;
 }
 
@@ -287,24 +234,36 @@ export function openLabelPrintWindow(sample, { isArabic = false, samples = null 
   return openPrintDocumentWindow(html);
 }
 
-export function openLabelPrintWindowWithImages(samples, barcodeImg, { isArabic = false, autoPrint = true } = {}) {
-  const list = (samples || []).filter(Boolean);
-  if (!list.length || !barcodeImg) return false;
-  const html = buildMultiLabelPrintDocumentWithImage(list, barcodeImg, { isArabic, autoPrint });
-  return openPrintDocumentWindow(html);
-}
-
-/** Print on-screen previews from the open modal (barcode already rendered). */
-export function printLabelsFromPreviewWindow() {
-  const modalPreviews = document.querySelectorAll('[role="dialog"] .label-preview');
-  const previews = modalPreviews.length
-    ? modalPreviews
-    : document.querySelectorAll('.label-preview.label-50x25, .label-preview');
+/** Print labels already visible in the open modal — no popup, uses printing-sample-label CSS. */
+export function printSampleLabelInPlace() {
+  const area = document.querySelector('[role="dialog"] .label-print-area');
+  const previews = area
+    ? area.querySelectorAll('.label-preview')
+    : document.querySelectorAll('[role="dialog"] .label-preview, .label-print-area .label-preview');
   if (!previews.length) return false;
 
-  const bodies = [...previews].map((el) => el.outerHTML).join('\n');
-  const html = buildPreviewPrintDocument(bodies, { autoPrint: true });
-  return openPrintDocumentWindow(html);
+  const cleanup = () => {
+    document.documentElement.classList.remove('printing-sample-label');
+    document.body.classList.remove('printing-sample-label');
+  };
+
+  document.documentElement.classList.add('printing-sample-label');
+  document.body.classList.add('printing-sample-label');
+
+  const onAfterPrint = () => {
+    cleanup();
+    window.removeEventListener('afterprint', onAfterPrint);
+  };
+  window.addEventListener('afterprint', onAfterPrint);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.print();
+      setTimeout(cleanup, 3000);
+    });
+  });
+
+  return true;
 }
 
 const getPrintFrame = () => {
@@ -320,25 +279,6 @@ const getPrintFrame = () => {
   return iframe;
 };
 
-const waitForFrameReady = (iframe, { minWaitMs = 350, maxWaitMs = 12000 } = {}) => new Promise((resolve) => {
-  const win = iframe.contentWindow;
-  const started = Date.now();
-
-  const tick = () => {
-    const elapsed = Date.now() - started;
-    const ready = win.__limsLabelReady;
-    if ((ready && elapsed >= minWaitMs) || elapsed >= maxWaitMs) {
-      win.focus();
-      win.print();
-      resolve(true);
-      return;
-    }
-    setTimeout(tick, 60);
-  };
-
-  setTimeout(tick, minWaitMs);
-});
-
 export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
   const list = Array.isArray(samples) ? samples.filter(Boolean) : (samples ? [samples] : []);
   if (!list.length) return false;
@@ -348,7 +288,14 @@ export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
   doc.open();
   doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: false }));
   doc.close();
-  await waitForFrameReady(iframe);
+
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      resolve(true);
+    }, 400);
+  });
   return true;
 }
 
@@ -356,7 +303,6 @@ export async function printLabelViaIframe(sample, { isArabic = false } = {}) {
   return printLabelsViaIframe([sample], { isArabic });
 }
 
-/** @deprecated Prefer printLabelsFromPreviewWindow — hidden iframe often yields blank print preview. */
 export async function printLabelFromPreview() {
-  return printLabelsFromPreviewWindow();
+  return printSampleLabelInPlace();
 }
