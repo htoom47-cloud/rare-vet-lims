@@ -7,42 +7,49 @@ import {
   buildMultiLabelPrintDocument,
   buildMultiLabelPrintDocumentWithImage,
   openPrintDocumentWindow,
-  printLabelsViaIframe,
-  printSampleLabelInPlace,
 } from './labelPrintHtml';
 import { expandSampleLabelJobs, expandSamplesForLabelPrint } from './labelCopies';
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
+/** Browser 50×25 mm — always opens a standalone print window (never window.print on main app). */
 const printSampleLabelBrowser = async (sample, { isArabic }) => {
   const jobs = expandSampleLabelJobs(sample);
   if (!jobs.length) return false;
 
-  // 1) Print modal preview in-place (barcode SVG already on screen — no popup).
-  if (printSampleLabelInPlace()) return true;
-
-  // 2) Server PNG + sync SVG popup fallback.
+  let fresh = sample;
   if (sample.id) {
     try {
-      const { data } = await samplesAPI.getBarcode(sample.id);
+      const { data } = await samplesAPI.get(sample.id);
+      fresh = data.data;
+    } catch {
+      /* use row data */
+    }
+  }
+
+  const enrichedJobs = jobs.map((job) => ({ ...job, ...fresh, tests: job.tests || fresh.tests }));
+
+  let html = '';
+  if (fresh.id) {
+    try {
+      const { data } = await samplesAPI.getBarcode(fresh.id);
       const img = data?.data?.image;
       if (img) {
-        const html = buildMultiLabelPrintDocumentWithImage(jobs, img, { isArabic, autoPrint: true });
-        if (openPrintDocumentWindow(html)) return true;
-        throw new Error('POPUP_BLOCKED');
+        html = buildMultiLabelPrintDocumentWithImage(enrichedJobs, img, { isArabic, autoPrint: true });
       }
     } catch (error) {
-      if (error.message === 'POPUP_BLOCKED') throw error;
       if (error.response?.data?.error?.code === 'INVOICE_REQUIRED') throw error;
     }
   }
 
-  const html = jobs.length > 1
-    ? buildMultiLabelPrintDocument(jobs, { isArabic, autoPrint: true })
-    : buildLabelPrintDocument(jobs[0], { isArabic, autoPrint: true });
-  if (openPrintDocumentWindow(html)) return true;
+  if (!html) {
+    html = enrichedJobs.length > 1
+      ? buildMultiLabelPrintDocument(enrichedJobs, { isArabic, autoPrint: true })
+      : buildLabelPrintDocument(enrichedJobs[0], { isArabic, autoPrint: true });
+  }
 
-  return printLabelsViaIframe(jobs, { isArabic });
+  if (openPrintDocumentWindow(html)) return true;
+  throw new Error('POPUP_BLOCKED');
 };
 
 /** Auto-print after registration — Zebra first; modal opens if bridge unavailable. */

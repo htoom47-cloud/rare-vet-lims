@@ -8,6 +8,14 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;');
 
 const LABEL_PRINT_STYLES = `
+  @media screen {
+    html, body { background: #f3f4f6; margin: 0; padding: 8px; }
+    .label-50x25, .label-page {
+      border: 1px dashed #9ca3af;
+      background: #fff;
+      margin-bottom: 6px;
+    }
+  }
   @page { size: 50mm 25mm; margin: 0; }
   html, body {
     margin: 0; padding: 0;
@@ -106,14 +114,20 @@ const labelBodyInnerWithImage = (content, barcodeImg) => `
     ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}`;
 
 const autoPrintScript = () => `
-  window.__limsLabelReady = true;
   function finishPrint() {
+    var imgs = document.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i += 1) {
+      if (!imgs[i].complete) {
+        setTimeout(finishPrint, 80);
+        return;
+      }
+    }
     window.focus();
     window.print();
     window.onafterprint = function () { window.close(); };
   }
-  if (document.readyState === 'complete') setTimeout(finishPrint, 200);
-  else window.addEventListener('load', function () { setTimeout(finishPrint, 200); });
+  if (document.readyState === 'complete') setTimeout(finishPrint, 350);
+  else window.addEventListener('load', function () { setTimeout(finishPrint, 350); });
 `;
 
 const wrapPrintDocument = ({ title, body, autoPrint = false, extraStyles = '' }) => `<!DOCTYPE html>
@@ -195,32 +209,14 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   });
 };
 
-let printBlobUrl = null;
-
-const revokePrintBlobUrl = () => {
-  if (printBlobUrl) {
-    URL.revokeObjectURL(printBlobUrl);
-    printBlobUrl = null;
-  }
-};
-
-/** Open print HTML via blob URL — reliable across browsers (avoids blank named-window reuse). */
-export function openPrintDocumentWindow(html, { autoPrint = true } = {}) {
+/** Open standalone print page — same pattern as thermal invoice (document.write, not blob URL). */
+export function openPrintDocumentWindow(html) {
   if (!html) return false;
-  revokePrintBlobUrl();
-
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  printBlobUrl = URL.createObjectURL(blob);
-  const win = window.open(printBlobUrl, '_blank', 'width=360,height=320,menubar=no,toolbar=no,location=no');
-  if (!win) {
-    revokePrintBlobUrl();
-    return false;
-  }
-
-  win.addEventListener('load', () => {
-    setTimeout(revokePrintBlobUrl, 60000);
-  }, { once: true });
-
+  const win = window.open('', 'lims-label-print', 'width=420,height=380,menubar=no,toolbar=no,location=no');
+  if (!win) return false;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
   return true;
 }
 
