@@ -364,8 +364,8 @@ const validateResultBeforeApproval = (result = {}, context = {}) => {
     warnings.push('Value is missing');
   }
 
-  if (evaluated.flag === RESULT_FLAGS.MISSING && evaluated.flag === RESULT_FLAGS.LOW) {
-    errors.push('Missing value must not be flagged as LOW');
+  if (evaluated.isMissing && (evaluated.flag === RESULT_FLAGS.LOW || evaluated.flag === RESULT_FLAGS.HIGH)) {
+    errors.push('Missing value must not produce HIGH/LOW flag');
   }
 
   const code = result.parameter_code || context.parameter_code;

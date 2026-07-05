@@ -150,25 +150,31 @@ export const asciiLabelText = (text) => {
  * English-only label content for Zebra ZPL (thermal printer).
  * Barcode / Code128 unchanged; no Arabic sent to the printer.
  */
-export const buildZebraThermalLabelContent = (sample) => {
+export const buildZebraThermalLabelContent = (sample, { isArabic = false } = {}) => {
   const id = displaySampleId(sample?.sample_code || sample?.barcode);
-  const animalType = animalTypeLabel(sample?.animal_type, false);
-  const animalCode = asciiLabelText(sample?.animal_code);
+  const animalName = String(sample?.animal_name || sample?.name_tag || '').trim();
+  const animalCode = String(sample?.animal_code || '').trim();
+  const animalType = animalTypeLabel(sample?.animal_type, isArabic);
   const testsSummary = formatTestsForLabel(sample, { isArabic: false });
 
   let sampleDate = '';
   if (sample?.collection_date) {
     const d = new Date(sample.collection_date);
     if (!Number.isNaN(d.getTime())) {
-      sampleDate = d.toLocaleDateString('en-GB', {
+      sampleDate = d.toLocaleDateString(isArabic ? 'ar-SA' : 'en-GB', {
         day: '2-digit', month: '2-digit', year: '2-digit',
       });
     }
   }
 
-  const animalLine = animalType
-    ? (animalCode ? `Type: ${animalType} · ${animalCode}` : `Type: ${animalType}`)
-    : (animalCode ? `ID: ${animalCode}` : '');
+  let animalLine = '';
+  if (isArabic && animalName) {
+    animalLine = animalCode ? `${animalName} · ${animalCode}` : animalName;
+  } else if (animalType) {
+    animalLine = animalCode ? `Type: ${animalType} · ${animalCode}` : `Type: ${animalType}`;
+  } else if (animalCode) {
+    animalLine = `ID: ${animalCode}`;
+  }
 
   return {
     barcode: id,
@@ -176,8 +182,8 @@ export const buildZebraThermalLabelContent = (sample) => {
     barcodeEncode: encodeCode128C(id),
     customerLine: '',
     animalLine: animalLine ? truncateLabel(animalLine, 36) : '',
-    dateLine: sampleDate ? truncateLabel(`Date: ${sampleDate}`, 36) : '',
-    testLine: testsSummary ? truncateLabel(`Test: ${testsSummary}`, 36) : '',
+    dateLine: sampleDate ? truncateLabel(`${isArabic ? 'التاريخ' : 'Date'}: ${sampleDate}`, 36) : '',
+    testLine: testsSummary ? truncateLabel(`${isArabic ? 'الفحص' : 'Test'}: ${testsSummary}`, 36) : '',
   };
 };
 
@@ -206,10 +212,12 @@ export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => {
     }
   }
 
-  const animalLine = animalName && animalType
-    ? `${animalPrefix}: ${animalName} · ${typePrefix}: ${animalType}`
-    : animalName
-      ? `${animalPrefix}: ${animalName}`
+  const animalLine = animalName
+    ? (animalCode
+      ? `${animalPrefix}: ${animalName} · ${animalCode}`
+      : `${animalPrefix}: ${animalName}`)
+    : animalCode
+      ? `${animalPrefix}: ${animalCode}`
       : animalType
         ? `${typePrefix}: ${animalType}`
         : '';

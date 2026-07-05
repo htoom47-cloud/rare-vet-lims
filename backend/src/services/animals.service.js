@@ -1,6 +1,6 @@
-const { query } = require('../config/database');
+const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const { generateCode, paginate, buildPagination } = require('../utils/helpers');
+const { generateAnimalCode, paginate, buildPagination } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 
 const list = async ({ search, owner_id, animal_type, page, limit }) => {
@@ -59,13 +59,24 @@ const getHistory = async (id) => {
 };
 
 const create = async (data, userId) => {
-  const animalCode = generateCode('ANM');
-  const result = await query(
-    `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip, owner_id, medical_history, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-    [uuidv4(), animalCode, data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId]
-  );
-  return result.rows[0];
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(26000001)');
+    const animalCode = await generateAnimalCode(client.query.bind(client));
+    const result = await client.query(
+      `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip, owner_id, medical_history, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [uuidv4(), animalCode, data.animal_type, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId]
+    );
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const update = async (id, data) => {

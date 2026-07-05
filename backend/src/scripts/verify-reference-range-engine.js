@@ -88,13 +88,12 @@ check('Low flag — value below min', () => {
   assert.strictEqual(flag.flag, 'LOW');
 });
 
-check('Norma result_values.notes is legacy only — not used for bounds', () => {
+check('Norma result_values.notes ignored — bounds from LIMS only', () => {
   const row = limsRow('WBC', 4, 15);
   row.rv_notes = 'Norma: 99-999';
-  const range = engine.resolveReferenceRangeFromRow({ row, legacyNotes: row.rv_notes });
+  const range = engine.resolveReferenceRangeFromRow({ row });
   assert.strictEqual(range.min_value, 4);
   assert.strictEqual(range.max_value, 15);
-  assert(range.legacy?.verbatim, '99-999');
   const flag = engine.evaluateResultFlag(10, range);
   assert.strictEqual(flag.flag, 'NORMAL');
 });

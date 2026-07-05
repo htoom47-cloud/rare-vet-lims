@@ -1,9 +1,22 @@
 const crypto = require('crypto');
 
+const ANIMAL_CODE_START = 26000001;
+
 const generateCode = (prefix, length = 6) => {
   const num = Math.floor(Math.random() * Math.pow(10, length)).toString().padStart(length, '0');
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
   return `${prefix}-${date}-${num}`;
+};
+
+/** Sequential animal ID: 26000001, 26000002, … */
+const generateAnimalCode = async (queryFn) => {
+  const result = await queryFn(
+    `SELECT COALESCE(MAX(animal_code::bigint), $1 - 1) + 1 AS next_code
+     FROM animals
+     WHERE animal_code ~ '^[0-9]+$'`,
+    [ANIMAL_CODE_START]
+  );
+  return String(result.rows[0].next_code);
 };
 
 /** Unified 12-digit sample ID — YYMMDD + 6 random digits (same value for sample_code and barcode). */
@@ -49,6 +62,8 @@ const normalizeMobileDigits = (mobile = '') => {
 
 module.exports = {
   generateCode,
+  generateAnimalCode,
+  ANIMAL_CODE_START,
   generateSampleDigitsId,
   sampleDigitsOnly,
   hashToken,

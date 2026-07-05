@@ -33,6 +33,7 @@ export default function TechnicianWorkbench() {
         setCritical(critRes.data.data);
         setImported(importedRes.data.data || []);
       })
+      .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
       .finally(() => setLoading(false));
   };
 

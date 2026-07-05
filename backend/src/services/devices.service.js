@@ -160,9 +160,13 @@ const processInboundMessage = async (device, rawMessage) => {
 const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
 const { normalizeSampleScanId } = require('../utils/barcode-scan');
 
+const { DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
+
 const replaySampleImport = async (device, sampleCode) => {
   const raw = String(sampleCode || '').trim();
   if (!raw) throw new AppError('sampleCode required', 400, 'VALIDATION');
+
+  const testCode = device?.config?.test_code || device?.config?.testCode || DEFAULT_CBC_TEST_CODE;
 
   const id = normalizeSampleScanId(raw) || raw;
   const sampleResult = await query(
@@ -188,12 +192,16 @@ const replaySampleImport = async (device, sampleCode) => {
   await query(
     `UPDATE results r SET is_validated = false, validated_by = NULL, validated_at = NULL
      FROM sample_tests st
-     WHERE r.sample_test_id = st.id AND st.sample_id = $1`,
-    [sample.id]
+     JOIN tests t ON t.id = st.test_id
+     WHERE r.sample_test_id = st.id
+       AND st.sample_id = $1
+       AND t.code = $2`,
+    [sample.id, testCode]
   );
   await query(
-    `UPDATE sample_tests SET status = 'running', completed_at = NULL WHERE sample_id = $1`,
-    [sample.id]
+    `UPDATE sample_tests SET status = 'running', completed_at = NULL
+     WHERE sample_id = $1 AND test_id = (SELECT id FROM tests WHERE code = $2 LIMIT 1)`,
+    [sample.id, testCode]
   );
   await query(
     `UPDATE samples SET status = 'running', completed_date = NULL, updated_at = NOW() WHERE id = $1`,

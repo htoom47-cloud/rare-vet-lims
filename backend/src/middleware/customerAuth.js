@@ -12,11 +12,12 @@ const resolvePortalCustomerIds = async (customer) => {
   const result = await query(
     `SELECT id FROM customers
      WHERE is_active = true
-       AND regexp_replace(mobile, '[^0-9]', '', 'g') LIKE $1`,
-    [`%${digits.slice(-9)}`]
+       AND regexp_replace(mobile, '[^0-9]', '', 'g') = $1`,
+    [digits]
   );
 
   const ids = result.rows.map((r) => r.id);
+  if (!ids.length) return [customer.id];
   if (!ids.includes(customer.id)) ids.unshift(customer.id);
   return ids;
 };

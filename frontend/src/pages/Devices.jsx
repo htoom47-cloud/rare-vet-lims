@@ -42,6 +42,7 @@ export default function Devices() {
         setConfigured(data.data.configured || []);
         setSupported(data.data.supported || []);
       })
+      .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
       .finally(() => setLoading(false));
   };
 
@@ -50,8 +51,13 @@ export default function Devices() {
   const selectDevice = async (device) => {
     setSelected(device);
     setRevealedApiKey(device.api_key_once || null);
-    const { data } = await devicesAPI.messages(device.id);
-    setMessages(data.data || []);
+    try {
+      const { data } = await devicesAPI.messages(device.id);
+      setMessages(data.data || []);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+      setMessages([]);
+    }
   };
 
   const activateNorma = async () => {

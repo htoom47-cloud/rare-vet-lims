@@ -154,10 +154,10 @@ const code128CModules = (digits) => {
   return 11 + pairs * 11 + 11 + 13;
 };
 
-const zplLandscapeHeader = () => [
+const zplLandscapeHeader = (isArabic = false) => [
   '^XA',
-  '^FX LIMS label v8 larger text',
-  '^CI0',
+  isArabic ? '^FX LIMS label v9 Arabic UTF-8' : '^FX LIMS label v9 larger text',
+  isArabic ? '^CI28' : '^CI0',
   '^MTD',
   '^MD35',
   '^MNW',
@@ -195,10 +195,10 @@ export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
   buildThermalLabelContent(sample, { isArabic })
 );
 
-/** ZPL for Zebra ZD421 50×25 mm — English text only (no Arabic to printer). */
-export const buildCbcLabelZpl = (sample) => {
-  const content = buildZebraThermalLabelContent(sample);
-  const lines = [...zplLandscapeHeader()];
+/** ZPL for Zebra ZD421 50×25 mm — Arabic animal name when isArabic=true (^CI28). */
+export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
+  const content = buildZebraThermalLabelContent(sample, { isArabic });
+  const lines = [...zplLandscapeHeader(isArabic)];
 
   if (content.barcode) {
     lines.push(barcodeField(content.barcode));
@@ -240,8 +240,8 @@ async function sendZplLocalBridge(zpl) {
   await sendZplHttp(null, zpl);
 }
 
-export async function printToZebra(sample) {
-  const zpl = buildCbcLabelZpl(sample);
+export async function printToZebra(sample, { isArabic = false } = {}) {
+  const zpl = buildCbcLabelZpl(sample, { isArabic });
 
   // 1) LIMS local bridge (RAW) — works with send-zebra-raw.ps1
   try {

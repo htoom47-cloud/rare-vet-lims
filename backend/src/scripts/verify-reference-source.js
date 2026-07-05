@@ -89,6 +89,12 @@ assert(engine.RANGE_SOURCES.LIMS_SPECIES === 'lims-species', 'LIMS_SPECIES sourc
 assert(engine.RANGE_SOURCES.LIMS_GENERAL === 'lims-general', 'LIMS_GENERAL source exists');
 assert(!engine.RANGE_SOURCES.DEVICE, 'No DEVICE source');
 
+// ── 7b. Synced-from notes are NOT manual tier ───────────────────────────
+console.log('\n7b. Synced-from notes excluded from manual tier');
+assert(!engine.isManualLimsNotes('Synced from norma-profile'), 'Synced from is not manual');
+assert(!engine.isManualLimsNotes('Norma: 5-15'), 'Norma notes are not manual');
+assert(engine.isManualLimsNotes('Admin override note'), 'True manual notes detected');
+
 // ── 8. No device fallback in engine ────────────────────────────────────
 console.log('\n8. No device fallback');
 const engineSrc = fs.readFileSync(

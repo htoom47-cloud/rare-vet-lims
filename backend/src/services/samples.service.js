@@ -255,16 +255,12 @@ const reconcileSampleStatuses = async () => {
       updated_at = NOW()
     WHERE s.status IN ('received', 'running')
       AND (
-        EXISTS (SELECT 1 FROM reports rep WHERE rep.sample_id = s.id)
-        OR (
+        (
           EXISTS (SELECT 1 FROM sample_tests st WHERE st.sample_id = s.id)
           AND NOT EXISTS (
             SELECT 1 FROM sample_tests st
             WHERE st.sample_id = s.id AND st.status NOT IN ('completed', 'cancelled')
           )
-        )
-        OR (
-          EXISTS (SELECT 1 FROM sample_tests st WHERE st.sample_id = s.id)
           AND NOT EXISTS (
             SELECT 1 FROM sample_tests st
             WHERE st.sample_id = s.id

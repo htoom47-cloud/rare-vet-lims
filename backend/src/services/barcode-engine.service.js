@@ -244,10 +244,11 @@ const code128CModules = (digits) => {
 const zplHeader = (opts) => {
   const w = opts.labelWidthDots || LABEL_WIDTH;
   const h = opts.labelHeightDots || LABEL_HEIGHT;
+  const isArabic = opts.isArabic ?? opts.language === 'ar';
   return [
     '^XA',
-    '^FX LIMS Barcode Engine v1 English ZPL larger text',
-    '^CI0',
+    '^FX LIMS Barcode Engine v1',
+    isArabic ? '^CI28' : '^CI0',
     '^MTD',
     `^MD${opts.darkness ?? DEFAULT_PRINTER.darkness}`,
     '^MNW',
@@ -295,18 +296,22 @@ const asciiLabelText = (text) => {
   return s;
 };
 
-/** English-only lines for ZPL — Zebra ^A0N does not render Arabic reliably. */
-const buildZplTextLines = (payload) => {
-  const animalType = animalTypeLabel(payload.meta?.animal_type, false);
-  const animalCode = asciiLabelText(payload.meta?.animal_code);
-  const sampleDate = formatSampleDate(payload.meta?.collection_date, false);
+/** English or Arabic text lines for ZPL — Arabic uses ^CI28 when isArabic=true. */
+const buildZplTextLines = (payload, isArabic = false) => {
+  const animalName = String(payload.humanReadable?.animalName || '').trim();
+  const animalCode = String(payload.meta?.animal_code || '').trim();
+  const animalType = animalTypeLabel(payload.meta?.animal_type, isArabic);
+  const sampleDate = formatSampleDate(payload.meta?.collection_date, isArabic);
   const testsSummary = formatTestsForLabel(
     { tests: payload.meta?.tests || [] },
-    false
+    isArabic
   );
 
   const lines = [];
-  if (animalType) {
+  if (isArabic && animalName) {
+    const bit = animalCode ? `${animalName} · ${animalCode}` : animalName;
+    lines.push({ key: 'animal', text: truncateLabel(bit) });
+  } else if (animalType) {
     const animalBit = animalCode
       ? `Type: ${animalType} · ${animalCode}`
       : `Type: ${animalType}`;
@@ -315,10 +320,10 @@ const buildZplTextLines = (payload) => {
     lines.push({ key: 'animal', text: truncateLabel(`ID: ${animalCode}`) });
   }
   if (sampleDate) {
-    lines.push({ key: 'date', text: truncateLabel(`Date: ${sampleDate}`) });
+    lines.push({ key: 'date', text: truncateLabel(`${isArabic ? 'التاريخ' : 'Date'}: ${sampleDate}`) });
   }
   if (testsSummary) {
-    lines.push({ key: 'test', text: truncateLabel(`Test: ${testsSummary}`) });
+    lines.push({ key: 'test', text: truncateLabel(`${isArabic ? 'الفحص' : 'Test'}: ${testsSummary}`) });
   }
   return lines;
 };
@@ -344,7 +349,7 @@ const buildZplLabel = (payload, options = {}) => {
   const sampleDigits = payload.barcodeValue || payload.humanReadable?.sampleId || '';
   lines.push(textLine(LAYOUT.digitsY, sampleDigits, labelW, FONT_DIGITS));
 
-  const zplLines = buildZplTextLines(payload);
+  const zplLines = buildZplTextLines(payload, opts.isArabic);
   const yByKey = { animal: LAYOUT.animalY, date: LAYOUT.dateY, test: LAYOUT.testY };
   const fontByKey = { animal: FONT_LINE, date: FONT_LINE, test: FONT_TEST };
   for (const line of zplLines) {
@@ -375,11 +380,14 @@ const validateZplQuietZone = (zpl, options = {}) => {
   }
 
   const textFds = src.match(/\^FD([\s\S]*?)\^FS/g) || [];
-  for (const block of textFds) {
-    const fdMatch = block.match(/\^FD([\s\S]*?)\^FS/);
-    const fdVal = fdMatch ? fdMatch[1] : '';
-    if (ARABIC_RE.test(fdVal)) {
-      errors.push('Arabic text found in ZPL ^FD field');
+  const isArabic = opts.isArabic ?? opts.language === 'ar';
+  if (!isArabic) {
+    for (const block of textFds) {
+      const fdMatch = block.match(/\^FD([\s\S]*?)\^FS/);
+      const fdVal = fdMatch ? fdMatch[1] : '';
+      if (ARABIC_RE.test(fdVal) && !String(fdVal).startsWith('>;>8')) {
+        errors.push('Arabic text found in ZPL ^FD field');
+      }
     }
   }
 

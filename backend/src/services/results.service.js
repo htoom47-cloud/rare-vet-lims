@@ -108,7 +108,8 @@ const enterResults = async (data, userId) => {
     await client.query('BEGIN');
 
     const stResult = await client.query(
-      `SELECT st.*, s.animal_id, a.animal_type FROM sample_tests st
+      `SELECT st.*, s.animal_id, a.animal_type, a.gender, a.age
+       FROM sample_tests st
        JOIN samples s ON st.sample_id = s.id
        JOIN animals a ON s.animal_id = a.id WHERE st.id = $1`,
       [data.sample_test_id]
@@ -116,7 +117,7 @@ const enterResults = async (data, userId) => {
 
     if (!stResult.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
 
-    const { animal_type } = stResult.rows[0];
+    const { animal_type, gender, age } = stResult.rows[0];
     let hasCritical = false;
 
     let resultId;
@@ -172,7 +173,10 @@ const enterResults = async (data, userId) => {
       );
       const unit = paramMeta.rows[0]?.unit;
       const parameterCode = paramMeta.rows[0]?.code;
-      const range = await getLimsReferenceRange(val.parameter_id, animal_type);
+      const range = await getLimsReferenceRange(val.parameter_id, animal_type, {
+        sex: gender,
+        age,
+      });
 
       const evaluated = resultEngine.evaluateResult(
         { value: raw, unit, parameter_code: parameterCode },
@@ -312,6 +316,10 @@ const unvalidateResults = async (sampleTestId) => {
 
     await client.query('COMMIT');
     committed = true;
+    if (st.rows[0]?.sample_id) {
+      const lifecycle = require('./report-lifecycle.service');
+      await lifecycle.markReportsNeedsUpdateBySampleId(st.rows[0].sample_id, 'RESULTS');
+    }
     return getBySampleTest(sampleTestId);
   } catch (err) {
     if (!committed) {

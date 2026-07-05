@@ -56,10 +56,10 @@ const findCustomerByMobile = async (mobile) => {
     `SELECT id, full_name, full_name_ar, mobile, city, farm_company
      FROM customers
      WHERE is_active = true
-       AND regexp_replace(mobile, '[^0-9]', '', 'g') LIKE $1
+       AND regexp_replace(mobile, '[^0-9]', '', 'g') = $1
      ORDER BY created_at DESC
      LIMIT 1`,
-    [`%${digits.slice(-9)}`]
+    [digits]
   );
 
   return result.rows[0] || null;

@@ -89,8 +89,16 @@ export default function Reports() {
 
   const load = () => {
     setLoading(true);
-    reportsAPI.list().then(({ data }) => setReports(data.data)).finally(() => setLoading(false));
-    samplesAPI.list({ status: 'completed', limit: 50 }).then(({ data }) => setCompletedSamples(data.data));
+    Promise.all([
+      reportsAPI.list(),
+      samplesAPI.list({ status: 'completed', limit: 50 }),
+    ])
+      .then(([reportsRes, samplesRes]) => {
+        setReports(reportsRes.data.data);
+        setCompletedSamples(samplesRes.data.data);
+      })
+      .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);

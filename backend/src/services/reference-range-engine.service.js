@@ -17,9 +17,16 @@ const RANGE_SOURCES = {
   LIMS_GENERAL: 'lims-general',
 };
 
+const isSyncedOrNormaNotes = (notes) => {
+  const n = String(notes || '').trim();
+  if (!n) return false;
+  return n.startsWith('Synced from') || n.startsWith('Norma:');
+};
+
 const isManualLimsNotes = (notes) => {
   const n = String(notes || '').trim();
-  return !!n;
+  if (!n) return false;
+  return !isSyncedOrNormaNotes(n);
 };
 
 const isActiveRange = (row) => row?.is_active !== false;
@@ -114,7 +121,10 @@ const normalizeLimsRow = (row, source) => ({
  */
 const RANGE_PRIORITY_ORDER = `
   CASE
-    WHEN trr.notes IS NOT NULL AND TRIM(trr.notes) <> '' THEN 0
+    WHEN trr.notes IS NOT NULL
+      AND TRIM(trr.notes) <> ''
+      AND trr.notes NOT LIKE 'Synced from%'
+      AND trr.notes NOT LIKE 'Norma:%' THEN 0
     WHEN trr.animal_type IS NOT NULL AND trr.animal_type::text <> 'other' THEN 1
     ELSE 2
   END,

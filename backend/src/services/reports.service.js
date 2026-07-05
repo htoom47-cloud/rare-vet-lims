@@ -430,6 +430,14 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
   const { reconcileSampleStatuses } = require('./samples.service');
   await reconcileSampleStatuses();
 
+  const existingReport = await query(
+    'SELECT id FROM reports WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [sampleId]
+  );
+  if (existingReport.rows[0] && !options.forceRegenerate) {
+    return getById(existingReport.rows[0].id);
+  }
+
   const sampleResult = await query(
     'SELECT id FROM samples WHERE id = $1 AND status = $2',
     [sampleId, 'completed']
@@ -473,7 +481,13 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
 
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);
-  await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
+  let savedPdf;
+  try {
+    savedPdf = await persistLocalFile(pdf.filePath, 'reports', pdf.filename);
+  } catch (persistErr) {
+    try { await deleteFile(pdf.url || pdf.filePath); } catch { /* ignore */ }
+    throw persistErr;
+  }
 
   const result = await query(
     `INSERT INTO reports (
@@ -486,7 +500,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
      VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11, $12, true)
      RETURNING *`,
     [
-      uuidv4(), reportNumber, sampleId, pdf.url, verificationCode, userId, language,
+      uuidv4(), reportNumber, sampleId, savedPdf.url, verificationCode, userId, language,
       treatmentRecommendations || null,
       approveLab ? userId : null,
       approveLab ? now : null,

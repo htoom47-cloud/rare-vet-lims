@@ -25,6 +25,7 @@ const smsEnabled = process.env.SMS_ENABLED === 'true';
 const resolvePortalStaticOtp = () => {
   const raw = process.env.PORTAL_OTP_STATIC;
   if (raw === 'off' || raw === 'false' || raw === '0') return null;
+  if (raw?.trim() && process.env.NODE_ENV === 'production') return null;
   if (raw?.trim()) return raw.trim();
   if (smsEnabled) return null;
   if (process.env.NODE_ENV === 'production') return null;

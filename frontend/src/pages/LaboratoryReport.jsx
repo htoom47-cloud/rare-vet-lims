@@ -299,7 +299,13 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     setSavingNotes(true);
     try {
       await reportsAPI.updateNotes(id, { treatment_recommendations: notesValue });
-      setReport((prev) => prev ? { ...prev, recommendations: notesValue || null } : prev);
+      setReport((prev) => prev ? {
+        ...prev,
+        recommendations: notesValue || null,
+        smartLifecycle: prev.smartLifecycle
+          ? { ...prev.smartLifecycle, isUpToDate: false, needsUpdate: true }
+          : prev.smartLifecycle,
+      } : prev);
       setEditingNotes(false);
       toast.success(t('labReport.notesSaved'));
     } catch (err) {

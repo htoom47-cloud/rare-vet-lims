@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Search, Eye, Pencil, FlaskConical, ListPlus, BarChart3, Trash2, Package, FolderTree, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -1052,13 +1053,14 @@ export default function Tests() {
                                 <Trash2 size={14} /> {t('common.delete')}
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => openAddRange(param)}
-                              className="text-primary-600 text-sm"
-                            >
-                              + {t('tests.addRange')}
-                            </button>
+                            {canManage && (
+                              <Link
+                                to="/reference-ranges"
+                                className="text-primary-600 text-sm"
+                              >
+                                {t('nav.referenceRanges')} →
+                              </Link>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1073,7 +1075,6 @@ export default function Tests() {
                                 <th className="text-start py-1">{t('tests.criticalLow')}</th>
                                 <th className="text-start py-1">{t('tests.criticalHigh')}</th>
                                 <th className="text-start py-1">{t('tests.unit')}</th>
-                                {canManage && <th className="text-start py-1">{t('common.actions')}</th>}
                               </tr>
                             </thead>
                             <tbody>
@@ -1085,26 +1086,6 @@ export default function Tests() {
                                   <td className="py-1.5 text-amber-600">{range.critical_low ?? '—'}</td>
                                   <td className="py-1.5 text-red-600">{range.critical_high ?? '—'}</td>
                                   <td className="py-1.5">{range.unit || '—'}</td>
-                                  {canManage && (
-                                    <td className="py-1.5">
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => openEditRange(param, range)}
-                                          className="text-primary-600 text-sm flex items-center gap-1"
-                                        >
-                                          <Pencil size={14} /> {t('common.edit')}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteRange(range)}
-                                          className="text-red-600 text-sm flex items-center gap-1"
-                                        >
-                                          <Trash2 size={14} /> {t('common.delete')}
-                                        </button>
-                                      </div>
-                                    </td>
-                                  )}
                                 </tr>
                               ))}
                             </tbody>
