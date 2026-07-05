@@ -1,7 +1,7 @@
 /**
  * CBC reference range parameter alignment — WBC differential % uses *_PCT codes.
  */
-const { NORMA_CBC_PCT_BY_ABS, NORMA_CBC_SCREEN_ORDER, getNormaPanelRow } = require('./norma-cbc-panel');
+const { NORMA_CBC_PCT_BY_ABS, NORMA_CBC_SCREEN_ORDER, getNormaPanelRow, NORMA_CBC_PANEL } = require('./norma-cbc-panel');
 
 const PCT_BY_ABS = { ...NORMA_CBC_PCT_BY_ABS };
 const ABS_BY_PCT = Object.fromEntries(Object.entries(PCT_BY_ABS).map(([abs, pct]) => [pct, abs]));
@@ -45,14 +45,52 @@ const cbcPctFallbackAbsCode = (pctCode) => ABS_BY_PCT[pctCode] || null;
 
 const CBC_ABS_DIFF_CODES = new Set(Object.keys(PCT_BY_ABS));
 
+const CBC_PCT_CODES = new Set(Object.values(PCT_BY_ABS));
+
+/** Resolve LIMS range: manual abs (#) wins over synced *_PCT for WBC differential %. */
+const resolveCbcLimsRange = async (parameterCode, parameterId, context, paramIdByCode, getRange) => {
+  const { animal_type, gender, age } = context;
+  const extras = { sex: gender, age };
+  const absCode = cbcPctFallbackAbsCode(parameterCode);
+
+  if (absCode && CBC_PCT_CODES.has(parameterCode)) {
+    const absId = paramIdByCode[absCode];
+    if (absId) {
+      const manualAbs = await getRange(absId, animal_type, extras);
+      if (manualAbs?.min_value != null && manualAbs?.max_value != null && !isSyncedNotes(manualAbs.notes)) {
+        return manualAbs;
+      }
+    }
+  }
+
+  const directId = paramIdByCode[parameterCode] || parameterId;
+  if (directId) {
+    const direct = await getRange(directId, animal_type, extras);
+    if (direct && (direct.min_value != null || direct.text_reference)) return direct;
+  }
+
+  if (absCode && CBC_PCT_CODES.has(parameterCode)) {
+    const absId = paramIdByCode[absCode];
+    if (absId) {
+      const absRange = await getRange(absId, animal_type, extras);
+      if (absRange?.min_value != null && absRange?.max_value != null) return absRange;
+    }
+  }
+
+  return null;
+};
+
 module.exports = {
   PCT_BY_ABS,
   ABS_BY_PCT,
   CBC_ABS_DIFF_CODES,
+  CBC_PCT_CODES,
+  NORMA_CBC_PANEL,
   NORMA_CBC_SCREEN_ORDER,
   isSyncedNotes,
   isPercentLikeRange,
   cbcReferenceDisplayCode,
   cbcScreenDataCode,
   cbcPctFallbackAbsCode,
+  resolveCbcLimsRange,
 };

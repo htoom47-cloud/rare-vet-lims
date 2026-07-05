@@ -8,20 +8,16 @@ const {
   isSyncedNotes,
   cbcReferenceDisplayCode,
   cbcPctFallbackAbsCode,
+  resolveCbcLimsRange,
 } = require('../utils/cbc-reference-params');
 
 let passed = 0;
 let failed = 0;
 
+const checks = [];
+
 const check = (label, fn) => {
-  try {
-    fn();
-    passed += 1;
-    console.log(`  ✅ ${label}`);
-  } catch (err) {
-    failed += 1;
-    console.error(`  ❌ ${label}: ${err.message}`);
-  }
+  checks.push({ label, fn });
 };
 
 console.log('\nCBC reference parameter alignment\n');
@@ -55,10 +51,29 @@ check('pct fallback abs code', () => {
   assert.strictEqual(cbcPctFallbackAbsCode('NEU_PCT'), 'NEU');
 });
 
-check('synced notes detected', () => {
-  assert.strictEqual(isSyncedNotes('Synced from norma-defaults'), true);
-  assert.strictEqual(isSyncedNotes(''), false);
+check('resolveCbcLimsRange prefers manual MON over synced MON_PCT', async () => {
+  const paramIdByCode = { MON: 'abs-id', MON_PCT: 'pct-id' };
+  const getRange = async (pid) => {
+    if (pid === 'abs-id') return { min_value: 2, max_value: 8, notes: '' };
+    if (pid === 'pct-id') return { min_value: 1, max_value: 12, notes: 'Synced from norma-defaults' };
+    return null;
+  };
+  const range = await resolveCbcLimsRange('MON_PCT', 'pct-id', { animal_type: 'camel' }, paramIdByCode, getRange);
+  assert.strictEqual(range.min_value, 2);
+  assert.strictEqual(range.max_value, 8);
 });
 
-console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
-process.exit(failed ? 1 : 0);
+(async () => {
+  for (const { label, fn } of checks) {
+    try {
+      await fn();
+      passed += 1;
+      console.log(`  ✅ ${label}`);
+    } catch (err) {
+      failed += 1;
+      console.error(`  ❌ ${label}: ${err.message}`);
+    }
+  }
+  console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
+  process.exit(failed ? 1 : 0);
+})();

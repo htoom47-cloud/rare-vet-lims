@@ -1,17 +1,14 @@
 const {
   DEFAULT_CBC_TEST_CODE,
   mapCbcRowsForDisplay,
-  NORMA_CBC_PCT_BY_ABS,
 } = require('../utils/norma-cbc-map');
 const { query } = require('../config/database');
 const { getLimsReferenceRange } = require('./reference-ranges.service');
-const { cbcPctFallbackAbsCode, isPercentLikeRange, isSyncedNotes } = require('../utils/cbc-reference-params');
+const { cbcPctFallbackAbsCode, resolveCbcLimsRange } = require('../utils/cbc-reference-params');
 const resultEngine = require('./result-engine.service');
 
-const CBC_PCT_CODES = new Set(Object.values(NORMA_CBC_PCT_BY_ABS));
-
 const hasResolvedReference = (row) => {
-  if (row.reference) return true;
+  if (row.reference && row.reference !== '-') return true;
   if (row.trr_min != null && row.trr_max != null) return true;
   if (row.trr_text_reference != null && String(row.trr_text_reference).trim() !== '') return true;
   return false;
@@ -50,53 +47,58 @@ const reevaluateRowWithRange = (row, range) => {
   };
 };
 
-/** Fill missing CBC references (LYM_PCT, RDW-SD, …) from LIMS + misplaced abs % fallback. */
-const enrichCbcReferences = async (rows, { animal_type, gender, age }) => {
-  const needsRef = rows.filter((r) => !hasResolvedReference(r));
-  if (!needsRef.length || !animal_type) return rows;
-
-  const codes = [...new Set(needsRef.map((r) => r.parameter_code))];
-  const absCodes = [...new Set(codes.map((c) => cbcPctFallbackAbsCode(c)).filter(Boolean))];
-  const allCodes = [...new Set([...codes, ...absCodes])];
+const loadCbcParamIdByCode = async () => {
   const paramResult = await query(
     `SELECT tp.id, tp.code FROM test_parameters tp
      JOIN tests t ON tp.test_id = t.id
-     WHERE t.code = $1 AND tp.code = ANY($2)`,
-    [DEFAULT_CBC_TEST_CODE, allCodes]
+     WHERE t.code = $1 AND tp.is_active = true`,
+    [DEFAULT_CBC_TEST_CODE]
   );
-  const paramIdByCode = Object.fromEntries(paramResult.rows.map((p) => [p.code, p.id]));
+  return Object.fromEntries(paramResult.rows.map((p) => [p.code, p.id]));
+};
+
+/** Fill missing CBC references from LIMS (manual abs # → *_PCT %, plus RDW/PLT params). */
+const enrichCbcReferences = async (rows, context) => {
+  if (!rows.length || !context.animal_type) return rows;
+  const paramIdByCode = await loadCbcParamIdByCode();
 
   return Promise.all(rows.map(async (row) => {
-    if (hasResolvedReference(row)) return row;
-    const parameterId = paramIdByCode[row.parameter_code] || row.parameter_id;
-    let range = parameterId
-      ? await getLimsReferenceRange(parameterId, animal_type, { sex: gender, age })
-      : null;
-
-    if (!range || (range.min_value == null && range.max_value == null)) {
-      const absCode = cbcPctFallbackAbsCode(row.parameter_code);
-      const absParamId = absCode ? paramIdByCode[absCode] : null;
-      if (absParamId) {
-        const absRange = await getLimsReferenceRange(absParamId, animal_type, { sex: gender, age });
-        if (absRange && !isSyncedNotes(absRange.notes)) {
-          range = absRange;
-        } else if (absRange && isPercentLikeRange(absRange.min_value, absRange.max_value, absRange.unit)) {
-          range = absRange;
-        }
+    if (hasResolvedReference(row)) {
+      if (row.trr_min != null && row.trr_max != null) {
+        return reevaluateRowWithRange(row, {
+          min_value: row.trr_min,
+          max_value: row.trr_max,
+          critical_low: row.trr_critical_low,
+          critical_high: row.trr_critical_high,
+          text_reference: row.trr_text_reference,
+          notes: row.trr_notes,
+          unit: row.trr_unit,
+        });
       }
+      return row;
     }
 
-    if (!range) return row;
-    return reevaluateRowWithRange({ ...row, parameter_id: parameterId || row.parameter_id }, range);
+    const range = await resolveCbcLimsRange(
+      row.parameter_code,
+      row.parameter_id,
+      context,
+      paramIdByCode,
+      getLimsReferenceRange
+    );
+
+    if (!range || (range.min_value == null && range.max_value == null && !range.text_reference)) {
+      return row;
+    }
+    return reevaluateRowWithRange(
+      { ...row, parameter_id: paramIdByCode[row.parameter_code] || row.parameter_id },
+      range
+    );
   }));
 };
 
 /** @deprecated use enrichCbcReferences */
 const enrichCbcPctReferences = enrichCbcReferences;
 
-/**
- * Norma CBC screen rows for reports/PDF — same reference logic as workbench.
- */
 const buildCbcReportRowsFromSql = async (sqlRows, context) => {
   if (!sqlRows?.length) return [];
   const meta = sqlRows[0];
@@ -107,6 +109,7 @@ const buildCbcReportRowsFromSql = async (sqlRows, context) => {
   let display = mapRawRowsToCbcDisplay(withRef);
   display = await enrichCbcReferences(display, context);
   const byCode = Object.fromEntries(withRef.map((r) => [r.parameter_code, r]));
+
   return display.map((d) => {
     const src = byCode[d.parameter_code]
       || byCode[cbcPctFallbackAbsCode(d.parameter_code)]
@@ -143,4 +146,5 @@ module.exports = {
   buildCbcReportRowsFromSql,
   reevaluateRowWithRange,
   hasResolvedReference,
+  loadCbcParamIdByCode,
 };
