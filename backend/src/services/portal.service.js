@@ -243,6 +243,20 @@ const sanitizePortalPreview = (preview) => portalSync.sanitizeForPortal(preview)
 
 const portalReportFilter = portalSync.portalVisibilitySql('r');
 
+/** One portal row per sample — latest report when duplicates exist. */
+const portalReportRowsSql = (whereSql) => `
+  SELECT DISTINCT ON (s.id)
+    r.id, r.report_number, r.pdf_url, r.language, r.is_final, r.created_at,
+    r.lab_specialist_approved_by, r.vet_approved_by,
+    s.sample_code, s.status AS sample_status, s.animal_id,
+    a.animal_code, a.animal_type, a.name_tag AS animal_name
+  FROM reports r
+  JOIN samples s ON r.sample_id = s.id
+  LEFT JOIN animals a ON s.animal_id = a.id
+  WHERE ${whereSql}
+  ORDER BY s.id, r.created_at DESC
+`;
+
 const listReports = async (customerIds, { page, limit, animalId }) => {
   const ids = asArray(customerIds);
   const { offset, page: p, limit: l } = paginate(page, limit);
@@ -256,25 +270,15 @@ const listReports = async (customerIds, { page, limit, animalId }) => {
   const where = filters.join(' AND ');
 
   const countResult = await query(
-    `SELECT COUNT(*) FROM reports r
-     JOIN samples s ON r.sample_id = s.id
-     LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE ${where}`,
+    `SELECT COUNT(*) FROM (${portalReportRowsSql(where)}) portal_reports`,
     params
   );
   const total = parseInt(countResult.rows[0].count, 10);
 
   const listParams = [...params, l, offset];
   const result = await query(
-    `SELECT r.id, r.report_number, r.pdf_url, r.language, r.is_final, r.created_at,
-            r.lab_specialist_approved_by, r.vet_approved_by,
-            s.sample_code, s.status as sample_status, s.animal_id,
-            a.animal_code, a.animal_type, a.name_tag as animal_name
-     FROM reports r
-     JOIN samples s ON r.sample_id = s.id
-     LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE ${where}
-     ORDER BY r.created_at DESC
+    `SELECT * FROM (${portalReportRowsSql(where)}) portal_reports
+     ORDER BY created_at DESC
      LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
     listParams
   );
@@ -298,21 +302,26 @@ const assertAnimalOwnership = async (animalId, customerIds) => {
 
 const fetchAnimalReports = async (customerIds, animalId, limit = 20) => {
   const ids = asArray(customerIds);
+  const where = `s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}`;
   const params = [ids, animalId];
-  let limitClause = '';
+  let limitSql = '';
   if (limit) {
     params.push(limit);
-    limitClause = `LIMIT $${params.length}`;
+    limitSql = `LIMIT $${params.length}`;
   }
   const result = await query(
-    `SELECT r.id, r.report_number, r.pdf_url, r.created_at, r.is_final,
-            r.lab_specialist_approved_by, r.vet_approved_by,
-            s.sample_code, s.collection_date
-     FROM reports r
-     JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}
-     ORDER BY r.created_at DESC
-     ${limitClause}`,
+    `SELECT * FROM (
+       SELECT DISTINCT ON (s.id)
+              r.id, r.report_number, r.pdf_url, r.created_at, r.is_final,
+              r.lab_specialist_approved_by, r.vet_approved_by,
+              s.sample_code, s.collection_date
+       FROM reports r
+       JOIN samples s ON r.sample_id = s.id
+       WHERE ${where}
+       ORDER BY s.id, r.created_at DESC
+     ) animal_reports
+     ORDER BY created_at DESC
+     ${limitSql}`,
     params
   );
   return result.rows;
@@ -343,7 +352,7 @@ const listAnimals = async (customerIds) => {
   const ids = asArray(customerIds);
   const result = await query(
     `SELECT a.id, a.animal_code, a.animal_type, a.name_tag, a.gender, a.age,
-            COUNT(DISTINCT r.id)::int AS report_count,
+            COUNT(DISTINCT s.id)::int AS report_count,
             MAX(r.created_at) AS latest_report_at
      FROM animals a
      JOIN samples s ON s.animal_id = a.id
@@ -505,15 +514,18 @@ const getDashboard = async (customerIds) => {
   const customer = customerResult.rows[0];
 
   const statsResult = await query(
-    `SELECT
-       COUNT(DISTINCT r.id)::int AS report_count,
-       COUNT(DISTINCT a.id)::int AS animal_count,
-       COUNT(DISTINCT r.id) FILTER (WHERE r.created_at > NOW() - INTERVAL '7 days')::int AS new_reports_7d
-     FROM customers c
-     LEFT JOIN samples s ON s.customer_id = c.id
-     LEFT JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
-     LEFT JOIN animals a ON a.owner_id = c.id AND a.is_active = true
-     WHERE c.id = ANY($1::uuid[])`,
+    `WITH portal_reports AS (
+       SELECT DISTINCT ON (s.id)
+         r.id, r.created_at
+       FROM samples s
+       JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
+       WHERE s.customer_id = ANY($1::uuid[])
+       ORDER BY s.id, r.created_at DESC
+     )
+     SELECT
+       (SELECT COUNT(*)::int FROM portal_reports) AS report_count,
+       (SELECT COUNT(*)::int FROM animals WHERE owner_id = ANY($1::uuid[]) AND is_active = true) AS animal_count,
+       (SELECT COUNT(*)::int FROM portal_reports WHERE created_at > NOW() - INTERVAL '7 days') AS new_reports_7d`,
     [ids]
   );
   const stats = statsResult.rows[0] || { report_count: 0, animal_count: 0, new_reports_7d: 0 };

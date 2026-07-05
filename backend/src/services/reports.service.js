@@ -499,6 +499,15 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
     throw persistErr;
   }
 
+  const dupBeforeInsert = await query(
+    'SELECT id FROM reports WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [sampleId]
+  );
+  if (dupBeforeInsert.rows[0] && !options.forceRegenerate) {
+    try { await deleteFile(savedPdf.url); } catch { /* ignore */ }
+    return getById(dupBeforeInsert.rows[0].id);
+  }
+
   const result = await query(
     `INSERT INTO reports (
        id, report_number, sample_id, pdf_url, qr_verification_code, generated_by, language,

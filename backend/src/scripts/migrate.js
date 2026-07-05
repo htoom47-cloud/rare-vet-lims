@@ -544,6 +544,18 @@ async function applyPatches() {
       END $$
     `);
     await fixDuplicateSampleTests(client);
+    await client.query(`
+      DELETE FROM reports older
+      USING reports newer
+      WHERE older.sample_id IS NOT NULL
+        AND older.sample_id = newer.sample_id
+        AND older.created_at < newer.created_at
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_sample_id_unique
+      ON reports (sample_id)
+      WHERE sample_id IS NOT NULL
+    `);
   } finally {
     client.release();
   }

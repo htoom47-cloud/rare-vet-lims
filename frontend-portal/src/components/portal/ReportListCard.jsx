@@ -57,6 +57,7 @@ export default function ReportListCard({ report, isAr, showAnimal = true, compac
       )}
       <p className="text-xs text-muted-foreground mt-1 truncate">
         {report.report_number}
+        {report.sample_code ? ` · ${report.sample_code}` : ''}
         {' · '}
         {formatDate(report.created_at)}
       </p>
