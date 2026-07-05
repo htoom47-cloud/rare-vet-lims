@@ -6,8 +6,9 @@ const barcodeEngine = require('../services/barcode-engine.service');
 const generateCode128 = async (text) => {
   const scanId = displaySampleId(text) || String(text || '').trim();
   const payload = encodeCode128C(scanId) || scanId;
+  // bwip-js exposes bcid "code128" only — not "code128c". Payload stays Code128-C digits (even length).
   const png = await bwipjs.toBuffer({
-    bcid: 'code128c',
+    bcid: 'code128',
     text: payload,
     scale: 3,
     height: 12,
