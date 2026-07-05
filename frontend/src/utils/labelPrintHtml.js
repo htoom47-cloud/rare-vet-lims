@@ -66,15 +66,13 @@ const labelBodyInner = (content) => {
 };
 
 const renderBarcodeScript = (autoPrint) => {
-  const autoPrintScript = autoPrint ? `
-      window.onload = function () {
-        setTimeout(function () { window.focus(); window.print(); }, 150);
-      };
-      window.onafterprint = function () { window.close(); };
-  ` : '';
+  const autoPrintBlock = autoPrint ? `
+      setTimeout(function () { window.focus(); window.print(); }, 120);
+      window.onafterprint = function () { window.close(); };` : '';
 
   return `
-    (function () {
+    function renderSampleBarcodes() {
+      if (typeof JsBarcode === 'undefined') return false;
       document.querySelectorAll('svg.sample-barcode').forEach(function (el, idx) {
         var code = el.getAttribute('data-code');
         if (!code) return;
@@ -84,8 +82,19 @@ const renderBarcodeScript = (autoPrint) => {
           margin: 0, background: '#ffffff', lineColor: '#000000'
         });
       });
-      ${autoPrintScript}
-    })();
+      ${autoPrintBlock}
+      return true;
+    }
+    function bootLabelPrint() {
+      if (renderSampleBarcodes()) return;
+      var attempts = 0;
+      var timer = setInterval(function () {
+        attempts += 1;
+        if (renderSampleBarcodes() || attempts > 40) clearInterval(timer);
+      }, 50);
+    }
+    if (document.readyState === 'complete') bootLabelPrint();
+    else window.addEventListener('load', bootLabelPrint);
   `;
 };
 
@@ -121,12 +130,6 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
   if (!list.length) return buildLabelPrintDocument(null, { isArabic, autoPrint });
 
   const pages = list.map((sample) => labelBodyHtml(sample, isArabic)).join('\n');
-  const autoPrintScript = autoPrint ? `
-      window.onload = function () {
-        setTimeout(function () { window.focus(); window.print(); }, 350);
-      };
-      window.onafterprint = function () { window.close(); };
-  ` : '';
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -182,7 +185,7 @@ const triggerFramePrint = (iframe, { waitMs = 180 } = {}) => new Promise((resolv
 
 /** @deprecated GDI/browser print only — prints blank on Zebra thermal. Do not use for labels. */
 export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
-  const list = (samples || []).filter(Boolean);
+  const list = Array.isArray(samples) ? samples.filter(Boolean) : (samples ? [samples] : []);
   if (!list.length) return false;
 
   const iframe = getPrintFrame();
@@ -190,7 +193,7 @@ export async function printLabelsViaIframe(samples, { isArabic = false } = {}) {
   doc.open();
   doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: false }));
   doc.close();
-  await triggerFramePrint(iframe, { waitMs: 200 + list.length * 100 });
+  await triggerFramePrint(iframe, { waitMs: 450 + list.length * 120 });
   return true;
 }
 
@@ -209,7 +212,7 @@ export async function printLabelFromPreview() {
   doc.open();
   doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${LABEL_PRINT_STYLES}</style></head><body>${el.outerHTML}</body></html>`);
   doc.close();
-  await triggerFramePrint(iframe, { waitMs: 80 });
+  await triggerFramePrint(iframe, { waitMs: 250 });
   return true;
 }
 

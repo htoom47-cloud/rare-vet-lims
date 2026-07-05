@@ -319,7 +319,6 @@ export default function WorkflowCase() {
         created.push(data.data);
       }
       setSamples(created);
-      setStep(4);
       toast.success(t('workflow.samplesCreated', { count: created.length }));
 
       const expected = totalLabelCountForSamples(created);
