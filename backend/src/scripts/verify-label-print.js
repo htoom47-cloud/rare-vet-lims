@@ -82,8 +82,9 @@ ok('in-place print CSS class exists in frontend index.css', async () => {
 ok('ZPL label builder produces valid ZPL', async () => {
   const engine = require('../services/barcode-engine.service');
   const payload = engine.buildBarcodePayload({
-    sample_code: '260702968431',
-    animal_code: 'ANM-001',
+    sample_code: '26000003',
+    barcode: '260705798445',
+    animal_code: '384729',
     animal_name: 'Test',
     tests: [{ test_code: 'CBC', test_name: 'CBC', category_code: 'CBC' }],
   }, { isArabic: false });

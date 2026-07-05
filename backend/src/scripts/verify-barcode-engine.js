@@ -25,8 +25,8 @@ const check = (label, fn) => {
 const ARABIC_RE = /[\u0600-\u06FF]/;
 
 const sampleFixture = (overrides = {}) => ({
-  sample_code: '260702625897',
-  barcode: '260702625897',
+  sample_code: '26000003',
+  barcode: '260705798445',
   customer_name: 'Mohammed',
   customer_name_ar: 'محمد العتيبي',
   animal_name: 'شاهين',
@@ -38,9 +38,10 @@ const sampleFixture = (overrides = {}) => ({
 
 console.log('\n=== Barcode Engine — Phase 5 ===\n');
 
-check('barcodeValue = sample_id digits only', () => {
+check('barcodeValue uses barcode column (12-digit scan value)', () => {
   const payload = engine.buildBarcodePayload(sampleFixture());
-  assert.strictEqual(payload.barcodeValue, '260702625897');
+  assert.strictEqual(payload.barcodeValue, '260705798445');
+  assert.strictEqual(payload.humanReadable.sampleId, '26000003');
   assert.strictEqual(payload.barcodeType, 'Code128');
   assert.ok(!ARABIC_RE.test(payload.barcodeValue));
 });
@@ -51,9 +52,9 @@ check('validateBarcodePayload accepts valid payload', () => {
   assert.strictEqual(v.valid, true, v.errors?.join('; '));
 });
 
-check('^BC ^FD contains sample_id digits only (no Arabic)', () => {
-  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: true });
-  const zpl = engine.buildZplLabel(payload, { isArabic: true });
+check('^BC ^FD contains barcode digits only (no Arabic)', () => {
+  const payload = engine.buildBarcodePayload(sampleFixture());
+  const zpl = engine.buildZplLabel(payload);
   const bcBlock = zpl.match(/\^BC[\s\S]*?\^FS/);
   assert.ok(bcBlock, 'missing ^BC block');
   const fd = bcBlock[0].match(/\^FD([\s\S]*?)\^FS/)[1];
@@ -61,20 +62,14 @@ check('^BC ^FD contains sample_id digits only (no Arabic)', () => {
   assert.ok(!ARABIC_RE.test(fd));
 });
 
-check('ZPL Arabic mode — ^CI28 + animal name in Arabic', () => {
-  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: true });
-  const zpl = engine.buildZplLabel(payload, { isArabic: true });
-  assert.ok(zpl.includes('^CI28'), 'UTF-8 ZPL mode missing');
-  assert.ok(ARABIC_RE.test(zpl), 'Arabic animal name must appear in ZPL');
-  assert.ok(zpl.includes('شاهين'), 'Animal name missing from ZPL');
-});
-
-check('ZPL English mode — ^CI0, no Arabic in text', () => {
-  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: false });
-  const zpl = engine.buildZplLabel(payload, { isArabic: false });
+check('ZPL English-only — Sample, test, animal type, no Arabic', () => {
+  const payload = engine.buildBarcodePayload(sampleFixture());
+  const zpl = engine.buildZplLabel(payload);
   assert.ok(zpl.includes('^CI0'), 'ASCII ZPL mode missing');
-  assert.ok(!ARABIC_RE.test(zpl), 'Arabic must not appear in English ZPL');
-  assert.ok(zpl.includes('Type: Camel'), 'English animal type missing');
+  assert.ok(!ARABIC_RE.test(zpl), 'Arabic must not appear in ZPL');
+  assert.ok(zpl.includes('Sample 26000003'), 'Sample line missing');
+  assert.ok(zpl.includes('CBC'), 'Test line missing');
+  assert.ok(zpl.includes('Camel'), 'Animal type missing');
 });
 
 check('No Arabic inside barcode encode value', () => {
@@ -84,7 +79,7 @@ check('No Arabic inside barcode encode value', () => {
     animal_name: 'ناقة',
   });
   assert.ok(!ARABIC_RE.test(payload.barcodeEncode));
-  assert.strictEqual(payload.barcodeEncode, encodeCode128C('260702625897'));
+  assert.strictEqual(payload.barcodeEncode, encodeCode128C('260705798445'));
 });
 
 check('Quiet zone left and right sufficient', () => {
@@ -128,24 +123,13 @@ check('Norma HL7 PID sampleId unchanged (scanner / Norma chain)', () => {
   assert.strictEqual(payload.normaSampleId, normalizeSampleScanId(payload.barcodeValue));
 });
 
-check('Arabic animal type label correct (camel → إبل)', () => {
-  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: true });
-  assert.strictEqual(payload.humanReadable.animalType, 'إبل');
-  const customerLine = payload.textLines.find((l) => l.key === 'customer');
-  assert.ok(customerLine.text.includes('العميل'));
-});
-
-check('Arabic test panel label (CBC → تعداد الدم)', () => {
-  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: true });
-  assert.strictEqual(payload.humanReadable.testsSummary, 'تعداد الدم');
-});
-
-check('Printed Arabic name preserved in humanReadable textLines', () => {
-  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: true });
-  const customer = payload.textLines.find((l) => l.key === 'customer');
-  assert.ok(customer.text.includes('محمد العتيبي'));
-  const animal = payload.textLines.find((l) => l.key === 'animal');
-  assert.ok(animal.text.includes('شاهين'));
+check('Label text lines: Sample, test, animal type only', () => {
+  const payload = engine.buildBarcodePayload(sampleFixture());
+  const keys = payload.textLines.map((l) => l.key);
+  assert.deepStrictEqual(keys, ['sample', 'test', 'animalType']);
+  assert.ok(payload.textLines[0].text.includes('26000003'));
+  assert.ok(payload.textLines[1].text.includes('CBC'));
+  assert.ok(payload.textLines[2].text.includes('Camel'));
 });
 
 check('validateBarcodePayload rejects Arabic in barcodeValue', () => {
@@ -163,6 +147,10 @@ check('normalizePrinterOptions defaults for Zebra 50×25', () => {
   assert.strictEqual(opts.labelWidthMm, 50);
   assert.strictEqual(opts.labelHeightMm, 25);
   assert.strictEqual(opts.labelWidthDots, 400);
+});
+
+check('displaySampleId accepts 8-digit sample codes', () => {
+  assert.strictEqual(displaySampleId('26000003'), '26000003');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

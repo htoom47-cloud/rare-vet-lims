@@ -1,6 +1,6 @@
 const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const { generateAnimalCode, paginate, buildPagination } = require('../utils/helpers');
+const { generateRandomAnimalCode, ANIMAL_CODE_LOCK, paginate, buildPagination } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 
 const list = async ({ search, owner_id, animal_type, page, limit }) => {
@@ -62,8 +62,8 @@ const create = async (data, userId) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(26000001)');
-    const animalCode = await generateAnimalCode(client.query.bind(client));
+    await client.query('SELECT pg_advisory_xact_lock($1)', [ANIMAL_CODE_LOCK]);
+    const animalCode = await generateRandomAnimalCode(client.query.bind(client));
     const result = await client.query(
       `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip, owner_id, medical_history, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,

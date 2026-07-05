@@ -9,8 +9,9 @@ const ANIMAL_TYPE_LABELS = {
   other: { en: 'Other', ar: 'أخرى' },
   // legacy enum values (pre-migration records)
   bird: { en: 'Other', ar: 'أخرى' },
-  cat: { en: 'Other', ar: 'أخرى' },
-  dog: { en: 'Other', ar: 'أخرى' },
+  cat: { en: 'Cat', ar: 'قط' },
+  dog: { en: 'Dog', ar: 'كلب' },
+  cow: { en: 'Cow', ar: 'بقر' },
 };
 
 module.exports = { ANIMAL_TYPE_CODES, ANIMAL_TYPE_LABELS };

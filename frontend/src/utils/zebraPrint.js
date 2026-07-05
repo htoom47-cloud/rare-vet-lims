@@ -141,15 +141,16 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
-/** Vertical layout v8 — larger English text; barcode unchanged (50×25 mm). */
+const TOP_MARGIN_DOTS = 8; // 1 mm @ 203 dpi
+
+/** Vertical layout v10 — 50×25 mm, 1 mm top margin, centered text. */
 const LAYOUT = {
-  barcodeY: 2,
-  barcodeHeight: 52,
+  barcodeY: TOP_MARGIN_DOTS,
+  barcodeHeight: 44,
   digitsY: 56,
-  customerY: 76,
-  animalY: 86,
-  dateY: 110,
-  testY: 134,
+  sampleY: 76,
+  testY: 96,
+  animalY: 116,
 };
 
 const zplEscape = (value) => String(value ?? '')
@@ -184,9 +185,9 @@ const zplLandscapeHeader = (isArabic = false) => [
 
 const field = (zpl) => `^FWN${zpl}`;
 
-const FONT_DIGITS = '^A0N,28,26';
-const FONT_LINE = '^A0N,22,20';
-const FONT_LINE_BOLD = '^A0N,22,22';
+const FONT_DIGITS = '^A0N,30,28';
+const FONT_LINE = '^A0N,24,22';
+const FONT_LINE_BOLD = '^A0N,24,24';
 
 const textLine = (y, value, font = FONT_LINE) => (
   field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
@@ -206,24 +207,24 @@ export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
   buildThermalLabelContent(sample, { isArabic })
 );
 
-/** ZPL for Zebra ZD421 50×25 mm — Arabic animal name when isArabic=true (^CI28). */
-export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
-  const content = buildZebraThermalLabelContent(sample, { isArabic });
-  const lines = [...zplLandscapeHeader(isArabic)];
+/** ZPL for Zebra ZD421 50×25 mm — English only, no Arabic in ^FD fields. */
+export const buildCbcLabelZpl = (sample) => {
+  const content = buildZebraThermalLabelContent(sample);
+  const lines = [...zplLandscapeHeader(false)];
 
   if (content.barcode) {
     lines.push(barcodeField(content.barcode));
     if (content.barcodeDigits) {
       lines.push(textLine(LAYOUT.digitsY, content.barcodeDigits, FONT_DIGITS));
     }
-    if (content.animalLine) {
-      lines.push(textLine(LAYOUT.animalY, content.animalLine, FONT_LINE));
-    }
-    if (content.dateLine) {
-      lines.push(textLine(LAYOUT.dateY, content.dateLine, FONT_LINE));
+    if (content.sampleLine) {
+      lines.push(textLine(LAYOUT.sampleY, content.sampleLine, FONT_LINE));
     }
     if (content.testLine) {
       lines.push(textLine(LAYOUT.testY, content.testLine, FONT_LINE_BOLD));
+    }
+    if (content.animalTypeLine) {
+      lines.push(textLine(LAYOUT.animalY, content.animalTypeLine, FONT_LINE));
     }
   }
 
@@ -251,8 +252,8 @@ async function sendZplLocalBridge(zpl) {
   await sendZplHttp(null, zpl, { timeoutMs: 2000 });
 }
 
-export async function printToZebra(sample, { isArabic = false } = {}) {
-  const zpl = buildCbcLabelZpl(sample, { isArabic });
+export async function printToZebra(sample) {
+  const zpl = buildCbcLabelZpl(sample);
   if (!zpl || !String(zpl).includes('^FD')) {
     throw new ZebraPrintError('Empty label data', 'EMPTY_ZPL');
   }

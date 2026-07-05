@@ -8,8 +8,9 @@ export const ANIMAL_TYPES = {
   goat: { en: 'Goat', ar: 'ماعز' },
   other: { en: 'Other', ar: 'أخرى' },
   bird: { en: 'Other', ar: 'أخرى' },
-  cat: { en: 'Other', ar: 'أخرى' },
-  dog: { en: 'Other', ar: 'أخرى' },
+  cat: { en: 'Cat', ar: 'قط' },
+  dog: { en: 'Dog', ar: 'كلب' },
+  cow: { en: 'Cow', ar: 'بقر' },
 };
 
 export const animalTypeLabel = (type, isAr) => {

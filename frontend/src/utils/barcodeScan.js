@@ -6,7 +6,7 @@ export const displaySampleId = (input) => {
   const norm = normalizeSampleScanId(input);
   if (!norm) return '';
   const digits = extractDigits(norm);
-  if (digits.length >= 10 && digits.length <= 14) return digits;
+  if (digits.length >= 8 && digits.length <= 14) return digits;
   return norm;
 };
 
@@ -23,7 +23,7 @@ export const normalizeSampleScanId = (input) => {
     return digits.slice(1);
   }
 
-  if (digits.length >= 10 && digits.length <= 14) return digits;
+  if (digits.length >= 8 && digits.length <= 14) return digits;
   if (/^(SMP|BC)-/i.test(trimmed)) return trimmed.toUpperCase();
   return trimmed;
 };
@@ -42,5 +42,5 @@ export const scanMatchesStored = (stored, scanned) => {
   if (a === b) return true;
   const da = extractDigits(a);
   const db = extractDigits(b);
-  return da.length >= 10 && da === db;
+  return da.length >= 8 && da === db;
 };

@@ -2,7 +2,13 @@ const { query, getClient } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
 const { normalizeSampleScanId } = require('../utils/barcode-scan');
-const { generateSampleDigitsId, paginate, buildPagination } = require('../utils/helpers');
+const {
+  generateNextSampleCode,
+  generateBarcodeDigitsId,
+  SAMPLE_SEQUENCE_LOCK,
+  paginate,
+  buildPagination,
+} = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
 const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
 const { resolveSampleTestIds } = require('../utils/packageTests');
@@ -187,25 +193,26 @@ const create = async (data, userId) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1)', [SAMPLE_SEQUENCE_LOCK]);
 
-    let sampleDigits = null;
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const candidate = generateSampleDigitsId();
+    const sampleCode = await generateNextSampleCode(client.query.bind(client));
+
+    let barcode = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const candidate = generateBarcodeDigitsId();
       // eslint-disable-next-line no-await-in-loop
       const exists = await client.query(
-        'SELECT 1 FROM samples WHERE sample_code = $1 OR barcode = $1 LIMIT 1',
+        'SELECT 1 FROM samples WHERE barcode = $1 LIMIT 1',
         [candidate]
       );
       if (!exists.rows.length) {
-        sampleDigits = candidate;
+        barcode = candidate;
         break;
       }
     }
-    if (!sampleDigits) {
-      throw new AppError('Could not generate unique sample ID', 500, 'SAMPLE_ID_COLLISION');
+    if (!barcode) {
+      throw new AppError('Could not generate unique barcode', 500, 'BARCODE_COLLISION');
     }
-    const sampleCode = sampleDigits;
-    const barcode = sampleDigits;
 
     const sampleResult = await client.query(
       `INSERT INTO samples (id, sample_code, barcode, customer_id, animal_id, department, priority, notes, status, created_by)

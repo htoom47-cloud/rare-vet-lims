@@ -148,7 +148,7 @@
 .label-50x25 {
   width: 50mm;
   height: 25mm;
-  padding: 0.5mm 1.2mm 0.4mm;
+  padding: 1mm 1mm 0.3mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -175,9 +175,9 @@
 }
 
 .label-50x25-digits {
-  margin: 0.2mm 0 0;
+  margin: 0.15mm 0 0;
   padding: 0;
-  font-size: 10.5pt;
+  font-size: 11pt;
   font-weight: 800;
   line-height: 1.05;
   text-align: center;
@@ -203,10 +203,10 @@
 }
 
 .label-50x25-line {
-  margin: 0;
+  margin: 0.1mm 0 0;
   padding: 0;
-  font-size: 8pt;
-  line-height: 1.15;
+  font-size: 9pt;
+  line-height: 1.12;
   text-align: center;
   font-family: Arial, 'Segoe UI', Tahoma, sans-serif;
   color: #000;

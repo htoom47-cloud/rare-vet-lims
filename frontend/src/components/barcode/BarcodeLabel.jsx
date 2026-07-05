@@ -4,15 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { buildThermalLabelContent, barcodeEncodeDigits } from '../../utils/labelPanel';
 
 const emptyLabelContent = (sample) => {
-  const code = String(sample?.sample_code || sample?.barcode || '').trim();
+  const code = String(sample?.barcode || sample?.sample_code || '').trim();
+  const sampleId = String(sample?.sample_code || '').replace(/\D/g, '') || code;
   return {
     barcode: code,
     barcodeEncode: barcodeEncodeDigits(code),
     barcodeDigits: code,
-    customerLine: '',
-    animalLine: '',
+    sampleLine: sampleId ? `Sample ${sampleId}` : '',
     testLine: '',
-    dateLine: '',
+    animalTypeLine: '',
   };
 };
 
@@ -66,24 +66,19 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
         )}
 
         <div className="label-50x25-details">
-          {content.customerLine && (
-            <p className="label-50x25-line label-50x25-meta" title={content.customerLine}>
-              {content.customerLine}
-            </p>
-          )}
-          {content.animalLine && (
-            <p className="label-50x25-line label-50x25-meta" title={content.animalLine}>
-              {content.animalLine}
-            </p>
-          )}
-          {content.dateLine && (
-            <p className="label-50x25-line label-50x25-meta" title={content.dateLine}>
-              {content.dateLine}
+          {content.sampleLine && (
+            <p className="label-50x25-line label-50x25-sample" title={content.sampleLine}>
+              {content.sampleLine}
             </p>
           )}
           {content.testLine && (
             <p className="label-50x25-line label-50x25-test" title={content.testLine}>
               {content.testLine}
+            </p>
+          )}
+          {content.animalTypeLine && (
+            <p className="label-50x25-line label-50x25-meta" title={content.animalTypeLine}>
+              {content.animalTypeLine}
             </p>
           )}
         </div>

@@ -1,6 +1,9 @@
 const crypto = require('crypto');
 
-const ANIMAL_CODE_START = 26000001;
+const SAMPLE_CODE_MIN = 26000001;
+const SAMPLE_CODE_MAX = 26999999;
+const SAMPLE_SEQUENCE_LOCK = 26999901;
+const ANIMAL_CODE_LOCK = 38472901;
 
 const generateCode = (prefix, length = 6) => {
   const num = Math.floor(Math.random() * Math.pow(10, length)).toString().padStart(length, '0');
@@ -8,23 +11,48 @@ const generateCode = (prefix, length = 6) => {
   return `${prefix}-${date}-${num}`;
 };
 
-/** Sequential animal ID: 26000001, 26000002, … */
-const generateAnimalCode = async (queryFn) => {
-  const result = await queryFn(
-    `SELECT COALESCE(MAX(animal_code::bigint), $1 - 1) + 1 AS next_code
-     FROM animals
-     WHERE animal_code ~ '^[0-9]+$'`,
-    [ANIMAL_CODE_START]
-  );
-  return String(result.rows[0].next_code);
+/** Random 6-digit animal ID for newly created animals (100000–999999). */
+const generateRandomAnimalCode = async (queryFn) => {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await queryFn(
+      'SELECT 1 FROM animals WHERE animal_code = $1 LIMIT 1',
+      [code]
+    );
+    if (!exists.rows.length) return code;
+  }
+  throw new Error('Could not generate unique animal code');
 };
 
-/** Unified 12-digit sample ID — YYMMDD + 6 random digits (same value for sample_code and barcode). */
-const generateSampleDigitsId = (suffixLength = 6) => {
+/**
+ * Sequential sample ID: 26000001 … 26999999, then wraps to 26000001.
+ * Must run inside a transaction after pg_advisory_xact_lock(SAMPLE_SEQUENCE_LOCK).
+ */
+const generateNextSampleCode = async (queryFn) => {
+  const result = await queryFn(
+    `SELECT COALESCE(MAX(sample_code::bigint), $1 - 1) AS max_code
+     FROM samples
+     WHERE sample_code ~ '^[0-9]+$'
+       AND sample_code::bigint >= $1
+       AND sample_code::bigint <= $2`,
+    [SAMPLE_CODE_MIN, SAMPLE_CODE_MAX]
+  );
+  let next = Number(result.rows[0].max_code) + 1;
+  if (!Number.isFinite(next) || next < SAMPLE_CODE_MIN) next = SAMPLE_CODE_MIN;
+  if (next > SAMPLE_CODE_MAX) next = SAMPLE_CODE_MIN;
+  return String(next);
+};
+
+/** 12-digit barcode: YYMMDD + 6 random digits (Code128 scan value). */
+const generateBarcodeDigitsId = (suffixLength = 6) => {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
   const num = Math.floor(Math.random() * 10 ** suffixLength).toString().padStart(suffixLength, '0');
   return `${date}${num}`;
 };
+
+/** @deprecated use generateBarcodeDigitsId */
+const generateSampleDigitsId = generateBarcodeDigitsId;
 
 const sampleDigitsOnly = (value) => String(value || '').replace(/\D/g, '');
 
@@ -72,9 +100,14 @@ const mobileEqualsSql = (column, paramIndex) => (
 
 module.exports = {
   generateCode,
-  generateAnimalCode,
-  ANIMAL_CODE_START,
+  generateRandomAnimalCode,
+  generateNextSampleCode,
+  generateBarcodeDigitsId,
   generateSampleDigitsId,
+  SAMPLE_CODE_MIN,
+  SAMPLE_CODE_MAX,
+  SAMPLE_SEQUENCE_LOCK,
+  ANIMAL_CODE_LOCK,
   sampleDigitsOnly,
   hashToken,
   paginate,

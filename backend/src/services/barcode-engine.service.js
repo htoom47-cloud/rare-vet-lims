@@ -22,23 +22,24 @@ const ANIMAL_TYPES = {
   sheep: { en: 'Sheep', ar: 'غنم' },
   horse: { en: 'Horse', ar: 'خيل' },
   goat: { en: 'Goat', ar: 'ماعز' },
+  cow: { en: 'Cow', ar: 'بقر' },
+  cat: { en: 'Cat', ar: 'قط' },
+  dog: { en: 'Dog', ar: 'كلب' },
   other: { en: 'Other', ar: 'أخرى' },
   bird: { en: 'Other', ar: 'أخرى' },
-  cat: { en: 'Other', ar: 'أخرى' },
-  dog: { en: 'Other', ar: 'أخرى' },
 };
 
 const PANEL_LABELS = {
   CBC: { ar: 'تعداد الدم', en: 'CBC' },
   CHEM: { ar: 'كيمياء الدم', en: 'Chemistry' },
-  MICRO: { ar: 'طفيليات', en: 'Parasitology' },
-  PARAS: { ar: 'طفيليات', en: 'Parasitology' },
-  HORM: { ar: 'هرمونات', en: 'Hormones' },
+  MICRO: { ar: 'طفيليات', en: 'Parasites' },
+  PARAS: { ar: 'طفيليات', en: 'Parasites' },
+  HORM: { ar: 'هرمونات', en: 'Hormone' },
   ELISA: { ar: 'ELISA', en: 'ELISA' },
   SERO: { ar: 'أمصال', en: 'Serology' },
   PCR: { ar: 'PCR', en: 'PCR' },
   CULT: { ar: 'مزارع', en: 'Culture' },
-  OTHER: { ar: 'فحص مخبري', en: 'Lab' },
+  OTHER: { ar: 'أخرى', en: 'Other' },
 };
 
 const DEFAULT_PRINTER = {
@@ -55,13 +56,12 @@ const LABEL_HEIGHT = 200;
 const MIN_QUIET_ZONE = 10;
 
 const LAYOUT = {
-  barcodeY: 2,
-  barcodeHeight: 52,
+  barcodeY: 8,
+  barcodeHeight: 44,
   digitsY: 56,
-  customerY: 76,
-  animalY: 86,
-  dateY: 110,
-  testY: 134,
+  sampleY: 76,
+  testY: 96,
+  animalY: 116,
 };
 
 const zplEscape = (value) => String(value ?? '')
@@ -130,44 +130,25 @@ const labels = (isArabic) => ({
  */
 const buildBarcodePayload = (sample = {}, context = {}) => {
   const isArabic = context.isArabic ?? context.language === 'ar';
-  const L = labels(isArabic);
 
-  const rawId = sample.sample_code || sample.barcode || sample.sample_id;
-  const barcodeValue = displaySampleId(rawId) || '';
+  const rawBarcode = sample.barcode || sample.sample_code || sample.sample_id;
+  const barcodeValue = displaySampleId(rawBarcode) || '';
   const barcodeEncode = encodeCode128C(barcodeValue);
-
-  const customerName = String(
-    sample.customer_name_ar || sample.customer_name || sample.client_name || ''
-  ).trim();
-  const animalName = String(sample.animal_name || sample.name_tag || '').trim();
-  const animalType = animalTypeLabel(sample.animal_type, isArabic);
-  const sampleDate = formatSampleDate(sample.collection_date || sample.date, isArabic);
-  const testsSummary = formatTestsForLabel(sample, isArabic);
+  const sampleId = String(sample.sample_code || '').replace(/\D/g, '') || barcodeValue;
+  const testsSummary = formatTestsForLabel(sample, false);
+  const animalType = animalTypeLabel(sample.animal_type, false);
 
   const humanReadable = {
-    sampleId: barcodeValue,
-    customerName,
-    animalName,
+    sampleId,
+    barcodeValue,
     animalType,
-    sampleDate,
     testsSummary,
   };
 
   const textLines = [
-    { key: 'sampleId', text: truncateLabel(`${L.sampleId}: ${barcodeValue}`) },
-    customerName && { key: 'customer', text: truncateLabel(`${L.customer}: ${customerName}`) },
-    (animalName || animalType) && {
-      key: 'animal',
-      text: truncateLabel(
-        animalName && animalType
-          ? `${L.animal}: ${animalName} · ${L.type}: ${animalType}`
-          : animalName
-            ? `${L.animal}: ${animalName}`
-            : `${L.type}: ${animalType}`
-      ),
-    },
-    sampleDate && { key: 'date', text: truncateLabel(`${L.date}: ${sampleDate}`) },
-    testsSummary && { key: 'test', text: truncateLabel(`${L.test}: ${testsSummary}`) },
+    sampleId && { key: 'sample', text: truncateLabel(`Sample ${sampleId}`) },
+    testsSummary && { key: 'test', text: truncateLabel(testsSummary) },
+    animalType && { key: 'animalType', text: truncateLabel(animalType) },
   ].filter(Boolean);
 
   return {
@@ -180,7 +161,7 @@ const buildBarcodePayload = (sample = {}, context = {}) => {
     meta: {
       animal_type: sample.animal_type,
       animal_code: sample.animal_code,
-      collection_date: sample.collection_date || sample.date,
+      sample_code: sampleId,
       tests: sample.tests || [],
     },
   };
@@ -265,9 +246,9 @@ const zplHeader = (opts) => {
 
 const field = (zpl) => `^FWN${zpl}`;
 
-const FONT_DIGITS = '^A0N,28,26';
-const FONT_LINE = '^A0N,22,20';
-const FONT_TEST = '^A0N,22,22';
+const FONT_DIGITS = '^A0N,30,28';
+const FONT_LINE = '^A0N,24,22';
+const FONT_TEST = '^A0N,24,24';
 
 const textLine = (y, value, width, font = FONT_LINE) => (
   field(`^FO0,${y}^FB${width},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
@@ -296,35 +277,16 @@ const asciiLabelText = (text) => {
   return s;
 };
 
-/** English or Arabic text lines for ZPL — Arabic uses ^CI28 when isArabic=true. */
-const buildZplTextLines = (payload, isArabic = false) => {
-  const animalName = String(payload.humanReadable?.animalName || '').trim();
-  const animalCode = String(payload.meta?.animal_code || '').trim();
-  const animalType = animalTypeLabel(payload.meta?.animal_type, isArabic);
-  const sampleDate = formatSampleDate(payload.meta?.collection_date, isArabic);
-  const testsSummary = formatTestsForLabel(
-    { tests: payload.meta?.tests || [] },
-    isArabic
-  );
+/** English-only text lines for ZPL (no Arabic, no customer/animal name). */
+const buildZplTextLines = (payload) => {
+  const sampleId = payload.meta?.sample_code || payload.humanReadable?.sampleId || '';
+  const testsSummary = formatTestsForLabel({ tests: payload.meta?.tests || [] }, false);
+  const animalType = animalTypeLabel(payload.meta?.animal_type, false);
 
   const lines = [];
-  if (isArabic && animalName) {
-    const bit = animalCode ? `${animalName} · ${animalCode}` : animalName;
-    lines.push({ key: 'animal', text: truncateLabel(bit) });
-  } else if (animalType) {
-    const animalBit = animalCode
-      ? `Type: ${animalType} · ${animalCode}`
-      : `Type: ${animalType}`;
-    lines.push({ key: 'animal', text: truncateLabel(animalBit) });
-  } else if (animalCode) {
-    lines.push({ key: 'animal', text: truncateLabel(`ID: ${animalCode}`) });
-  }
-  if (sampleDate) {
-    lines.push({ key: 'date', text: truncateLabel(`${isArabic ? 'التاريخ' : 'Date'}: ${sampleDate}`) });
-  }
-  if (testsSummary) {
-    lines.push({ key: 'test', text: truncateLabel(`${isArabic ? 'الفحص' : 'Test'}: ${testsSummary}`) });
-  }
+  if (sampleId) lines.push({ key: 'sample', text: truncateLabel(`Sample ${sampleId}`) });
+  if (testsSummary) lines.push({ key: 'test', text: truncateLabel(testsSummary) });
+  if (animalType) lines.push({ key: 'animalType', text: truncateLabel(animalType) });
   return lines;
 };
 
@@ -339,19 +301,19 @@ const buildZplLabel = (payload, options = {}) => {
     throw err;
   }
 
-  const opts = normalizePrinterOptions(options);
+  const opts = normalizePrinterOptions({ ...options, isArabic: false });
   const labelW = opts.labelWidthDots || LABEL_WIDTH;
-  const lines = [...zplHeader(opts)];
+  const lines = [...zplHeader({ ...opts, isArabic: false })];
 
   const bc = barcodeField(payload, opts);
   lines.push(bc.zpl);
 
-  const sampleDigits = payload.barcodeValue || payload.humanReadable?.sampleId || '';
+  const sampleDigits = payload.barcodeValue || '';
   lines.push(textLine(LAYOUT.digitsY, sampleDigits, labelW, FONT_DIGITS));
 
-  const zplLines = buildZplTextLines(payload, opts.isArabic);
-  const yByKey = { animal: LAYOUT.animalY, date: LAYOUT.dateY, test: LAYOUT.testY };
-  const fontByKey = { animal: FONT_LINE, date: FONT_LINE, test: FONT_TEST };
+  const zplLines = buildZplTextLines(payload);
+  const yByKey = { sample: LAYOUT.sampleY, test: LAYOUT.testY, animalType: LAYOUT.animalY };
+  const fontByKey = { sample: FONT_LINE, test: FONT_TEST, animalType: FONT_LINE };
   for (const line of zplLines) {
     lines.push(textLine(yByKey[line.key], line.text, labelW, fontByKey[line.key] || FONT_LINE));
   }

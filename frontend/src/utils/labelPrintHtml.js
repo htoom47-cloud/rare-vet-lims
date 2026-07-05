@@ -25,7 +25,7 @@ const LABEL_PRINT_STYLES = `
   }
   .label-50x25 {
     width: 50mm; height: 25mm; max-height: 25mm; box-sizing: border-box;
-    padding: 0.4mm 1mm 0.3mm;
+    padding: 1mm 1mm 0.3mm;
     display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     font-family: Arial, Helvetica, sans-serif; color: #000;
     overflow: hidden;
@@ -44,8 +44,8 @@ const LABEL_PRINT_STYLES = `
     max-width: 100%; max-height: 11mm; height: auto; display: block;
   }
   .label-50x25-digits {
-    margin: 0.2mm 0 0; padding: 0;
-    font-size: 10.5pt; font-weight: 800; line-height: 1.05;
+    margin: 0.15mm 0 0; padding: 0;
+    font-size: 11pt; font-weight: 800; line-height: 1.05;
     text-align: center; letter-spacing: 0.08em;
     font-family: Consolas, 'Courier New', monospace;
   }
@@ -54,8 +54,8 @@ const LABEL_PRINT_STYLES = `
     display: flex; flex-direction: column; justify-content: center; gap: 0.1mm; min-height: 0;
   }
   .label-50x25-line {
-    margin: 0.12mm 0 0; padding: 0;
-    font-size: 8pt; line-height: 1.15;
+    margin: 0.1mm 0 0; padding: 0;
+    font-size: 9pt; line-height: 1.12;
     text-align: center; max-width: 100%;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     font-weight: 600;
@@ -72,13 +72,15 @@ export const labelMetaFromSample = (sample, isArabic = false) => {
     // eslint-disable-next-line no-console
     console.error('[labelPrintHtml] labelMetaFromSample', error);
     const id = String(sample?.sample_code || sample?.barcode || '').trim() || '—';
+    const scan = String(sample?.barcode || id).trim();
     return {
-      barcode: id,
-      barcodeDigits: id,
-      barcodeEncode: barcodeEncodeDigits(id),
+      barcode: scan,
+      barcodeDigits: scan,
+      barcodeEncode: barcodeEncodeDigits(scan),
       animalLine: '',
       testLine: '',
-      customerLine: '',
+      sampleLine: id ? `Sample ${id}` : '',
+      animalTypeLine: '',
     };
   }
 };
@@ -114,8 +116,9 @@ const labelBodyInner = (content) => {
     ? `<p class="label-50x25-digits">${escapeHtml(content.barcodeDigits)}</p>`
     : ''}
     </div>
-    ${content.animalLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalLine)}">${escapeHtml(content.animalLine)}</p>` : ''}
-    ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}`;
+    ${content.sampleLine ? `<p class="label-50x25-line label-50x25-sample" title="${escapeHtml(content.sampleLine)}">${escapeHtml(content.sampleLine)}</p>` : ''}
+    ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}
+    ${content.animalTypeLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalTypeLine)}">${escapeHtml(content.animalTypeLine)}</p>` : ''}`;
 };
 
 const labelBodyInnerWithImage = (content, barcodeImg) => `
@@ -124,8 +127,9 @@ const labelBodyInnerWithImage = (content, barcodeImg) => `
     ? `<img class="label-50x25-barcode-img" src="${barcodeImg}" alt="" />`
     : '<p class="label-50x25-error">No barcode</p>'}
     </div>
-    ${content.animalLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalLine)}">${escapeHtml(content.animalLine)}</p>` : ''}
-    ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}`;
+    ${content.sampleLine ? `<p class="label-50x25-line label-50x25-sample" title="${escapeHtml(content.sampleLine)}">${escapeHtml(content.sampleLine)}</p>` : ''}
+    ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}
+    ${content.animalTypeLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalTypeLine)}">${escapeHtml(content.animalTypeLine)}</p>` : ''}`;
 
 const autoPrintScript = () => `
   function finishPrint() {
