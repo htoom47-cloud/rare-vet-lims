@@ -66,6 +66,17 @@ const NORMA_CBC_PCT_BY_ABS = {
 /** WBC differential rows in reports/UI — show % (LYM%) not absolute # (LYM). */
 const NORMA_CBC_WBC_DIFF_PCT_CODES = Object.values(NORMA_CBC_PCT_BY_ABS);
 
+/** Copy LIMS reference columns from a SQL/enriched row onto a display row. */
+const copyTrrFields = (src = {}) => ({
+  trr_min: src.trr_min ?? null,
+  trr_max: src.trr_max ?? null,
+  trr_critical_low: src.trr_critical_low ?? null,
+  trr_critical_high: src.trr_critical_high ?? null,
+  trr_notes: src.trr_notes ?? null,
+  trr_text_reference: src.trr_text_reference ?? null,
+  trr_unit: src.trr_unit ?? null,
+});
+
 /**
  * Resolve one CBC screen row for display (report, API, workbench).
  * WBC differential uses percentage param; WBC/RBC/PLT use absolute.
@@ -80,6 +91,7 @@ function resolveCbcScreenRow(screenCode, byCode) {
     const pctPanel = getNormaPanelRow(pctCode);
     const pctValue = String(pctData?.value ?? '').trim();
     if (pctValue !== '') {
+      const refSrc = pctData || absData;
       return {
         parameter_id: pctData.parameter_id,
         parameter_code: pctCode,
@@ -93,6 +105,7 @@ function resolveCbcScreenRow(screenCode, byCode) {
         is_critical: pctData.is_critical || false,
         reference: pctData.reference ?? null,
         sort_order: screenPanel?.displayOrder ?? pctData.sort_order,
+        ...copyTrrFields(refSrc),
       };
     }
 
@@ -113,6 +126,7 @@ function resolveCbcScreenRow(screenCode, byCode) {
         is_critical: pctData?.is_critical || absData?.is_critical || false,
         reference: pctData?.reference ?? null,
         sort_order: screenPanel?.displayOrder,
+        ...copyTrrFields(pctData || absData),
       };
     }
     return null;
@@ -133,6 +147,7 @@ function resolveCbcScreenRow(screenCode, byCode) {
     is_critical: absData.is_critical || false,
     reference: absData.reference ?? null,
     sort_order: absData.sort_order,
+    ...copyTrrFields(absData),
   };
 }
 

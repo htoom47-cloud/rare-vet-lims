@@ -19,6 +19,10 @@ const isRefreshableAutoRow = (notes) => {
   return n.startsWith('Synced from norma-defaults') || n.startsWith('Species default');
 };
 
+const rowMissingBounds = (row) => (
+  row && (row.min_value == null || row.max_value == null)
+);
+
 const upsertReferenceRange = async ({
   parameterId,
   animalType,
@@ -41,32 +45,33 @@ const upsertReferenceRange = async ({
   const noteText = notes ?? (source === 'manual' ? null : `Synced from ${source}`);
 
   const existing = await query(
-    `SELECT id, notes FROM test_reference_ranges trr
+    `SELECT id, notes, min_value, max_value FROM test_reference_ranges trr
      WHERE trr.parameter_id = $1 AND trr.animal_type = $2
      ORDER BY ${LIMS_REF_PRIORITY_ORDER}
      LIMIT 1`,
     [parameterId, animalType]
   );
 
-  if (existing.rows[0] && onlyIfMissing) return existing.rows[0];
-  if (existing.rows[0] && isManualLimsNotes(existing.rows[0].notes) && !force) {
-    return { ...existing.rows[0], skipped_manual: true };
+  const prev = existing.rows[0];
+  if (prev && onlyIfMissing && !rowMissingBounds(prev)) return prev;
+  if (prev && isManualLimsNotes(prev.notes) && !force) {
+    return { ...prev, skipped_manual: true };
   }
-  if (existing.rows[0] && refreshAutoDefaults && !force
-    && !isRefreshableAutoRow(existing.rows[0].notes)) {
-    return { ...existing.rows[0], skipped_protected: true };
+  if (prev && refreshAutoDefaults && !force && !rowMissingBounds(prev)
+    && !isRefreshableAutoRow(prev.notes)) {
+    return { ...prev, skipped_protected: true };
   }
-  if (existing.rows[0] && !force && !refreshAutoDefaults && !onlyIfMissing) {
-    return existing.rows[0];
+  if (prev && !force && !refreshAutoDefaults && !onlyIfMissing) {
+    return prev;
   }
 
-  if (existing.rows[0]) {
+  if (prev) {
     const result = await query(
       `UPDATE test_reference_ranges
        SET min_value = $1, max_value = $2, critical_low = $3, critical_high = $4,
            unit = COALESCE($5, unit), notes = $6
        WHERE id = $7 RETURNING *`,
-      [min, max, cLow, cHigh, unit, noteText, existing.rows[0].id]
+      [min, max, cLow, cHigh, unit, noteText, prev.id]
     );
     return result.rows[0];
   }

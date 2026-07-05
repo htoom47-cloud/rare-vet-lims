@@ -7,12 +7,10 @@ const { getLimsReferenceRange } = require('./reference-ranges.service');
 const { cbcPctFallbackAbsCode, resolveCbcLimsRange } = require('../utils/cbc-reference-params');
 const resultEngine = require('./result-engine.service');
 
-const hasResolvedReference = (row) => {
-  if (row.reference && row.reference !== '-') return true;
-  if (row.trr_min != null && row.trr_max != null) return true;
-  if (row.trr_text_reference != null && String(row.trr_text_reference).trim() !== '') return true;
-  return false;
-};
+const hasResolvedReference = (row) => (
+  (row.trr_min != null && row.trr_max != null)
+  || (row.trr_text_reference != null && String(row.trr_text_reference).trim() !== '')
+);
 
 const reevaluateRowWithRange = (row, range) => {
   const evaluated = resultEngine.evaluateResult(
@@ -64,18 +62,15 @@ const enrichCbcReferences = async (rows, context) => {
 
   return Promise.all(rows.map(async (row) => {
     if (hasResolvedReference(row)) {
-      if (row.trr_min != null && row.trr_max != null) {
-        return reevaluateRowWithRange(row, {
-          min_value: row.trr_min,
-          max_value: row.trr_max,
-          critical_low: row.trr_critical_low,
-          critical_high: row.trr_critical_high,
-          text_reference: row.trr_text_reference,
-          notes: row.trr_notes,
-          unit: row.trr_unit,
-        });
-      }
-      return row;
+      return reevaluateRowWithRange(row, {
+        min_value: row.trr_min,
+        max_value: row.trr_max,
+        critical_low: row.trr_critical_low,
+        critical_high: row.trr_critical_high,
+        text_reference: row.trr_text_reference,
+        notes: row.trr_notes,
+        unit: row.trr_unit,
+      });
     }
 
     const range = await resolveCbcLimsRange(

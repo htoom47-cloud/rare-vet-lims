@@ -6,7 +6,7 @@ const { NORMA_CBC_PCT_BY_ABS, NORMA_CBC_SCREEN_ORDER, getNormaPanelRow, NORMA_CB
 const PCT_BY_ABS = { ...NORMA_CBC_PCT_BY_ABS };
 const ABS_BY_PCT = Object.fromEntries(Object.entries(PCT_BY_ABS).map(([abs, pct]) => [pct, abs]));
 
-const SYNCED_NOTE_PREFIXES = ['Synced from', 'Norma:'];
+const SYNCED_NOTE_PREFIXES = ['Synced from', 'Norma:', 'Species default'];
 
 const isSyncedNotes = (notes) => {
   const n = String(notes || '').trim();
