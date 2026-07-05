@@ -3,7 +3,7 @@ const service = require('../services/samples.service');
 const testMgmt = require('../services/sample-test-management.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { sampleSchema } = require('../validators/schemas');
+const { sampleSchema, sampleReassignAnimalSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 const { auditLog } = require('../middleware/audit');
 
@@ -86,6 +86,13 @@ router.post('/', authorize(PERMISSIONS.SAMPLES_CREATE), validate(sampleSchema), 
 router.patch('/:id/status', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog('update_status', 'samples'), async (req, res, next) => {
   try {
     const data = await service.updateStatus(req.params.id, req.body.status, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.patch('/:id/animal', authorize(PERMISSIONS.SAMPLES_UPDATE), validate(sampleReassignAnimalSchema), auditLog('reassign_animal', 'samples'), async (req, res, next) => {
+  try {
+    const data = await service.reassignAnimal(req.params.id, req.body.animal_id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

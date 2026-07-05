@@ -46,6 +46,9 @@ export default function Samples() {
   const [samples, setSamples] = useState([]);
 
   const [detailSample, setDetailSample] = useState(null);
+  const [detailAnimals, setDetailAnimals] = useState([]);
+  const [reassignAnimalId, setReassignAnimalId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
 
   const [loading, setLoading] = useState(true);
 
@@ -207,11 +210,31 @@ export default function Samples() {
 
 
   const viewDetail = async (sample) => {
-
     const { data } = await samplesAPI.get(sample.id);
-
     setDetailSample(data.data);
+    setReassignAnimalId(data.data.animal_id || '');
+    if (data.data.customer_id) {
+      animalsAPI.list({ owner_id: data.data.customer_id, limit: 50 })
+        .then(({ data: resp }) => setDetailAnimals(resp.data || []))
+        .catch(() => setDetailAnimals([]));
+    } else {
+      setDetailAnimals([]);
+    }
+  };
 
+  const reassignSampleAnimal = async () => {
+    if (!detailSample || !reassignAnimalId || reassignAnimalId === detailSample.animal_id) return;
+    setReassigning(true);
+    try {
+      const { data } = await samplesAPI.reassignAnimal(detailSample.id, reassignAnimalId);
+      setDetailSample(data.data);
+      toast.success(t('samples.reassignAnimalDone'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setReassigning(false);
+    }
   };
 
 
@@ -382,7 +405,12 @@ export default function Samples() {
 
     { key: 'customer_name', label: t('customers.fullName') },
 
-    { key: 'animal_code', label: t('animals.animalId') },
+    { key: 'animal_code', label: t('animals.animalId'), render: (r) => (
+      <span title={r.animal_name || ''}>
+        {r.animal_code}
+        {r.animal_name ? ` · ${r.animal_name}` : ''}
+      </span>
+    ) },
 
     { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} label={t(`samples.statuses.${r.status}`)} /> },
 
@@ -614,7 +642,34 @@ export default function Samples() {
 
               <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailSample.customer_name}</div>
 
-              <div><span className="text-gray-500">{t('animals.animalId')}:</span> {detailSample.animal_code}</div>
+              <div><span className="text-gray-500">{t('animals.animalId')}:</span> {detailSample.animal_code}{detailSample.animal_name ? ` · ${detailSample.animal_name}` : ''}</div>
+
+              {hasPermission('samples.update') && detailAnimals.length > 0 && (
+                <div className="col-span-2 flex flex-wrap items-end gap-2">
+                  <div className="flex-1 min-w-[12rem]">
+                    <label className="block text-xs text-gray-500 mb-1">{t('samples.reassignAnimal')}</label>
+                    <select
+                      value={reassignAnimalId}
+                      onChange={(e) => setReassignAnimalId(e.target.value)}
+                      className="input-field text-sm"
+                    >
+                      {detailAnimals.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.animal_code}{a.name_tag ? ` · ${a.name_tag}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={reassignSampleAnimal}
+                    disabled={reassigning || reassignAnimalId === detailSample.animal_id}
+                    className="btn-secondary text-sm py-2"
+                  >
+                    {reassigning ? t('common.loading') : t('samples.saveAnimalLink')}
+                  </button>
+                </div>
+              )}
 
               <div><span className="text-gray-500">{t('samples.barcode')}:</span> {detailSample.barcode}</div>
 

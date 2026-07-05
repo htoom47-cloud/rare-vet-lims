@@ -57,6 +57,10 @@ const sampleSchema = Joi.object({
   return value;
 });
 
+const sampleReassignAnimalSchema = Joi.object({
+  animal_id: Joi.string().uuid().required(),
+});
+
 const testSchema = Joi.object({
   code: Joi.string().required(),
   name: Joi.string().required(),
@@ -193,6 +197,7 @@ module.exports = {
   customerSchema,
   animalSchema,
   sampleSchema,
+  sampleReassignAnimalSchema,
   testSchema,
   testCategorySchema,
   packageSchema,

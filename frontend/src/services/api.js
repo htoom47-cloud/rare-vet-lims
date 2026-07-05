@@ -107,6 +107,7 @@ export const samplesAPI = {
   get: (id) => api.get(`/samples/${id}`),
   create: (data) => api.post('/samples', data),
   updateStatus: (id, data) => api.patch(`/samples/${id}/status`, data),
+  reassignAnimal: (id, animalId) => api.patch(`/samples/${id}/animal`, { animal_id: animalId }),
   getQueue: () => api.get('/samples/queue'),
   parasitologyQueue: () => api.get('/samples/queue/parasitology'),
   scan: (barcode) => api.get(`/samples/scan/${barcode}`),

@@ -510,6 +510,9 @@ const resources = {
       },
       samples: {
         title: 'Sample Management', register: 'Register Sample', barcode: 'Barcode',
+        reassignAnimal: 'Correct linked animal',
+        saveAnimalLink: 'Save animal link',
+        reassignAnimalDone: 'Sample linked to the selected animal — regenerate report PDF if needed',
         scan: 'Scan Barcode', printLabel: 'Print Label', selectTests: 'Select Tests',
         selectPackages: 'Test packages',
         packageTestCount: '{{count}} tests',
@@ -1402,6 +1405,9 @@ const resources = {
       },
       samples: {
         title: 'إدارة العينات', register: 'تسجيل عينة', barcode: 'الباركود',
+        reassignAnimal: 'تصحيح الحيوان المرتبط',
+        saveAnimalLink: 'حفظ ربط الحيوان',
+        reassignAnimalDone: 'تم ربط العينة بالحيوان المختار — أعد توليد PDF التقرير إن لزم',
         scan: 'مسح الباركود', printLabel: 'طباعة الملصق', selectTests: 'اختر الفحوصات',
         selectPackages: 'باقات الفحوصات',
         packageTestCount: '{{count}} فحص',

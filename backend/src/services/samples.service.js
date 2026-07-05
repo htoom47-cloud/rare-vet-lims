@@ -370,12 +370,50 @@ const getBarcode = async (id, format = 'code128') => {
   return { barcode: sample.barcode, sample_code: sample.sample_code, image: barcodeImage };
 };
 
+const reassignAnimal = async (sampleId, animalId) => {
+  const sample = await getById(sampleId);
+  const animalResult = await query(
+    `SELECT id, owner_id, animal_code, name_tag FROM animals
+     WHERE id = $1 AND is_active = true`,
+    [animalId]
+  );
+  if (!animalResult.rows[0]) {
+    throw new AppError('Animal not found', 404, 'NOT_FOUND');
+  }
+  if (animalResult.rows[0].owner_id !== sample.customer_id) {
+    throw new AppError(
+      'Animal must belong to the same customer as the sample',
+      400,
+      'ANIMAL_OWNER_MISMATCH'
+    );
+  }
+  if (animalResult.rows[0].id === sample.animal_id) {
+    return sample;
+  }
+
+  const previousAnimalId = sample.animal_id;
+  await query(
+    'UPDATE samples SET animal_id = $1, updated_at = NOW() WHERE id = $2',
+    [animalId, sampleId]
+  );
+
+  const reportLifecycle = require('./report-lifecycle.service');
+  await reportLifecycle.markReportsNeedsUpdateBySampleId(sampleId, 'ANIMAL');
+  if (previousAnimalId) {
+    await reportLifecycle.markReportsNeedsUpdateByAnimalId(previousAnimalId, 'ANIMAL');
+  }
+  await reportLifecycle.markReportsNeedsUpdateByAnimalId(animalId, 'ANIMAL');
+
+  return getById(sampleId);
+};
+
 module.exports = {
   list,
   getById,
   getByBarcode,
   create,
   updateStatus,
+  reassignAnimal,
   reconcileSampleStatuses,
   getQueue,
   getParasitologyQueue,
