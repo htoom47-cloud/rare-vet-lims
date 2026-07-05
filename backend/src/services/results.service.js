@@ -8,7 +8,7 @@ const {
 } = require('../utils/norma-cbc-map');
 const resultEngine = require('./result-engine.service');
 const { getLimsReferenceRange, LIMS_REF_SELECT_SQL, limsRefLateralJoin } = require('./reference-ranges.service');
-const { mapRawRowsToCbcDisplay, enrichCbcPctReferences } = require('./cbc-result-display.service');
+const { mapRawRowsToCbcDisplay, enrichCbcReferences } = require('./cbc-result-display.service');
 const { uuidv4 } = require('../utils/uuid');
 const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
@@ -91,7 +91,7 @@ const getBySampleTest = async (sampleTestId) => {
     : values.sort(compareByNormaOrder);
 
   if (isCbc) {
-    sortedValues = await enrichCbcPctReferences(sortedValues, {
+    sortedValues = await enrichCbcReferences(sortedValues, {
       animal_type: head.animal_type,
       gender: head.animal_gender,
       age: head.animal_age,

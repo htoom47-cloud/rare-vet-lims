@@ -10,6 +10,13 @@ const resultEngine = require('./result-engine.service');
 
 const CBC_PCT_CODES = new Set(Object.values(NORMA_CBC_PCT_BY_ABS));
 
+const hasResolvedReference = (row) => {
+  if (row.reference) return true;
+  if (row.trr_min != null && row.trr_max != null) return true;
+  if (row.trr_text_reference != null && String(row.trr_text_reference).trim() !== '') return true;
+  return false;
+};
+
 const reevaluateRowWithRange = (row, range) => {
   const evaluated = resultEngine.evaluateResult(
     { value: row.value, unit: row.unit, parameter_code: row.parameter_code },
@@ -43,8 +50,9 @@ const reevaluateRowWithRange = (row, range) => {
   };
 };
 
-const enrichCbcPctReferences = async (rows, { animal_type, gender, age }) => {
-  const needsRef = rows.filter((r) => CBC_PCT_CODES.has(r.parameter_code) && !r.reference);
+/** Fill missing CBC references (LYM_PCT, RDW-SD, …) from LIMS + misplaced abs % fallback. */
+const enrichCbcReferences = async (rows, { animal_type, gender, age }) => {
+  const needsRef = rows.filter((r) => !hasResolvedReference(r));
   if (!needsRef.length || !animal_type) return rows;
 
   const codes = [...new Set(needsRef.map((r) => r.parameter_code))];
@@ -59,7 +67,7 @@ const enrichCbcPctReferences = async (rows, { animal_type, gender, age }) => {
   const paramIdByCode = Object.fromEntries(paramResult.rows.map((p) => [p.code, p.id]));
 
   return Promise.all(rows.map(async (row) => {
-    if (!CBC_PCT_CODES.has(row.parameter_code) || row.reference) return row;
+    if (hasResolvedReference(row)) return row;
     const parameterId = paramIdByCode[row.parameter_code] || row.parameter_id;
     let range = parameterId
       ? await getLimsReferenceRange(parameterId, animal_type, { sex: gender, age })
@@ -83,10 +91,56 @@ const enrichCbcPctReferences = async (rows, { animal_type, gender, age }) => {
   }));
 };
 
+/** @deprecated use enrichCbcReferences */
+const enrichCbcPctReferences = enrichCbcReferences;
+
+/**
+ * Norma CBC screen rows for reports/PDF — same reference logic as workbench.
+ */
+const buildCbcReportRowsFromSql = async (sqlRows, context) => {
+  if (!sqlRows?.length) return [];
+  const meta = sqlRows[0];
+  const withRef = sqlRows.map((row) => ({
+    ...row,
+    reference: resultEngine.evaluateResult(row).reference || null,
+  }));
+  let display = mapRawRowsToCbcDisplay(withRef);
+  display = await enrichCbcReferences(display, context);
+  const byCode = Object.fromEntries(withRef.map((r) => [r.parameter_code, r]));
+  return display.map((d) => {
+    const src = byCode[d.parameter_code]
+      || byCode[cbcPctFallbackAbsCode(d.parameter_code)]
+      || {};
+    return {
+      ...meta,
+      parameter_id: d.parameter_id,
+      parameter_code: d.parameter_code,
+      parameter_name: d.parameter_name,
+      parameter_name_ar: d.parameter_name_ar,
+      value: d.value,
+      numeric_value: d.numeric_value,
+      unit: d.unit,
+      flag: d.flag,
+      is_critical: d.is_critical,
+      sort_order: d.sort_order,
+      trr_min: d.trr_min ?? src.trr_min ?? null,
+      trr_max: d.trr_max ?? src.trr_max ?? null,
+      trr_critical_low: d.trr_critical_low ?? src.trr_critical_low ?? null,
+      trr_critical_high: d.trr_critical_high ?? src.trr_critical_high ?? null,
+      trr_notes: d.trr_notes ?? src.trr_notes ?? null,
+      trr_text_reference: d.trr_text_reference ?? src.trr_text_reference ?? null,
+      trr_unit: d.trr_unit ?? src.trr_unit ?? null,
+    };
+  });
+};
+
 const mapRawRowsToCbcDisplay = (rawRows) => mapCbcRowsForDisplay(rawRows);
 
 module.exports = {
   mapRawRowsToCbcDisplay,
   enrichCbcPctReferences,
+  enrichCbcReferences,
+  buildCbcReportRowsFromSql,
   reevaluateRowWithRange,
+  hasResolvedReference,
 };

@@ -7,7 +7,8 @@ const logger = require('../config/logger');
 const { generateCode, paginate, buildPagination } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
-const { compareByNormaOrder, filterCbcReportRows } = require('../utils/norma-cbc-map');
+const { compareByNormaOrder, filterCbcReportRows, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
+const { buildCbcReportRowsFromSql } = require('./cbc-result-display.service');
 const {
   LIMS_REF_SELECT_SQL,
   limsRefLateralJoin,
@@ -254,10 +255,19 @@ const buildReportData = async (sampleId, opts) => {
 
   const uniqueByParameter = [];
   const seenParameters = new Set();
-  const sortedRows = filterCbcReportRows(
-    [...resultsData.rows].sort(compareByNormaOrder)
-  );
-  for (const row of sortedRows) {
+
+  const cbcSqlRows = resultsData.rows.filter((r) => r.test_code === DEFAULT_CBC_TEST_CODE);
+  const otherSqlRows = resultsData.rows.filter((r) => r.test_code !== DEFAULT_CBC_TEST_CODE);
+
+  const cbcContext = {
+    animal_type: sample.animal_type,
+    gender: sample.animal_gender,
+    age: sample.animal_age,
+  };
+  const cbcReportRows = await buildCbcReportRowsFromSql(cbcSqlRows, cbcContext);
+
+  const sortedOther = filterCbcReportRows([...otherSqlRows].sort(compareByNormaOrder));
+  for (const row of [...cbcReportRows, ...sortedOther]) {
     if (seenParameters.has(row.parameter_id)) continue;
     seenParameters.add(row.parameter_id);
     uniqueByParameter.push(row);
