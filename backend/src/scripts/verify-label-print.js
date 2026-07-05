@@ -108,11 +108,15 @@ ok('labelPrintHtml uses sync JsBarcode import', async () => {
 ok('printLabel tries Zebra before browser', async () => {
   const fs = require('fs');
   const path = require('path');
-  const src = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/printLabel.js'), 'utf8');
-  if (src.includes('preferBrowser')) fail('preferBrowser should be removed');
-  if (!src.includes('printSampleLabelWithDialogSync')) fail('printSampleLabelWithDialogSync missing');
-  if (!src.includes('showDialog')) fail('showDialog option missing');
-  if (!src.includes('printToZebra')) fail('printToZebra missing');
+  const printSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/printLabel.js'), 'utf8');
+  const panelSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/labelPanel.js'), 'utf8');
+  if (printSrc.includes('preferBrowser')) fail('preferBrowser should be removed');
+  if (!panelSrc.includes('animalCode = String(sample?.animal_code')) {
+    fail('buildThermalLabelContent missing animalCode');
+  }
+  if (!printSrc.includes('printSampleLabelWithDialogSync')) fail('printSampleLabelWithDialogSync missing');
+  if (!printSrc.includes('showDialog')) fail('showDialog option missing');
+  if (!printSrc.includes('printToZebra')) fail('printToZebra missing');
   return true;
 });
 

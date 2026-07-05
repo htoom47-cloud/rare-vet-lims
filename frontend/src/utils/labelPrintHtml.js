@@ -65,9 +65,23 @@ const LABEL_PRINT_STYLES = `
   .label-50x25-error { font-size: 7pt; color: #c00; text-align: center; }
 `;
 
-export const labelMetaFromSample = (sample, isArabic = false) => (
-  buildThermalLabelContent(sample, { isArabic })
-);
+export const labelMetaFromSample = (sample, isArabic = false) => {
+  try {
+    return buildThermalLabelContent(sample, { isArabic });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[labelPrintHtml] labelMetaFromSample', error);
+    const id = String(sample?.sample_code || sample?.barcode || '').trim() || '—';
+    return {
+      barcode: id,
+      barcodeDigits: id,
+      barcodeEncode: barcodeEncodeDigits(id),
+      animalLine: '',
+      testLine: '',
+      customerLine: '',
+    };
+  }
+};
 
 /** Render Code128 SVG synchronously — no CDN / no async race. */
 export const renderBarcodeSvgHtml = (encodeValue) => {
@@ -265,32 +279,39 @@ export function openLabelPrintWindow(sample, { isArabic = false, samples = null 
 
 /** Print labels already visible in the open modal — must call window.print() synchronously from click handler. */
 export function printSampleLabelInPlace() {
-  const area = document.querySelector('[role="dialog"] .label-print-area');
-  const previews = area
-    ? area.querySelectorAll('.label-preview')
-    : document.querySelectorAll('[role="dialog"] .label-preview, .label-print-area .label-preview');
-  if (!previews.length) return false;
+  try {
+    const area = document.querySelector('[role="dialog"] .label-print-area');
+    const previews = area
+      ? area.querySelectorAll('.label-preview')
+      : document.querySelectorAll('[role="dialog"] .label-preview, .label-print-area .label-preview');
+    if (!previews.length) return false;
 
-  const cleanup = () => {
+    const cleanup = () => {
+      document.documentElement.classList.remove('printing-sample-label');
+      document.body.classList.remove('printing-sample-label');
+    };
+
+    document.documentElement.classList.add('printing-sample-label');
+    document.body.classList.add('printing-sample-label');
+
+    const onAfterPrint = () => {
+      cleanup();
+      window.removeEventListener('afterprint', onAfterPrint);
+    };
+    window.addEventListener('afterprint', onAfterPrint);
+
+    void document.body.offsetHeight;
+    window.print();
+    setTimeout(cleanup, 5000);
+
+    return true;
+  } catch (error) {
     document.documentElement.classList.remove('printing-sample-label');
     document.body.classList.remove('printing-sample-label');
-  };
-
-  document.documentElement.classList.add('printing-sample-label');
-  document.body.classList.add('printing-sample-label');
-
-  const onAfterPrint = () => {
-    cleanup();
-    window.removeEventListener('afterprint', onAfterPrint);
-  };
-  window.addEventListener('afterprint', onAfterPrint);
-
-  // Force layout so @media print rules apply before print (still sync — user gesture preserved).
-  void document.body.offsetHeight;
-  window.print();
-  setTimeout(cleanup, 5000);
-
-  return true;
+    // eslint-disable-next-line no-console
+    console.error('[labelPrintHtml] printSampleLabelInPlace', error);
+    return false;
+  }
 }
 
 const getPrintFrame = () => {
@@ -307,18 +328,26 @@ const getPrintFrame = () => {
 };
 
 export function printLabelsViaIframeSync(samples, { isArabic = false } = {}) {
-  const list = Array.isArray(samples) ? samples.filter(Boolean) : (samples ? [samples] : []);
-  if (!list.length) return false;
+  try {
+    const list = Array.isArray(samples) ? samples.filter(Boolean) : (samples ? [samples] : []);
+    if (!list.length) return false;
 
-  const iframe = getPrintFrame();
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: false }));
-  doc.close();
-  void iframe.contentDocument?.body?.offsetHeight;
-  iframe.contentWindow.focus();
-  iframe.contentWindow.print();
-  return true;
+    const iframe = getPrintFrame();
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return false;
+
+    doc.open();
+    doc.write(buildMultiLabelPrintDocument(list, { isArabic, autoPrint: false }));
+    doc.close();
+    void iframe.contentDocument?.body?.offsetHeight;
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    return true;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[labelPrintHtml] printLabelsViaIframeSync', error);
+    return false;
+  }
 }
 
 export async function printLabelsViaIframe(samples, { isArabic = false, autoPrint = false } = {}) {

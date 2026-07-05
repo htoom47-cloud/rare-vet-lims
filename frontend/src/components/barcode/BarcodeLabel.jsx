@@ -3,15 +3,35 @@ import QRCode from 'react-qr-code';
 import { useTranslation } from 'react-i18next';
 import { buildThermalLabelContent, barcodeEncodeDigits } from '../../utils/labelPanel';
 
+const emptyLabelContent = (sample) => {
+  const code = String(sample?.sample_code || sample?.barcode || '').trim();
+  return {
+    barcode: code,
+    barcodeEncode: barcodeEncodeDigits(code),
+    barcodeDigits: code,
+    customerLine: '',
+    animalLine: '',
+    testLine: '',
+    dateLine: '',
+  };
+};
+
 /**
  * Sample label — default layout fits Zebra ZD421 direct thermal 50×25 mm rolls.
  * @param {'thermal-50x25'|'full'} size
  */
 export default function BarcodeLabel({ sample, format = 'code128', size = 'thermal-50x25' }) {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const isArabic = i18n.language === 'ar';
 
-  const content = buildThermalLabelContent(sample, { isArabic });
+  let content;
+  try {
+    content = buildThermalLabelContent(sample, { isArabic });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[BarcodeLabel]', error);
+    content = emptyLabelContent(sample);
+  }
   const barcodeEncode = content.barcodeEncode || barcodeEncodeDigits(content.barcode);
   const isThermal = size === 'thermal-50x25';
 
@@ -42,7 +62,7 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
             )}
           </div>
         ) : (
-          <p className="label-50x25-error">No barcode</p>
+          <p className="label-50x25-error">{t('samples.barcodeLabelBuildFailed')}</p>
         )}
 
         <div className="label-50x25-details">

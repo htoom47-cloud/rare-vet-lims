@@ -15,6 +15,7 @@ import Modal from '../components/ui/Modal';
 import BarcodeScanner from '../components/barcode/BarcodeScanner';
 
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
+import BarcodeLabelErrorBoundary from '../components/barcode/BarcodeLabelErrorBoundary';
 import { printSampleLabel } from '../utils/printLabel';
 import { expandSampleLabelJobs, totalLabelCountForSample } from '../utils/labelCopies';
 
@@ -137,6 +138,16 @@ export default function Samples() {
   };
 
 
+
+  const handlePrintLabel = (sample) => {
+    try {
+      printSampleLabel(sample, { showDialog: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[Samples] handlePrintLabel', error);
+      toast.error(t('samples.barcodeLabelBuildFailed'));
+    }
+  };
 
   const openPrintLabel = async (row) => {
     try {
@@ -891,14 +902,15 @@ export default function Samples() {
           )}
           <div className="label-print-area space-y-3 max-h-96 overflow-y-auto">
             {expandSampleLabelJobs(printSample).map((job, idx) => (
-              <BarcodeLabel
-                key={job.panelKey || idx}
-                sample={job}
-              />
+              <BarcodeLabelErrorBoundary key={job.panelKey || idx}>
+                <BarcodeLabel
+                  sample={job}
+                />
+              </BarcodeLabelErrorBoundary>
             ))}
           </div>
 
-          <button type="button" onClick={() => printSampleLabel(printSample, { showDialog: true })} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+          <button type="button" onClick={() => handlePrintLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
 
         </Modal>
 

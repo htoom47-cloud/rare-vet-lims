@@ -7,6 +7,7 @@ import WorkflowStepper, { RECEPTION_STEP_COUNT } from '../components/workflow/Wo
 import CustomerSearch from '../components/customers/CustomerSearch';
 import Modal from '../components/ui/Modal';
 import BarcodeLabel from '../components/barcode/BarcodeLabel';
+import BarcodeLabelErrorBoundary from '../components/barcode/BarcodeLabelErrorBoundary';
 import { printSampleLabel, autoPrintSampleLabels } from '../utils/printLabel';
 import { expandSampleLabelJobs, totalLabelCountForSample, totalLabelCountForSamples } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
@@ -357,6 +358,16 @@ export default function WorkflowCase() {
       toast.success(t('workflow.allSamplesReceived'));
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
+    }
+  };
+
+  const handlePrintLabel = (sample) => {
+    try {
+      printSampleLabel(sample, { showDialog: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[WorkflowCase] handlePrintLabel', error);
+      toast.error(t('samples.barcodeLabelBuildFailed'));
     }
   };
 
@@ -853,15 +864,16 @@ export default function WorkflowCase() {
             )}
             <div className="label-print-area space-y-3 max-h-96 overflow-y-auto">
               {expandSampleLabelJobs(printSample).map((job, idx) => (
-                <BarcodeLabel
-                  key={job.panelKey || idx}
-                  sample={job}
-                />
+                <BarcodeLabelErrorBoundary key={job.panelKey || idx}>
+                  <BarcodeLabel
+                    sample={job}
+                  />
+                </BarcodeLabelErrorBoundary>
               ))}
             </div>
           </>
         )}
-        <button type="button" onClick={() => printSampleLabel(printSample, { showDialog: true })} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+        <button type="button" onClick={() => handlePrintLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
       </Modal>
     </div>
   );

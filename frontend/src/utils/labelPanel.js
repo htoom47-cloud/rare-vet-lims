@@ -199,6 +199,7 @@ export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => {
 
   const customerName = String(sample?.customer_name_ar || sample?.customer_name || '').trim();
   const animalName = String(sample?.animal_name || sample?.name_tag || '').trim();
+  const animalCode = String(sample?.animal_code || '').trim();
   const animalType = animalTypeLabel(sample?.animal_type, isArabic);
   const testsSummary = formatTestsForLabel(sample, { isArabic });
 
