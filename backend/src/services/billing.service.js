@@ -11,7 +11,7 @@ const { syncCustomerArBalance } = require('./accounting.service');
 const ledger = require('./ledger.service');
 const { assertDayOpen } = require('./daily-closing.service');
 const { logBillingAudit } = require('../utils/billing-audit');
-const { resolveDiscount } = require('../utils/discount');
+const { calcDocumentTotals } = require('../utils/discount');
 const { prepareCatalogItems } = require('../utils/vat');
 
 const generateVatQR = (invoice) => {
@@ -123,19 +123,18 @@ const createInvoice = async (data, userId) => {
 
     const invoiceNumber = generateCode('INV');
     const catalogItems = prepareCatalogItems(data.items);
-    const subtotal = catalogItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-    const discount = resolveDiscount(subtotal, data);
-    const discountPercent = parseFloat(data.discount_percent) || 0;
-    const taxable = subtotal - discount;
-    const taxRate = 15;
-    const taxAmount = taxable * (taxRate / 100);
-    const total = taxable + taxAmount;
+    const totals = calcDocumentTotals(catalogItems, data);
 
     const invoiceId = uuidv4();
     const invoiceResult = await client.query(
-      `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, discount_percent, tax_rate, tax_amount, total, status, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'issued',$11,$12) RETURNING *`,
-      [invoiceId, invoiceNumber, data.customer_id, data.sample_id, subtotal, discount, discountPercent, taxRate, taxAmount, total, data.notes, userId]
+      `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, discount_percent, field_visit_discount_amount, field_visit_discount_percent, tax_rate, tax_amount, total, status, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'issued',$13,$14) RETURNING *`,
+      [
+        invoiceId, invoiceNumber, data.customer_id, data.sample_id,
+        totals.subtotal, totals.discount_amount, totals.discount_percent,
+        totals.field_visit_discount_amount, totals.field_visit_discount_percent,
+        totals.taxRate, totals.taxAmount, totals.total, data.notes, userId,
+      ]
     );
 
     const invoice = invoiceResult.rows[0];
@@ -160,7 +159,7 @@ const createInvoice = async (data, userId) => {
       action: 'create_invoice',
       entityType: 'invoice',
       entityId: invoice.id,
-      newValues: { invoice_number: invoiceNumber, total, customer_id: data.customer_id },
+      newValues: { invoice_number: invoiceNumber, total: totals.total, customer_id: data.customer_id },
     });
     return issued;
   } catch (err) {
@@ -191,26 +190,34 @@ const recordPayment = async (data, userId, req = null) => {
     );
     const alreadyPaid = parseFloat(paidResult.rows[0].total_paid);
 
-    const subtotal = parseFloat(invoice.subtotal);
-    const taxRate = parseFloat(invoice.tax_rate) || 15;
-    const discountPercent = parseFloat(data.discount_percent) || 0;
-    const discountAmount = resolveDiscount(subtotal, {
-      discount_amount: data.discount_amount,
-      discount_percent: discountPercent,
-    });
-    const taxable = Math.max(0, subtotal - discountAmount);
-    const taxAmount = taxable * (taxRate / 100);
-    const newTotal = taxable + taxAmount;
+    const itemsResult = await client.query(
+      'SELECT description, quantity, unit_price, total_price FROM invoice_items WHERE invoice_id = $1',
+      [data.invoice_id]
+    );
+    const totals = calcDocumentTotals(itemsResult.rows, data);
+    const newTotal = totals.total;
 
     if (alreadyPaid > newTotal + 0.01) {
       throw new AppError('Discount exceeds amount already paid', 400, 'INVALID_DISCOUNT');
     }
 
     await client.query(
-      `UPDATE invoices SET discount_amount = $1, discount_percent = $2, tax_amount = $3, total = $4, pdf_url = NULL, updated_at = NOW() WHERE id = $5`,
-      [discountAmount, discountPercent, taxAmount, newTotal, data.invoice_id]
+      `UPDATE invoices SET discount_amount = $1, discount_percent = $2, field_visit_discount_amount = $3, field_visit_discount_percent = $4, tax_amount = $5, total = $6, pdf_url = NULL, updated_at = NOW() WHERE id = $7`,
+      [
+        totals.discount_amount, totals.discount_percent,
+        totals.field_visit_discount_amount, totals.field_visit_discount_percent,
+        totals.taxAmount, newTotal, data.invoice_id,
+      ]
     );
-    invoice = { ...invoice, discount_amount: discountAmount, discount_percent: discountPercent, tax_amount: taxAmount, total: newTotal };
+    invoice = {
+      ...invoice,
+      discount_amount: totals.discount_amount,
+      discount_percent: totals.discount_percent,
+      field_visit_discount_amount: totals.field_visit_discount_amount,
+      field_visit_discount_percent: totals.field_visit_discount_percent,
+      tax_amount: totals.taxAmount,
+      total: newTotal,
+    };
 
     const balance = Math.max(0, newTotal - alreadyPaid);
     const amount = parseFloat(data.amount);

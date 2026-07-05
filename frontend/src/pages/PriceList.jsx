@@ -9,8 +9,8 @@ import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
-import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload } from '../utils/discount';
-import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals } from '../utils/discount';
+import { fmtCatalog, fmtNet, fmtGross } from '../utils/vat';
 import toast from 'react-hot-toast';
 import {
   FIELD_VISIT_CODE,
@@ -18,6 +18,7 @@ import {
   isFieldVisitItem,
   buildFieldVisitLineItem,
   refreshFieldVisitItem,
+  fieldVisitTierRanges,
 } from '../utils/fieldVisitService';
 
 const fmt = fmtCatalog;
@@ -28,13 +29,9 @@ const defaultValidUntil = () => {
   return d.toISOString().slice(0, 10);
 };
 
-const calcTotals = (items, discountType, discountValue) => {
-  const subtotal = catalogLinesNetSubtotal(items);
-  const disc = resolveDiscountAmount(subtotal, discountType, discountValue);
-  const taxable = Math.max(0, subtotal - disc);
-  const taxAmount = taxable * (VAT_RATE / 100);
-  return { subtotal, discountAmount: disc, taxAmount, total: taxable + taxAmount };
-};
+const calcTotals = (items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue) => (
+  calcSplitTotals(items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue)
+);
 
 const newLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -63,6 +60,8 @@ export default function PriceList() {
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [discountValue, setDiscountValue] = useState('');
+  const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
   const [notes, setNotes] = useState('');
   const [validUntil, setValidUntil] = useState(defaultValidUntil());
   const [submitting, setSubmitting] = useState(false);
@@ -135,7 +134,11 @@ export default function PriceList() {
     });
   }, [filtered, categories, i18n.language]);
 
-  const totals = useMemo(() => calcTotals(lineItems, discountType, discountValue), [lineItems, discountType, discountValue]);
+  const lineSubtotals = useMemo(() => splitLineSubtotals(lineItems), [lineItems]);
+  const totals = useMemo(
+    () => calcTotals(lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue),
+    [lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
+  );
   const totalTests = filtered.length;
 
   const handleCustomerChange = (id, customer) => {
@@ -212,6 +215,8 @@ export default function PriceList() {
     setLineItems([]);
     setDiscountType(DISCOUNT_TYPES.NONE);
     setDiscountValue('');
+    setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
+    setFieldVisitDiscountValue('');
     setNotes('');
     setValidUntil(defaultValidUntil());
     setLastQuote(null);
@@ -241,16 +246,18 @@ export default function PriceList() {
     }
     setSubmitting(true);
     try {
-      const subtotal = catalogLinesNetSubtotal(lineItems);
-      const discountFields = buildDiscountPayload(subtotal, discountType, discountValue);
+      const discountFields = buildSplitDiscountPayload(
+        lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+      );
       const payload = {
         customer_id: customerId || null,
         customer_name: customerName.trim(),
         customer_name_ar: customerNameAr.trim() || null,
         customer_mobile: customerMobile.trim() || null,
-        items: lineItems.map(({ test_id, package_id, description, quantity, unit_price }) => ({
+        items: lineItems.map(({ test_id, package_id, description, quantity, unit_price, service_code }) => ({
           test_id: test_id || null,
           package_id: package_id || null,
+          service_code: service_code || null,
           description,
           quantity: parseInt(quantity, 10) || 1,
           unit_price: parseFloat(unit_price) || 0,
@@ -507,12 +514,23 @@ export default function PriceList() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DiscountField
-                subtotal={totals.subtotal}
+                subtotal={lineSubtotals.serviceSubtotal}
                 type={discountType}
                 value={discountValue}
                 onTypeChange={setDiscountType}
                 onValueChange={setDiscountValue}
+                labelKey="billing.servicesDiscount"
               />
+              <DiscountField
+                subtotal={lineSubtotals.fieldVisitSubtotal}
+                type={fieldVisitDiscountType}
+                value={fieldVisitDiscountValue}
+                onTypeChange={setFieldVisitDiscountType}
+                onValueChange={setFieldVisitDiscountValue}
+                labelKey="billing.fieldVisitDiscount"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">{t('priceList.notes')}</label>
                 <input
@@ -527,7 +545,10 @@ export default function PriceList() {
             <div className="bg-primary-50 rounded-lg p-4 space-y-1 text-sm max-w-xs ms-auto">
               <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(totals.subtotal)}</span></div>
               {totals.discountAmount > 0 && (
-                <div className="flex justify-between text-red-600"><span>{t('priceList.discount')}</span><span>- {fmtNet(totals.discountAmount)}</span></div>
+                <div className="flex justify-between text-red-600"><span>{t('priceList.servicesDiscount')}</span><span>- {fmtNet(totals.discountAmount)}</span></div>
+              )}
+              {totals.fieldVisitDiscountAmount > 0 && (
+                <div className="flex justify-between text-red-600"><span>{t('priceList.fieldVisitDiscount')}</span><span>- {fmtNet(totals.fieldVisitDiscountAmount)}</span></div>
               )}
               <div className="flex justify-between"><span>{t('priceList.vat')}</span><span>{fmtNet(totals.taxAmount)}</span></div>
               <div className="flex justify-between font-bold text-base border-t pt-1 mt-1"><span>{t('priceList.grandTotal')}</span><span>{fmtGross(totals.total)}</span></div>
@@ -619,6 +640,11 @@ export default function PriceList() {
                     <p className="font-semibold">{pkg.name}</p>
                     {pkg.description && <p className="text-xs text-gray-500 mt-1">{pkg.description}</p>}
                     <p className="text-xl font-bold text-primary-600 mt-2">{fmt(pkg.price)}</p>
+                    {parseFloat(pkg.discount_percent) > 0 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        {t('billing.discountPercent')}: {pkg.discount_percent}%
+                      </p>
+                    )}
                     {pkg.test_names?.filter(Boolean).length > 0 && (
                       <p className="text-xs text-gray-500 mt-2 line-clamp-2">{pkg.test_names.join('، ')}</p>
                     )}
@@ -627,6 +653,25 @@ export default function PriceList() {
               </div>
             </div>
           )}
+
+          <div className="space-y-3">
+            <h2 className="font-semibold flex items-center gap-2 text-primary-800">
+              <MapPin size={18} /> {t('priceList.fieldVisitPricing')}
+            </h2>
+            <div className="card p-4 border-primary-100">
+              <p className="font-semibold">{i18n.language === 'ar' ? fieldVisit.name_ar : fieldVisit.name_en}</p>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 mt-3 text-sm">
+                {fieldVisitTierRanges(fieldVisit).map((tier) => (
+                  <li key={tier.max_km} className="text-gray-600">
+                    {i18n.language === 'ar'
+                      ? `${tier.min_km}–${tier.max_km} كم: ${fmt(tier.price)}`
+                      : `${tier.min_km}–${tier.max_km} km: ${fmt(tier.price)}`}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500 mt-3">{t('priceList.fieldVisitDiscountNote')}</p>
+            </div>
+          </div>
 
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>{t('priceList.testCount', { count: totalTests })}</span>

@@ -66,7 +66,11 @@ export const fieldVisitDescription = (service, i18n, distanceKm) => {
   return i18n?.language === 'ar' ? `${label} — ${km} كم من المختبر` : `${label} — ${km} km from lab`;
 };
 
-export const isFieldVisitItem = (item) => item?.service_code === FIELD_VISIT_CODE;
+export const isFieldVisitItem = (item) => {
+  if (item?.service_code === FIELD_VISIT_CODE) return true;
+  const d = String(item?.description || '');
+  return /field visit|زيارة ميدانية/i.test(d);
+};
 
 export const buildFieldVisitLineItem = (service, i18n, distanceKm, { withKey } = {}) => {
   const svc = service || DEFAULT_FIELD_VISIT;
@@ -85,7 +89,7 @@ export const buildFieldVisitLineItem = (service, i18n, distanceKm, { withKey } =
 
 export const buildFieldVisitInvoiceItem = (service, i18n, distanceKm) => {
   const line = buildFieldVisitLineItem(service, i18n, distanceKm);
-  const { service_code, distance_km, ...rest } = line;
+  const { distance_km, ...rest } = line;
   return rest;
 };
 

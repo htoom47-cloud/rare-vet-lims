@@ -10,14 +10,14 @@ import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
-import { DISCOUNT_TYPES, resolveDiscountAmount, buildDiscountPayload, initDiscountFromInvoice, calcInvoiceTotals } from '../utils/discount';
-import { fmtCatalog, fmtNet, fmtGross, catalogLinesNetSubtotal, VAT_RATE } from '../utils/vat';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals } from '../utils/discount';
+import { fmtCatalog, fmtNet, fmtGross } from '../utils/vat';
 import { billingAPI, testsAPI } from '../services/api';
 import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
-  fieldVisitLabel,
+  isFieldVisitItem,
 } from '../utils/fieldVisitService';
 
 function groupItemsByAnimal(items, t) {
@@ -65,11 +65,15 @@ export default function Billing() {
   });
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [discountValue, setDiscountValue] = useState('');
+  const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
   const [paymentForm, setPaymentForm] = useState({
     amount: '', method: 'cash', reference_number: '', notes: '',
   });
   const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
+  const [paymentFieldVisitDiscountType, setPaymentFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [paymentFieldVisitDiscountValue, setPaymentFieldVisitDiscountValue] = useState('');
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
 
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -134,7 +138,7 @@ export default function Billing() {
       toast.error(t('priceList.invalidDistance'));
       return;
     }
-    if (invoiceForm.items.some((item) => item.description?.includes(fieldVisitLabel(fieldVisit, i18n)))) {
+    if (invoiceForm.items.some(isFieldVisitItem)) {
       toast.error(t('priceList.fieldVisitAlreadyAdded'));
       return;
     }
@@ -150,14 +154,17 @@ export default function Billing() {
     e.preventDefault();
     if (!invoiceForm.customer_id || !invoiceForm.items.length) return toast.error('اختر العميل وأضف بنود الفاتورة');
     try {
-      const subtotal = catalogLinesNetSubtotal(invoiceForm.items);
-      const discountFields = buildDiscountPayload(subtotal, discountType, discountValue);
+      const discountFields = buildSplitDiscountPayload(
+        invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+      );
       await billingAPI.createInvoice({ ...invoiceForm, ...discountFields });
       toast.success('تم إنشاء الفاتورة');
       setInvoiceModal(false);
       setInvoiceForm({ customer_id: '', sample_id: '', notes: '', items: [] });
       setDiscountType(DISCOUNT_TYPES.NONE);
       setDiscountValue('');
+      setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
+      setFieldVisitDiscountValue('');
       load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -167,8 +174,13 @@ export default function Billing() {
   const recordPayment = async (e) => {
     e.preventDefault();
     try {
-      const subtotal = parseFloat(selectedInvoice.subtotal) || 0;
-      const discountFields = buildDiscountPayload(subtotal, paymentDiscountType, paymentDiscountValue);
+      const discountFields = buildSplitDiscountPayload(
+        selectedInvoice.items || [],
+        paymentDiscountType,
+        paymentDiscountValue,
+        paymentFieldVisitDiscountType,
+        paymentFieldVisitDiscountValue,
+      );
       await billingAPI.recordPayment({
         invoice_id: selectedInvoice.id,
         amount: Number(paymentForm.amount),
@@ -182,6 +194,8 @@ export default function Billing() {
       setPaymentForm({ amount: '', method: 'cash', reference_number: '', notes: '' });
       setPaymentDiscountType(DISCOUNT_TYPES.NONE);
       setPaymentDiscountValue('');
+      setPaymentFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
+      setPaymentFieldVisitDiscountValue('');
       load();
       if (detailInvoice?.id === selectedInvoice.id) openInvoiceDetail(selectedInvoice);
     } catch (err) {
@@ -201,10 +215,17 @@ export default function Billing() {
     }
     setSelectedInvoice(inv);
     const { type, value } = initDiscountFromInvoice(inv);
+    const fv = initFieldVisitDiscountFromInvoice(inv);
     setPaymentDiscountType(type);
     setPaymentDiscountValue(value);
+    setPaymentFieldVisitDiscountType(fv.type);
+    setPaymentFieldVisitDiscountValue(fv.value);
     const paid = parseFloat(inv.total_paid || 0);
-    const preview = calcInvoiceTotals(inv.subtotal, type, value, inv.tax_rate || 15, paid);
+    const preview = calcInvoiceTotals(inv.subtotal, type, value, inv.tax_rate || 15, paid, {
+      items: inv.items || [],
+      fvDiscountType: fv.type,
+      fvDiscountValue: fv.value,
+    });
     setPaymentForm({
       amount: String(preview.balanceDue.toFixed(2)),
       method: 'cash',
@@ -223,13 +244,24 @@ export default function Billing() {
       paymentDiscountValue,
       selectedInvoice.tax_rate || 15,
       paid,
+      {
+        items: selectedInvoice.items || [],
+        fvDiscountType: paymentFieldVisitDiscountType,
+        fvDiscountValue: paymentFieldVisitDiscountValue,
+      },
     );
-  }, [selectedInvoice, paymentDiscountType, paymentDiscountValue]);
+  }, [
+    selectedInvoice,
+    paymentDiscountType,
+    paymentDiscountValue,
+    paymentFieldVisitDiscountType,
+    paymentFieldVisitDiscountValue,
+  ]);
 
   useEffect(() => {
     if (!paymentModal || !paymentPreview) return;
     setPaymentForm((prev) => ({ ...prev, amount: String(paymentPreview.balanceDue.toFixed(2)) }));
-  }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue]);
+  }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue, paymentFieldVisitDiscountType, paymentFieldVisitDiscountValue]);
 
   const openInvoicePdf = async (invoiceId, regenerate = false) => {
     setPdfLoading(true);
@@ -269,11 +301,13 @@ export default function Billing() {
     )},
   ];
 
-  const subtotal = catalogLinesNetSubtotal(invoiceForm.items);
-  const discountAmount = resolveDiscountAmount(subtotal, discountType, discountValue);
-  const afterDiscount = subtotal - discountAmount;
-  const tax = afterDiscount * (VAT_RATE / 100);
-  const total = afterDiscount + tax;
+  const lineSubtotals = useMemo(() => splitLineSubtotals(invoiceForm.items), [invoiceForm.items]);
+  const invoiceTotals = useMemo(
+    () => calcSplitTotals(
+      invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+    ),
+    [invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
+  );
 
   return (
     <div>
@@ -390,7 +424,10 @@ export default function Billing() {
             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
               <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>SAR {parseFloat(detailInvoice.subtotal).toFixed(2)}</span></div>
               {parseFloat(detailInvoice.discount_amount) > 0 && (
-                <div className="flex justify-between"><span>{t('billing.discount')}:</span><span>- SAR {parseFloat(detailInvoice.discount_amount).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>{t('billing.servicesDiscount')}:</span><span>- SAR {parseFloat(detailInvoice.discount_amount).toFixed(2)}</span></div>
+              )}
+              {parseFloat(detailInvoice.field_visit_discount_amount) > 0 && (
+                <div className="flex justify-between"><span>{t('billing.fieldVisitDiscount')}:</span><span>- SAR {parseFloat(detailInvoice.field_visit_discount_amount).toFixed(2)}</span></div>
               )}
               <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>SAR {parseFloat(detailInvoice.tax_amount).toFixed(2)}</span></div>
               <div className="flex justify-between font-bold"><span>{t('billing.total')}:</span><span>SAR {parseFloat(detailInvoice.total).toFixed(2)}</span></div>
@@ -445,15 +482,24 @@ export default function Billing() {
                 onChange={(id) => setInvoiceForm({ ...invoiceForm, customer_id: id })}
               />
             </div>
-            <div>
-              <DiscountField
-                subtotal={subtotal}
-                type={discountType}
-                value={discountValue}
-                onTypeChange={setDiscountType}
-                onValueChange={setDiscountValue}
-              />
-            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DiscountField
+              subtotal={lineSubtotals.serviceSubtotal}
+              type={discountType}
+              value={discountValue}
+              onTypeChange={setDiscountType}
+              onValueChange={setDiscountValue}
+              labelKey="billing.servicesDiscount"
+            />
+            <DiscountField
+              subtotal={lineSubtotals.fieldVisitSubtotal}
+              type={fieldVisitDiscountType}
+              value={fieldVisitDiscountValue}
+              onTypeChange={setFieldVisitDiscountType}
+              onValueChange={setFieldVisitDiscountValue}
+              labelKey="billing.fieldVisitDiscount"
+            />
           </div>
 
           <div className="border rounded-lg p-4 space-y-3">
@@ -508,15 +554,21 @@ export default function Billing() {
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm space-y-1">
-            <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>{fmtNet(subtotal)}</span></div>
-            {discountAmount > 0 && (
+            <div className="flex justify-between"><span>{t('billing.subtotal')}:</span><span>{fmtNet(invoiceTotals.subtotal)}</span></div>
+            {invoiceTotals.discountAmount > 0 && (
               <div className="flex justify-between text-red-600">
-                <span>{t('billing.discount')}:</span>
-                <span>- {fmtNet(discountAmount)}</span>
+                <span>{t('billing.servicesDiscount')}:</span>
+                <span>- {fmtNet(invoiceTotals.discountAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>{fmtNet(tax)}</span></div>
-            <div className="flex justify-between font-bold text-base"><span>{t('billing.total')}:</span><span>{fmtGross(total)}</span></div>
+            {invoiceTotals.fieldVisitDiscountAmount > 0 && (
+              <div className="flex justify-between text-red-600">
+                <span>{t('billing.fieldVisitDiscount')}:</span>
+                <span>- {fmtNet(invoiceTotals.fieldVisitDiscountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between"><span>{t('billing.tax')}:</span><span>{fmtNet(invoiceTotals.taxAmount)}</span></div>
+            <div className="flex justify-between font-bold text-base"><span>{t('billing.total')}:</span><span>{fmtGross(invoiceTotals.total)}</span></div>
           </div>
 
           <div className="flex gap-2 justify-end">
@@ -533,7 +585,12 @@ export default function Billing() {
               <div className="flex justify-between"><span>{t('billing.subtotal')}</span><span>SAR {paymentPreview.subtotal.toFixed(2)}</span></div>
               {paymentPreview.discountAmount > 0 && (
                 <div className="flex justify-between text-red-600">
-                  <span>{t('billing.discount')}</span><span>- SAR {paymentPreview.discountAmount.toFixed(2)}</span>
+                  <span>{t('billing.servicesDiscount')}</span><span>- SAR {paymentPreview.discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              {paymentPreview.fieldVisitDiscountAmount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>{t('billing.fieldVisitDiscount')}</span><span>- SAR {paymentPreview.fieldVisitDiscountAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between"><span>{t('billing.tax')}</span><span>SAR {paymentPreview.taxAmount.toFixed(2)}</span></div>
@@ -544,13 +601,24 @@ export default function Billing() {
             </div>
           )}
 
-          <DiscountField
-            subtotal={parseFloat(selectedInvoice?.subtotal) || 0}
-            type={paymentDiscountType}
-            value={paymentDiscountValue}
-            onTypeChange={setPaymentDiscountType}
-            onValueChange={setPaymentDiscountValue}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DiscountField
+              subtotal={splitLineSubtotals(selectedInvoice?.items || []).serviceSubtotal}
+              type={paymentDiscountType}
+              value={paymentDiscountValue}
+              onTypeChange={setPaymentDiscountType}
+              onValueChange={setPaymentDiscountValue}
+              labelKey="billing.servicesDiscount"
+            />
+            <DiscountField
+              subtotal={splitLineSubtotals(selectedInvoice?.items || []).fieldVisitSubtotal}
+              type={paymentFieldVisitDiscountType}
+              value={paymentFieldVisitDiscountValue}
+              onTypeChange={setPaymentFieldVisitDiscountType}
+              onValueChange={setPaymentFieldVisitDiscountValue}
+              labelKey="billing.fieldVisitDiscount"
+            />
+          </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">{t('billing.amount')} (SAR)</label>

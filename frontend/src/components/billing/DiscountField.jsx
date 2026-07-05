@@ -10,13 +10,14 @@ export default function DiscountField({
   onTypeChange,
   onValueChange,
   className = '',
+  labelKey = 'billing.discountType',
 }) {
   const { t } = useTranslation();
   const applied = resolveDiscountAmount(subtotal, type, value);
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium mb-1">{t('billing.discountType')}</label>
+      <label className="block text-sm font-medium mb-1">{t(labelKey)}</label>
       <div className="flex flex-col sm:flex-row gap-2">
         <select
           className="input-field sm:w-44"

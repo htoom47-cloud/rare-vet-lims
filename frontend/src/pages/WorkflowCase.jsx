@@ -12,7 +12,9 @@ import { printSampleLabel, autoPrintSampleLabels } from '../utils/printLabel';
 import { expandSampleLabelJobs, totalLabelCountForSample, totalLabelCountForSamples } from '../utils/labelCopies';
 import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
-import { fmtCatalog } from '../utils/vat';
+import { fmtCatalog, fmtNet } from '../utils/vat';
+import DiscountField from '../components/billing/DiscountField';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload } from '../utils/discount';
 import {
   customersAPI, animalsAPI, testsAPI, billingAPI, samplesAPI,
 } from '../services/api';
@@ -21,7 +23,6 @@ import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import { getResultsEntryTargets } from '../utils/parasitologyTests';
 import {
   isTestCoveredByPackages,
-  animalServiceTotal,
   animalHasServices,
   packageLabel,
   packageTestIds,
@@ -30,7 +31,6 @@ import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
-  calcFieldVisitPrice,
 } from '../utils/fieldVisitService';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 import printThermalInvoice from '../utils/thermalInvoicePrint';
@@ -67,6 +67,10 @@ export default function WorkflowCase() {
   const [includeFieldVisit, setIncludeFieldVisit] = useState(false);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
+  const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [discountValue, setDiscountValue] = useState('');
+  const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [samples, setSamples] = useState([]);
@@ -190,17 +194,55 @@ export default function WorkflowCase() {
     });
   };
 
-  const invoiceTotal = () => {
-    const services = selectedAnimalIds.reduce(
-      (sum, animalId) => sum + animalServiceTotal({
-        animalId, animalTests, animalPackages, tests, packages,
-      }),
-      0
-    );
-    return services + (includeFieldVisit && fieldVisitKm !== ''
-      ? calcFieldVisitPrice(fieldVisit, fieldVisitKm)
-      : 0);
-  };
+  const workflowInvoiceItems = useMemo(() => {
+    const items = [];
+    for (const animalId of selectedAnimalIds) {
+      const animal = animals.find((a) => a.id === animalId);
+      for (const packageId of animalPackages[animalId] || []) {
+        const pkg = packages.find((p) => p.id === packageId);
+        if (!pkg) continue;
+        items.push({
+          package_id: packageId,
+          description: `${animal?.name_tag || animal?.animal_code} — ${packageLabel(pkg, i18n)}`,
+          quantity: 1,
+          unit_price: parseFloat(pkg.price) || 0,
+        });
+      }
+      for (const testId of animalTests[animalId] || []) {
+        if (isTestCoveredByPackages(testId, animalPackages[animalId], packages)) continue;
+        const test = tests.find((x) => x.id === testId);
+        items.push({
+          test_id: testId,
+          description: `${animal?.name_tag || animal?.animal_code} — ${testLabel(test)}`,
+          quantity: 1,
+          unit_price: parseFloat(test?.price) || 0,
+        });
+      }
+    }
+    if (includeFieldVisit && fieldVisitKm !== '') {
+      const km = parseFloat(fieldVisitKm);
+      if (Number.isFinite(km) && km >= 0) {
+        items.push(buildFieldVisitInvoiceItem(fieldVisit, i18n, km));
+      }
+    }
+    return items;
+  }, [
+    selectedAnimalIds, animals, animalPackages, animalTests, packages, tests, i18n,
+    includeFieldVisit, fieldVisitKm, fieldVisit,
+  ]);
+
+  const invoiceTotalsPreview = useMemo(
+    () => calcSplitTotals(
+      workflowInvoiceItems,
+      discountType,
+      discountValue,
+      fieldVisitDiscountType,
+      fieldVisitDiscountValue,
+    ),
+    [workflowInvoiceItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
+  );
+
+  const invoiceTotal = () => invoiceTotalsPreview.total;
 
   const canNext = () => {
     if (step === 0) return !!customerId;
@@ -287,10 +329,13 @@ export default function WorkflowCase() {
         items.push(buildFieldVisitInvoiceItem(fieldVisit, i18n, km));
       }
 
+      const discountFields = buildSplitDiscountPayload(
+        items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+      );
       const { data } = await billingAPI.createInvoice({
         customer_id: customerId,
         items,
-        discount_amount: 0,
+        ...discountFields,
       });
       setInvoiceId(data.data.id);
       setInvoiceNumber(data.data.invoice_number);
@@ -686,8 +731,42 @@ export default function WorkflowCase() {
                     </div>
                   )}
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t">
-                  <span className="font-bold text-primary-800">{t('workflow.total')}: {invoiceTotal().toFixed(0)} {t('reception.sar')}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-lg border border-primary-100 bg-white dark:bg-primary-900/10">
+                  <DiscountField
+                    subtotal={invoiceTotalsPreview.serviceSubtotal}
+                    type={discountType}
+                    value={discountValue}
+                    onTypeChange={setDiscountType}
+                    onValueChange={setDiscountValue}
+                    labelKey="billing.servicesDiscount"
+                  />
+                  <DiscountField
+                    subtotal={invoiceTotalsPreview.fieldVisitSubtotal}
+                    type={fieldVisitDiscountType}
+                    value={fieldVisitDiscountValue}
+                    onTypeChange={setFieldVisitDiscountType}
+                    onValueChange={setFieldVisitDiscountValue}
+                    labelKey="billing.fieldVisitDiscount"
+                  />
+                </div>
+                <div className="bg-primary-50 rounded-lg p-3 text-sm space-y-1">
+                  <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(invoiceTotalsPreview.subtotal)}</span></div>
+                  {invoiceTotalsPreview.discountAmount > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>{t('priceList.servicesDiscount')}</span><span>- {fmtNet(invoiceTotalsPreview.discountAmount)}</span>
+                    </div>
+                  )}
+                  {invoiceTotalsPreview.fieldVisitDiscountAmount > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>{t('priceList.fieldVisitDiscount')}</span><span>- {fmtNet(invoiceTotalsPreview.fieldVisitDiscountAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold border-t pt-1 mt-1">
+                    <span>{t('workflow.total')}</span>
+                    <span>{invoiceTotal().toFixed(2)} {t('reception.sar')}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2 border-t">
                   <button
                     onClick={createInvoice}
                     disabled={creating || invoiceTotal() === 0 || !hasPermission('billing.create')}

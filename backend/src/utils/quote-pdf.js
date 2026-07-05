@@ -194,9 +194,15 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
     totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(quote.subtotal));
     if (parseFloat(quote.discount_amount) > 0) {
       const pct = parseFloat(quote.discount_percent) || 0;
-      const discEn = pct > 0 ? `Discount (${pct}%)` : 'Discount';
-      const discAr = pct > 0 ? `خصم (${pct}%)` : 'الخصم';
+      const discEn = pct > 0 ? `Services discount (${pct}%)` : 'Services discount';
+      const discAr = pct > 0 ? `خصم الخدمات (${pct}%)` : 'خصم الخدمات';
       totalLine(discEn, discAr, `- ${fmtMoney(quote.discount_amount)}`);
+    }
+    if (parseFloat(quote.field_visit_discount_amount) > 0) {
+      const pct = parseFloat(quote.field_visit_discount_percent) || 0;
+      const discEn = pct > 0 ? `Field visit discount (${pct}%)` : 'Field visit discount';
+      const discAr = pct > 0 ? `خصم الزيارة الميدانية (${pct}%)` : 'خصم الزيارة الميدانية';
+      totalLine(discEn, discAr, `- ${fmtMoney(quote.field_visit_discount_amount)}`);
     }
     totalLine(`VAT ${quote.tax_rate || 15}%`, `ضريبة القيمة المضافة ${quote.tax_rate || 15}%`, fmtMoney(quote.tax_amount));
     totalLine('Total incl. VAT', 'الإجمالي شامل الضريبة', fmtMoney(quote.total), true);

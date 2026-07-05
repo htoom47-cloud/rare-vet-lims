@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { generateQuotePDF } = require('../utils/quote-pdf');
 const invoiceSettingsService = require('./invoice-settings.service');
-const { resolveDiscount } = require('../utils/discount');
+const { calcDocumentTotals } = require('../utils/discount');
 const { prepareCatalogItems } = require('../utils/vat');
 
 const quotePdfDir = () => path.join(env.storage.path, 'quotes');
@@ -96,13 +96,7 @@ const createQuote = async (data, userId) => {
     if (!customerName) throw new AppError('Customer name is required', 400, 'VALIDATION_ERROR');
 
     const catalogItems = prepareCatalogItems(data.items);
-    const subtotal = catalogItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-    const discount = resolveDiscount(subtotal, data);
-    const discountPercent = parseFloat(data.discount_percent) || 0;
-    const taxable = Math.max(0, subtotal - discount);
-    const taxRate = 15;
-    const taxAmount = taxable * (taxRate / 100);
-    const total = taxable + taxAmount;
+    const totals = calcDocumentTotals(catalogItems, data);
     const validUntil = data.valid_until || defaultValidUntil();
 
     const quoteId = uuidv4();
@@ -111,11 +105,14 @@ const createQuote = async (data, userId) => {
     const quoteResult = await client.query(
       `INSERT INTO price_quotes (
         id, quote_number, customer_id, customer_name, customer_name_ar, customer_mobile,
-        subtotal, discount_amount, discount_percent, tax_rate, tax_amount, total, notes, valid_until, status, created_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'sent',$15) RETURNING *`,
+        subtotal, discount_amount, discount_percent, field_visit_discount_amount, field_visit_discount_percent,
+        tax_rate, tax_amount, total, notes, valid_until, status, created_by
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'sent',$17) RETURNING *`,
       [
         quoteId, quoteNumber, customerId, customerName, customerNameAr, customerMobile,
-        subtotal, discount, discountPercent, taxRate, taxAmount, total, data.notes || null, validUntil, userId,
+        totals.subtotal, totals.discount_amount, totals.discount_percent,
+        totals.field_visit_discount_amount, totals.field_visit_discount_percent,
+        totals.taxRate, totals.taxAmount, totals.total, data.notes || null, validUntil, userId,
       ]
     );
 

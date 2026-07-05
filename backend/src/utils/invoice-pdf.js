@@ -225,9 +225,15 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(invoice.subtotal));
     if (parseFloat(invoice.discount_amount) > 0) {
       const pct = parseFloat(invoice.discount_percent) || 0;
-      const discEn = pct > 0 ? `Discount (${pct}%)` : 'Discount';
-      const discAr = pct > 0 ? `خصم (${pct}%)` : 'الخصم';
+      const discEn = pct > 0 ? `Services discount (${pct}%)` : 'Services discount';
+      const discAr = pct > 0 ? `خصم الخدمات (${pct}%)` : 'خصم الخدمات';
       totalLine(discEn, discAr, `- ${fmtMoney(invoice.discount_amount)}`);
+    }
+    if (parseFloat(invoice.field_visit_discount_amount) > 0) {
+      const pct = parseFloat(invoice.field_visit_discount_percent) || 0;
+      const discEn = pct > 0 ? `Field visit discount (${pct}%)` : 'Field visit discount';
+      const discAr = pct > 0 ? `خصم الزيارة الميدانية (${pct}%)` : 'خصم الزيارة الميدانية';
+      totalLine(discEn, discAr, `- ${fmtMoney(invoice.field_visit_discount_amount)}`);
     }
     totalLine(`VAT ${invoice.tax_rate || 15}%`, `ضريبة القيمة المضافة ${invoice.tax_rate || 15}%`, fmtMoney(invoice.tax_amount));
     totalLine('Total incl. VAT', 'الإجمالي شامل الضريبة', fmtMoney(invoice.total), true);

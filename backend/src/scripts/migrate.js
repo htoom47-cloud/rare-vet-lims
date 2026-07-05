@@ -561,6 +561,16 @@ async function applyPatches() {
         ADD COLUMN IF NOT EXISTS lab_handover_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS lab_handover_by UUID REFERENCES users(id)
     `);
+    await client.query(`
+      ALTER TABLE price_quotes
+        ADD COLUMN IF NOT EXISTS field_visit_discount_amount DECIMAL(12,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS field_visit_discount_percent DECIMAL(5,2) DEFAULT 0
+    `);
+    await client.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS field_visit_discount_amount DECIMAL(12,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS field_visit_discount_percent DECIMAL(5,2) DEFAULT 0
+    `);
   } finally {
     client.release();
   }
