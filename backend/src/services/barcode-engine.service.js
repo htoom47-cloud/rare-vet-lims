@@ -56,18 +56,25 @@ const LABEL_HEIGHT = 200;
 const MIN_QUIET_ZONE = 10;
 
 const LAYOUT = {
-  barcodeY: 8,
-  barcodeHeight: 44,
-  digitsY: 56,
-  sampleY: 76,
-  testY: 96,
-  animalY: 116,
+  barcodeY: 24,
+  barcodeHeight: 40,
+  digitsY: 68,
+  sampleY: 86,
+  testY: 106,
+  animalY: 126,
 };
 
 const zplEscape = (value) => String(value ?? '')
   .replace(/\\/g, '\\\\')
   .replace(/\^/g, '\\^')
   .replace(/~/g, '\\~');
+
+const zplAsciiField = (value) => {
+  const cleaned = String(value ?? '')
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
+  return zplEscape(cleaned);
+};
 
 const truncateLabel = (text, max = 34) => {
   const s = String(text || '').trim();
@@ -225,11 +232,10 @@ const code128CModules = (digits) => {
 const zplHeader = (opts) => {
   const w = opts.labelWidthDots || LABEL_WIDTH;
   const h = opts.labelHeightDots || LABEL_HEIGHT;
-  const isArabic = opts.isArabic ?? opts.language === 'ar';
   return [
     '^XA',
-    '^FX LIMS Barcode Engine v1',
-    isArabic ? '^CI28' : '^CI0',
+    '^FX LIMS Barcode Engine v11 ASCII',
+    '^CI0',
     '^MTD',
     `^MD${opts.darkness ?? DEFAULT_PRINTER.darkness}`,
     '^MNW',
@@ -250,9 +256,11 @@ const FONT_DIGITS = '^A0N,30,28';
 const FONT_LINE = '^A0N,24,22';
 const FONT_TEST = '^A0N,24,24';
 
-const textLine = (y, value, width, font = FONT_LINE) => (
-  field(`^FO0,${y}^FB${width},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
-);
+const textLine = (y, value, width, font = FONT_LINE) => {
+  const text = zplAsciiField(value);
+  if (!text) return '';
+  return field(`^FO0,${y}^FB${width},1,0,C,0${font}^FD${text}^FS`);
+};
 
 const barcodeField = (payload, opts) => {
   const digits = payload.barcodeEncode || encodeCode128C(payload.barcodeValue);
@@ -315,11 +323,12 @@ const buildZplLabel = (payload, options = {}) => {
   const yByKey = { sample: LAYOUT.sampleY, test: LAYOUT.testY, animalType: LAYOUT.animalY };
   const fontByKey = { sample: FONT_LINE, test: FONT_TEST, animalType: FONT_LINE };
   for (const line of zplLines) {
-    lines.push(textLine(yByKey[line.key], line.text, labelW, fontByKey[line.key] || FONT_LINE));
+    const zplLine = textLine(yByKey[line.key], line.text, labelW, fontByKey[line.key] || FONT_LINE);
+    if (zplLine) lines.push(zplLine);
   }
 
   lines.push('^XZ');
-  const zpl = lines.join('\n');
+  const zpl = lines.filter(Boolean).join('\n');
 
   const quiet = validateZplQuietZone(zpl, opts);
   if (!quiet.valid) {

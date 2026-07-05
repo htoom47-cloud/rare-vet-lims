@@ -1,4 +1,4 @@
-import { buildThermalLabelContent, buildZebraThermalLabelContent } from './labelPanel';
+import { buildZebraThermalLabelContent, asciiLabelText } from './labelPanel';
 import { encodeCode128C } from './barcodeScan';
 
 const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
@@ -141,16 +141,16 @@ export async function getDefaultPrinter() {
 const LABEL_WIDTH = 400;  // 50 mm @ 203 dpi
 const LABEL_HEIGHT = 200; // 25 mm @ 203 dpi
 
-const TOP_MARGIN_DOTS = 8; // 1 mm @ 203 dpi
+const TOP_MARGIN_DOTS = 24; // 3 mm @ 203 dpi (1 mm base + 2 mm lower)
 
-/** Vertical layout v10 — 50×25 mm, 1 mm top margin, centered text. */
+/** Vertical layout v11 — 50×25 mm, centered ASCII text only. */
 const LAYOUT = {
   barcodeY: TOP_MARGIN_DOTS,
-  barcodeHeight: 44,
-  digitsY: 56,
-  sampleY: 76,
-  testY: 96,
-  animalY: 116,
+  barcodeHeight: 40,
+  digitsY: 68,
+  sampleY: 86,
+  testY: 106,
+  animalY: 126,
 };
 
 const zplEscape = (value) => String(value ?? '')
@@ -158,18 +158,18 @@ const zplEscape = (value) => String(value ?? '')
   .replace(/\^/g, '\\^')
   .replace(/~/g, '\\~');
 
-/** Code128-C payload — even length; display digits on label stay unpadded. */
-export const thermalScanDigits = (barcode) => encodeCode128C(barcode);
-
-const code128CModules = (digits) => {
-  const pairs = String(digits).length / 2;
-  return 11 + pairs * 11 + 11 + 13;
+/** ZPL ^FD text — ASCII printable only (^CI0). Strips Arabic / UTF-8 that prints as garbage. */
+const zplAsciiField = (value) => {
+  const cleaned = String(value ?? '')
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
+  return zplEscape(asciiLabelText(cleaned) || cleaned);
 };
 
-const zplLandscapeHeader = (isArabic = false) => [
+const zplHeader = () => [
   '^XA',
-  isArabic ? '^FX LIMS label v9 Arabic UTF-8' : '^FX LIMS label v9 larger text',
-  isArabic ? '^CI28' : '^CI0',
+  '^FX LIMS label v11 50x25 ASCII',
+  '^CI0',
   '^MTD',
   '^MD35',
   '^MNW',
@@ -183,15 +183,27 @@ const zplLandscapeHeader = (isArabic = false) => [
   '^PON',
 ];
 
+/** Code128-C payload — even length; display digits on label stay unpadded. */
+export const thermalScanDigits = (barcode) => encodeCode128C(barcode);
+
+const code128CModules = (digits) => {
+  const pairs = String(digits).length / 2;
+  return 11 + pairs * 11 + 11 + 13;
+};
+
+const zplLandscapeHeader = () => zplHeader();
+
 const field = (zpl) => `^FWN${zpl}`;
 
 const FONT_DIGITS = '^A0N,30,28';
 const FONT_LINE = '^A0N,24,22';
 const FONT_LINE_BOLD = '^A0N,24,24';
 
-const textLine = (y, value, font = FONT_LINE) => (
-  field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${zplEscape(value)}^FS`)
-);
+const textLine = (y, value, font = FONT_LINE) => {
+  const text = zplAsciiField(value);
+  if (!text) return '';
+  return field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${text}^FS`);
+};
 
 /** Thick Code128-C — fits 50 mm, readable by 1D USB scanners (size unchanged). */
 const barcodeField = (barcode) => {
@@ -203,33 +215,35 @@ const barcodeField = (barcode) => {
   return field(`^FO${x},${LAYOUT.barcodeY}^BY${moduleWidth},3,${barHeight}^BCN,${barHeight},N,N,N^FD>;>8${digits}^FS`);
 };
 
-export const getLabelPrintFields = (sample, { isArabic = false } = {}) => (
-  buildThermalLabelContent(sample, { isArabic })
-);
+export const getLabelPrintFields = (sample) => buildZebraThermalLabelContent(sample);
 
-/** ZPL for Zebra ZD421 50×25 mm — English only, no Arabic in ^FD fields. */
+/** ZPL for Zebra ZD421 50×25 mm — English ASCII only. */
 export const buildCbcLabelZpl = (sample) => {
   const content = buildZebraThermalLabelContent(sample);
-  const lines = [...zplLandscapeHeader(false)];
+  const lines = [...zplHeader()];
 
   if (content.barcode) {
     lines.push(barcodeField(content.barcode));
     if (content.barcodeDigits) {
-      lines.push(textLine(LAYOUT.digitsY, content.barcodeDigits, FONT_DIGITS));
+      const digitsLine = textLine(LAYOUT.digitsY, content.barcodeDigits, FONT_DIGITS);
+      if (digitsLine) lines.push(digitsLine);
     }
     if (content.sampleLine) {
-      lines.push(textLine(LAYOUT.sampleY, content.sampleLine, FONT_LINE));
+      const sampleLine = textLine(LAYOUT.sampleY, content.sampleLine, FONT_LINE);
+      if (sampleLine) lines.push(sampleLine);
     }
     if (content.testLine) {
-      lines.push(textLine(LAYOUT.testY, content.testLine, FONT_LINE_BOLD));
+      const testLine = textLine(LAYOUT.testY, content.testLine, FONT_LINE_BOLD);
+      if (testLine) lines.push(testLine);
     }
     if (content.animalTypeLine) {
-      lines.push(textLine(LAYOUT.animalY, content.animalTypeLine, FONT_LINE));
+      const animalLine = textLine(LAYOUT.animalY, content.animalTypeLine, FONT_LINE);
+      if (animalLine) lines.push(animalLine);
     }
   }
 
   lines.push('^XZ');
-  return lines.join('\n');
+  return lines.filter(Boolean).join('\n');
 };
 
 const sendZplSdk = (device, zpl) => new Promise((resolve, reject) => {

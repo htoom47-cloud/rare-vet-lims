@@ -121,14 +121,20 @@ const PANEL_FRIENDLY_EN = {
   OTHER: 'Other',
 };
 
-export const panelFriendlyName = (panelKey, isArabic = false) => {
+export const panelFriendlyName = (panelKey, langOrOptions = false) => {
   const key = String(panelKey || 'OTHER').toUpperCase();
+  const isArabic = typeof langOrOptions === 'object'
+    ? Boolean(langOrOptions?.isArabic)
+    : Boolean(langOrOptions);
   if (isArabic) return panelDisplayName(key, true);
   return PANEL_FRIENDLY_EN[key] || panelCode(key);
 };
 
 /** Join panel names for label test line — e.g. "CBC + Chemistry". */
-export const formatTestsForLabel = (sample, { isArabic = false } = {}) => {
+export const formatTestsForLabel = (sample, langOrOptions = false) => {
+  const isArabic = typeof langOrOptions === 'object'
+    ? Boolean(langOrOptions?.isArabic)
+    : Boolean(langOrOptions);
   const tests = sample?.tests?.filter(Boolean) || [];
   if (!tests.length) {
     return panelFriendlyName(sample?.panelKey, isArabic);
@@ -161,20 +167,22 @@ export const sampleDisplayId = (sample) => {
 const buildLabelContentCore = (sample, { isArabic = false, englishOnly = false } = {}) => {
   const barcode = barcodeScanValue(sample);
   const sampleId = sampleDisplayId(sample);
-  const testLine = formatTestsForLabel(sample, { isArabic: englishOnly ? false : isArabic });
+  const testLine = formatTestsForLabel(sample, englishOnly ? false : isArabic);
   const animalTypeLine = animalTypeLabel(sample?.animal_type, englishOnly ? false : isArabic);
 
   const sampleLine = sampleId
-    ? (englishOnly || !isArabic ? `Sample ${sampleId}` : `عينة ${sampleId}`)
+    ? (englishOnly || !isArabic ? `Sample ${sampleId}` : `Sample ${sampleId}`)
     : '';
+
+  const sanitize = (text) => (englishOnly ? asciiLabelText(text) || text : text);
 
   return {
     barcode,
     barcodeDigits: barcode,
     barcodeEncode: encodeCode128C(barcode),
-    sampleLine: sampleLine ? truncateLabel(sampleLine, 28) : '',
-    testLine: testLine ? truncateLabel(testLine, 28) : '',
-    animalTypeLine: animalTypeLine ? truncateLabel(animalTypeLine, 28) : '',
+    sampleLine: sampleLine ? truncateLabel(sanitize(sampleLine), 28) : '',
+    testLine: testLine ? truncateLabel(sanitize(testLine), 28) : '',
+    animalTypeLine: animalTypeLine ? truncateLabel(sanitize(animalTypeLine), 28) : '',
     sampleCode: sampleId,
   };
 };
