@@ -9,6 +9,16 @@ const {
   isManualLimsNotes,
 } = engine;
 
+const isDeviceNormaNotes = (notes) => String(notes || '').trim().startsWith('Norma:');
+
+/** Rows safe to replace when refreshing species default tables. */
+const isRefreshableAutoRow = (notes) => {
+  const n = String(notes || '').trim();
+  if (!n || isDeviceNormaNotes(n)) return false;
+  if (isManualLimsNotes(n)) return false;
+  return n.startsWith('Synced from norma-defaults') || n.startsWith('Species default');
+};
+
 const upsertReferenceRange = async ({
   parameterId,
   animalType,
@@ -20,6 +30,7 @@ const upsertReferenceRange = async ({
   notes,
   source = 'norma',
   onlyIfMissing = false,
+  refreshAutoDefaults = false,
   force = false,
 }) => {
   if (parameterId == null || !animalType || min == null || max == null) return null;
@@ -40,6 +51,13 @@ const upsertReferenceRange = async ({
   if (existing.rows[0] && onlyIfMissing) return existing.rows[0];
   if (existing.rows[0] && isManualLimsNotes(existing.rows[0].notes) && !force) {
     return { ...existing.rows[0], skipped_manual: true };
+  }
+  if (existing.rows[0] && refreshAutoDefaults && !force
+    && !isRefreshableAutoRow(existing.rows[0].notes)) {
+    return { ...existing.rows[0], skipped_protected: true };
+  }
+  if (existing.rows[0] && !force && !refreshAutoDefaults && !onlyIfMissing) {
+    return existing.rows[0];
   }
 
   if (existing.rows[0]) {
@@ -99,5 +117,7 @@ module.exports = {
   LIMS_REF_SELECT_SQL,
   limsRefLateralJoin,
   isManualLimsNotes,
+  isRefreshableAutoRow,
+  isDeviceNormaNotes,
   LIMS_REF_PRIORITY_ORDER,
 };

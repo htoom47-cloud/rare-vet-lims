@@ -33,6 +33,7 @@ async function main() {
 
   let upserted = 0;
   let skippedManual = 0;
+  let skippedProtected = 0;
   let missingParam = 0;
 
   for (const species of SPECIES) {
@@ -54,12 +55,13 @@ async function main() {
         criticalLow: ref.crit_low,
         criticalHigh: ref.crit_high,
         unit: param.unit || panel.unit,
-        notes: 'Synced from norma-defaults',
+        notes: `Species default (${species})`,
         source: 'norma-defaults',
-        onlyIfMissing: true,
+        refreshAutoDefaults: true,
       });
 
       if (result?.skipped_manual) skippedManual += 1;
+      else if (result?.skipped_protected) skippedProtected += 1;
       else if (result) upserted += 1;
     }
   }
@@ -67,6 +69,7 @@ async function main() {
   logger.info('CBC reference ranges ensured', {
     upserted,
     skippedManual,
+    skippedProtected,
     missingParam,
     species: SPECIES.length,
     parameters: NORMA_CBC_PANEL.length,

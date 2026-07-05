@@ -4,7 +4,12 @@ const { pool, query } = require('../config/database');
 const { PERMISSIONS, ROLE_PERMISSIONS } = require('../utils/permissions');
 const logger = require('../config/logger');
 const { NORMA_CBC_REFERENCES } = require('../utils/norma-cbc-references');
+const { CHEM_REFERENCE_RANGES } = require('../utils/chem-reference-ranges');
+const { HORM_REFERENCE_RANGES } = require('../utils/horm-reference-ranges');
 const { LAB_NAME_EN, LAB_NAME_AR } = require('../constants/brand');
+const { ANIMAL_TYPE_CODES } = require('../constants/animal-types');
+
+const SEED_SPECIES = ANIMAL_TYPE_CODES.filter((t) => t !== 'other');
 
 const ROLES = [
   { name: 'admin', name_ar: 'مدير النظام', description: 'Full system access' },
@@ -81,20 +86,9 @@ const CHEM_PARAMS = [
 ];
 
 const TEST_PARAMS = {
-  'CBC-FULL': { params: CBC_PARAMS, ranges: NORMA_CBC_REFERENCES.camel },
-  'CHEM-BASIC': { params: CHEM_PARAMS, ranges: {
-    GLU: { min: 60, max: 120, crit_low: 40, crit_high: 400 },
-    BUN: { min: 10, max: 30, crit_low: 5, crit_high: 80 },
-    CREA: { min: 0.8, max: 2.0, crit_low: 0.3, crit_high: 5 },
-    ALT: { min: 10, max: 60, crit_low: 5, crit_high: 300 },
-    AST: { min: 10, max: 50, crit_low: 5, crit_high: 250 },
-    ALP: { min: 50, max: 300, crit_low: 20, crit_high: 800 },
-    TP: { min: 5.5, max: 8.5, crit_low: 4, crit_high: 10 },
-    ALB: { min: 2.5, max: 4.5, crit_low: 1.5, crit_high: 5.5 },
-  }},
-  'HORM-T4': { params: [{ code: 'T4', name: 'Thyroxine T4', name_ar: 'هرمون T4', unit: 'µg/dL' }], ranges: {
-    T4: { min: 1.0, max: 4.0, crit_low: 0.5, crit_high: 8 },
-  }},
+  'CBC-FULL': { params: CBC_PARAMS, rangesBySpecies: NORMA_CBC_REFERENCES },
+  'CHEM-BASIC': { params: CHEM_PARAMS, rangesBySpecies: CHEM_REFERENCE_RANGES },
+  'HORM-T4': { params: [{ code: 'T4', name: 'Thyroxine T4', name_ar: 'هرمون T4', unit: 'µg/dL' }], rangesBySpecies: HORM_REFERENCE_RANGES },
   'PCR-BRU': { params: [{ code: 'PCR-RES', name: 'PCR Result', name_ar: 'نتيجة PCR', unit: '' }] },
   'ELISA-FMD': { params: [{ code: 'SP-RATIO', name: 'S/P Ratio', name_ar: 'نسبة S/P', unit: '' }] },
   'CULT-BACT': { params: [{ code: 'GROWTH', name: 'Culture Result', name_ar: 'نتيجة المزرعة', unit: '' }] },
@@ -155,11 +149,18 @@ async function seedTestParameters(testId, config) {
         [i, param.name, param.name_ar, param.unit, paramId]
       );
     }
-    const r = config.ranges?.[param.code];
-    if (r && paramId) {
+    const rangesBySpecies = config.rangesBySpecies || {};
+    const legacyRanges = config.ranges || {};
+    const speciesList = Object.keys(rangesBySpecies).length ? SEED_SPECIES : ['camel'];
+
+    for (const species of speciesList) {
+      const speciesRanges = rangesBySpecies[species] || legacyRanges;
+      const r = speciesRanges?.[param.code];
+      if (!r || !paramId) continue;
+
       const rangeExists = await query(
-        `SELECT id FROM test_reference_ranges WHERE parameter_id = $1 AND animal_type = 'camel'`,
-        [paramId]
+        `SELECT id FROM test_reference_ranges WHERE parameter_id = $1 AND animal_type = $2`,
+        [paramId, species]
       );
       const min = r.min ?? r.min_value;
       const max = r.max ?? r.max_value;
@@ -175,8 +176,8 @@ async function seedTestParameters(testId, config) {
       } else {
         await query(
           `INSERT INTO test_reference_ranges (parameter_id, animal_type, min_value, max_value, critical_low, critical_high, unit)
-           VALUES ($1, 'camel', $2, $3, $4, $5, $6)`,
-          [paramId, min, max, critLow, critHigh, param.unit]
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [paramId, species, min, max, critLow, critHigh, param.unit]
         );
       }
     }

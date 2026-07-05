@@ -20,7 +20,7 @@ const RANGE_SOURCES = {
 const isSyncedOrNormaNotes = (notes) => {
   const n = String(notes || '').trim();
   if (!n) return false;
-  return n.startsWith('Synced from') || n.startsWith('Norma:');
+  return n.startsWith('Synced from') || n.startsWith('Norma:') || n.startsWith('Species default');
 };
 
 const isManualLimsNotes = (notes) => {
