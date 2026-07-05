@@ -130,14 +130,35 @@ const autoPrintScript = () => `
   else window.addEventListener('load', function () { setTimeout(finishPrint, 350); });
 `;
 
-const wrapPrintDocument = ({ title, body, autoPrint = false, extraStyles = '' }) => `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+const printToolbar = (isArabic = false) => `
+  <div class="lims-print-toolbar">
+    <p class="lims-print-hint">${isArabic
+    ? 'لطباعة الملصق على Zebra: شغّل <strong>start-zebra-bridge.bat</strong> على جهاز الاستقبال ثم أعد المحاولة من LIMS. للطباعة من المتصفح: اختر <strong>ZDesigner ZD421</strong> ثم اضغط الزر أدناه.'
+    : 'For Zebra labels: run <strong>start-zebra-bridge.bat</strong> on reception PC, then retry from LIMS. Browser fallback: select <strong>ZDesigner ZD421</strong> and click below.'}</p>
+    <button type="button" class="lims-print-btn" onclick="window.print()">${isArabic ? 'طباعة الملصق' : 'Print label'}</button>
+  </div>
+  <style>
+    @media print { .lims-print-toolbar { display: none !important; } }
+    .lims-print-toolbar {
+      padding: 12px 10px 8px; text-align: center; font-family: Arial, Tahoma, sans-serif;
+      max-width: 420px; margin: 0 auto 8px;
+    }
+    .lims-print-hint { font-size: 12px; line-height: 1.45; margin: 0 0 12px; color: #1f2937; }
+    .lims-print-btn {
+      font-size: 16px; padding: 10px 28px; cursor: pointer;
+      background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: 600;
+    }
+  </style>`;
+
+const wrapPrintDocument = ({ title, body, autoPrint = false, extraStyles = '', isArabic = false }) => `<!DOCTYPE html>
+<html lang="${isArabic ? 'ar' : 'en'}" dir="${isArabic ? 'rtl' : 'ltr'}">
 <head>
   <meta charset="utf-8">
   <title>${title}</title>
   <style>${LABEL_PRINT_STYLES}${extraStyles}</style>
 </head>
 <body>
+  ${autoPrint ? '' : printToolbar(isArabic)}
   ${body}
   ${autoPrint ? `<script>${autoPrintScript()}<\/script>` : ''}
 </body>
@@ -150,6 +171,7 @@ export const buildLabelPrintDocument = (sample, { isArabic = false, autoPrint = 
     title: 'Label',
     body: `<div class="label-50x25">${labelBodyInner(content)}</div>`,
     autoPrint,
+    isArabic,
   });
 };
 
@@ -183,6 +205,7 @@ export const buildMultiLabelPrintDocumentWithImage = (samples, barcodeImg, { isA
     body: pages,
     autoPrint,
     extraStyles,
+    isArabic,
   });
 };
 
@@ -206,6 +229,7 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
     body: pages,
     autoPrint,
     extraStyles,
+    isArabic,
   });
 };
 

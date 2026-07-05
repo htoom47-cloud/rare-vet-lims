@@ -329,9 +329,10 @@ export default function WorkflowCase() {
       }
       if (printed > 0) {
         toast.success(t('samples.zebraPrintPartial', { printed, total: expected, printer: 'Zebra' }));
-      } else {
-        toast.error(t('samples.zebraBridgeRequired'), { duration: 8000 });
-        if (created[0]) {
+      }
+      if (printed < expected && created[0]) {
+        const result = await printSampleLabel(created[0]);
+        if (result === 'failed') {
           setPrintSample(created[0]);
           setPrintOpen(true);
         }
@@ -863,7 +864,7 @@ export default function WorkflowCase() {
             </div>
           </>
         )}
-        <button type="button" onClick={() => printSampleLabel(printSample, { preferBrowser: true })} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
+        <button type="button" onClick={() => printSampleLabel(printSample)} className="btn-primary w-full mt-4 no-print">{t('common.print')}</button>
       </Modal>
     </div>
   );

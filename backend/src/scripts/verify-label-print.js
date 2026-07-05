@@ -79,14 +79,38 @@ ok('in-place print CSS class exists in frontend index.css', async () => {
   return true;
 });
 
+ok('ZPL label builder produces valid ZPL', async () => {
+  const engine = require('../services/barcode-engine.service');
+  const payload = engine.buildBarcodePayload({
+    sample_code: '260702968431',
+    animal_code: 'ANM-001',
+    animal_name: 'Test',
+    tests: [{ test_code: 'CBC', test_name: 'CBC', category_code: 'CBC' }],
+  }, { isArabic: false });
+  const zpl = engine.buildZplLabel(payload, { isArabic: false });
+  if (!zpl || !String(zpl).includes('^XA') || !String(zpl).includes('^XZ')) {
+    fail('invalid ZPL output');
+  }
+  return true;
+});
+
 ok('labelPrintHtml uses sync JsBarcode import', async () => {
   const fs = require('fs');
   const path = require('path');
   const jsPath = path.join(__dirname, '../../../frontend/src/utils/labelPrintHtml.js');
   const src = fs.readFileSync(jsPath, 'utf8');
   if (!src.includes("import JsBarcode from 'jsbarcode'")) fail('JsBarcode import missing');
-  if (!src.includes('printSampleLabelInPlace')) fail('printSampleLabelInPlace missing');
+  if (!src.includes('lims-print-toolbar')) fail('manual print toolbar missing');
   if (!src.includes('document.write(html)')) fail('document.write print window missing');
+  return true;
+});
+
+ok('printLabel tries Zebra before browser', async () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/printLabel.js'), 'utf8');
+  if (src.includes('preferBrowser')) fail('preferBrowser should be removed');
+  if (!src.includes('printToZebra')) fail('printToZebra missing');
   return true;
 });
 

@@ -25,11 +25,12 @@ const BROWSER_PRINT_BASES = () => {
 async function browserPrintFetch(path, options = {}) {
   const bases = BROWSER_PRINT_BASES();
   let lastError = null;
+  const timeoutMs = options.timeoutMs ?? 2500;
 
   for (let i = 0; i < bases.length; i += 1) {
     const base = bases[i];
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 3000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       // eslint-disable-next-line no-await-in-loop
       const res = await fetch(`${base}${path}`, {
@@ -60,6 +61,16 @@ async function browserPrintFetch(path, options = {}) {
   }
 
   throw lastError || new ZebraPrintError('Browser Print not running', SERVICE_UNAVAILABLE);
+}
+
+/** Quick probe — is LIMS Zebra Bridge or Browser Print listening on localhost? */
+export async function isZebraBridgeAvailable() {
+  try {
+    await browserPrintFetch('/available', { timeoutMs: 900 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const normalizeDevice = (payload) => {
@@ -226,24 +237,27 @@ const sendZplSdk = (device, zpl) => new Promise((resolve, reject) => {
   });
 });
 
-async function sendZplHttp(device, zpl) {
+async function sendZplHttp(device, zpl, { timeoutMs = 8000 } = {}) {
   await browserPrintFetch('/write', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ device: device || { name: 'LIMS Zebra Bridge' }, data: zpl }),
-    timeoutMs: 8000,
+    timeoutMs,
   });
 }
 
 /** Send ZPL via local LIMS bridge (RAW) — preferred on Windows with zebra-local-bridge. */
 async function sendZplLocalBridge(zpl) {
-  await sendZplHttp(null, zpl);
+  await sendZplHttp(null, zpl, { timeoutMs: 2000 });
 }
 
 export async function printToZebra(sample, { isArabic = false } = {}) {
   const zpl = buildCbcLabelZpl(sample, { isArabic });
+  if (!zpl || !String(zpl).includes('^FD')) {
+    throw new ZebraPrintError('Empty label data', 'EMPTY_ZPL');
+  }
 
-  // 1) LIMS local bridge (RAW) — works with send-zebra-raw.ps1
+  // 1) LIMS local bridge (RAW) — reception PC: start-zebra-bridge.bat
   try {
     await sendZplLocalBridge(zpl);
     return { method: 'zpl-bridge', device: 'LIMS Zebra Bridge' };
