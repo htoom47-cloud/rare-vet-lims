@@ -61,13 +61,20 @@ check('^BC ^FD contains sample_id digits only (no Arabic)', () => {
   assert.ok(!ARABIC_RE.test(fd));
 });
 
-check('ZPL label text is English-only (no Arabic sent to printer)', () => {
+check('ZPL Arabic mode — ^CI28 + animal name in Arabic', () => {
   const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: true });
   const zpl = engine.buildZplLabel(payload, { isArabic: true });
-  assert.ok(!ARABIC_RE.test(zpl), 'Arabic characters must not appear in ZPL');
+  assert.ok(zpl.includes('^CI28'), 'UTF-8 ZPL mode missing');
+  assert.ok(ARABIC_RE.test(zpl), 'Arabic animal name must appear in ZPL');
+  assert.ok(zpl.includes('شاهين'), 'Animal name missing from ZPL');
+});
+
+check('ZPL English mode — ^CI0, no Arabic in text', () => {
+  const payload = engine.buildBarcodePayload(sampleFixture(), { isArabic: false });
+  const zpl = engine.buildZplLabel(payload, { isArabic: false });
   assert.ok(zpl.includes('^CI0'), 'ASCII ZPL mode missing');
+  assert.ok(!ARABIC_RE.test(zpl), 'Arabic must not appear in English ZPL');
   assert.ok(zpl.includes('Type: Camel'), 'English animal type missing');
-  assert.ok(zpl.includes('Test: CBC'), 'English test line missing');
 });
 
 check('No Arabic inside barcode encode value', () => {
