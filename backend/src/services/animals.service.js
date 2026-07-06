@@ -3,11 +3,12 @@ const { AppError } = require('../middleware/errorHandler');
 const { generateRandomAnimalCode, ANIMAL_CODE_LOCK, paginate, buildPagination } = require('../utils/helpers');
 const { uuidv4 } = require('../utils/uuid');
 const speciesService = require('./animal-species.service');
+const { notDeleted } = require('../utils/soft-delete-sql');
 
 const list = async ({ search, owner_id, animal_type, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
-  let where = 'WHERE a.is_active = true';
+  let where = `WHERE a.is_active = true AND ${notDeleted('a')}`;
 
   if (search) {
     params.push(`%${search}%`);

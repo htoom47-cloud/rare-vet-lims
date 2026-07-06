@@ -1,13 +1,14 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
+const { notDeleted } = require('../utils/soft-delete-sql');
 const { uuidv4 } = require('../utils/uuid');
 const { getCustomerStatement } = require('./accounting.service');
 
 const list = async ({ search, mobile, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
-  let where = 'WHERE c.is_active = true';
+  let where = `WHERE c.is_active = true AND ${notDeleted('c')}`;
 
   if (mobile) {
     const digits = normalizeMobileDigits(mobile);
@@ -40,7 +41,7 @@ const list = async ({ search, mobile, page, limit }) => {
 };
 
 const getById = async (id) => {
-  const result = await query('SELECT * FROM customers WHERE id = $1', [id]);
+  const result = await query(`SELECT * FROM customers WHERE id = $1 AND ${notDeleted()}`, [id]);
   if (!result.rows[0]) throw new AppError('Customer not found', 404, 'NOT_FOUND');
   return result.rows[0];
 };
@@ -74,6 +75,7 @@ const checkDuplicateMobile = async (mobile) => {
     `SELECT id, full_name, mobile
      FROM customers
      WHERE is_active = true
+       AND ${notDeleted()}
        AND regexp_replace(mobile, '[^0-9]', '', 'g') LIKE $1
      ORDER BY created_at DESC
      LIMIT 1`,

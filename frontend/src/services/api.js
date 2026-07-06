@@ -465,4 +465,11 @@ export const settingsAPI = {
   public: () => api.get('/settings/public'),
 };
 
+export const trashAPI = {
+  status: () => api.get('/trash/status'),
+  list: (type, params) => api.get(`/trash/${type}`, { params }),
+  delete: (type, id) => api.post(`/trash/${type}/${id}`),
+  restore: (type, id) => api.post(`/trash/${type}/${id}/restore`),
+};
+
 export default api;

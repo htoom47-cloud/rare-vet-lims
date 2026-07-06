@@ -19,6 +19,7 @@ const devicesRoutes = require('./devices.routes');
 const settingsRoutes = require('./settings.routes');
 const portalRoutes = require('./portal.routes');
 const publicRoutes = require('./public.routes');
+const trashRoutes = require('./trash.routes');
 
 const router = express.Router();
 
@@ -43,6 +44,7 @@ router.use('/reference-ranges', require('./reference-ranges.routes'));
 router.use('/animal-species', require('./animal-species.routes'));
 router.use('/report-mastering', require('./report-mastering.routes'));
 router.use('/settings', settingsRoutes);
+router.use('/trash', trashRoutes);
 router.use('/portal', portalRoutes);
 
 router.get('/health', async (_req, res) => {

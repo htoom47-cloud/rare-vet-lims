@@ -4,6 +4,7 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const { AppError } = require('../middleware/errorHandler');
 const { hashToken, normalizeMobileDigits, paginate, buildPagination, mobileEqualsSql } = require('../utils/helpers');
+const { notDeleted } = require('../utils/soft-delete-sql');
 const { formatToE164 } = require('../utils/phone');
 const reportsService = require('./reports.service');
 const portalSync = require('./portal-sync.service');
@@ -55,7 +56,7 @@ const findCustomerByMobile = async (mobile) => {
   const active = await query(
     `SELECT id, full_name, full_name_ar, mobile, city, farm_company
      FROM customers
-     WHERE is_active = true AND ${mobileEqualsSql('mobile', 1)}
+     WHERE is_active = true AND ${notDeleted()} AND ${mobileEqualsSql('mobile', 1)}
      ORDER BY created_at DESC
      LIMIT 1`,
     [digits]
@@ -229,7 +230,8 @@ const assertReportOwnership = async (reportId, customerIds) => {
   const result = await query(
     `SELECT r.id FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE r.id = $1 AND s.customer_id = ANY($2::uuid[])`,
+     WHERE r.id = $1 AND s.customer_id = ANY($2::uuid[])
+       AND ${notDeleted('r')} AND ${notDeleted('s')}`,
     [reportId, ids]
   );
   if (!result.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
@@ -261,7 +263,7 @@ const listReports = async (customerIds, { page, limit, animalId }) => {
   const ids = asArray(customerIds);
   const { offset, page: p, limit: l } = paginate(page, limit);
 
-  const filters = ['s.customer_id = ANY($1::uuid[])', portalReportFilter];
+  const filters = ['s.customer_id = ANY($1::uuid[])', portalReportFilter, notDeleted('r'), notDeleted('s')];
   const params = [ids];
   if (animalId) {
     params.push(animalId);

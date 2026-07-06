@@ -26,6 +26,7 @@ import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
 import Devices from './pages/Devices';
 import ReferenceRanges from './pages/ReferenceRanges';
+import TrashBin from './pages/TrashBin';
 import ReportMastering from './pages/ReportMastering';
 import AnimalTrends from './pages/AnimalTrends';
 import TechnicianWorkbench from './pages/TechnicianWorkbench';
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="quality" element={<ProtectedRoute permission="quality.view"><Quality /></ProtectedRoute>} />
               <Route path="users" element={<ProtectedRoute permission="users.view" adminOnly><Users /></ProtectedRoute>} />
               <Route path="audit" element={<ProtectedRoute permission="audit.view"><AuditLogs /></ProtectedRoute>} />
+              <Route path="trash" element={<ProtectedRoute permission="data.trash.view"><TrashBin /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute permission="settings.view"><Settings /></ProtectedRoute>} />
               <Route path="devices" element={<ProtectedRoute permission="devices.view"><Devices /></ProtectedRoute>} />
               <Route path="reference-ranges" element={<ProtectedRoute permission="reference_ranges.manage"><ReferenceRanges /></ProtectedRoute>} />

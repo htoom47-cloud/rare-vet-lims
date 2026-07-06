@@ -21,6 +21,7 @@ export const routeTitleKey = (pathname, isReception) => {
     '/devices': 'nav.devices',
     '/users': 'nav.users',
     '/audit': 'nav.audit',
+    '/trash': 'nav.trash',
     '/settings': 'nav.settings',
   };
   return map[pathname] || 'app.subtitle';

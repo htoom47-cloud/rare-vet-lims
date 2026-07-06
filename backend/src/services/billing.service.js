@@ -13,6 +13,7 @@ const { assertDayOpen } = require('./daily-closing.service');
 const { logBillingAudit } = require('../utils/billing-audit');
 const { calcDocumentTotals } = require('../utils/discount');
 const { prepareCatalogItems } = require('../utils/vat');
+const { notDeleted } = require('../utils/soft-delete-sql');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -32,7 +33,7 @@ const listInvoices = async ({
 }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
-  let where = 'WHERE 1=1';
+  let where = `WHERE ${notDeleted('i')}`;
 
   if (status) { params.push(status); where += ` AND i.status = $${params.length}`; }
   if (customer_id) { params.push(customer_id); where += ` AND i.customer_id = $${params.length}`; }
@@ -80,7 +81,7 @@ const getInvoiceById = async (id) => {
     `SELECT i.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar, c.mobile as customer_mobile
      FROM invoices i
      LEFT JOIN customers c ON i.customer_id = c.id
-     WHERE i.id = $1`,
+     WHERE i.id = $1 AND ${notDeleted('i')}`,
     [id]
   );
   if (!invoiceResult.rows[0]) throw new AppError('Invoice not found', 404, 'NOT_FOUND');

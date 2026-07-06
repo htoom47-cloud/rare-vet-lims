@@ -83,6 +83,10 @@ const PERMISSIONS = {
 
   // Reference ranges (manager/admin only)
   REFERENCE_RANGES_MANAGE: 'reference_ranges.manage',
+
+  // Data trash (soft delete + restore — admin + manager)
+  DATA_TRASH_VIEW: 'data.trash.view',
+  DATA_TRASH_MANAGE: 'data.trash.manage',
 };
 
 const ROLE_PERMISSIONS = {
@@ -106,6 +110,7 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.AUDIT_VIEW,
     PERMISSIONS.DEVICES_VIEW, PERMISSIONS.DEVICES_MANAGE,
     PERMISSIONS.REFERENCE_RANGES_MANAGE,
+    PERMISSIONS.DATA_TRASH_VIEW, PERMISSIONS.DATA_TRASH_MANAGE,
   ],
   reception: [
     PERMISSIONS.DASHBOARD_VIEW,

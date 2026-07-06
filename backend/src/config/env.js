@@ -108,6 +108,10 @@ const env = {
     /** Lock results/tests/customer/animal edits after report approval */
     lockApprovedReports: process.env.LOCK_APPROVED_REPORTS === 'true',
   },
+  softDelete: {
+    enabled: process.env.SOFT_DELETE_ENABLED === 'true',
+    retentionHours: parseInt(process.env.SOFT_DELETE_RETENTION_HOURS || '48', 10),
+  },
   backup: {
     uploads: {
       enabled: process.env.UPLOAD_BACKUP_ENABLED === 'true',

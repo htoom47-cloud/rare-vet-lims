@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, PawPrint, FlaskConical, TestTube, FileText, Activity, Stethoscope,
-  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags, GitCompare, TrendingUp,
+  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags, GitCompare, TrendingUp, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isReception, userRole } from '../../utils/roles';
@@ -60,6 +60,7 @@ const navSections = [
     section: 'nav.sections.admin',
     items: [
       { path: '/users', icon: UserCog, label: 'nav.users', permission: 'users.view', adminOnly: true },
+      { path: '/trash', icon: Trash2, label: 'nav.trash', permission: 'data.trash.view', feature: 'softDeleteEnabled' },
       { path: '/audit', icon: ScrollText, label: 'nav.audit', permission: 'audit.view' },
       { path: '/settings', icon: Settings, label: 'nav.settings', permission: 'settings.view' },
     ],
@@ -114,6 +115,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCollapse, onCloseMobi
         {(isReception(user) ? receptionNavSections : navSections).map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (item.adminOnly && userRole(user) !== 'admin') return false;
+            if (item.feature && !user?.features?.[item.feature]) return false;
             if (item.permissions?.length) return hasAnyPermission(...item.permissions);
             return hasPermission(item.permission);
           });

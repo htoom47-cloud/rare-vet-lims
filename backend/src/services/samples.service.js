@@ -11,6 +11,7 @@ const {
 } = require('../utils/helpers');
 const { generateSampleBarcode } = require('../utils/barcode');
 const { PARAS_CATEGORY_CODE } = require('../utils/parasitologyTests');
+const { notDeleted } = require('../utils/soft-delete-sql');
 const { resolveSampleTestIds } = require('../utils/packageTests');
 const autoInvoice = require('./auto-invoice.service');
 const workflowEngine = require('./laboratory-workflow.service');
@@ -70,7 +71,7 @@ const queueStatusWhere = () => {
 const list = async ({ status, search, awaiting_validation, page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
-  let where = 'WHERE 1=1';
+  let where = `WHERE ${notDeleted('s')}`;
 
   if (awaiting_validation === 'true' || awaiting_validation === true || awaiting_validation === '1') {
     where += ` AND EXISTS (
@@ -132,7 +133,7 @@ const getById = async (id) => {
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
      LEFT JOIN invoices inv ON inv.sample_id = s.id
-     WHERE s.id = $1`,
+     WHERE s.id = $1 AND ${notDeleted('s')}`,
     [id]
   );
   if (!result.rows[0]) throw new AppError('Sample not found', 404, 'NOT_FOUND');

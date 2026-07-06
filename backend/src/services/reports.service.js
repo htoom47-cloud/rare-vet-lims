@@ -17,6 +17,7 @@ const resultEngine = require('./result-engine.service');
 const { buildReportSections, filterReportableAttachments, buildApprovalSection } = require('./report-builder.service');
 const portalSync = require('./portal-sync.service');
 const reportLifecycle = require('./report-lifecycle.service');
+const { notDeleted } = require('../utils/soft-delete-sql');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -110,11 +111,12 @@ const REPORT_SELECT = `
 
 const list = async ({ page, limit }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
-  const countResult = await query('SELECT COUNT(*) FROM reports');
+  const countResult = await query(`SELECT COUNT(*) FROM reports r WHERE ${notDeleted('r')}`);
   const total = parseInt(countResult.rows[0].count, 10);
 
   const result = await query(
     `${REPORT_SELECT}
+     WHERE ${notDeleted('r')}
      ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`,
     [l, offset]
   );
@@ -123,7 +125,7 @@ const list = async ({ page, limit }) => {
 };
 
 const getById = async (id) => {
-  const result = await query(`${REPORT_SELECT} WHERE r.id = $1`, [id]);
+  const result = await query(`${REPORT_SELECT} WHERE r.id = $1 AND ${notDeleted('r')}`, [id]);
   if (!result.rows[0]) throw new AppError('Report not found', 404, 'NOT_FOUND');
   return result.rows[0];
 };

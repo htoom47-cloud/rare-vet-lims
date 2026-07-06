@@ -620,6 +620,16 @@ async function applyPatches() {
       const speciesService = require('../services/animal-species.service');
       await speciesService.refreshLabelCache();
     } catch (_) { /* optional on first boot */ }
+
+    const softDeleteTables = ['customers', 'animals', 'samples', 'reports', 'invoices'];
+    for (const table of softDeleteTables) {
+      await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id)`);
+      await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS purge_after TIMESTAMPTZ`);
+      await client.query(
+        `CREATE INDEX IF NOT EXISTS idx_${table}_trash ON ${table}(purge_after) WHERE deleted_at IS NOT NULL`
+      );
+    }
   } finally {
     client.release();
   }
