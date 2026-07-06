@@ -952,7 +952,7 @@ export default function WorkflowCase() {
             )}
             <div className="label-print-area space-y-3 max-h-96 overflow-y-auto">
               {expandSampleLabelJobs(printSample).map((job, idx) => (
-                <BarcodeLabelErrorBoundary key={job.panelKey || idx}>
+                <BarcodeLabelErrorBoundary key={`${job.panelKey}-${idx}`}>
                   <BarcodeLabel
                     sample={job}
                   />

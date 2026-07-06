@@ -136,6 +136,9 @@ export const formatTestsForLabel = (sample, langOrOptions = false) => {
   const isArabic = typeof langOrOptions === 'object'
     ? Boolean(langOrOptions?.isArabic)
     : Boolean(langOrOptions);
+  if (sample?.panelKey) {
+    return panelFriendlyName(sample.panelKey, isArabic);
+  }
   const tests = sample?.tests?.filter(Boolean) || [];
   if (!tests.length) {
     return panelFriendlyName(sample?.panelKey, isArabic);

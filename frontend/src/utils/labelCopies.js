@@ -25,10 +25,15 @@ export function expandSampleLabelJobs(sample) {
     groups.get(key).push(test);
   }
 
+  const panelKeys = sortPanelKeys([...groups.keys()]);
+  const multiPanel = panelKeys.length > 1;
+
   const jobs = [];
-  for (const key of sortPanelKeys([...groups.keys()])) {
+  for (const key of panelKeys) {
     const groupTests = groups.get(key);
-    const copies = groupTests.length === 1
+    // Multiple lab panels on one sample → one tube label per panel (CBC + CHEM = 2 labels).
+    // label_copies applies only when the whole order is a single panel / single test.
+    const copies = !multiPanel && groupTests.length === 1
       ? labelCopiesForTest(groupTests[0])
       : 1;
     for (let i = 0; i < copies; i += 1) {

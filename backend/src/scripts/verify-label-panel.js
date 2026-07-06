@@ -8,6 +8,7 @@ const path = require('path');
 
 const panelPath = path.join(__dirname, '../../../frontend/src/utils/labelPanel.js');
 const speciesPath = path.join(__dirname, '../../../frontend/src/utils/speciesLabels.js');
+const copiesPath = path.join(__dirname, '../../../frontend/src/utils/labelCopies.js');
 const printPath = path.join(__dirname, '../../../frontend/src/utils/printLabel.js');
 
 let passed = 0;
@@ -15,18 +16,30 @@ let failed = 0;
 
 const check = (label, fn) => {
   try {
-    fn();
+    const result = fn();
+    if (result && typeof result.then === 'function') {
+      return result.then(() => {
+        passed += 1;
+        console.log(`  OK  ${label}`);
+      }).catch((err) => {
+        failed += 1;
+        console.error(`  FAIL ${label}: ${err.message}`);
+      });
+    }
     passed += 1;
     console.log(`  OK  ${label}`);
+    return Promise.resolve();
   } catch (err) {
     failed += 1;
     console.error(`  FAIL ${label}: ${err.message}`);
+    return Promise.resolve();
   }
 };
 
 console.log('\n=== verify-label-panel ===\n');
 
-check('labelPanel exports buildThermalLabelContent', () => {
+(async () => {
+await check('labelPanel exports buildThermalLabelContent', () => {
   const src = fs.readFileSync(panelPath, 'utf8');
   assert.ok(src.includes('export const buildThermalLabelContent'));
   assert.ok(src.includes('export const buildZebraThermalLabelContent'));
@@ -35,13 +48,13 @@ check('labelPanel exports buildThermalLabelContent', () => {
   assert.ok(!src.includes('animalCode'), 'stale animalCode reference');
 });
 
-check('speciesLabels module exists', () => {
+await check('speciesLabels module exists', () => {
   const src = fs.readFileSync(speciesPath, 'utf8');
   assert.ok(src.includes('export const speciesLabel'));
   assert.ok(src.includes('bootstrapSpeciesLabels'));
 });
 
-check('printLabel uses Zebra-first modal flow', () => {
+await check('printLabel uses Zebra-first modal flow', () => {
   const src = fs.readFileSync(printPath, 'utf8');
   assert.ok(src.includes('printSampleLabelFromModal'));
   assert.ok(src.includes('printJobsToZebra'));
@@ -49,7 +62,21 @@ check('printLabel uses Zebra-first modal flow', () => {
   assert.ok(src.includes('writeBrowserPrintToWindow'));
 });
 
-check('barcode engine builds ZPL for standard sample', () => {
+await check('multi-panel sample prints one label per panel', () => {
+  const src = fs.readFileSync(copiesPath, 'utf8');
+  assert.ok(src.includes('multiPanel'), 'label_copies must not duplicate when CBC+CHEM on same sample');
+  assert.ok(
+    src.includes('!multiPanel && groupTests.length === 1'),
+    'label_copies only when single panel on sample'
+  );
+});
+
+await check('panelKey drives label test line text', () => {
+  const src = fs.readFileSync(panelPath, 'utf8');
+  assert.ok(src.includes('if (sample?.panelKey)'));
+});
+
+await check('barcode engine builds ZPL for standard sample', () => {
   const engine = require('../services/barcode-engine.service');
   const payload = engine.buildBarcodePayload({
     sample_code: '26000003',
@@ -65,3 +92,4 @@ check('barcode engine builds ZPL for standard sample', () => {
 
 console.log(`\n${passed}/${passed + failed} passed\n`);
 process.exit(failed ? 1 : 0);
+})();
