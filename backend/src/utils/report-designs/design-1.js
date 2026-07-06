@@ -32,8 +32,13 @@ const FLAG_COLORS = {
   POS: '#dc2626', NEG: '#16a34a',
 };
 const FLAG_SYMBOL = {
-  NORMAL: '', HIGH: '\u2191', LOW: '\u2193', CRIT_HIGH: '\u2191\u2191', CRIT_LOW: '\u2193\u2193',
-  POS: '+', NEG: '\u2212',
+  NORMAL: '',
+  HIGH: 'H',
+  LOW: 'L',
+  CRIT_HIGH: 'H+',
+  CRIT_LOW: 'L+',
+  POS: '+',
+  NEG: '-',
 };
 
 const PATIENT_PAIRS = [
@@ -344,7 +349,12 @@ const drawResultsTable = (doc, results, reportData = {}) => {
       }
 
       strokeCell(doc, xs[COL.REF], y, COLS[COL.REF], rowH, bg);
-      cellLatin(doc, row.reference, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5.5, color: BRAND.muted, align: 'center' });
+      const refStr = clean(String(row.reference ?? '-'));
+      if (hasAr(refStr)) {
+        cellArabic(doc, refStr, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5.5, color: BRAND.muted, align: 'center' });
+      } else {
+        cellLatin(doc, refStr, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5.5, color: BRAND.muted, align: 'center' });
+      }
 
       strokeCell(doc, xs[COL.UNIT], y, COLS[COL.UNIT], rowH, bg);
       cellLatin(doc, row.unit || '-', xs[COL.UNIT] + 1, y + 2, COLS[COL.UNIT] - 2, rowH - 3, { size: 5, color: BRAND.muted, align: 'center' });

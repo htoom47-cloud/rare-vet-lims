@@ -35,8 +35,13 @@ const FLAG_COLORS = {
   POS: '#dc2626', NEG: '#16a34a',
 };
 const FLAG_SYMBOL = {
-  NORMAL: '', HIGH: '\u2191', LOW: '\u2193', CRIT_HIGH: '\u2191\u2191', CRIT_LOW: '\u2193\u2193',
-  POS: '+', NEG: '\u2212',
+  NORMAL: '',
+  HIGH: 'H',
+  LOW: 'L',
+  CRIT_HIGH: 'H+',
+  CRIT_LOW: 'L+',
+  POS: '+',
+  NEG: '-',
 };
 
 const { ANIMAL_TYPE_LABELS } = require('../../constants/animal-types');
@@ -75,6 +80,14 @@ const cellAr = (doc, text, x, y, w, opts = {}) => {
   doc.y = saved;
 };
 
+/** English left + Arabic right — never mixed Latin/Arabic in one cellEn call */
+const bilingualLine = (doc, textEn, textAr, x, y, w, opts = {}) => {
+  const { size = 6, color = BRAND.brownMid, bold = true } = opts;
+  const half = w / 2;
+  cellEn(doc, textEn, x, y, half - 2, { size, color, bold, align: 'center' });
+  cellAr(doc, textAr, x + half, y, half - 2, { size, color, bold, align: 'center' });
+};
+
 const strokeBox = (doc, x, y, w, h, fill) => {
   if (fill) doc.rect(x, y, w, h).fill(fill);
   doc.rect(x, y, w, h).lineWidth(0.35).strokeColor(BRAND.border).stroke();
@@ -105,8 +118,8 @@ const drawHeader = (doc, reportData, qrBuffer, logoBuf) => {
 
   cellEn(doc, labEn, textX, 5, textW / 2 - 4, { size: 8.5, bold: true });
   cellAr(doc, labAr, textX + textW / 2, 5, textW / 2 - 4, { size: 8.5, bold: true, align: 'right' });
-  cellEn(doc, 'Laboratory Results Report  |  تقرير نتائج المختبر', textX, 17, textW, {
-    size: 6, color: BRAND.brownMid, bold: true, align: 'center',
+  bilingualLine(doc, 'Laboratory Results Report', 'تقرير نتائج المختبر', textX, 17, textW, {
+    size: 6, color: BRAND.brownMid, bold: true,
   });
   cellEn(doc, `${env.lab.phone}  ·  ${reportData.reportNumber}`, textX, 27, textW, {
     size: 5.5, color: BRAND.muted, align: 'center',
@@ -214,7 +227,12 @@ const drawResultsTable = (doc, results) => {
     else cellEn(doc, resultStr, xs[COL.RESULT] + 1, y + 2, COLS[COL.RESULT] - 2, rowH - 3, { size: 6, color: fc, bold: true, align: 'center' });
 
     strokeBox(doc, xs[COL.REF], y, COLS[COL.REF], rowH, bg);
-    cellEn(doc, row.reference, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5, color: BRAND.muted, align: 'center' });
+    const refStr = clean(String(row.reference ?? '-'));
+    if (hasAr(refStr)) {
+      cellAr(doc, refStr, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5, color: BRAND.muted, align: 'center' });
+    } else {
+      cellEn(doc, refStr, xs[COL.REF] + 1, y + 2, COLS[COL.REF] - 2, rowH - 3, { size: 5, color: BRAND.muted, align: 'center' });
+    }
 
     strokeBox(doc, xs[COL.UNIT], y, COLS[COL.UNIT], rowH, bg);
     cellEn(doc, row.unit || '-', xs[COL.UNIT] + 1, y + 2, COLS[COL.UNIT] - 2, rowH - 3, { size: 5, color: BRAND.muted, align: 'center' });
@@ -245,7 +263,8 @@ const drawAbnormalSummary = (doc, y, results) => {
 
   doc.rect(TX, y, TW, h).fill('#fef2f2');
   doc.rect(TX, y, TW, h).lineWidth(0.4).strokeColor('#fecaca').stroke();
-  cellEn(doc, 'Abnormal / غير طبيعي:', TX + 3, y + 1, 62, { size: 5, bold: true, color: '#991b1b' });
+  cellEn(doc, 'Abnormal /', TX + 3, y + 1, 28, { size: 5, bold: true, color: '#991b1b' });
+  cellAr(doc, 'غير طبيعي:', TX + 30, y + 1, 34, { size: 5, bold: true, color: '#991b1b', align: 'right' });
   cellEn(doc, items, TX + 66, y + 1, TW - 70, { size: 5, color: '#b91c1c' });
   pinY(doc, y + h + 1);
   return y + h + 1;
