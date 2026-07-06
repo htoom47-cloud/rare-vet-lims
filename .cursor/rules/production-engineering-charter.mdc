@@ -1,0 +1,96 @@
+---
+description: Rare Vet Care LIMS — Permanent Production Engineering Charter (stability, data safety, minimal diffs)
+alwaysApply: true
+---
+
+# Rare Vet Care LIMS — Permanent Engineering Charter
+
+Production veterinary laboratory system. Treat every change as affecting real clients and live lab operations.
+
+## Priority order
+
+1. System stability
+2. Data integrity
+3. Do not break existing functionality
+4. New features only after the above (behind Feature Flag if risky)
+
+**If speed conflicts with stability, always choose stability.** Prefer solutions reliable for years, not quick hacks.
+
+## Before any code change
+
+1. Understand the problem and root cause
+2. List affected files and workflow/DB impact
+3. Propose the solution
+4. **Wait for approval** if workflow or database changes
+5. Do not start coding immediately
+
+## Minimal change only
+
+- Smallest diff that fixes the issue
+- No large refactors, rewrites, architecture moves, file moves, API renames
+- No DB changes unless necessary
+- Changes must be: backward compatible, atomic, minimal, safe, rollback-friendly
+
+## Protected systems — do not modify unless the request is directly about them
+
+Norma Integration · Mindray Integration · Zebra Printing · Barcode Engine · Report Builder · PDF Engine · Portal · Authentication · Notifications · Reference Range Engine · Result Engine
+
+## Database
+
+- Migrations only when necessary; state why first
+- Migrations must be safe, idempotent, runnable multiple times
+
+## Feature flags
+
+- Workflow changes behind a flag; default **false**
+
+## Tests & deploy
+
+- Run appropriate tests before commit; no commit if tests fail
+- No push without verifying the change
+- After changes: report root cause, files touched, migration?, flag?, side effects?, test results?, production-safe?, deploy?, rollback?
+
+## Data protection
+
+Never silently: delete data, change results/reports/reference ranges/barcodes/device mappings, or modify customers/animals/invoices/results/reports without explicit request, clear migration, or user action.
+
+## Production first (§15)
+
+Changes must not cause: sample intake stop, device bridge stop, lost results, wrong report, report shown to wrong client, wrong barcode print, or altered lab results.
+
+## No overwrite (§17) — device import priority
+
+For Norma, Mindray, or any device import:
+
+**Manual Edit > LIMS Admin > Device Import**
+
+Never overwrite manual edits on import unless the user explicitly requests it.
+
+## No fake save (§18)
+
+Save buttons must confirm DB + API success and reload from DB. Never rely on React state alone as source of truth.
+
+## No surprise auto-mutations (§19)
+
+Sync, replay, regenerate, reconcile, import, migration must not change user data unless part of the explicit request. Warn first if data may change.
+
+## No surprises (§20)
+
+Yesterday's behavior must work today unless behind a flag or explicit user approval.
+
+## Project constants
+
+- Reference ranges source of truth: LIMS Admin
+- Zebra labels: English only; preview may be Arabic
+- Portal: approved reports only; send from customers page
+- One report per sample (no duplicate generation)
+- No real notifications during testing
+- Workflow changes must not block lab operations
+
+## Code quality before commit
+
+No dead code, unnecessary console logs, unfinished TODOs, duplication, unhandled exceptions. User-facing errors must be clear.
+
+## When uncertain
+
+Stop. Explain. Propose. Wait for approval.
