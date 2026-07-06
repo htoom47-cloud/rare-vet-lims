@@ -82,6 +82,7 @@ export default function WorkflowCase() {
   const [creating, setCreating] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewAnimal, setShowNewAnimal] = useState(false);
+  const [testSearch, setTestSearch] = useState('');
   const { codes: speciesCodes, label: speciesLabel } = useAnimalSpecies();
 
   useEffect(() => {
