@@ -7,10 +7,9 @@ import {
 } from './zebraPrint';
 import { labelHasValidBarcode } from './labelPanel';
 import {
-  buildLabelPrintDocument,
-  buildMultiLabelPrintDocument,
+  buildBrowserPrintHtml,
   printLabelsViaIframeSync,
-  printSampleLabelInPlace,
+  writeBrowserPrintToWindow,
 } from './labelPrintHtml';
 import { expandSampleLabelJobs, expandSamplesForLabelPrint } from './labelCopies';
 
@@ -45,78 +44,59 @@ const enrichPrintJobs = async (sample) => {
   };
 };
 
-const buildPrintHtmlSafe = (jobs, isArabic) => {
+const openFallbackPrintWindow = () => {
   try {
-    return jobs.length > 1
-      ? buildMultiLabelPrintDocument(jobs, { isArabic, autoPrint: true })
-      : buildLabelPrintDocument(jobs[0], { isArabic, autoPrint: true });
-  } catch (error) {
-    logPrintError('buildPrintHtmlSafe', error);
+    return window.open(
+      'about:blank',
+      '_blank',
+      'width=420,height=320,menubar=no,toolbar=no,location=no,status=no'
+    );
+  } catch {
     return null;
   }
 };
 
-/**
- * Synchronous print — MUST run directly inside the click handler (before any await).
- * Browsers block window.print() when called after async gaps (lost user activation).
- */
-export function printSampleLabelWithDialogSync(sample) {
-  try {
-    if (!sample) return 'failed';
+const printJobsToZebra = async (jobs) => {
+  let printed = 0;
+  let lastDevice = 'Zebra';
+  let lastError = null;
 
-    const isArabic = i18n.language === 'ar';
-    const jobs = expandSampleLabelJobs(sample);
-    if (!jobs.length) return 'failed';
-
-    if (!jobsHaveValidBarcode(jobs)) return 'build_failed';
-
-    if (printSampleLabelInPlace()) {
-      return 'browser';
+  for (let i = 0; i < jobs.length; i += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await printToZebra(jobs[i]);
+      printed += 1;
+      lastDevice = result.device || lastDevice;
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(120);
+    } catch (error) {
+      lastError = error;
+      break;
     }
-
-    const html = buildPrintHtmlSafe(jobs, isArabic);
-    if (!html) return 'build_failed';
-
-    const win = window.open('about:blank', '_blank', 'width=420,height=420,menubar=no,toolbar=no,location=no');
-    if (win) {
-      try {
-        win.document.open();
-        win.document.write(html);
-        win.document.close();
-        win.focus();
-        return 'browser';
-      } catch (error) {
-        logPrintError('popup write', error);
-        try { win.close(); } catch { /* ignore */ }
-      }
-    }
-
-    if (printLabelsViaIframeSync(jobs, { isArabic })) {
-      return 'browser';
-    }
-
-    return 'popup_blocked';
-  } catch (error) {
-    logPrintError('printSampleLabelWithDialogSync', error);
-    return 'build_failed';
   }
-}
 
-/** @deprecated use printSampleLabelWithDialogSync from click handlers */
-export async function printSampleLabelWithDialog(sample) {
-  const result = printSampleLabelWithDialogSync(sample);
-  if (result === 'browser') return 'browser';
-  if (result === 'popup_blocked') {
-    toast.error(i18n.t('samples.printDialogFailed'));
-    return 'failed';
+  return { printed, total: jobs.length, lastDevice, lastError };
+};
+
+const browserPrintJobs = (jobs, { isArabic, fallbackWin = null } = {}) => {
+  if (fallbackWin && writeBrowserPrintToWindow(fallbackWin, jobs, { isArabic, autoPrint: true })) {
+    return 'browser';
   }
-  if (result === 'build_failed') {
-    toast.error(i18n.t('samples.barcodeLabelBuildFailed'));
-    return 'failed';
+
+  const html = buildBrowserPrintHtml(jobs, { isArabic, autoPrint: true });
+  if (!html) return 'build_failed';
+
+  const win = openFallbackPrintWindow();
+  if (win && writeBrowserPrintToWindow(win, jobs, { isArabic, autoPrint: true })) {
+    return 'browser';
   }
-  toast.error(i18n.t('samples.labelPrintFailed'));
-  return 'failed';
-}
+
+  if (printLabelsViaIframeSync(jobs, { isArabic })) {
+    return 'browser';
+  }
+
+  return 'popup_blocked';
+};
 
 const toastZebraBridgeHelp = async () => {
   const bridgeUp = await isZebraBridgeAvailable();
@@ -128,9 +108,80 @@ const toastZebraBridgeHelp = async () => {
 };
 
 /**
- * Auto-print after registration — Zebra ZPL only (silent, no print dialog).
- * @returns {{ printed: number, total: number, reason: 'invalid_barcode'|'zebra_failed'|null }}
+ * Print from modal — Zebra ZPL first, then isolated 50×25 mm browser page (not the LIMS app).
+ * Opens a blank window synchronously on click so browser print still works if Zebra fails.
  */
+export async function printSampleLabelFromModal(sample) {
+  if (!sample) return 'failed';
+
+  let jobs = expandSampleLabelJobs(sample);
+  if (!jobs.length || !jobsHaveValidBarcode(jobs)) {
+    toast.error(i18n.t('samples.barcodeLabelBuildFailed'));
+    return 'failed';
+  }
+
+  const isArabic = i18n.language === 'ar';
+  const fallbackWin = openFallbackPrintWindow();
+
+  const { jobs: enrichedJobs } = await enrichPrintJobs(sample);
+  jobs = enrichedJobs.length ? enrichedJobs : jobs;
+
+  if (!jobsHaveValidBarcode(jobs)) {
+    try { fallbackWin?.close(); } catch { /* ignore */ }
+    toast.error(i18n.t('samples.barcodeLabelBuildFailed'));
+    return 'failed';
+  }
+
+  const zebra = await printJobsToZebra(jobs);
+
+  if (zebra.printed === zebra.total) {
+    try { fallbackWin?.close(); } catch { /* ignore */ }
+    toast.success(
+      jobs.length > 1
+        ? i18n.t('samples.zebraPrintMultipleOk', { count: zebra.printed, printer: zebra.lastDevice })
+        : i18n.t('samples.zebraPrintOk', { printer: zebra.lastDevice })
+    );
+    return 'zebra';
+  }
+
+  if (zebra.printed > 0) {
+    toast.success(
+      i18n.t('samples.zebraPrintPartial', {
+        printed: zebra.printed,
+        total: zebra.total,
+        printer: zebra.lastDevice,
+      })
+    );
+  }
+
+  const browserResult = browserPrintJobs(jobs, { isArabic, fallbackWin });
+  if (browserResult === 'browser') {
+    if (zebra.printed === 0) {
+      toast.success(i18n.t('samples.browserPrintOk'));
+    }
+    return 'browser';
+  }
+
+  try { fallbackWin?.close(); } catch { /* ignore */ }
+  await toastZebraBridgeHelp();
+  if (browserResult === 'popup_blocked') {
+    toast.error(i18n.t('samples.printDialogFailed'), { duration: 8000 });
+  }
+  if (zebra.lastError?.code === 'EMPTY_LABEL_DATA' || zebra.lastError?.code === 'EMPTY_ZPL') {
+    toast.error(zebra.lastError.message, { duration: 10000 });
+  }
+  return 'failed';
+}
+
+/** @deprecated use printSampleLabelFromModal — browser-only fallback without Zebra */
+export function printSampleLabelWithDialogSync(sample) {
+  if (!sample) return 'failed';
+  const jobs = expandSampleLabelJobs(sample);
+  if (!jobs.length || !jobsHaveValidBarcode(jobs)) return 'build_failed';
+  return browserPrintJobs(jobs, { isArabic: i18n.language === 'ar' });
+}
+
+/** Auto-print after registration — Zebra ZPL only (silent, no print dialog). */
 export async function autoPrintSampleLabels(samples) {
   const jobs = expandSamplesForLabelPrint(samples);
   if (!jobs.length) {
@@ -141,62 +192,26 @@ export async function autoPrintSampleLabels(samples) {
     return { printed: 0, total: jobs.length, reason: 'invalid_barcode' };
   }
 
-  let printed = 0;
-  for (let i = 0; i < jobs.length; i += 1) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      await printToZebra(jobs[i]);
-      printed += 1;
-      // eslint-disable-next-line no-await-in-loop
-      await sleep(120);
-    } catch (error) {
-      logPrintError(`autoPrint job ${i + 1}`, error);
-    }
-  }
-
+  const zebra = await printJobsToZebra(jobs);
   return {
-    printed,
+    printed: zebra.printed,
     total: jobs.length,
-    reason: printed === 0 ? 'zebra_failed' : null,
+    reason: zebra.printed === 0 ? 'zebra_failed' : null,
   };
 }
 
-const toastPrintResult = (result) => {
-  if (result === 'browser') {
-    toast.success(i18n.t('samples.browserPrintOk'));
-    return;
-  }
-  if (result === 'popup_blocked') {
-    toast.error(i18n.t('samples.printDialogFailed'), { duration: 8000 });
-    return;
-  }
-  if (result === 'build_failed') {
-    toast.error(i18n.t('samples.barcodeLabelBuildFailed'), { duration: 8000 });
-    return;
-  }
-  toast.error(i18n.t('samples.labelPrintFailed'));
-};
-
 /**
  * @param {object} sample
- * @param {{ showDialog?: boolean }} options — showDialog opens browser print dialog (UI button).
+ * @param {{ showDialog?: boolean }} options — showDialog = modal print (Zebra then browser).
  */
 export function printSampleLabel(sample, { showDialog = false } = {}) {
-  try {
-    if (!sample) return Promise.resolve('failed');
+  if (!sample) return Promise.resolve('failed');
 
-    if (showDialog) {
-      const result = printSampleLabelWithDialogSync(sample);
-      toastPrintResult(result);
-      return Promise.resolve(result === 'browser' ? 'browser' : 'failed');
-    }
-
-    return printSampleLabelViaZebra(sample);
-  } catch (error) {
-    logPrintError('printSampleLabel', error);
-    toast.error(i18n.t('samples.barcodeLabelBuildFailed'));
-    return Promise.resolve('failed');
+  if (showDialog) {
+    return printSampleLabelFromModal(sample);
   }
+
+  return printSampleLabelViaZebra(sample);
 }
 
 async function printSampleLabelViaZebra(sample) {
@@ -212,43 +227,31 @@ async function printSampleLabelViaZebra(sample) {
       return 'failed';
     }
 
-    let zebraPrinted = 0;
-    let lastDevice = 'Zebra';
-    let lastZebraError = null;
+    const zebra = await printJobsToZebra(jobs);
 
-    for (let i = 0; i < jobs.length; i += 1) {
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const result = await printToZebra(jobs[i]);
-        zebraPrinted += 1;
-        lastDevice = result.device || lastDevice;
-        // eslint-disable-next-line no-await-in-loop
-        await sleep(120);
-      } catch (error) {
-        lastZebraError = error;
-        break;
-      }
-    }
-
-    if (zebraPrinted === jobs.length) {
+    if (zebra.printed === zebra.total) {
       toast.success(
         jobs.length > 1
-          ? i18n.t('samples.zebraPrintMultipleOk', { count: zebraPrinted, printer: lastDevice })
-          : i18n.t('samples.zebraPrintOk', { printer: lastDevice })
+          ? i18n.t('samples.zebraPrintMultipleOk', { count: zebra.printed, printer: zebra.lastDevice })
+          : i18n.t('samples.zebraPrintOk', { printer: zebra.lastDevice })
       );
       return 'zebra';
     }
 
-    if (zebraPrinted > 0) {
+    if (zebra.printed > 0) {
       toast.success(
-        i18n.t('samples.zebraPrintPartial', { printed: zebraPrinted, total: jobs.length, printer: lastDevice })
+        i18n.t('samples.zebraPrintPartial', {
+          printed: zebra.printed,
+          total: zebra.total,
+          printer: zebra.lastDevice,
+        })
       );
     }
 
     await toastZebraBridgeHelp();
     toast.error(i18n.t('samples.zebraUsePreviewPrint'), { duration: 10000 });
-    if (lastZebraError?.code === 'EMPTY_LABEL_DATA' || lastZebraError?.code === 'EMPTY_ZPL') {
-      toast.error(lastZebraError.message, { duration: 10000 });
+    if (zebra.lastError?.code === 'EMPTY_LABEL_DATA' || zebra.lastError?.code === 'EMPTY_ZPL') {
+      toast.error(zebra.lastError.message, { duration: 10000 });
     }
     return 'failed';
   } catch (error) {

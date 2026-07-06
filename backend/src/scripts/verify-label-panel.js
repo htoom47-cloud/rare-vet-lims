@@ -41,12 +41,12 @@ check('speciesLabels module exists', () => {
   assert.ok(src.includes('bootstrapSpeciesLabels'));
 });
 
-check('printLabel validates barcode before in-place print', () => {
+check('printLabel uses Zebra-first modal flow', () => {
   const src = fs.readFileSync(printPath, 'utf8');
-  assert.ok(src.includes('labelHasValidBarcode'));
-  assert.ok(src.match(/jobsHaveValidBarcode[\s\S]*printSampleLabelInPlace/));
-  assert.ok(src.includes('reason: \'invalid_barcode\''));
-  assert.ok(src.includes('zebraUsePreviewPrint'));
+  assert.ok(src.includes('printSampleLabelFromModal'));
+  assert.ok(src.includes('printJobsToZebra'));
+  assert.ok(!src.match(/printSampleLabelInPlace\(\)/), 'must not print the LIMS app page');
+  assert.ok(src.includes('writeBrowserPrintToWindow'));
 });
 
 check('barcode engine builds ZPL for standard sample', () => {

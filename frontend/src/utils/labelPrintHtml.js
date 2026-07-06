@@ -116,9 +116,11 @@ const labelBodyInner = (content) => {
     ? `<p class="label-50x25-digits">${escapeHtml(content.barcodeDigits)}</p>`
     : ''}
     </div>
+    <div class="label-50x25-details">
     ${content.sampleLine ? `<p class="label-50x25-line label-50x25-sample" title="${escapeHtml(content.sampleLine)}">${escapeHtml(content.sampleLine)}</p>` : ''}
     ${content.testLine ? `<p class="label-50x25-line label-50x25-test" title="${escapeHtml(content.testLine)}">${escapeHtml(content.testLine)}</p>` : ''}
-    ${content.animalTypeLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalTypeLine)}">${escapeHtml(content.animalTypeLine)}</p>` : ''}`;
+    ${content.animalTypeLine ? `<p class="label-50x25-line label-50x25-meta" title="${escapeHtml(content.animalTypeLine)}">${escapeHtml(content.animalTypeLine)}</p>` : ''}
+    </div>`;
 };
 
 const labelBodyInnerWithImage = (content, barcodeImg) => `
@@ -253,6 +255,31 @@ export const buildMultiLabelPrintDocument = (samples, { isArabic = false, autoPr
     isArabic,
   });
 };
+
+/** Build standalone 50×25 mm HTML for browser print (one page per label). */
+export const buildBrowserPrintHtml = (jobs, { isArabic = false, autoPrint = true } = {}) => {
+  const list = (jobs || []).filter(Boolean);
+  if (!list.length) return null;
+  return list.length > 1
+    ? buildMultiLabelPrintDocument(list, { isArabic, autoPrint })
+    : buildLabelPrintDocument(list[0], { isArabic, autoPrint });
+};
+
+/** Write label-only HTML into a window opened synchronously from the click handler. */
+export function writeBrowserPrintToWindow(win, jobs, { isArabic = false, autoPrint = true } = {}) {
+  if (!win) return false;
+  const html = buildBrowserPrintHtml(jobs, { isArabic, autoPrint });
+  if (!html) return false;
+  try {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Open standalone print page and run window.print() from inline script when autoPrint. */
 export function openPrintDocumentWindow(html) {

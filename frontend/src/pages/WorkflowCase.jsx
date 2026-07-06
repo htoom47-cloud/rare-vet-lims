@@ -415,9 +415,9 @@ export default function WorkflowCase() {
     }
   };
 
-  const handlePrintLabel = (sample) => {
+  const handlePrintLabel = async (sample) => {
     try {
-      printSampleLabel(sample, { showDialog: true });
+      await printSampleLabel(sample, { showDialog: true });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('[WorkflowCase] handlePrintLabel', error);
