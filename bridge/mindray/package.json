@@ -1,0 +1,12 @@
+{
+  "name": "rare-vet-mindray-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mindray BS-120 chemistry HL7/ASTM bridge for Rare Vet LIMS (port 5150)",
+  "scripts": {
+    "start": "node mindray-listener.js",
+    "pm2:start": "pm2 start ecosystem.mindray.config.cjs",
+    "pm2:stop": "pm2 stop mindray-bridge",
+    "pm2:logs": "pm2 logs mindray-bridge"
+  }
+}

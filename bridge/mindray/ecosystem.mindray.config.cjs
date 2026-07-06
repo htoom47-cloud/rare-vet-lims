@@ -1,0 +1,51 @@
+const fs = require('fs');
+const path = require('path');
+
+const loadEnvFile = (filename) => {
+  const filePath = path.join(__dirname, filename);
+  if (!fs.existsSync(filePath)) return {};
+  const env = {};
+  fs.readFileSync(filePath, 'utf8')
+    .split(/\r?\n/)
+    .forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const idx = trimmed.indexOf('=');
+      if (idx <= 0) return;
+      const key = trimmed.slice(0, idx).trim();
+      const value = trimmed.slice(idx + 1).trim();
+      if (key) env[key] = value;
+    });
+  return env;
+};
+
+const bridgeEnv = loadEnvFile('mindray-bridge.env');
+const logDir = path.join(__dirname, 'logs');
+
+module.exports = {
+  apps: [
+    {
+      name: 'mindray-bridge',
+      script: 'mindray-listener.js',
+      cwd: __dirname,
+      autorestart: true,
+      max_restarts: 100,
+      min_uptime: '10s',
+      restart_delay: 5000,
+      exp_backoff_restart_delay: 2000,
+      max_memory_restart: '200M',
+      watch: false,
+      merge_logs: true,
+      error_file: path.join(logDir, 'mindray-bridge-error.log'),
+      out_file: path.join(logDir, 'mindray-bridge-out.log'),
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      env: {
+        NODE_ENV: 'production',
+        LIMS_API_URL: bridgeEnv.LIMS_API_URL || 'https://lims.rarevetcare.com/api',
+        DEVICE_ID: bridgeEnv.DEVICE_ID || '',
+        DEVICE_API_KEY: bridgeEnv.DEVICE_API_KEY || '',
+        LISTEN_PORT: bridgeEnv.LISTEN_PORT || '5150',
+      },
+    },
+  ],
+};
