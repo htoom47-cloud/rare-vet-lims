@@ -1,13 +1,47 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { RotateCcw, Search, Trash2 } from 'lucide-react';
 import DataTable from '../components/ui/DataTable';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
-import { trashAPI } from '../services/api';
+import {
+  billingAPI, customersAPI, reportsAPI, samplesAPI, trashAPI,
+} from '../services/api';
 
 const TABS = ['customers', 'samples', 'reports', 'invoices'];
+
+async function searchActiveRecords(type, q) {
+  const query = q.trim();
+  if (!query) return [];
+
+  if (type === 'customers') {
+    const { data } = await customersAPI.list({ search: query, limit: 20 });
+    return data.data || [];
+  }
+  if (type === 'samples') {
+    const { data } = await samplesAPI.list({ search: query, limit: 20 });
+    return data.data || [];
+  }
+  if (type === 'invoices') {
+    const { data } = await billingAPI.invoices({ search: query, limit: 20 });
+    return data.data || [];
+  }
+  const { data } = await reportsAPI.list({ limit: 100 });
+  const ql = query.toLowerCase();
+  return (data.data || []).filter((r) => (
+    r.report_number?.toLowerCase().includes(ql)
+    || r.sample_code?.toLowerCase().includes(ql)
+    || r.customer_name?.toLowerCase().includes(ql)
+  )).slice(0, 20);
+}
+
+function activeLabel(type, row) {
+  if (type === 'customers') return row.full_name || row.mobile;
+  if (type === 'samples') return row.sample_code || row.barcode;
+  if (type === 'reports') return row.report_number || row.sample_code;
+  return row.invoice_number;
+}
 
 function formatCountdown(purgeAfter, t) {
   if (!purgeAfter) return '—';
@@ -28,6 +62,9 @@ export default function TrashBin() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const retentionHours = user?.features?.softDeleteRetentionHours ?? 48;
 
@@ -50,6 +87,42 @@ export default function TrashBin() {
 
   useEffect(() => { loadTrash(); }, [loadTrash]);
 
+  useEffect(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+  }, [activeTab]);
+
+  const moveToTrash = async (id) => {
+    if (!window.confirm(t('trash.deleteConfirm'))) return;
+    setBusyId(id);
+    try {
+      await trashAPI.delete(activeTab, id);
+      toast.success(t('trash.deleted'));
+      setDeleteId('');
+      setSearchResults((prev) => prev.filter((r) => r.id !== id));
+      await loadTrash();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('trash.deleteFailed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const results = await searchActiveRecords(activeTab, searchQuery);
+      setSearchResults(results);
+      if (!results.length) toast.error(t('trash.noSearchResults'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('trash.searchFailed'));
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleRestore = async (row) => {
     setBusyId(row.id);
     try {
@@ -66,18 +139,7 @@ export default function TrashBin() {
   const handleDelete = async () => {
     const id = deleteId.trim();
     if (!id) return;
-    if (!window.confirm(t('trash.deleteConfirm'))) return;
-    setBusyId(id);
-    try {
-      await trashAPI.delete(activeTab, id);
-      toast.success(t('trash.deleted'));
-      setDeleteId('');
-      await loadTrash();
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || t('trash.deleteFailed'));
-    } finally {
-      setBusyId(null);
-    }
+    await moveToTrash(id);
   };
 
   const labelForRow = (row) => {
@@ -172,24 +234,89 @@ export default function TrashBin() {
       </div>
 
       {canManage && (
-        <div className="mb-6 flex flex-wrap gap-2 items-end p-4 rounded-2xl border border-border/60 bg-card">
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-medium text-muted-foreground block mb-1">
-              {t('trash.deleteById')}
-            </label>
-            <input
-              type="text"
-              value={deleteId}
-              onChange={(e) => setDeleteId(e.target.value)}
-              placeholder={t('trash.idPlaceholder')}
-              className="w-full rounded-xl border border-border px-3 py-2 text-sm"
-            />
+        <div className="mb-6 p-4 rounded-2xl border border-border/60 bg-card space-y-4">
+          <p className="text-sm font-semibold">{t('trash.searchAndDelete')}</p>
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-xs font-medium text-muted-foreground block mb-1">
+                {t('trash.searchLabel')}
+              </label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                placeholder={t(`trash.searchPlaceholder.${activeTab}`)}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm"
+              />
+            </div>
+            <Button type="button" onClick={handleSearch} disabled={!searchQuery.trim() || searching}>
+              <Search size={16} className="me-1" />
+              {searching ? t('common.loading') : t('trash.search')}
+            </Button>
           </div>
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={!deleteId.trim() || busyId === deleteId.trim()}>
-            {t('trash.moveToTrash')}
-          </Button>
+
+          {searchResults.length > 0 && (
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-start px-3 py-2 font-medium">{t('trash.record')}</th>
+                    <th className="text-start px-3 py-2 font-medium">{t('trash.details')}</th>
+                    <th className="text-end px-3 py-2 font-medium">{t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {searchResults.map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-3 py-2 font-medium">{activeLabel(activeTab, row)}</td>
+                      <td className="px-3 py-2 text-muted-foreground text-xs">
+                        {activeTab === 'customers' && row.mobile}
+                        {activeTab === 'samples' && (row.customer_name || row.barcode)}
+                        {activeTab === 'reports' && row.customer_name}
+                        {activeTab === 'invoices' && (row.customer_name || row.total)}
+                      </td>
+                      <td className="px-3 py-2 text-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          disabled={busyId === row.id}
+                          onClick={() => moveToTrash(row.id)}
+                        >
+                          {t('trash.moveToTrash')}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+              {t('trash.deleteByIdAdvanced')}
+            </summary>
+            <div className="flex flex-wrap gap-2 items-end mt-3 pt-3 border-t border-border/60">
+              <div className="flex-1 min-w-[200px]">
+                <input
+                  type="text"
+                  value={deleteId}
+                  onChange={(e) => setDeleteId(e.target.value)}
+                  placeholder={t('trash.idPlaceholder')}
+                  className="w-full rounded-xl border border-border px-3 py-2 text-sm font-mono text-xs"
+                />
+              </div>
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={!deleteId.trim() || busyId === deleteId.trim()}>
+                {t('trash.moveToTrash')}
+              </Button>
+            </div>
+          </details>
         </div>
       )}
+
+      <h2 className="text-lg font-semibold mb-3">{t('trash.inTrash')}</h2>
 
       <DataTable columns={columns} data={rows} loading={loading} />
     </div>
