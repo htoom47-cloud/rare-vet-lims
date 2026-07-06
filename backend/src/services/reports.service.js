@@ -725,6 +725,13 @@ const getPreview = async (id) => {
   return unified;
 };
 
+const getReportHtml = async (id) => {
+  const reportRow = await getById(id);
+  const payload = await buildPdfPayload(reportRow);
+  const { buildReportHtml } = require('../utils/report-designs/design-3/build-html');
+  return buildReportHtml(payload);
+};
+
 const getLifecycleStatus = async (id) => {
   const reportRow = await getById(id);
   return reportLifecycle.getReportLifecycleStatus(reportRow, reportRow.language || 'ar');
@@ -781,5 +788,5 @@ const updateNotes = async (reportId, { treatment_recommendations, ai_interpretat
 };
 
 module.exports = {
-  list, getPreview, getLifecycleStatus, generate, approve, reopen, verify, servePdf, regeneratePdfById, buildReportData, updateNotes,
+  list, getPreview, getReportHtml, getLifecycleStatus, generate, approve, reopen, verify, servePdf, regeneratePdfById, buildReportData, updateNotes,
 };

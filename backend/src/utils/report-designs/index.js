@@ -3,7 +3,7 @@
  * Design 1 = compact professional bilingual layout (saved Jun 2026).
  * Design 2 = legacy PDFKit premium layout.
  * Design 3 = VetConnect HTML/CSS — Puppeteer PDF.
- * Set REPORT_DESIGN=1|2|3 in env (default 1 — matches staff preview LaboratoryReport.jsx).
+ * Set REPORT_DESIGN=1|2|3 in env (default 3 — VetConnect official layout).
  */
 const design1 = require('./design-1');
 const design2 = require('./design-2');
@@ -76,7 +76,9 @@ const DESIGNS = {
       pdf: 'backend/src/utils/report-designs/design-3/index.js',
       html: 'backend/src/utils/report-designs/design-3/build-html.js',
       styles: 'backend/src/utils/report-designs/design-3/styles.css',
-      helpers: 'backend/src/utils/report-designs/design-3/helpers.js',
+      staffPreview: 'frontend/src/components/reports/ReportHtmlFrame.jsx',
+      staffPage: 'frontend/src/pages/LaboratoryReport.jsx',
+      portalPage: 'frontend-portal/src/pages/LaboratoryReport.jsx',
     },
     traits: [
       'HTML/CSS Grid + Flexbox layout (Puppeteer → PDF)',
@@ -90,13 +92,13 @@ const DESIGNS = {
 };
 
 const getActiveDesignId = () => {
-  const raw = process.env.REPORT_DESIGN || '1';
+  const raw = process.env.REPORT_DESIGN || '3';
   const id = Number(raw);
-  return DESIGNS[id] ? id : 1;
+  return DESIGNS[id] ? id : 3;
 };
 
 const getDesign = (id = getActiveDesignId()) => {
-  const design = DESIGNS[Number(id)] || DESIGNS[1];
+  const design = DESIGNS[Number(id)] || DESIGNS[3];
   if (!design) throw new Error(`Unknown report design: ${id}`);
   return design;
 };

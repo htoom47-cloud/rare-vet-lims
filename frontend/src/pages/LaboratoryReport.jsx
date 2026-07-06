@@ -19,6 +19,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { reportsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ReportHtmlFrame from '../components/reports/ReportHtmlFrame';
 import { DEMO_REPORT } from '../data/demoReport';
 import { downloadLabReportPdf, printLabReport } from '../utils/labReportPrint';
 import { isSinglePageLayout, isAbnormalFlag, flattenResults } from '../utils/reportLayout';
@@ -104,14 +105,16 @@ function PatientField({ label, value }) {
   );
 }
 
-/** Active layout: report design #1 — see .cursor/rules/report-design-1.mdc */
+/** Official layout: design #3 (VetConnect HTML) — preview matches stored PDF */
 export default function LaboratoryReport({ demoMode = false, initialReport = null, backPath = null, hideShareActions = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { user, hasPermission } = useAuth();
   const reportRef = useRef(null);
+  const htmlFrameRef = useRef(null);
   const [report, setReport] = useState(initialReport || (demoMode ? DEMO_REPORT : null));
+  const [reportHtml, setReportHtml] = useState(null);
   const [loading, setLoading] = useState(!demoMode && !initialReport);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [regeneratingPdf, setRegeneratingPdf] = useState(false);
@@ -126,19 +129,30 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const locale = isAr ? 'ar' : 'en';
 
   const load = useCallback(async () => {
-    if (initialReport) { setReport(initialReport); setLoading(false); return; }
     if (demoMode || id === 'demo') {
       setReport({ ...DEMO_REPORT, verifyUrl: `${window.location.origin}/verify/${DEMO_REPORT.verificationCode}` });
+      setReportHtml(null);
       setLoading(false);
       return;
     }
+
+    const reportId = initialReport?.id || id;
+    if (!reportId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data } = await reportsAPI.getPreview(id);
-      setReport(data.data);
+      const [previewRes, html] = await Promise.all([
+        reportsAPI.getPreview(reportId),
+        reportsAPI.getReportHtml(reportId).catch(() => null),
+      ]);
+      setReport(previewRes.data.data);
+      setReportHtml(html);
     } catch {
       toast.error(t('labReport.loadFailed'));
-      navigate('/reports');
+      if (!initialReport) navigate('/reports');
     } finally {
       setLoading(false);
     }
@@ -208,6 +222,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
 
   const handlePrint = async () => {
     toast.dismiss();
+    if (reportHtml && htmlFrameRef.current?.print()) return;
     if (!reportRef.current) return;
     try {
       await printLabReport(reportRef.current, { isAr, dir });
@@ -278,10 +293,12 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           }
           : prev.smartLifecycle,
       } : prev));
+      try {
+        const html = await reportsAPI.getReportHtml(id);
+        setReportHtml(html);
+      } catch { /* preview JSON still valid */ }
       toast.success(t('reports.updateReportDone'));
-      if (report?.smartLifecycle?.enabled) {
-        await load();
-      }
+      await load();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('reports.regenerateFailed'));
     } finally {
@@ -423,6 +440,15 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
         </div>
       )}
 
+      {reportHtml ? (
+        <div className="max-w-[210mm] mx-auto">
+          <ReportHtmlFrame
+            ref={htmlFrameRef}
+            html={reportHtml}
+            title={report.reportNumber || t('labReport.title')}
+          />
+        </div>
+      ) : demoMode ? (
       <div
         ref={reportRef}
         className={cn(
@@ -652,6 +678,11 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           </div>
         </footer>
       </div>
+      ) : (
+        <div className="max-w-[210mm] mx-auto rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-sm text-amber-950">
+          {t('labReport.previewUnavailable')}
+        </div>
+      )}
     </div>
   );
 }

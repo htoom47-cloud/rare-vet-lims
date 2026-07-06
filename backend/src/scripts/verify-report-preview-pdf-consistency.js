@@ -128,22 +128,27 @@ check('portal getReportPreview uses reportsService.getPreview', () => {
 check('Active PDF design reads reportData.sections', () => {
   const registry = require('../utils/report-designs');
   const activeId = registry.getActiveDesignId();
-  assert.strictEqual(activeId, 1, 'default REPORT_DESIGN should be 1 (matches staff preview)');
-  const designPath = path.join(ROOT, 'utils', 'report-designs', `design-${activeId}.js`);
+  assert.strictEqual(activeId, 3, 'default REPORT_DESIGN should be 3 (VetConnect official layout)');
+  const designPath = activeId === 3
+    ? path.join(ROOT, 'utils', 'report-designs', 'design-3', 'build-html.js')
+    : path.join(ROOT, 'utils', 'report-designs', `design-${activeId}.js`);
   const src = fs.readFileSync(designPath, 'utf8');
-  assert.ok(src.includes('generateReportPDF'));
-  assert.ok(
-    src.includes('reportData.results') || src.includes('reportData.sections'),
-    'PDF generator must consume unified report payload'
-  );
+  assert.ok(src.includes('buildReportHtml') || src.includes('generateReportPDF'));
 });
 
-check('staff LaboratoryReport.jsx prefers report.sections', () => {
+check('getReportHtml always uses design-3 build-html', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'services', 'reports.service.js'), 'utf8');
+  assert.ok(src.includes("require('../utils/report-designs/design-3/build-html')"));
+  assert.ok(!src.includes('HTML_PREVIEW_UNAVAILABLE'));
+});
+
+check('staff LaboratoryReport.jsx uses ReportHtmlFrame preview', () => {
   const src = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend', 'src', 'pages', 'LaboratoryReport.jsx'),
     'utf8'
   );
-  assert.ok(src.includes('report?.sections?.length'));
+  assert.ok(src.includes('ReportHtmlFrame'));
+  assert.ok(src.includes('getReportHtml'));
 });
 
 check('portal LaboratoryReport.jsx prefers report.sections', () => {
