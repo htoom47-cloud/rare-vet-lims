@@ -2,8 +2,9 @@
 import {
   displaySampleId,
   encodeCode128C,
+  extractDigits,
 } from './barcodeScan';
-import { animalTypeLabel } from '../constants/animalTypes';
+import { speciesLabel } from './speciesLabels';
 
 /** Short English codes printed on thermal labels (Zebra 50×25 mm). */
 export const PANEL_CODES = {
@@ -152,10 +153,14 @@ export const asciiLabelText = (text) => {
   return s;
 };
 
-/** Code128 scan value (12-digit barcode column). */
-export const barcodeScanValue = (sample) => (
-  displaySampleId(sample?.barcode || sample?.sample_code)
-);
+/** Code128 scan value — prefer 12-digit barcode column; fall back to sample ID digits. */
+export const barcodeScanValue = (sample) => {
+  const scan = displaySampleId(sample?.barcode);
+  if (scan && extractDigits(scan).length >= 8) return scan;
+  const fromCode = displaySampleId(sample?.sample_code);
+  if (fromCode && extractDigits(fromCode).length >= 8) return fromCode;
+  return scan || fromCode || '';
+};
 
 /** Sequential sample ID shown on label (e.g. 26000003). */
 export const sampleDisplayId = (sample) => {
@@ -168,13 +173,13 @@ const buildLabelContentCore = (sample, { isArabic = false, englishOnly = false }
   const barcode = barcodeScanValue(sample);
   const sampleId = sampleDisplayId(sample);
   const testLine = formatTestsForLabel(sample, englishOnly ? false : isArabic);
-  const animalTypeLine = animalTypeLabel(sample?.animal_type, englishOnly ? false : isArabic);
+  const animalTypeLine = speciesLabel(sample?.animal_type, englishOnly ? false : isArabic);
 
   const sampleLine = sampleId
-    ? (englishOnly || !isArabic ? `Sample ${sampleId}` : `Sample ${sampleId}`)
+    ? (englishOnly || !isArabic ? `Sample ${sampleId}` : `عينة ${sampleId}`)
     : '';
 
-  const sanitize = (text) => (englishOnly ? asciiLabelText(text) || text : text);
+  const sanitize = (text) => (englishOnly ? (asciiLabelText(text) || '') : text);
 
   return {
     barcode,

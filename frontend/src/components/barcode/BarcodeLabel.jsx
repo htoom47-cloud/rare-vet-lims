@@ -34,6 +34,7 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
   }
   const barcodeEncode = content.barcodeEncode || barcodeEncodeDigits(content.barcode);
   const isThermal = size === 'thermal-50x25';
+  const canRenderBarcode = Boolean(barcodeEncode && /^\d+$/.test(String(barcodeEncode)));
 
   if (isThermal) {
     return (
@@ -42,7 +43,7 @@ export default function BarcodeLabel({ sample, format = 'code128', size = 'therm
           <div className="label-50x25-qr">
             <QRCode value={content.barcode || content.sampleCode} size={56} />
           </div>
-        ) : barcodeEncode ? (
+        ) : canRenderBarcode ? (
           <div className="label-50x25-barcode-wrap">
             <div className="label-50x25-barcode">
               <Barcode

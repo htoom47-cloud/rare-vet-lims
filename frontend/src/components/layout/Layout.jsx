@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import AnimatedOutlet from '../motion/AnimatedOutlet';
+import { bootstrapSpeciesLabels } from '../../utils/speciesLabels';
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    bootstrapSpeciesLabels();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background bg-app-mesh">

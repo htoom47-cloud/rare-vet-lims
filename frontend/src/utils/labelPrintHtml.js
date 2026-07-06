@@ -284,7 +284,9 @@ export function openLabelPrintWindow(sample, { isArabic = false, samples = null 
 /** Print labels already visible in the open modal — must call window.print() synchronously from click handler. */
 export function printSampleLabelInPlace() {
   try {
-    const area = document.querySelector('[role="dialog"] .label-print-area');
+    const area = document.querySelector('[role="dialog"] .label-print-area')
+      || document.querySelector('[data-state="open"] .label-print-area')
+      || document.querySelector('.label-print-area');
     const previews = area
       ? area.querySelectorAll('.label-preview')
       : document.querySelectorAll('[role="dialog"] .label-preview, .label-print-area .label-preview');

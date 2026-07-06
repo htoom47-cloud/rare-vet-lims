@@ -68,6 +68,12 @@ export function printSampleLabelWithDialogSync(sample) {
     const jobs = expandSampleLabelJobs(sample);
     if (!jobs.length) return 'failed';
 
+    const hasBarcode = jobs.some((job) => {
+      const fields = getLabelPrintFields(job);
+      return fields?.barcode && String(fields.barcodeEncode || '').replace(/\D/g, '').length >= 8;
+    });
+    if (!hasBarcode) return 'build_failed';
+
     const html = buildPrintHtmlSafe(jobs, isArabic);
     if (!html) return 'build_failed';
 
@@ -190,6 +196,14 @@ async function printSampleLabelViaZebra(sample) {
     const { jobs } = await enrichPrintJobs(sample);
     if (!jobs.length) {
       toast.error(i18n.t('samples.labelPrintFailed'));
+      return 'failed';
+    }
+
+    if (!jobs.some((job) => {
+      const fields = getLabelPrintFields(job);
+      return fields?.barcode && String(fields.barcodeEncode || '').replace(/\D/g, '').length >= 8;
+    })) {
+      toast.error(i18n.t('samples.barcodeLabelBuildFailed'));
       return 'failed';
     }
 
