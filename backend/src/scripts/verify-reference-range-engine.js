@@ -31,6 +31,7 @@ const limsRow = (code, min, max, notes = null, extras = {}) => ({
   trr_text_reference: extras.text_reference ?? null,
   trr_is_active: true,
   trr_animal_type: extras.animal_type ?? 'camel',
+  trr_created_by: extras.created_by ?? null,
   rv_notes: extras.rv_notes ?? null,
 });
 
@@ -43,7 +44,7 @@ check('CBC camel WBC — resolves 4-15', () => {
   const range = engine.resolveReferenceRangeFromRow({ row });
   assert(range, 'expected range');
   assert.strictEqual(range.source, engine.RANGE_SOURCES.LIMS_MANUAL);
-  assert.strictEqual(engine.formatReferenceRange(range), 'Manual WBC range');
+  assert.strictEqual(engine.formatReferenceRange(range), `${camel.WBC.min}-${camel.WBC.max}`);
   const flag = engine.evaluateResultFlag(10, range);
   assert.strictEqual(flag.flag, 'NORMAL');
 });
@@ -121,6 +122,38 @@ check('Manual range beats Synced from for same parameter', () => {
   });
   assert.strictEqual(picked.source, engine.RANGE_SOURCES.LIMS_MANUAL);
   assert.strictEqual(picked.min_value, 8);
+});
+
+check('Admin created_by range beats seed defaults', () => {
+  const admin = {
+    parameter_id: 'p1',
+    animal_type: 'camel',
+    min_value: 6,
+    max_value: 18,
+    notes: 'Species default',
+    created_by: 'user-uuid',
+    is_active: true,
+  };
+  const seed = {
+    parameter_id: 'p1',
+    animal_type: 'camel',
+    min_value: 4,
+    max_value: 15,
+    notes: 'Species default',
+    is_active: true,
+  };
+  const picked = engine.pickBestLimsRow([seed, admin], {
+    parameter_id: 'p1',
+    animal_type: 'camel',
+  });
+  assert.strictEqual(picked.source, engine.RANGE_SOURCES.LIMS_MANUAL);
+  assert.strictEqual(picked.min_value, 6);
+});
+
+check('Text reference shown when no numeric bounds', () => {
+  const row = limsRow('FINDINGS', null, null, null, { text_reference: 'Negative' });
+  const range = engine.resolveReferenceRangeFromRow({ row });
+  assert.strictEqual(engine.formatReferenceRange(range), 'Negative');
 });
 
 check('resolveReportReferenceBounds delegates to engine', () => {

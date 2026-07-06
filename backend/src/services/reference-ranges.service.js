@@ -100,6 +100,7 @@ const getLimsReferenceRange = async (parameterId, animalType, extras = {}) => {
     critical_high: resolved.critical_high,
     unit: resolved.unit,
     notes: resolved.notes,
+    text_reference: resolved.text_reference,
   };
 };
 

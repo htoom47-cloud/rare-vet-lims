@@ -69,6 +69,7 @@ const deviceMatchesRange = (deviceId, row) => {
 
 const classifyLimsTier = (row) => {
   if (!row || !isActiveRange(row)) return null;
+  if (row.created_by) return RANGE_SOURCES.LIMS_MANUAL;
   if (isManualLimsNotes(row.notes)) return RANGE_SOURCES.LIMS_MANUAL;
   if (row.animal_type && row.animal_type !== 'other') return RANGE_SOURCES.LIMS_SPECIES;
   return RANGE_SOURCES.LIMS_GENERAL;
@@ -97,6 +98,7 @@ const rowFromLimsPrefixes = (row) => {
     age_unit: row.trr_age_unit,
     device_id: row.trr_device_id,
     is_active: row.trr_is_active,
+    created_by: row.trr_created_by ?? row.created_by ?? null,
   };
 };
 
@@ -121,12 +123,14 @@ const normalizeLimsRow = (row, source) => ({
  */
 const RANGE_PRIORITY_ORDER = `
   CASE
+    WHEN trr.created_by IS NOT NULL THEN 0
     WHEN trr.notes IS NOT NULL
       AND TRIM(trr.notes) <> ''
       AND trr.notes NOT LIKE 'Synced from%'
-      AND trr.notes NOT LIKE 'Norma:%' THEN 0
-    WHEN trr.animal_type IS NOT NULL AND trr.animal_type::text <> 'other' THEN 1
-    ELSE 2
+      AND trr.notes NOT LIKE 'Norma:%'
+      AND trr.notes NOT LIKE 'Species default%' THEN 1
+    WHEN trr.animal_type IS NOT NULL AND trr.animal_type::text <> 'other' THEN 2
+    ELSE 3
   END,
   CASE
     WHEN trr.sex IS NULL OR trr.sex = '' THEN 1
@@ -153,7 +157,8 @@ const ENGINE_REF_SELECT_SQL = `
   trr.age_unit AS trr_age_unit,
   trr.device_id AS trr_device_id,
   trr.is_active AS trr_is_active,
-  trr.animal_type AS trr_animal_type`;
+  trr.animal_type AS trr_animal_type,
+  trr.created_by AS trr_created_by`;
 
 /** Backward-compatible alias for reports/results queries. */
 const LIMS_REF_SELECT_SQL = ENGINE_REF_SELECT_SQL;
@@ -168,7 +173,7 @@ const engineRefLateralJoin = (
     SELECT
       trr.id, trr.min_value, trr.max_value, trr.critical_low, trr.critical_high,
       trr.notes, trr.text_reference, trr.unit, trr.sex, trr.age_min, trr.age_max,
-      trr.age_unit, trr.device_id, trr.is_active, trr.animal_type
+      trr.age_unit, trr.device_id, trr.is_active, trr.animal_type, trr.created_by
     FROM test_reference_ranges trr
     WHERE trr.parameter_id = ${paramExpr}
       AND (trr.is_active IS NULL OR trr.is_active = true)
@@ -209,7 +214,8 @@ const scoreLimsCandidate = (row, context) => {
   if (!tier) return -1;
 
   let score = 0;
-  if (tier === RANGE_SOURCES.LIMS_MANUAL) score += 1000;
+  if (row.created_by) score += 3000;
+  else if (tier === RANGE_SOURCES.LIMS_MANUAL) score += 1000;
   else if (tier === RANGE_SOURCES.LIMS_SPECIES) score += 500;
   else score += 100;
   if (isSpeciesRow) score += 50;
@@ -292,17 +298,17 @@ const resolveReferenceRange = async (context = {}) => {
 const formatReferenceRange = (range) => {
   if (!range) return null;
   if (range.text_reference) return String(range.text_reference).trim();
-  if (range.min_value == null || range.max_value == null) return null;
-
+  if (range.min_value != null && range.max_value != null) {
+    const fmt = (n) => {
+      const num = Number(n);
+      if (Number.isNaN(num)) return String(n);
+      return Number.isInteger(num) ? String(num) : String(num).replace(/\.?0+$/, '');
+    };
+    return `${fmt(range.min_value)}-${fmt(range.max_value)}`;
+  }
   const note = range.notes != null ? String(range.notes).trim() : '';
   if (note && isManualLimsNotes(note)) return note;
-
-  const fmt = (n) => {
-    const num = Number(n);
-    if (Number.isNaN(num)) return String(n);
-    return Number.isInteger(num) ? String(num) : String(num).replace(/\.?0+$/, '');
-  };
-  return `${fmt(range.min_value)}-${fmt(range.max_value)}`;
+  return null;
 };
 
 const evaluateResultFlag = (value, range) => {
