@@ -372,10 +372,15 @@ export default function WorkflowCase() {
       toast.success(t('workflow.samplesCreated', { count: created.length }));
 
       const expected = totalLabelCountForSamples(created);
-      const printed = await autoPrintSampleLabels(created);
+      const { printed, reason } = await autoPrintSampleLabels(created);
       if (printed >= expected) {
         toast.success(t('samples.autoPrintOk', { count: printed }));
         return;
+      }
+      if (reason === 'invalid_barcode') {
+        toast.error(t('samples.barcodeLabelBuildFailed'));
+      } else if (printed === 0) {
+        toast.error(t('samples.autoPrintFailed'));
       }
       if (printed > 0) {
         toast.success(t('samples.zebraPrintPartial', { printed, total: expected, printer: 'Zebra' }));

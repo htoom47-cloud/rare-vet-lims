@@ -1,6 +1,8 @@
 import { ANIMAL_TYPES, animalTypeLabel as staticLabel } from '../constants/animalTypes';
 import { animalSpeciesAPI } from '../services/api';
 
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+
 let labelMap = { ...ANIMAL_TYPES };
 
 export const mergeSpeciesRows = (rows = []) => {
@@ -22,6 +24,17 @@ export const speciesLabel = (code, isArabic = false) => {
   const entry = labelMap[key] || labelMap[key.toLowerCase()];
   if (entry) return isArabic ? (entry.ar || entry.en) : (entry.en || entry.ar);
   return staticLabel(key, isArabic);
+};
+
+/** Zebra ZPL — ASCII English only; never Arabic (falls back to code). */
+export const speciesLabelForZpl = (code) => {
+  const key = String(code || '').trim();
+  if (!key) return '';
+  const entry = labelMap[key] || labelMap[key.toLowerCase()];
+  if (entry?.en && !ARABIC_RE.test(entry.en)) return entry.en;
+  const staticEn = ANIMAL_TYPES[key]?.en || ANIMAL_TYPES[key.toLowerCase()]?.en;
+  if (staticEn) return staticEn;
+  return key;
 };
 
 let bootstrapPromise = null;

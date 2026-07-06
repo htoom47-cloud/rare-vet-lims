@@ -11,6 +11,7 @@ const {
   encodeCode128C,
   normalizeSampleScanId,
   extractDigits,
+  barcodeScanValue,
 } = require('../utils/barcode-scan');
 
 const BARCODE_TYPE = 'Code128';
@@ -96,6 +97,7 @@ const formatSampleDate = (value, isArabic) => {
 const speciesService = require('./animal-species.service');
 
 const animalTypeLabel = (type, isArabic) => speciesService.speciesLabel(type, isArabic);
+const animalTypeLabelForZpl = (type) => speciesService.speciesLabelForZpl(type);
 
 const resolvePanelKey = (test) => {
   const cat = String(test?.category_code || '').toUpperCase();
@@ -137,12 +139,12 @@ const labels = (isArabic) => ({
 const buildBarcodePayload = (sample = {}, context = {}) => {
   const isArabic = context.isArabic ?? context.language === 'ar';
 
-  const rawBarcode = sample.barcode || sample.sample_code || sample.sample_id;
-  const barcodeValue = displaySampleId(rawBarcode) || '';
+  const rawBarcode = barcodeScanValue(sample);
+  const barcodeValue = displaySampleId(rawBarcode) || rawBarcode || '';
   const barcodeEncode = encodeCode128C(barcodeValue);
   const sampleId = String(sample.sample_code || '').replace(/\D/g, '') || barcodeValue;
   const testsSummary = formatTestsForLabel(sample, false);
-  const animalType = animalTypeLabel(sample.animal_type, false);
+  const animalType = animalTypeLabelForZpl(sample.animal_type);
 
   const humanReadable = {
     sampleId,
@@ -288,7 +290,7 @@ const asciiLabelText = (text) => {
 const buildZplTextLines = (payload) => {
   const sampleId = payload.meta?.sample_code || payload.humanReadable?.sampleId || '';
   const testsSummary = formatTestsForLabel({ tests: payload.meta?.tests || [] }, false);
-  const animalType = animalTypeLabel(payload.meta?.animal_type, false);
+  const animalType = animalTypeLabelForZpl(payload.meta?.animal_type);
 
   const lines = [];
   if (sampleId) lines.push({ key: 'sample', text: truncateLabel(`Sample ${sampleId}`) });

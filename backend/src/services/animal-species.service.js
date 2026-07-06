@@ -23,10 +23,22 @@ const refreshLabelCache = async () => {
   return result.rows;
 };
 
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+
 const speciesLabel = (code, isArabic = false) => {
   const entry = labelCache[String(code || '').toLowerCase()];
   if (!entry) return code || '';
   return isArabic ? (entry.ar || entry.en) : (entry.en || entry.ar);
+};
+
+/** ASCII label line for Zebra — English or species code, never Arabic. */
+const speciesLabelForZpl = (code) => {
+  const key = String(code || '').toLowerCase();
+  const entry = labelCache[key];
+  if (entry?.en && !ARABIC_RE.test(entry.en)) return entry.en;
+  const staticEn = ANIMAL_TYPE_LABELS[key]?.en;
+  if (staticEn) return staticEn;
+  return String(code || '');
 };
 
 const listActive = async () => {
@@ -147,6 +159,7 @@ module.exports = {
   normalizeCode,
   refreshLabelCache,
   speciesLabel,
+  speciesLabelForZpl,
   listActive,
   listAll,
   getByCode,

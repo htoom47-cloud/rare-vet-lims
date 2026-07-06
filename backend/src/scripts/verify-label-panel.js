@@ -31,6 +31,7 @@ check('labelPanel exports buildThermalLabelContent', () => {
   assert.ok(src.includes('export const buildThermalLabelContent'));
   assert.ok(src.includes('export const buildZebraThermalLabelContent'));
   assert.ok(src.includes('speciesLabel'));
+  assert.ok(src.includes('speciesLabelForZpl'));
   assert.ok(!src.includes('animalCode'), 'stale animalCode reference');
 });
 
@@ -40,10 +41,12 @@ check('speciesLabels module exists', () => {
   assert.ok(src.includes('bootstrapSpeciesLabels'));
 });
 
-check('printLabel guards empty barcode before Zebra', () => {
+check('printLabel validates barcode before in-place print', () => {
   const src = fs.readFileSync(printPath, 'utf8');
-  assert.ok(src.includes('barcodeLabelBuildFailed'));
-  assert.ok(src.includes('getLabelPrintFields'));
+  assert.ok(src.includes('labelHasValidBarcode'));
+  assert.ok(src.match(/jobsHaveValidBarcode[\s\S]*printSampleLabelInPlace/));
+  assert.ok(src.includes('reason: \'invalid_barcode\''));
+  assert.ok(src.includes('zebraUsePreviewPrint'));
 });
 
 check('barcode engine builds ZPL for standard sample', () => {

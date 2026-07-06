@@ -4,7 +4,7 @@ import {
   encodeCode128C,
   extractDigits,
 } from './barcodeScan';
-import { speciesLabel } from './speciesLabels';
+import { speciesLabel, speciesLabelForZpl } from './speciesLabels';
 
 /** Short English codes printed on thermal labels (Zebra 50×25 mm). */
 export const PANEL_CODES = {
@@ -169,11 +169,19 @@ export const sampleDisplayId = (sample) => {
   return displaySampleId(sample?.barcode);
 };
 
+export const labelHasValidBarcode = (sample) => {
+  const barcode = barcodeScanValue(sample);
+  const encode = encodeCode128C(barcode);
+  return Boolean(barcode && extractDigits(encode).length >= 8);
+};
+
 const buildLabelContentCore = (sample, { isArabic = false, englishOnly = false } = {}) => {
   const barcode = barcodeScanValue(sample);
   const sampleId = sampleDisplayId(sample);
   const testLine = formatTestsForLabel(sample, englishOnly ? false : isArabic);
-  const animalTypeLine = speciesLabel(sample?.animal_type, englishOnly ? false : isArabic);
+  const animalTypeLine = englishOnly
+    ? speciesLabelForZpl(sample?.animal_type)
+    : speciesLabel(sample?.animal_type, isArabic);
 
   const sampleLine = sampleId
     ? (englishOnly || !isArabic ? `Sample ${sampleId}` : `عينة ${sampleId}`)

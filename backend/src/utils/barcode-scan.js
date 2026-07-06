@@ -54,6 +54,15 @@ const scanMatchesStored = (stored, scanned) => {
   return da.length >= 8 && da === db;
 };
 
+/** Code128 scan value — prefer barcode column (12-digit), else sample_code. */
+const barcodeScanValue = (sample) => {
+  const scan = displaySampleId(sample?.barcode);
+  if (scan && extractDigits(scan).length >= 8) return scan;
+  const fromCode = displaySampleId(sample?.sample_code);
+  if (fromCode && extractDigits(fromCode).length >= 8) return fromCode;
+  return scan || fromCode || '';
+};
+
 module.exports = {
   extractDigits,
   displaySampleId,
@@ -61,4 +70,5 @@ module.exports = {
   encodeCode128C,
   isUnifiedDigitsId,
   scanMatchesStored,
+  barcodeScanValue,
 };
