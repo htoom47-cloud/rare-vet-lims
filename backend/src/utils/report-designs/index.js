@@ -2,8 +2,8 @@
  * Lab report design registry.
  * Design 1 = compact professional bilingual layout (saved Jun 2026).
  * Design 2 = legacy PDFKit premium layout.
- * Design 3 = VetConnect HTML/CSS (default) — Puppeteer PDF.
- * Set REPORT_DESIGN=1|2|3 in env.
+ * Design 3 = VetConnect HTML/CSS — Puppeteer PDF.
+ * Set REPORT_DESIGN=1|2|3 in env (default 1 — matches staff preview LaboratoryReport.jsx).
  */
 const design1 = require('./design-1');
 const design2 = require('./design-2');
@@ -90,13 +90,13 @@ const DESIGNS = {
 };
 
 const getActiveDesignId = () => {
-  const raw = process.env.REPORT_DESIGN || '3';
+  const raw = process.env.REPORT_DESIGN || '1';
   const id = Number(raw);
-  return DESIGNS[id] ? id : 3;
+  return DESIGNS[id] ? id : 1;
 };
 
 const getDesign = (id = getActiveDesignId()) => {
-  const design = DESIGNS[Number(id)] || DESIGNS[3];
+  const design = DESIGNS[Number(id)] || DESIGNS[1];
   if (!design) throw new Error(`Unknown report design: ${id}`);
   return design;
 };

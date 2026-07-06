@@ -1,7 +1,7 @@
 /**
  * Dynamic Report Builder — sections driven by ordered tests + validated results + reportable images.
  *
- * PDF (design-3) and Preview both consume the same `sections` array from buildReportSections().
+ * PDF (active design) and Preview both consume the same `sections` array from buildReportSections().
  */
 const SECTION_META = {
   hematology: {

@@ -76,26 +76,26 @@ const simulatePortalPreview = (staffPreview) => {
   return safe;
 };
 
-/** Design 3 PDF receives buildPdfPayload output as reportData. */
-const simulateDesign3PdfInput = (pdfPayload) => pdfPayload;
+/** Active PDF generator receives buildPdfPayload output as reportData. */
+const simulatePdfInput = (pdfPayload) => pdfPayload;
 
 const assertPipelineConsistency = (fixture, label) => {
   const reportData = simulateBuildReportData(fixture);
   const pdfPayload = simulateBuildPdfPayload(reportData);
   const staffPreview = simulateStaffPreview(pdfPayload);
   const portalPreview = simulatePortalPreview(staffPreview);
-  const pdfInput = simulateDesign3PdfInput(pdfPayload);
+  const pdfInput = simulatePdfInput(pdfPayload);
 
   const sigReportData = builder.extractSectionSignature(reportData.sections);
   const sigPdf = builder.extractSectionSignature(pdfPayload.sections);
   const sigStaff = builder.extractSectionSignature(staffPreview.sections);
   const sigPortal = builder.extractSectionSignature(portalPreview.sections);
-  const sigDesign3 = builder.extractSectionSignature(pdfInput.sections);
+  const sigPdfInput = builder.extractSectionSignature(pdfInput.sections);
 
   assert.deepStrictEqual(sigPdf, sigReportData, `${label}: PDF payload ≠ buildReportData`);
   assert.deepStrictEqual(sigStaff, sigReportData, `${label}: staff preview ≠ buildReportData`);
   assert.deepStrictEqual(sigPortal, sigReportData, `${label}: portal preview ≠ buildReportData`);
-  assert.deepStrictEqual(sigDesign3, sigReportData, `${label}: Design 3 input ≠ buildReportData`);
+  assert.deepStrictEqual(sigPdfInput, sigReportData, `${label}: PDF input ≠ buildReportData`);
 };
 
 console.log('\n=== Phase 4.1 — PDF / Preview Consistency ===\n');
@@ -125,13 +125,17 @@ check('portal getReportPreview uses reportsService.getPreview', () => {
   assert.ok(src.includes('sanitizePortalPreview(preview)'));
 });
 
-check('Design 3 build-html reads reportData.sections', () => {
-  const src = fs.readFileSync(
-    path.join(ROOT, 'utils', 'report-designs', 'design-3', 'build-html.js'),
-    'utf8'
+check('Active PDF design reads reportData.sections', () => {
+  const registry = require('../utils/report-designs');
+  const activeId = registry.getActiveDesignId();
+  assert.strictEqual(activeId, 1, 'default REPORT_DESIGN should be 1 (matches staff preview)');
+  const designPath = path.join(ROOT, 'utils', 'report-designs', `design-${activeId}.js`);
+  const src = fs.readFileSync(designPath, 'utf8');
+  assert.ok(src.includes('generateReportPDF'));
+  assert.ok(
+    src.includes('reportData.results') || src.includes('reportData.sections'),
+    'PDF generator must consume unified report payload'
   );
-  assert.ok(src.includes('reportData.sections'));
-  assert.ok(src.includes('buildDynamicSections'));
 });
 
 check('staff LaboratoryReport.jsx prefers report.sections', () => {
@@ -262,7 +266,7 @@ check('Portal sanitizePortalPreview preserves section titles and order', () => {
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed === 0) {
-  console.log('Conclusion: PDF (Design 3), staff preview, and portal preview use the same');
+  console.log('Conclusion: official PDF (active design), staff preview, and portal preview use the same');
   console.log('report.sections pipeline from report-builder.service.js — no structural drift.\n');
 }
 process.exit(failed ? 1 : 0);

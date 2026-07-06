@@ -99,6 +99,7 @@ const env = {
     enabled: process.env.WORKFLOW_ENGINE_ENABLED === 'true',
   },
   features: {
+    reportDesign: parseInt(process.env.REPORT_DESIGN || '1', 10) || 1,
     smartReportLifecycle: process.env.SMART_REPORT_LIFECYCLE_ENABLED === 'true',
     reportMastering: process.env.REPORT_MASTERING_ENABLED === 'true',
     /** Block barcode print/register until invoice issued or credit allowed */
