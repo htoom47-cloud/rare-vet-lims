@@ -256,7 +256,7 @@ async function applyPatches() {
     );
     await client.query(
       `UPDATE tests SET category_id = (SELECT id FROM test_categories WHERE code = 'MICRO')
-       WHERE code IN ('PARAS-BLOOD', 'PARAS-STOOL', 'BRU-ROSE-BENGAL')
+       WHERE code IN ('PARAS-BLOOD', 'PARAS-STOOL', 'BRU-ROSE-BENGAL', 'BRUCELLA')
          AND EXISTS (SELECT 1 FROM test_categories WHERE code = 'MICRO')`
     );
     await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);

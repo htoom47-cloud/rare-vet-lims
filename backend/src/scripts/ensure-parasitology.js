@@ -2,18 +2,12 @@ require('dotenv').config();
 const { query, pool } = require('../config/database');
 const logger = require('../config/logger');
 
-const { PARAS_TEST_CODES } = require('../utils/parasitologyTests');
+const { consolidateBrucellaCatalog } = require('./consolidate-brucella-catalog');
 
+/** Blood + stool only — brucella is consolidated onto lab BRUCELLA (see consolidate-brucella-catalog.js). */
 const PARAS_TESTS = [
   { code: 'PARAS-BLOOD', name: 'Blood Parasites', name_ar: 'طفيليات الدم', price: 120, method: 'Microscope' },
   { code: 'PARAS-STOOL', name: 'Stool Parasites', name_ar: 'طفيليات البراز', price: 120, method: 'Microscope' },
-  {
-    code: 'BRU-ROSE-BENGAL',
-    name: 'Brucellosis Rose Bengal',
-    name_ar: 'المالطية روز بنغال',
-    price: 150,
-    method: 'Rose Bengal',
-  },
 ];
 
 const PARAS_PARAMS = {
@@ -104,7 +98,14 @@ async function ensureParasitologyCatalog() {
   }
 
   for (const [code, config] of Object.entries(PARAS_PARAMS)) {
-    await seedTestParameters(testIdMap[code], config);
+    if (testIdMap[code]) await seedTestParameters(testIdMap[code], config);
+  }
+
+  const client = await pool.connect();
+  try {
+    await consolidateBrucellaCatalog(client, { apply: true });
+  } finally {
+    client.release();
   }
 
   await query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
@@ -137,4 +138,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { ensureParasitologyCatalog };
+module.exports = { ensureParasitologyCatalog, seedTestParameters, PARAS_PARAMS };

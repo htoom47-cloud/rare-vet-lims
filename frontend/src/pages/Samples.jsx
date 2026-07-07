@@ -25,6 +25,7 @@ import CustomerSearch from '../components/customers/CustomerSearch';
 import { samplesAPI, animalsAPI, testsAPI, billingAPI, resultsAPI } from '../services/api';
 import { getResultsEntryTargets } from '../utils/parasitologyTests';
 import { fmtCatalog } from '../utils/vat';
+import { testDisplayName } from '../utils/formatResultValue';
 import { packageLabel, packageTestIds } from '../utils/packageSelection';
 import { useAuth } from '../context/AuthContext';
 
@@ -669,7 +670,7 @@ export default function Samples() {
                 <div key={test.id} className={`flex justify-between items-center gap-2 text-sm py-1.5 border-b ${test.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}>
 
                   <span className="flex items-center gap-1.5">
-                    {test.test_name}
+                    {testDisplayName(test, i18n.language)}
                     {test.status === 'cancelled' && (
                       <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded no-underline inline-block">{t('samples.statuses.cancelled')}</span>
                     )}

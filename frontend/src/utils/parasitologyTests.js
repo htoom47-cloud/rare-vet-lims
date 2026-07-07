@@ -1,19 +1,27 @@
 export const PARAS_CATEGORY_CODE = 'MICRO';
 
 export const PARAS_BRU_ROSE = 'BRU-ROSE-BENGAL';
+export const PARAS_BRUCELLA = 'BRUCELLA';
 export const PARAS_BLOOD = 'PARAS-BLOOD';
 export const PARAS_STOOL = 'PARAS-STOOL';
+
+/** Lab brucella test codes — BRUCELLA is canonical; BRU-ROSE-BENGAL is legacy catalog. */
+export const BRUCELLA_TEST_CODES = new Set([PARAS_BRU_ROSE, PARAS_BRUCELLA]);
+
+export const isBrucellaTestCode = (code) =>
+  BRUCELLA_TEST_CODES.has(code) || (code && /^BRU/i.test(code));
 
 export const MICRO_PANEL_ORDER = {
   [PARAS_BLOOD]: 0,
   [PARAS_BRU_ROSE]: 1,
+  [PARAS_BRUCELLA]: 1,
   [PARAS_STOOL]: 2,
 };
 
 export const panelI18nKey = (testCode) => {
   if (testCode === PARAS_BLOOD) return 'parasitology.bloodSection';
   if (testCode === PARAS_STOOL) return 'parasitology.stoolSection';
-  if (testCode === PARAS_BRU_ROSE) return 'parasitology.brucellaSection';
+  if (isBrucellaTestCode(testCode)) return 'parasitology.brucellaSection';
   return null;
 };
 

@@ -9,9 +9,9 @@ import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   isParasitologyTest,
+  isBrucellaTestCode,
   PARAS_BLOOD,
   PARAS_STOOL,
-  PARAS_BRU_ROSE,
   PARAS_CATEGORY_CODE,
   MICRO_PANEL_ORDER,
 } from '../utils/parasitologyTests';
@@ -29,7 +29,7 @@ const panelPresentation = (testMeta, t, i18n) => {
   const code = testMeta?.code;
   if (code === PARAS_BLOOD) return { icon: Droplets, title: t('parasitology.bloodSection') };
   if (code === PARAS_STOOL) return { icon: Bug, title: t('parasitology.stoolSection') };
-  if (code === PARAS_BRU_ROSE) return { icon: Shield, title: t('parasitology.brucellaSection') };
+  if (isBrucellaTestCode(code)) return { icon: Shield, title: t('parasitology.brucellaSection') };
   const name = i18n.language === 'ar' && testMeta?.name_ar ? testMeta.name_ar : testMeta?.name;
   return { icon: Microscope, title: name || code };
 };
