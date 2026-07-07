@@ -3,13 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { AnimatePresence, m } from 'framer-motion';
 import {
   Clock, Phone, MapPin, Droplets, FlaskConical, Microscope, Dna, Bug, Truck,
-  FileText, ShieldCheck, Smartphone, ChevronRight, Maximize2,
+  FileText, ShieldCheck, Smartphone, ChevronRight, Maximize2, MessageCircle,
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
 import AppLogo from '../components/ui/AppLogo';
 import { settingsAPI } from '../services/api';
 
-const SLIDE_KEYS = ['welcome', 'pricing', 'services', 'workflow', 'quality', 'portal', 'contact'];
+const SLIDE_KEYS = ['welcome', 'services', 'workflow', 'quality', 'portal', 'contact'];
 const ROTATE_MS = 12000;
+const PORTAL_URL = 'https://portal.rarevetcare.com';
+
+function toWhatsAppUrl(phone) {
+  const digits = String(phone || '0115007257').replace(/\D/g, '');
+  const normalized = digits.startsWith('966') ? digits : `966${digits.replace(/^0/, '')}`;
+  return `https://wa.me/${normalized}`;
+}
 
 const SERVICE_ICONS = {
   cbc: Droplets,
@@ -69,6 +77,54 @@ function useBiT() {
   }), [i18n]);
 }
 
+function ReceptionQrDock({ tAr, tEn, whatsappUrl }) {
+  const stop = (e) => e.stopPropagation();
+
+  const QrCard = ({ icon: Icon, iconClass, titleAr, titleEn, hintAr, hintEn, value }) => (
+    <div className="flex items-center gap-2 rounded-lg bg-primary-800/70 border border-primary-400/30 px-2 py-1 shadow-md shrink-0">
+      <div className="bg-white rounded-md p-0.5 shrink-0">
+        <QRCode value={value} size={44} level="M" bgColor="#FFFFFF" fgColor="#2B1B17" />
+      </div>
+      <div className="min-w-0 text-start hidden sm:block">
+        <div className="flex items-center gap-1">
+          <Icon size={11} className={`shrink-0 ${iconClass}`} />
+          <p className="text-[10px] font-bold text-primary-50 leading-tight">{titleAr}</p>
+        </div>
+        <p className="text-[8px] text-primary-300/85 leading-tight" dir="ltr">{titleEn}</p>
+        <p className="text-[8px] text-primary-400 mt-0.5 leading-tight">{hintAr}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      className="flex flex-row gap-2 justify-center items-center pointer-events-auto"
+      onClick={stop}
+      onMouseDown={stop}
+      aria-label="Quick contact QR codes"
+    >
+      <QrCard
+        icon={MessageCircle}
+        iconClass="text-green-400"
+        titleAr={tAr('receptionDisplay.qrWhatsApp')}
+        titleEn={tEn('receptionDisplay.qrWhatsApp')}
+        hintAr={tAr('receptionDisplay.qrWhatsAppHint')}
+        hintEn={tEn('receptionDisplay.qrWhatsAppHint')}
+        value={whatsappUrl}
+      />
+      <QrCard
+        icon={Smartphone}
+        iconClass="text-primary-300"
+        titleAr={tAr('receptionDisplay.qrPortal')}
+        titleEn={tEn('receptionDisplay.qrPortal')}
+        hintAr={tAr('receptionDisplay.qrPortalHint')}
+        hintEn={tEn('receptionDisplay.qrPortalHint')}
+        value={PORTAL_URL}
+      />
+    </div>
+  );
+}
+
 export default function ReceptionDisplay() {
   const { tAr, tEn } = useBiT();
   const now = useClock();
@@ -100,6 +156,7 @@ export default function ReceptionDisplay() {
   const labSubtitleAr = lab?.lab_subtitle_ar || tAr('app.subtitle');
   const labSubtitleEn = lab?.lab_subtitle || tEn('app.subtitle');
   const phone = lab?.phone || '0115007257';
+  const whatsappUrl = useMemo(() => toWhatsAppUrl(phone), [phone]);
   const addressAr = tAr('receptionDisplay.defaultAddress');
   const addressEn = tEn('receptionDisplay.defaultAddress');
 
@@ -112,7 +169,7 @@ export default function ReceptionDisplay() {
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden bg-gradient-to-br from-[#2B1B17] via-primary-800 to-[#5B3A29] text-primary-50 select-none"
+      className="fixed inset-0 overflow-hidden bg-gradient-to-br from-[#2B1B17] via-primary-800 to-[#5B3A29] text-primary-50 select-none grid grid-rows-[auto_auto_minmax(0,1fr)_auto_auto]"
       dir="rtl"
       onClick={nextSlide}
       onMouseEnter={() => setPaused(true)}
@@ -142,10 +199,12 @@ export default function ReceptionDisplay() {
             enClass="text-xs text-primary-300/80"
           />
         </div>
-        <div className="text-end shrink-0 bg-primary-800/60 border border-primary-400/30 rounded-xl px-4 py-2 shadow-lg" dir="ltr">
+        <div className="text-end shrink-0 bg-primary-800/60 border border-primary-400/30 rounded-xl px-4 py-2 shadow-lg max-w-[15rem]" dir="ltr">
           <p className="text-3xl font-mono font-bold text-primary-300 tabular-nums">{timeStr}</p>
           <p className="text-xs text-primary-200" dir="rtl">{now.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
           <p className="text-xs text-primary-300/80">{now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p>
+          <p className="text-[10px] text-primary-300/90 mt-1.5 leading-snug border-t border-primary-400/20 pt-1.5" dir="rtl">{tAr('receptionDisplay.hoursValue')}</p>
+          <p className="text-[9px] text-primary-400/80 leading-snug" dir="ltr">{tEn('receptionDisplay.hoursValue')}</p>
         </div>
       </header>
 
@@ -158,16 +217,27 @@ export default function ReceptionDisplay() {
         />
       </div>
 
-      <main className="relative z-10 flex items-center justify-center px-8 py-6 overflow-hidden" style={{ height: 'calc(100vh - 168px)' }}>
-        <AnimatePresence mode="wait">
-          <m.div
-            key={slideKey}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -24 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-6xl max-h-full overflow-y-auto"
-          >
+      <main className="relative z-10 flex flex-row min-h-0 overflow-hidden">
+        <aside
+          className="w-[38%] max-w-[520px] shrink-0 border-s border-primary-400/25 bg-[#2B1B17]/70 p-2 flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <img
+            src="/reception-display-usb/pricing-banner.png"
+            alt="عرض الافتتاح — قائمة الأسعار"
+            className="max-w-full max-h-full rounded-xl border-2 border-primary-400/35 shadow-2xl object-contain"
+          />
+        </aside>
+        <div className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden flex justify-center px-3 py-2">
+          <AnimatePresence mode="wait">
+            <m.div
+              key={slideKey}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.45 }}
+              className="w-full max-w-3xl"
+            >
             {slideKey === 'welcome' && (
               <div className="text-center">
                 <AppLogo size="lg" variant="gold" className="mx-auto mb-6 drop-shadow-[0_4px_16px_rgba(212,175,55,0.4)]" />
@@ -198,42 +268,32 @@ export default function ReceptionDisplay() {
               </div>
             )}
 
-            {slideKey === 'pricing' && (
-              <div className="text-center flex flex-col items-center justify-center">
-                <img
-                  src="/reception-display-usb/pricing-banner.png"
-                  alt="عرض الافتتاح — قائمة الأسعار"
-                  className="max-w-full max-h-[calc(100vh-200px)] rounded-xl border-2 border-primary-400/35 shadow-2xl object-contain"
-                />
-              </div>
-            )}
-
             {slideKey === 'services' && (
               <div>
-                <div className="mb-6 flex flex-col items-center">
+                <div className="sticky top-0 z-10 pb-2 mb-3 pt-1 bg-gradient-to-b from-[#3D2E22] from-80% to-transparent">
                   <BiHeading ar={tAr('receptionDisplay.servicesTitle')} en={tEn('receptionDisplay.servicesTitle')} size="section" />
-                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-400 to-transparent mt-2" />
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-primary-400 to-transparent mt-2 mx-auto" />
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {services.map((key) => {
                     const Icon = SERVICE_ICONS[key];
                     return (
-                      <div key={key} className="rounded-2xl bg-primary-800/55 border border-primary-400/30 p-5 shadow-lg shadow-black/20 hover:border-primary-300/50 transition-colors">
-                        <div className="w-12 h-12 rounded-xl bg-primary-400/15 border border-primary-400/25 flex items-center justify-center mb-3">
-                          <Icon size={24} className="text-primary-300" />
+                      <div key={key} className="rounded-xl bg-primary-800/55 border border-primary-400/30 p-3.5 shadow-lg shadow-black/20 hover:border-primary-300/50 transition-colors">
+                        <div className="w-10 h-10 rounded-lg bg-primary-400/15 border border-primary-400/25 flex items-center justify-center mb-2">
+                          <Icon size={20} className="text-primary-300" />
                         </div>
                         <BiText
                           ar={tAr(`receptionDisplay.services.${key}.title`)}
                           en={tEn(`receptionDisplay.services.${key}.title`)}
-                          arClass="text-base font-bold text-primary-50"
-                          enClass="text-xs text-primary-300 font-semibold"
+                          arClass="text-sm font-bold text-primary-50"
+                          enClass="text-[10px] text-primary-300 font-semibold"
                         />
                         <BiText
                           ar={tAr(`receptionDisplay.services.${key}.desc`)}
                           en={tEn(`receptionDisplay.services.${key}.desc`)}
-                          arClass="text-sm text-primary-200 mt-2 leading-snug"
-                          enClass="text-xs text-primary-300/75 mt-1 leading-snug"
-                          className="mt-2"
+                          arClass="text-xs text-primary-200 mt-1.5 leading-snug"
+                          enClass="text-[10px] text-primary-300/75 mt-0.5 leading-snug"
+                          className="mt-1.5"
                         />
                       </div>
                     );
@@ -400,9 +460,17 @@ export default function ReceptionDisplay() {
             )}
           </m.div>
         </AnimatePresence>
+        </div>
       </main>
 
-      <footer className="relative z-20 flex items-center justify-between px-8 py-3 border-t border-primary-400/25 bg-[#2B1B17]/92 backdrop-blur-md gap-4 shadow-[0_-4px_24px_rgba(0,0,0,0.25)]">
+      <div
+        className="relative z-20 flex justify-center items-center gap-3 px-4 py-1.5 border-t border-primary-400/20 bg-[#2B1B17]/95"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ReceptionQrDock tAr={tAr} tEn={tEn} whatsappUrl={whatsappUrl} />
+      </div>
+
+      <footer className="relative z-20 flex items-center justify-center px-6 py-2 border-t border-primary-400/25 bg-[#2B1B17]/92 backdrop-blur-md gap-4 shadow-[0_-4px_24px_rgba(0,0,0,0.25)]">
         <div className="flex items-center gap-2">
           {SLIDE_KEYS.map((key, i) => (
             <button
@@ -414,13 +482,6 @@ export default function ReceptionDisplay() {
             />
           ))}
         </div>
-        <BiText
-          ar={tAr('receptionDisplay.hint')}
-          en={tEn('receptionDisplay.hint')}
-          arClass="text-xs text-primary-300 hidden sm:block"
-          enClass="text-[10px] text-primary-300/70 hidden sm:block"
-          className="hidden sm:block text-center"
-        />
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); enterFullscreen(); }}

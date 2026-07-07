@@ -8,12 +8,16 @@ const path = require('path');
 const root = __dirname;
 const outDir = process.argv[2] || path.join(process.env.USERPROFILE || process.env.HOME || '.', 'Desktop', 'reception-display-usb');
 
-const files = ['index.html', 'اقرأني.txt', 'pricing-banner.png', 'logo-gold.png'];
+const files = ['index.html', 'اقرأني.txt', 'pricing-banner.png', 'logo-gold.png', 'whatsapp-qr.png', 'portal-qr.png'];
 const logoSrc = path.join(root, '../../backend/assets/logo.png');
 const goldLogoScript = path.join(root, 'generate-gold-logo.js');
+const qrScript = path.join(root, 'generate-reception-qrs.js');
 
 if (fs.existsSync(goldLogoScript)) {
   require('child_process').execSync(`node "${goldLogoScript}"`, { stdio: 'inherit', cwd: root });
+}
+if (fs.existsSync(qrScript)) {
+  require('child_process').execSync(`node "${qrScript}"`, { stdio: 'inherit', cwd: root });
 }
 
 fs.mkdirSync(outDir, { recursive: true });
