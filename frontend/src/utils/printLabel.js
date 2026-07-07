@@ -59,7 +59,6 @@ const openFallbackPrintWindow = () => {
 const printJobsToZebra = async (jobs) => {
   let printed = 0;
   let lastDevice = 'Zebra';
-  let lastMethod = null;
   let lastError = null;
 
   for (let i = 0; i < jobs.length; i += 1) {
@@ -68,7 +67,6 @@ const printJobsToZebra = async (jobs) => {
       const result = await printToZebra(jobs[i]);
       printed += 1;
       lastDevice = result.device || lastDevice;
-      lastMethod = result.method || lastMethod;
       // eslint-disable-next-line no-await-in-loop
       await sleep(120);
     } catch (error) {
@@ -77,7 +75,7 @@ const printJobsToZebra = async (jobs) => {
     }
   }
 
-  return { printed, total: jobs.length, lastDevice, lastMethod, lastError };
+  return { printed, total: jobs.length, lastDevice, lastError };
 };
 
 const browserPrintJobs = (jobs, { isArabic, fallbackWin = null } = {}) => {
@@ -106,7 +104,7 @@ const toastZebraBridgeHelp = async () => {
     toast.error(i18n.t('samples.zebraPrintFailed'), { duration: 8000 });
     return;
   }
-  toast.error(i18n.t('samples.zebraBridgeRequired'), { duration: 14000 });
+  toast.error(i18n.t('samples.zebraBridgeRequired'), { duration: 12000 });
 };
 
 /**
