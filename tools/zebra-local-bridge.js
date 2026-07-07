@@ -19,12 +19,15 @@ const RAW_SCRIPT = path.join(__dirname, 'send-zebra-raw.ps1');
 const PFX_PATH = path.join(__dirname, 'certs', 'bridge.pfx');
 const PFX_PASS = process.env.ZEBRA_BRIDGE_PFX_PASS || 'lims-bridge';
 
-const DEVICE = {
-  uid: PRINTER_NAME,
-  name: PRINTER_NAME,
+let activePrinterName = PRINTER_NAME;
+
+const DEVICE = () => ({
+  uid: activePrinterName,
+  name: activePrinterName,
   deviceType: 'printer',
   connection: 'usb',
-};
+  limsBridge: true,
+});
 
 const TMP = path.join(__dirname, '_bridge-out.zpl');
 const LOG_DIR = path.join(__dirname, 'zpl-log');
@@ -67,10 +70,29 @@ function extractZpl(payload) {
   return '';
 }
 
+async function detectZebraPrinter() {
+  if (process.platform !== 'win32') return PRINTER_NAME;
+  try {
+    const { stdout } = await execAsync(
+      'powershell -NoProfile -Command "Get-Printer | Where-Object { $_.Name -match \'ZDesigner|ZD421|Zebra\' } | Select-Object -First 1 -ExpandProperty Name"'
+    );
+    const name = String(stdout || '').trim();
+    if (name) return name;
+  } catch {
+    /* use default */
+  }
+  return PRINTER_NAME;
+}
+
 async function sendZpl(zpl) {
   fs.writeFileSync(TMP, zpl, 'ascii');
   if (process.platform === 'win32' && fs.existsSync(RAW_SCRIPT)) {
-    await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${RAW_SCRIPT}" -ZplFile "${TMP}" -PrinterName "${PRINTER_NAME}"`);
+    const { stderr } = await execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${RAW_SCRIPT}" -ZplFile "${TMP}" -PrinterName "${activePrinterName}"`
+    );
+    if (stderr && /failed/i.test(stderr)) {
+      throw new Error(String(stderr).trim());
+    }
     return;
   }
   await execAsync(`cmd /c copy /b "${TMP}" ${PRINTER_PORT}`);
@@ -115,7 +137,7 @@ async function handle(req, res) {
 <style>body{font-family:Segoe UI,Tahoma,sans-serif;max-width:520px;margin:48px auto;padding:0 16px}
 .ok{color:#0a7;font-size:1.25rem;font-weight:600}code{background:#f0f0f0;padding:2px 6px;border-radius:4px}</style></head>
 <body><p class="ok">✓ جسر الطباعة يعمل</p>
-<p>الطابعة: <strong>${DEVICE.name}</strong></p>
+<p>الطابعة: <strong>${activePrinterName}</strong></p>
 <p>يمكنك الآن الطباعة من <a href="https://lims.onrender.com">LIMS</a> (حدّث الصفحة Ctrl+F5).</p>
 <p>اختبار JSON: <code>/default</code></p></body></html>`;
     res.writeHead(200, {
@@ -126,13 +148,24 @@ async function handle(req, res) {
     return;
   }
 
+  if (req.method === 'GET' && (url.pathname === '/lims/ping' || url.pathname === '/ping')) {
+    sendJson(res, 200, {
+      limsBridge: true,
+      version: 1,
+      printer: activePrinterName,
+      port: PRINTER_PORT,
+    });
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/default') {
-    sendJson(res, 200, { device: DEVICE });
+    sendJson(res, 200, { device: DEVICE() });
     return;
   }
 
   if (req.method === 'GET' && url.pathname === '/available') {
-    sendJson(res, 200, { printer: [DEVICE], deviceList: [DEVICE] });
+    const device = DEVICE();
+    sendJson(res, 200, { limsBridge: true, printer: [device], deviceList: [device] });
     return;
   }
 
@@ -175,7 +208,13 @@ async function handle(req, res) {
     console.log(`[zebra-bridge] RAW print ${zpl.length} bytes — ${zpl.slice(0, 40).replace(/\n/g, ' ')}...`);
     saveZplLog(zpl, meta, rawPayloadType);
     await sendZpl(zpl);
-    sendJson(res, 200, { success: true, zplLength: zpl.length, meta });
+    sendJson(res, 200, {
+      limsBridge: true,
+      success: true,
+      zplLength: zpl.length,
+      printer: activePrinterName,
+      meta,
+    });
     return;
   }
 
@@ -189,24 +228,31 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(HTTP_PORT, '127.0.0.1', () => {
-  console.log(`HTTP  http://127.0.0.1:${HTTP_PORT} -> RAW ${PRINTER_NAME}`);
-});
+(async () => {
+  activePrinterName = await detectZebraPrinter();
+  if (activePrinterName !== PRINTER_NAME) {
+    console.log(`[zebra-bridge] Auto-detected printer: ${activePrinterName}`);
+  }
 
-if (fs.existsSync(PFX_PATH)) {
-  const tls = {
-    pfx: fs.readFileSync(PFX_PATH),
-    passphrase: PFX_PASS,
-  };
-  https.createServer(tls, (req, res) => {
-    handle(req, res).catch((error) => {
-      console.error('[zebra-bridge]', error.message);
-      sendJson(res, 500, { error: error.message });
-    });
-  }).listen(HTTPS_PORT, '127.0.0.1', () => {
-    console.log(`HTTPS https://127.0.0.1:${HTTPS_PORT} -> RAW ${PRINTER_NAME}`);
-    console.log('Open https://127.0.0.1:9101/default once in Chrome and accept the certificate.');
+  server.listen(HTTP_PORT, '127.0.0.1', () => {
+    console.log(`HTTP  http://127.0.0.1:${HTTP_PORT} -> RAW ${activePrinterName}`);
   });
-} else {
-  console.warn(`Missing ${PFX_PATH} — run tools/generate-bridge-cert.ps1 for HTTPS (required from lims.onrender.com)`);
-}
+
+  if (fs.existsSync(PFX_PATH)) {
+    const tls = {
+      pfx: fs.readFileSync(PFX_PATH),
+      passphrase: PFX_PASS,
+    };
+    https.createServer(tls, (req, res) => {
+      handle(req, res).catch((error) => {
+        console.error('[zebra-bridge]', error.message);
+        sendJson(res, 500, { error: error.message });
+      });
+    }).listen(HTTPS_PORT, '127.0.0.1', () => {
+      console.log(`HTTPS https://127.0.0.1:${HTTPS_PORT} -> RAW ${activePrinterName}`);
+      console.log('Open https://127.0.0.1:9101/default once in Chrome and accept the certificate.');
+    });
+  } else {
+    console.warn(`Missing ${PFX_PATH} — run tools/generate-bridge-cert.ps1 for HTTPS (required from lims.rarevetcare.com)`);
+  }
+})();

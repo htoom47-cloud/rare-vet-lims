@@ -15,6 +15,16 @@ export const isBrowserPrintMissing = (error) => (
   error instanceof ZebraPrintError && error.code === SERVICE_UNAVAILABLE
 );
 
+const looksLikeZebraPrinter = (name) => /zdesigner|zd421|zebra/i.test(String(name || ''));
+
+const isLimsBridgePing = (data) => (
+  data && typeof data === 'object' && data.limsBridge === true
+);
+
+const isLimsBridgeWriteOk = (data) => (
+  isLimsBridgePing(data) && data.success === true && Number(data.zplLength) > 0
+);
+
 const BROWSER_PRINT_BASES = () => {
   const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
   return secure
@@ -26,6 +36,7 @@ async function browserPrintFetch(path, options = {}) {
   const bases = BROWSER_PRINT_BASES();
   let lastError = null;
   const timeoutMs = options.timeoutMs ?? 2500;
+  const requireBody = options.requireBody === true;
 
   for (let i = 0; i < bases.length; i += 1) {
     const base = bases[i];
@@ -43,10 +54,20 @@ async function browserPrintFetch(path, options = {}) {
         continue;
       }
       const text = await res.text();
-      if (!text) return { data: null, base };
+      if (!text) {
+        if (requireBody) {
+          lastError = new ZebraPrintError('Empty print response', SERVICE_UNAVAILABLE);
+          continue;
+        }
+        return { data: null, base };
+      }
       try {
         return { data: JSON.parse(text), base };
       } catch {
+        if (requireBody) {
+          lastError = new ZebraPrintError('Invalid print response', SERVICE_UNAVAILABLE);
+          continue;
+        }
         return { data: text, base };
       }
     } catch (error) {
@@ -63,11 +84,32 @@ async function browserPrintFetch(path, options = {}) {
   throw lastError || new ZebraPrintError('Browser Print not running', SERVICE_UNAVAILABLE);
 }
 
-/** Quick probe — is LIMS Zebra Bridge or Browser Print listening on localhost? */
+/** Find LIMS local bridge — not the official Zebra Browser Print service. */
+export async function findLimsBridgeBase() {
+  const bases = BROWSER_PRINT_BASES();
+  for (let i = 0; i < bases.length; i += 1) {
+    const base = bases[i];
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await fetch(`${base}/lims/ping`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (isLimsBridgePing(data)) return { base, printer: data.printer || null };
+    } catch {
+      clearTimeout(timeout);
+    }
+  }
+  return null;
+}
+
+/** Quick probe — is LIMS Zebra Bridge listening on localhost? */
 export async function isZebraBridgeAvailable() {
   try {
-    await browserPrintFetch('/available', { timeoutMs: 900 });
-    return true;
+    const bridge = await findLimsBridgeBase();
+    return Boolean(bridge);
   } catch {
     return false;
   }
@@ -253,17 +295,62 @@ const sendZplSdk = (device, zpl) => new Promise((resolve, reject) => {
 });
 
 async function sendZplHttp(device, zpl, { timeoutMs = 8000 } = {}) {
-  await browserPrintFetch('/write', {
+  const { data } = await browserPrintFetch('/write', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device: device || { name: 'LIMS Zebra Bridge' }, data: zpl }),
+    body: JSON.stringify({ device, data: zpl }),
     timeoutMs,
+    requireBody: true,
   });
+  if (data && typeof data === 'object' && data.error) {
+    throw new ZebraPrintError(String(data.error), SERVICE_UNAVAILABLE);
+  }
 }
 
-/** Send ZPL via local LIMS bridge (RAW) — preferred on Windows with zebra-local-bridge. */
+/** Send ZPL via verified LIMS local bridge (RAW) — reception PC: start-zebra-bridge.bat */
 async function sendZplLocalBridge(zpl) {
-  await sendZplHttp(null, zpl, { timeoutMs: 2000 });
+  const bridge = await findLimsBridgeBase();
+  if (!bridge) {
+    throw new ZebraPrintError('LIMS Zebra Bridge not running', SERVICE_UNAVAILABLE);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`${bridge.base}/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: { name: 'LIMS Zebra Bridge', limsBridge: true }, data: zpl }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const text = await res.text();
+    if (!res.ok) {
+      let message = `Bridge HTTP ${res.status}`;
+      try {
+        const err = JSON.parse(text);
+        if (err?.error) message = String(err.error);
+      } catch { /* ignore */ }
+      throw new ZebraPrintError(message, SERVICE_UNAVAILABLE);
+    }
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new ZebraPrintError('Bridge returned invalid response', SERVICE_UNAVAILABLE);
+    }
+    if (!isLimsBridgeWriteOk(data)) {
+      throw new ZebraPrintError(data.error || 'Bridge did not confirm label print', SERVICE_UNAVAILABLE);
+    }
+    return { printer: data.printer || bridge.printer || 'LIMS Zebra Bridge' };
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof ZebraPrintError) throw error;
+    throw new ZebraPrintError(
+      error?.name === 'AbortError' ? 'Bridge timeout' : (error.message || 'Bridge print failed'),
+      SERVICE_UNAVAILABLE
+    );
+  }
 }
 
 export async function printToZebra(sample) {
@@ -274,20 +361,34 @@ export async function printToZebra(sample) {
 
   // 1) LIMS local bridge (RAW) — reception PC: start-zebra-bridge.bat
   try {
-    await sendZplLocalBridge(zpl);
-    return { method: 'zpl-bridge', device: 'LIMS Zebra Bridge' };
+    const bridgeResult = await sendZplLocalBridge(zpl);
+    return {
+      method: 'zpl-bridge',
+      device: bridgeResult.printer || 'LIMS Zebra Bridge',
+      verified: true,
+    };
   } catch (bridgeError) {
     // 2) Official Zebra Browser Print SDK
     try {
       const device = await getDefaultDeviceSdk();
+      const deviceName = device.name || device.uid || '';
+      if (!looksLikeZebraPrinter(deviceName)) {
+        throw new ZebraPrintError(
+          `Default printer is not Zebra (${deviceName || 'unknown'})`,
+          SERVICE_UNAVAILABLE
+        );
+      }
       await sendZplSdk(device, zpl);
-      return { method: 'zpl', device: device.name || device.uid };
+      return { method: 'zpl-sdk', device: deviceName, verified: false };
     } catch (sdkError) {
       try {
         const device = await getDefaultPrinter();
-        if (!device) throw sdkError;
+        const deviceName = device?.name || device?.uid || '';
+        if (!device || !looksLikeZebraPrinter(deviceName)) {
+          throw sdkError;
+        }
         await sendZplHttp(device, zpl);
-        return { method: 'zpl', device: device.name || device.uid };
+        return { method: 'zpl-http', device: deviceName, verified: false };
       } catch {
         throw isBrowserPrintMissing(bridgeError) && isBrowserPrintMissing(sdkError)
           ? bridgeError

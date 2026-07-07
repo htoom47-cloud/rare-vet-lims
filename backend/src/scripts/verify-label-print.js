@@ -106,21 +106,15 @@ ok('labelPrintHtml uses sync JsBarcode import', async () => {
   return true;
 });
 
-ok('printLabel tries Zebra before browser', async () => {
+ok('zebraPrint verifies LIMS bridge before success', async () => {
   const fs = require('fs');
   const path = require('path');
-  const printSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/printLabel.js'), 'utf8');
-  const panelSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/labelPanel.js'), 'utf8');
-  if (printSrc.includes('preferBrowser')) fail('preferBrowser should be removed');
-  if (!panelSrc.includes('buildZebraThermalLabelContent')) {
-    fail('labelPanel missing buildZebraThermalLabelContent');
-  }
-  if (!panelSrc.includes('speciesLabel')) {
-    fail('labelPanel should use speciesLabel for animal types');
-  }
-  if (!printSrc.includes('printSampleLabelWithDialogSync')) fail('printSampleLabelWithDialogSync missing');
-  if (!printSrc.includes('showDialog')) fail('showDialog option missing');
-  if (!printSrc.includes('printToZebra')) fail('printToZebra missing');
+  const zebraSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/zebraPrint.js'), 'utf8');
+  const bridgeSrc = fs.readFileSync(path.join(__dirname, '../../../tools/zebra-local-bridge.js'), 'utf8');
+  if (!zebraSrc.includes('findLimsBridgeBase')) fail('findLimsBridgeBase missing');
+  if (!zebraSrc.includes('isLimsBridgeWriteOk')) fail('isLimsBridgeWriteOk missing');
+  if (!zebraSrc.includes('requireBody: true')) fail('requireBody guard missing on /write');
+  if (!bridgeSrc.includes('/lims/ping')) fail('bridge /lims/ping missing');
   return true;
 });
 
