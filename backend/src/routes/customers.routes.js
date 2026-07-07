@@ -43,7 +43,19 @@ router.post('/:id/send-ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_
         ? 'النظام يعمل في وضع الاختبار (Dry Run)، ولم يتم إرسال رسالة فعلية.'
         : undefined,
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.code === 'ALREADY_SENT' && err.details) {
+      return res.status(err.statusCode || 409).json({
+        success: false,
+        error: {
+          code: err.code,
+          message: err.message,
+          details: err.details,
+        },
+      });
+    }
+    next(err);
+  }
 });
 
 router.get('/:id', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next) => {

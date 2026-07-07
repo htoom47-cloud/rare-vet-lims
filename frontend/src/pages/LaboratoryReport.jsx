@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   Download,
   FileText,
-  MessageCircle,
   Printer,
   RotateCcw,
 } from 'lucide-react';
@@ -106,7 +105,7 @@ function PatientField({ label, value }) {
 }
 
 /** Official layout: design #3 (VetConnect HTML) — preview matches stored PDF */
-export default function LaboratoryReport({ demoMode = false, initialReport = null, backPath = null, hideShareActions = false }) {
+export default function LaboratoryReport({ demoMode = false, initialReport = null, backPath = null }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
@@ -332,11 +331,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     }
   };
 
-  const handleWhatsApp = () => {
-    const text = encodeURIComponent(`${isAr ? 'تقرير' : 'Report'}: ${report.reportNumber}\n${report.verifyUrl}`);
-    window.open(`https://wa.me/${(report.customer.mobile || '').replace(/\D/g, '')}?text=${text}`, '_blank');
-  };
-
   if (loading) {
     return (
       <div className="space-y-4 max-w-[210mm] mx-auto">
@@ -396,9 +390,6 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           )}
           <Button variant="secondary" size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs"><Printer size={14} />{t('common.print')}</Button>
           <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={exportingPdf} className="gap-1.5 h-8 text-xs"><Download size={14} />{exportingPdf ? t('common.loading') : t('labReport.downloadPdf')}</Button>
-          {!hideShareActions && (
-            <Button variant="secondary" size="sm" onClick={handleWhatsApp} className="gap-1.5 h-8 text-xs text-green-700"><MessageCircle size={14} />WhatsApp</Button>
-          )}
           {canRegeneratePdf && report.pdfUrl && (
             <Button
               variant="secondary"

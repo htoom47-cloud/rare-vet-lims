@@ -62,19 +62,7 @@ const getOperationsStats = async () => {
          AND r.vet_approved_by IS NULL
          AND r.is_final IS NOT TRUE`
     ),
-    query(
-      `SELECT COUNT(DISTINCT c.id)::int AS count
-       FROM customers c
-       JOIN samples s ON s.customer_id = c.id
-       JOIN reports r ON r.sample_id = s.id AND ${portalVisible}
-       WHERE c.is_active = true
-         AND NOT EXISTS (
-           SELECT 1 FROM notification_queue nq
-           WHERE nq.status = 'sent'
-             AND nq.metadata->>'customer_id' = c.id::text
-             AND nq.metadata->'report_ids' ? r.id::text
-         )`
-    ),
+    query(reportNotify.countCustomersWaitingToSend()),
     query(
       `SELECT COUNT(*)::int AS count FROM notification_queue
        WHERE status = 'failed'
@@ -92,7 +80,7 @@ const getOperationsStats = async () => {
     awaiting_barcode_print: awaitingBarcodePrint.rows[0]?.count || 0,
     in_lab: inLab.rows[0]?.count || 0,
     pending_approval: pendingApproval.rows[0]?.count || 0,
-    ready_to_send: readyToSend.rows[0]?.count || 0,
+    ready_to_send: typeof readyToSend === 'number' ? readyToSend : (readyToSend?.rows?.[0]?.count || 0),
     failed_messages: failedMessages.rows[0]?.count || 0,
     data_errors: dataErrors.rows[0]?.count || 0,
   };

@@ -5,7 +5,7 @@ import { CheckCircle2, Download, Eye, FileText, FilePlus, RotateCcw, Stethoscope
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
-import { reportsAPI, samplesAPI, notificationsAPI } from '../services/api';
+import { reportsAPI, samplesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
@@ -69,7 +69,6 @@ export default function Reports() {
   const [verifyResult, setVerifyResult] = useState(null);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [sendingId, setSendingId] = useState(null);
   const [approvingKey, setApprovingKey] = useState(null);
   const [regeneratingId, setRegeneratingId] = useState(null);
 
@@ -81,7 +80,6 @@ export default function Reports() {
 
   const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
   const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
-  const canSendSmsToCustomer = user?.role === 'admin' && hasPermission('notifications.send_report');
   const canRegeneratePdf = hasPermission('reports.generate');
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)
@@ -118,27 +116,6 @@ export default function Reports() {
     } catch {
       toast.error(t('reports.invalidCode'));
       setVerifyResult(null);
-    }
-  };
-
-  const sendToCustomer = async (report) => {
-    setSendingId(report.id);
-    try {
-      const { data: resp } = await notificationsAPI.sendReport(report.sample_id, 'sms');
-      if (resp.dryRun) {
-        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 5000 });
-      } else {
-        toast.success(t('workflow.sentToCustomer'));
-      }
-    } catch (err) {
-      const code = err.response?.data?.error?.code;
-      if (code === 'CHANNEL_DISABLED') {
-        toast.error(t('notifications.channelDisabled'));
-      } else {
-        toast.error(err.response?.data?.error?.message || 'خطأ');
-      }
-    } finally {
-      setSendingId(null);
     }
   };
 

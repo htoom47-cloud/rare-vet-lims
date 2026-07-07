@@ -205,7 +205,13 @@ export default function Dashboard() {
             <StatCard title={t('dashboard.awaitingBarcodePrint')} value={stats.operations.awaiting_barcode_print || 0} icon={Printer} color="blue" />
             <StatCard title={t('dashboard.inLab')} value={stats.operations.in_lab || 0} icon={FlaskConical} color="primary" />
             <StatCard title={t('dashboard.pendingApproval')} value={stats.operations.pending_approval || 0} icon={FileCheck} color="orange" />
-            <StatCard title={t('dashboard.readyToSend')} value={stats.operations.ready_to_send || 0} icon={Send} color="green" />
+            <StatCard
+              title={`📨 ${t('dashboard.readyToSend')}`}
+              value={stats.operations.ready_to_send || 0}
+              subtitle={t('dashboard.readyToSendCustomers', { count: stats.operations.ready_to_send || 0 })}
+              icon={Send}
+              color="green"
+            />
             <StatCard title={t('dashboard.failedMessages')} value={stats.operations.failed_messages || 0} icon={Bell} color="orange" />
             <StatCard title={t('dashboard.dataErrors')} value={stats.operations.data_errors || 0} icon={AlertTriangle} color="orange" />
           </div>

@@ -144,30 +144,48 @@ check('Portal preview uses cache-bust param', () => {
   assert.ok(src.includes('Date.now()'));
 });
 
-check('Reports list — send hidden except admin', () => {
+check('Reports list — no per-report send button', () => {
   const src = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend', 'src', 'pages', 'Reports.jsx'),
     'utf8'
   );
-  assert.ok(src.includes("user?.role === 'admin'"));
+  assert.ok(!src.includes('sendToCustomer'));
+  assert.ok(!src.includes('notificationsAPI.sendReport'));
 });
 
-check('Samples list — per-sample send disabled', () => {
+check('Samples list — no per-sample send', () => {
   const src = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend', 'src', 'pages', 'Samples.jsx'),
     'utf8'
   );
-  assert.ok(src.includes('canSendSmsToCustomer = false'));
+  assert.ok(!src.includes('sendReportToCustomer'));
+  assert.ok(!src.includes('canSendForSample'));
 });
 
-check('Customer profile — send ready reports button', () => {
+check('Customer profile — dispatch section + send all', () => {
   const src = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend', 'src', 'pages', 'Customers.jsx'),
     'utf8'
   );
-  assert.ok(src.includes('sendReadyReports'));
-  assert.ok(src.includes('readyReports'));
-  assert.ok(src.includes('sendOneMessage'));
+  assert.ok(src.includes('readyReportsSection'));
+  assert.ok(src.includes('sendAllReadyReports'));
+  assert.ok(src.includes('report_dispatch_status'));
+  assert.ok(src.includes('confirmSendOpen'));
+  assert.ok(src.includes('resendOpen'));
+});
+
+check('send metadata stores report_numbers and count', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'services', 'customer-report-notifications.service.js'), 'utf8');
+  assert.ok(src.includes('report_numbers'));
+  assert.ok(src.includes('report_count'));
+  assert.ok(src.includes('providerResponse'));
+});
+
+check('dashboard counts customers not reports', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'services', 'customer-report-notifications.service.js'), 'utf8');
+  assert.ok(src.includes('countCustomersWaitingToSend'));
+  const dash = fs.readFileSync(path.join(ROOT, 'services', 'dashboard.service.js'), 'utf8');
+  assert.ok(dash.includes('countCustomersWaitingToSend'));
 });
 
 check('Manager has notifications.send_report permission', () => {

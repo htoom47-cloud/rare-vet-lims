@@ -1,6 +1,7 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
+const reportNotify = require('./customer-report-notifications.service');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { uuidv4 } = require('../utils/uuid');
 const { getCustomerStatement } = require('./accounting.service');
@@ -37,7 +38,8 @@ const list = async ({ search, mobile, page, limit }) => {
     params
   );
 
-  return { data: result.rows, pagination: buildPagination(total, p, l) };
+  const data = await reportNotify.enrichCustomersDispatchStatus(result.rows);
+  return { data, pagination: buildPagination(total, p, l) };
 };
 
 const getById = async (id) => {

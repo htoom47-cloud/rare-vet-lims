@@ -17,13 +17,19 @@ const {
   messageHash,
   extractSentReportIds,
   findDuplicateReportIds,
+  parseMetadata,
 } = require('./customer-report-notifications.utils');
 
 const visibilitySql = portalSync.portalVisibilitySql('r').replace(/\s+/g, ' ').trim();
 
 const READY_REPORTS_BASE = `
   SELECT r.id, r.report_number, r.pdf_url, r.language, r.is_final, r.created_at,
-         r.lab_specialist_approved_by, r.vet_approved_by,
+         r.lab_specialist_approved_by, r.lab_specialist_approved_at,
+         r.vet_approved_by, r.vet_approved_at,
+         GREATEST(
+           COALESCE(r.lab_specialist_approved_at, r.created_at),
+           COALESCE(r.vet_approved_at, r.created_at)
+         ) AS approved_at,
          s.id AS sample_id, s.sample_code, s.customer_id,
          a.id AS animal_id, a.name_tag AS animal_name, a.animal_type,
          (
@@ -44,27 +50,84 @@ const READY_REPORTS_SQL = `${READY_REPORTS_BASE} ORDER BY r.created_at DESC`;
 const loadSentBatches = async (customerIds) => {
   const ids = Array.isArray(customerIds) ? customerIds : [customerIds];
   const result = await query(
-    `SELECT id, metadata, sent_at, channel, status
-     FROM notification_queue
-     WHERE status IN ('sent')
-       AND metadata->>'customer_id' = ANY($1::text[])
+    `SELECT nq.id, nq.metadata, nq.sent_at, nq.created_at, nq.channel, nq.status,
+            u.full_name AS sent_by_name
+     FROM notification_queue nq
+     LEFT JOIN users u ON u.id::text = nq.metadata->>'sent_by'
+     WHERE nq.status IN ('sent', 'dry_run')
        AND (
-         metadata->>'type' = $2
-         OR metadata->>'batch_id' IS NOT NULL
+         nq.metadata->>'type' = $2
+         OR nq.metadata->>'batch_id' IS NOT NULL
        )
-     ORDER BY sent_at DESC NULLS LAST, created_at DESC`,
+       AND (
+         nq.metadata->>'customer_id' = ANY($1::text[])
+         OR EXISTS (
+           SELECT 1 FROM jsonb_array_elements_text(COALESCE(nq.metadata->'scope_customer_ids', '[]'::jsonb)) sid
+           WHERE sid = ANY($1::text[])
+         )
+       )
+     ORDER BY COALESCE(nq.sent_at, nq.created_at) DESC`,
     [ids.map(String), BATCH_TYPE]
   );
   return result.rows;
 };
 
-const mapReportRow = (row, sentIds) => {
+const loadFailedBatches = async (customerIds) => {
+  const ids = Array.isArray(customerIds) ? customerIds : [customerIds];
+  const result = await query(
+    `SELECT nq.id, nq.metadata, nq.created_at, nq.channel, nq.status
+     FROM notification_queue nq
+     WHERE nq.status = 'failed'
+       AND nq.metadata->>'type' = $2
+       AND nq.created_at >= NOW() - INTERVAL '30 days'
+       AND (
+         nq.metadata->>'customer_id' = ANY($1::text[])
+         OR EXISTS (
+           SELECT 1 FROM jsonb_array_elements_text(COALESCE(nq.metadata->'scope_customer_ids', '[]'::jsonb)) sid
+           WHERE sid = ANY($1::text[])
+         )
+       )
+     ORDER BY nq.created_at DESC`,
+    [ids.map(String), BATCH_TYPE]
+  );
+  return result.rows;
+};
+
+const findBatchForReportIds = (batches, reportIds) => {
+  const wanted = new Set(reportIds.map(String));
+  return batches.find((row) => {
+    const meta = parseMetadata(row.metadata);
+    return (meta.report_ids || []).some((id) => wanted.has(String(id)));
+  }) || null;
+};
+
+const dispatchStatusFromCounts = (readyCount, unsentCount, hasFailed) => {
+  if (readyCount === 0) return 'none';
+  if (hasFailed && unsentCount > 0) return 'failed';
+  if (unsentCount >= 2) return 'ready_multi';
+  if (unsentCount === 1) return 'ready_one';
+  if (unsentCount === 0) return 'sent';
+  return 'none';
+};
+
+const reportWasSent = (reportId, sentIds) => sentIds.has(String(reportId));
+
+const mapReportRow = (row, sentIds, sentBatches, failedBatches) => {
   const lifecycle = portalSync.resolveReportLifecycle(row);
+  const previouslySent = reportWasSent(row.id, sentIds);
+  const sentBatch = previouslySent ? findBatchForReportIds(sentBatches, [row.id]) : null;
+  const failedBatch = !previouslySent ? findBatchForReportIds(failedBatches, [row.id]) : null;
+  let send_status = 'unsent';
+  if (previouslySent) send_status = 'sent';
+  else if (failedBatch) send_status = 'failed';
+
   return {
     id: row.id,
     report_number: row.report_number,
     pdf_url: row.pdf_url,
     created_at: row.created_at,
+    approved_at: row.approved_at,
+    report_type: row.test_names,
     animal_name: row.animal_name,
     animal_type: row.animal_type,
     test_names: row.test_names,
@@ -72,7 +135,11 @@ const mapReportRow = (row, sentIds) => {
     customer_id: row.customer_id,
     lifecycle,
     status: lifecycle,
-    previously_sent: sentIds.has(String(row.id)),
+    send_status,
+    previously_sent: previouslySent,
+    last_sent_at: sentBatch?.sent_at || sentBatch?.created_at || null,
+    last_sent_channel: sentBatch?.channel || null,
+    last_sent_by_name: sentBatch?.sent_by_name || null,
   };
 };
 
@@ -84,26 +151,92 @@ const listReadyReports = async (customerId) => {
   );
   if (!customer.rows[0]) throw new AppError('Customer not found', 404, 'NOT_FOUND');
 
-  const sentRows = await loadSentBatches(scopeIds);
+  const [sentRows, failedRows, reports] = await Promise.all([
+    loadSentBatches(scopeIds),
+    loadFailedBatches(scopeIds),
+    query(READY_REPORTS_SQL, [scopeIds]),
+  ]);
   const sentIds = extractSentReportIds(sentRows);
-
-  const reports = await query(READY_REPORTS_SQL, [scopeIds]);
-  const rows = reports.rows.map((r) => mapReportRow(r, sentIds));
+  const rows = reports.rows.map((r) => mapReportRow(r, sentIds, sentRows, failedRows));
+  const unsent = rows.filter((r) => !r.previously_sent);
 
   return {
     customer: customer.rows[0],
     scopeCustomerIds: scopeIds,
     reports: rows,
-    unsentCount: rows.filter((r) => !r.previously_sent).length,
+    unsentReports: unsent,
+    unsentCount: unsent.length,
     portalUrl: env.portalAppUrl,
+    dispatchStatus: dispatchStatusFromCounts(
+      rows.length,
+      unsent.length,
+      failedRows.length > 0 && unsent.length > 0
+    ),
   };
 };
 
-const sendReadyReports = async (customerId, { reportIds, channel, forceResend = false }, userId) => {
-  if (!Array.isArray(reportIds) || reportIds.length === 0) {
-    throw new AppError('Select at least one report', 400, 'VALIDATION');
-  }
+const getCustomerDispatchStatus = async (customerId) => {
+  const scopeIds = await resolveCustomerIdsByMobile(customerId);
+  const [sentRows, failedRows, reports] = await Promise.all([
+    loadSentBatches(scopeIds),
+    loadFailedBatches(scopeIds),
+    query(READY_REPORTS_SQL, [scopeIds]),
+  ]);
+  const sentIds = extractSentReportIds(sentRows);
+  const readyCount = reports.rows.length;
+  const unsentCount = reports.rows.filter((r) => !sentIds.has(String(r.id))).length;
+  const hasFailed = failedRows.length > 0 && unsentCount > 0;
 
+  return {
+    status: dispatchStatusFromCounts(readyCount, unsentCount, hasFailed),
+    readyCount,
+    unsentCount,
+  };
+};
+
+const enrichCustomersDispatchStatus = async (customerRows = []) => {
+  if (!customerRows.length) return customerRows;
+  const statuses = await Promise.all(
+    customerRows.map((row) => getCustomerDispatchStatus(row.id))
+  );
+  return customerRows.map((row, i) => ({
+    ...row,
+    report_dispatch_status: statuses[i].status,
+    report_dispatch_unsent_count: statuses[i].unsentCount,
+    report_dispatch_ready_count: statuses[i].readyCount,
+  }));
+};
+
+/** Customers with ≥1 unsent portal-visible report (count customers, not reports). */
+const countCustomersWaitingToSend = async () => {
+  const result = await query(
+    `SELECT COUNT(DISTINCT c.id)::int AS count
+     FROM customers c
+     WHERE c.is_active = true
+       AND EXISTS (
+         SELECT 1
+         FROM reports r
+         JOIN samples s ON r.sample_id = s.id
+         JOIN customers c2 ON s.customer_id = c2.id
+         WHERE ${visibilitySql}
+           AND (
+             c2.id = c.id
+             OR RIGHT(regexp_replace(c2.mobile, '[^0-9]', '', 'g'), 9)
+               = RIGHT(regexp_replace(c.mobile, '[^0-9]', '', 'g'), 9)
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM notification_queue nq
+             WHERE nq.status IN ('sent', 'dry_run')
+               AND nq.metadata->>'type' = $1
+               AND nq.metadata->'report_ids' ? r.id::text
+           )
+       )`,
+    [BATCH_TYPE]
+  );
+  return result.rows[0]?.count || 0;
+};
+
+const sendReadyReports = async (customerId, { reportIds, channel, forceResend = false }, userId) => {
   const scopeIds = await resolveCustomerIdsByMobile(customerId);
   const selectedChannel = channel || env.notifications.defaultChannel || 'whatsapp';
 
@@ -113,16 +246,25 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
   );
   if (!customer.rows[0]) throw new AppError('Customer not found', 404, 'NOT_FOUND');
 
+  let idsToSend = Array.isArray(reportIds) ? reportIds.filter(Boolean) : [];
+  if (!idsToSend.length) {
+    const ready = await listReadyReports(customerId);
+    idsToSend = ready.unsentReports.map((r) => r.id);
+  }
+  if (!idsToSend.length) {
+    throw new AppError('No ready reports to send', 400, 'NO_READY_REPORTS');
+  }
+
   const row = customer.rows[0];
   const e164 = formatToE164(row.mobile);
   if (!e164) throw new AppError('Customer mobile number is missing or invalid', 400, 'NO_RECIPIENT');
 
   const reportsResult = await query(
     `${READY_REPORTS_BASE} AND r.id = ANY($2::uuid[]) ORDER BY r.created_at DESC`,
-    [scopeIds, reportIds]
+    [scopeIds, idsToSend]
   );
 
-  if (reportsResult.rows.length !== reportIds.length) {
+  if (reportsResult.rows.length !== idsToSend.length) {
     throw new AppError('One or more reports are not ready for customer delivery', 400, 'INVALID_REPORTS');
   }
 
@@ -133,14 +275,23 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
 
   const sentRows = await loadSentBatches(scopeIds);
   const sentIds = extractSentReportIds(sentRows);
-  const duplicates = findDuplicateReportIds(reportIds, sentIds);
+  const duplicates = findDuplicateReportIds(idsToSend, sentIds);
 
   if (duplicates.length && !forceResend) {
+    const previousBatch = findBatchForReportIds(sentRows, duplicates);
     throw new AppError(
       'These reports were already sent to the customer. Resend?',
       409,
       'ALREADY_SENT',
-      { duplicateReportIds: duplicates }
+      {
+        duplicateReportIds: duplicates,
+        previousSend: previousBatch ? {
+          sentAt: previousBatch.sent_at || previousBatch.created_at,
+          channel: previousBatch.channel,
+          sentByName: previousBatch.sent_by_name || null,
+          reportCount: parseMetadata(previousBatch.metadata).report_ids?.length || duplicates.length,
+        } : null,
+      }
     );
   }
 
@@ -153,11 +304,14 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
 
   const batchId = randomUUID();
   const hash = messageHash(body);
+  const reportNumbers = reportsResult.rows.map((r) => r.report_number);
   const metadata = {
     type: BATCH_TYPE,
     customer_id: customerId,
     scope_customer_ids: scopeIds,
-    report_ids: reportIds,
+    report_ids: idsToSend,
+    report_numbers: reportNumbers,
+    report_count: idsToSend.length,
     batch_id: batchId,
     message_hash: hash,
     sent_by: userId,
@@ -175,11 +329,12 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
 
   try {
     const result = await notifications.dispatchOne(queued);
+    const providerResponse = result.provider_result || null;
     logger.info('Customer report batch sent', {
       customerId,
       scopeIds,
       batchId,
-      reportCount: reportIds.length,
+      reportCount: idsToSend.length,
       channel: selectedChannel,
       dryRun: !env.notifications.sendReal,
       userId,
@@ -187,8 +342,13 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
     return {
       batchId,
       notificationId: result.id,
-      reportIds,
+      reportIds: idsToSend,
+      reportNumbers,
+      reportCount: idsToSend.length,
       channel: selectedChannel,
+      sentAt: result.sent_at || new Date().toISOString(),
+      sentBy: userId,
+      providerResponse,
       dryRun: !env.notifications.sendReal,
       duplicatesIgnored: forceResend ? duplicates : [],
     };
@@ -198,7 +358,7 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
   }
 };
 
-/** Customers with at least one unsent portal-visible report (for dashboard). */
+/** @deprecated use countCustomersWaitingToSend */
 const listCustomersReadyToSend = async (limit = 20) => {
   const result = await query(
     `SELECT c.id, c.full_name, c.full_name_ar, c.mobile,
@@ -209,8 +369,7 @@ const listCustomersReadyToSend = async (limit = 20) => {
      WHERE c.is_active = true
        AND NOT EXISTS (
          SELECT 1 FROM notification_queue nq
-         WHERE nq.status = 'sent'
-           AND nq.metadata->>'customer_id' = c.id::text
+         WHERE nq.status IN ('sent', 'dry_run')
            AND nq.metadata->>'type' = $1
            AND nq.metadata->'report_ids' ? r.id::text
        )
@@ -226,6 +385,10 @@ const listCustomersReadyToSend = async (limit = 20) => {
 module.exports = {
   listReadyReports,
   sendReadyReports,
+  getCustomerDispatchStatus,
+  enrichCustomersDispatchStatus,
+  countCustomersWaitingToSend,
   listCustomersReadyToSend,
   READY_REPORTS_SQL,
+  dispatchStatusFromCounts,
 };
