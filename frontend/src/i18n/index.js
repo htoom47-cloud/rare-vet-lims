@@ -297,9 +297,9 @@ const resources = {
         usbDisplayHint: 'Offline copy for TV — no internet needed. Copy folder to USB and open index.html',
       },
       receptionDisplay: {
-        ticker: '25% opening discount — accurate veterinary diagnostics & digital reports',
+        ticker: '20% opening discount — accurate veterinary diagnostics & digital reports',
         pricingTitle: 'Price List',
-        pricingPromo: '25% opening discount — limited time offer',
+        pricingPromo: '20% opening discount — limited time offer',
         welcomeTitle: 'Welcome',
         welcomeSubtitle: 'Specialized veterinary laboratory — clinical diagnostics and research for camels, horses, and livestock',
         defaultAddress: 'Al Muzahimiyah, Riyadh Region, Kingdom of Saudi Arabia',
@@ -1264,9 +1264,9 @@ const resources = {
         usbDisplayHint: 'تعمل بدون إنترنت — انسخ المجلد للفلاش وافتح index.html على التلفزيون',
       },
       receptionDisplay: {
-        ticker: 'خصم 25% بمناسبة الافتتاح — تحاليل بيطرية دقيقة وتقارير رقمية',
+        ticker: 'خصم 20% بمناسبة الافتتاح — تحاليل بيطرية دقيقة وتقارير رقمية',
         pricingTitle: 'قائمة الأسعار',
-        pricingPromo: 'خصم 25% بمناسبة الافتتاح — لفترة محدودة',
+        pricingPromo: 'خصم 20% بمناسبة الافتتاح — لفترة محدودة',
         welcomeTitle: 'أهلاً وسهلاً',
         welcomeSubtitle: 'مختبر بيطري متخصص — تشخيص سريري وبحثي للإبل والخيول والماشية',
         defaultAddress: 'المزاحمية، منطقة الرياض، المملكة العربية السعودية',
