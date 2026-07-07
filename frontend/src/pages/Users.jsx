@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Shield, Save, Trash2, UserX } from 'lucide-react';
+import { AlertTriangle, Plus, Pencil, Search, Shield, Save, Trash2, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import PasswordInput from '../components/ui/PasswordInput';
 import { usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import {
+  PERMISSION_UX_GROUPS,
+  PERMISSION_UX_GROUP_FILTER_OPTIONS,
+  PRESET_ORDER,
+  ROLE_PERMISSION_PRESETS,
+  isSensitivePermission,
+  uxGroupForCode,
+} from '../constants/permissionsUx';
 
 const apiError = (err, fallback = 'خطأ') => {
   const details = err.response?.data?.error?.details;
@@ -22,9 +30,14 @@ export default function Users() {
   const isAdmin = currentUser?.role === 'admin';
 
   const roleLabel = (name) => t(`permissions.roles.${name}`, { defaultValue: name?.replace(/_/g, ' ') ?? '' });
-  const moduleLabel = (module) => t(`permissions.modules.${module}`, { defaultValue: module });
+  const uxGroupLabel = (groupId) => t(`permissions.ux.groups.${groupId}`, { defaultValue: groupId });
   const permissionLabel = (code) => {
-    const [mod, action] = code.split('.');
+    if (code.startsWith('data.trash.')) {
+      const action = code.split('.').pop();
+      return t(`permissions.codes.data.trash.${action}`, { defaultValue: code });
+    }
+    const [mod, ...rest] = code.split('.');
+    const action = rest.join('.');
     return mod && action
       ? t(`permissions.codes.${mod}.${action}`, { defaultValue: code })
       : code;
@@ -38,6 +51,9 @@ export default function Users() {
   const [rolePermissions, setRolePermissions] = useState([]);
   const [editedPermissions, setEditedPermissions] = useState([]);
   const [savingPerms, setSavingPerms] = useState(false);
+  const [permSearch, setPermSearch] = useState('');
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [activePreset, setActivePreset] = useState(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -64,6 +80,9 @@ export default function Users() {
 
   const viewPermissions = async (role) => {
     setSelectedRole(role);
+    setPermSearch('');
+    setGroupFilter('all');
+    setActivePreset(null);
     const { data } = await usersAPI.permissions(role.id);
     const codes = data.data.map((p) => p.code);
     setRolePermissions(data.data);
@@ -71,28 +90,48 @@ export default function Users() {
   };
 
   const togglePermission = (code) => {
+    const enabling = !editedPermissions.includes(code);
+    if (enabling && isSensitivePermission(code)) {
+      if (!window.confirm(t('permissions.ux.sensitiveWarning'))) return;
+    }
+    setActivePreset(null);
     setEditedPermissions((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
     );
+  };
+
+  const applyPreset = (presetKey) => {
+    if (!selectedRole || selectedRole.name === 'admin') return;
+    const preset = ROLE_PERMISSION_PRESETS[presetKey];
+    if (!preset) {
+      toast.error(t('permissions.ux.adminPresetLocked'));
+      return;
+    }
+    const valid = preset.filter((code) => allPermissions.some((p) => p.code === code));
+    setEditedPermissions(valid);
+    setActivePreset(presetKey);
+    toast(t('permissions.ux.presetApplied', { role: roleLabel(presetKey) }), { icon: 'ℹ️' });
   };
 
   const saveRolePermissions = async () => {
     if (!selectedRole || selectedRole.name === 'admin') return;
     setSavingPerms(true);
     try {
-      const { data } = await usersAPI.updateRolePermissions(selectedRole.id, editedPermissions);
-      const saved = data.data || [];
+      const requested = [...editedPermissions];
+      await usersAPI.updateRolePermissions(selectedRole.id, requested);
+      const { data: refreshed } = await usersAPI.permissions(selectedRole.id);
+      const saved = refreshed.data || [];
       const savedCodes = saved.map((p) => p.code);
       setRolePermissions(saved);
       setEditedPermissions(savedCodes);
-      if (savedCodes.length !== editedPermissions.length) {
+      setActivePreset(null);
+      if (savedCodes.length !== requested.length) {
         toast.error(t('users.permsPartialSave', {
           saved: savedCodes.length,
-          requested: editedPermissions.length,
-          defaultValue: `Saved ${savedCodes.length} of ${editedPermissions.length} permissions — some codes are invalid`,
+          requested: requested.length,
         }));
       } else {
-        toast.success(t('users.permsSaved', { count: savedCodes.length, defaultValue: 'Permissions saved' }));
+        toast.success(t('users.permsSaved', { count: savedCodes.length }));
       }
     } catch (err) {
       toast.error(apiError(err));
@@ -179,17 +218,45 @@ export default function Users() {
     }
   };
 
-  const groupedPermissions = allPermissions.reduce((acc, p) => {
-    if (!acc[p.module]) acc[p.module] = [];
-    acc[p.module].push(p);
-    return acc;
-  }, {});
+  const selectedSensitiveCount = useMemo(
+    () => editedPermissions.filter((code) => isSensitivePermission(code)).length,
+    [editedPermissions]
+  );
 
-  const sortedPermissionGroups = useMemo(
-    () => Object.entries(groupedPermissions).sort(([a], [b]) =>
-      moduleLabel(a).localeCompare(moduleLabel(b), i18n.language)
-    ),
-    [groupedPermissions, i18n.language, t]
+  const filteredPermissions = useMemo(() => {
+    const q = permSearch.trim().toLowerCase();
+    return allPermissions.filter((p) => {
+      const label = permissionLabel(p.code).toLowerCase();
+      const group = uxGroupForCode(p.code);
+      if (groupFilter === 'sensitive' && !isSensitivePermission(p.code)) return false;
+      if (groupFilter !== 'all' && groupFilter !== 'sensitive' && group !== groupFilter) return false;
+      if (!q) return true;
+      return (
+        p.code.toLowerCase().includes(q)
+        || label.includes(q)
+        || uxGroupLabel(group).toLowerCase().includes(q)
+      );
+    });
+  }, [allPermissions, permSearch, groupFilter, i18n.language, t]);
+
+  const uxGroupedPermissions = useMemo(() => {
+    const groups = {};
+    for (const p of filteredPermissions) {
+      const g = uxGroupForCode(p.code);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(p);
+    }
+    for (const g of Object.keys(groups)) {
+      groups[g].sort((a, b) => permissionLabel(a.code).localeCompare(permissionLabel(b.code), i18n.language));
+    }
+    return PERMISSION_UX_GROUPS
+      .filter((g) => groups[g]?.length)
+      .map((g) => [g, groups[g]]);
+  }, [filteredPermissions, i18n.language, t]);
+
+  const sensitiveFiltered = useMemo(
+    () => filteredPermissions.filter((p) => isSensitivePermission(p.code)),
+    [filteredPermissions]
   );
 
   const columns = [
@@ -278,32 +345,123 @@ export default function Users() {
                 <p className="text-xs text-primary-500">{t('users.adminPermsLocked')}</p>
               ) : (
                 <>
-                  <div className="space-y-3 max-h-64 overflow-y-auto mb-3">
-                    {sortedPermissionGroups.map(([module, perms]) => (
-                      <div key={module}>
-                        <p className="text-xs font-semibold text-primary-600 mb-1">{moduleLabel(module)}</p>
+                  <div className="mb-3">
+                    <p className="text-xs text-primary-500 mb-1.5">{t('permissions.ux.presetsTitle')}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {PRESET_ORDER.map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => applyPreset(key)}
+                          className={`px-2 py-1 rounded text-[11px] border transition-colors ${
+                            activePreset === key
+                              ? 'bg-primary-100 border-primary-400 text-primary-800'
+                              : 'border-primary-200 hover:bg-primary-50 text-primary-700'
+                          }`}
+                        >
+                          {roleLabel(key)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <div className="relative flex-1 min-w-[140px]">
+                      <Search size={14} className="absolute start-2 top-1/2 -translate-y-1/2 text-primary-400" />
+                      <input
+                        type="search"
+                        value={permSearch}
+                        onChange={(e) => setPermSearch(e.target.value)}
+                        placeholder={t('permissions.ux.searchPlaceholder')}
+                        className="input-field text-xs ps-8 py-1.5"
+                      />
+                    </div>
+                    <select
+                      value={groupFilter}
+                      onChange={(e) => setGroupFilter(e.target.value)}
+                      className="input-field text-xs py-1.5 min-w-[120px]"
+                    >
+                      <option value="all">{t('permissions.ux.filterAllGroups')}</option>
+                      {PERMISSION_UX_GROUP_FILTER_OPTIONS.map((g) => (
+                        <option key={g} value={g}>{uxGroupLabel(g)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 text-xs text-primary-600 mb-2">
+                    <span>{t('permissions.ux.selectedCount', { count: editedPermissions.length })}</span>
+                    <span className="text-red-700">
+                      {t('permissions.ux.sensitiveSelectedCount', { count: selectedSensitiveCount })}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 max-h-80 overflow-y-auto mb-3">
+                    {uxGroupedPermissions.length === 0 ? (
+                      <p className="text-xs text-primary-500">{t('permissions.ux.noMatches')}</p>
+                    ) : (
+                      uxGroupedPermissions.map(([groupId, perms]) => (
+                        <div key={groupId}>
+                          <p className="text-xs font-semibold text-primary-700 mb-1">{uxGroupLabel(groupId)}</p>
+                          <div className="space-y-1.5">
+                            {perms.map((p) => {
+                              const sensitive = isSensitivePermission(p.code);
+                              return (
+                                <label
+                                  key={p.id}
+                                  className={`flex items-start gap-2 text-xs cursor-pointer rounded px-1 py-0.5 ${
+                                    sensitive ? 'bg-red-50/60' : ''
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="mt-0.5"
+                                    checked={editedPermissions.includes(p.code)}
+                                    onChange={() => togglePermission(p.code)}
+                                  />
+                                  <span className="flex-1 min-w-0">
+                                    <span className="flex items-center gap-1">
+                                      {sensitive && <span title={t('permissions.ux.sensitiveBadge')}>🔴</span>}
+                                      <span className="font-medium">{permissionLabel(p.code)}</span>
+                                    </span>
+                                    <span className="block text-[10px] text-primary-400 font-mono truncate">{p.code}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {groupFilter !== 'sensitive' && sensitiveFiltered.length > 0 && (
+                      <div className="border-t border-red-100 pt-3 mt-2">
+                        <p className="text-xs font-semibold text-red-700 mb-1 flex items-center gap-1">
+                          <AlertTriangle size={12} />
+                          {t('permissions.ux.sensitiveSection')}
+                        </p>
+                        <p className="text-[10px] text-red-600/80 mb-2">{t('permissions.ux.sensitiveSectionHint')}</p>
                         <div className="space-y-1">
-                          {perms.map((p) => (
-                            <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={editedPermissions.includes(p.code)}
-                                onChange={() => togglePermission(p.code)}
-                              />
+                          {sensitiveFiltered.map((p) => (
+                            <div key={`s-${p.id}`} className="text-[10px] text-red-800 flex gap-1">
+                              <span>🔴</span>
                               <span>{permissionLabel(p.code)}</span>
-                            </label>
+                              <span className="font-mono text-red-500">({p.code})</span>
+                            </div>
                           ))}
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
+
                   <button onClick={saveRolePermissions} disabled={savingPerms} className="btn-primary w-full text-sm flex items-center justify-center gap-2">
                     <Save size={16} /> {t('users.savePermissions')}
                   </button>
                 </>
               )}
               {rolePermissions.length > 0 && selectedRole.name !== 'admin' && (
-                <p className="text-xs text-primary-500 mt-2">{rolePermissions.length} {t('users.activePerms')}</p>
+                <p className="text-xs text-primary-500 mt-2">
+                  {t('permissions.ux.savedOnServer', { count: rolePermissions.length })}
+                </p>
               )}
             </div>
           )}
