@@ -318,12 +318,16 @@ const evaluateResultFlag = (value, range) => {
   if (!range || range.min_value == null || range.max_value == null) {
     return { flag: '', isCritical: false };
   }
+  const { isCriticalFlagsDisabled } = require('../utils/critical-flags');
+  // When critical flags disabled: evaluate Min/Max only → HIGH/LOW, never CRIT_*.
+  const criticalLow = isCriticalFlagsDisabled() ? null : range.critical_low;
+  const criticalHigh = isCriticalFlagsDisabled() ? null : range.critical_high;
   return evaluateFlag(
     num,
     range.min_value,
     range.max_value,
-    range.critical_low,
-    range.critical_high
+    criticalLow,
+    criticalHigh
   );
 };
 

@@ -205,6 +205,7 @@ const getStats = async () => {
 };
 
 const getTechnicianDashboard = async (userId) => {
+  const { isCriticalFlagsDisabled } = require('../utils/critical-flags');
   const [queue, running, critical] = await Promise.all([
     query(
       `SELECT COUNT(*)::int AS count FROM samples
@@ -216,12 +217,14 @@ const getTechnicianDashboard = async (userId) => {
       `SELECT COUNT(*)::int AS count FROM sample_tests WHERE technician_id = $1 AND status = 'running'`,
       [userId]
     ),
-    query(
-      `SELECT COUNT(*)::int AS count FROM results r
-       JOIN sample_tests st ON r.sample_test_id = st.id
-       WHERE st.technician_id = $1 AND r.has_critical = true AND r.is_validated = false`,
-      [userId]
-    ),
+    isCriticalFlagsDisabled()
+      ? Promise.resolve({ rows: [{ count: 0 }] })
+      : query(
+        `SELECT COUNT(*)::int AS count FROM results r
+         JOIN sample_tests st ON r.sample_test_id = st.id
+         WHERE st.technician_id = $1 AND r.has_critical = true AND r.is_validated = false`,
+        [userId]
+      ),
   ]);
 
   return {

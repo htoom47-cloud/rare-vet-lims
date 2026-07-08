@@ -99,7 +99,7 @@ const env = {
     enabled: process.env.WORKFLOW_ENGINE_ENABLED === 'true',
   },
   features: {
-    reportDesign: parseInt(process.env.REPORT_DESIGN || '1', 10) || 1,
+    reportDesign: parseInt(process.env.REPORT_DESIGN || '3', 10) || 3,
     smartReportLifecycle: process.env.SMART_REPORT_LIFECYCLE_ENABLED === 'true',
     reportMastering: process.env.REPORT_MASTERING_ENABLED === 'true',
     /** Block barcode print/register until invoice issued or credit allowed */
@@ -108,6 +108,11 @@ const env = {
     requireLabHandover: process.env.REQUIRE_LAB_HANDOVER === 'true',
     /** Lock results/tests/customer/animal edits after report approval */
     lockApprovedReports: process.env.LOCK_APPROVED_REPORTS === 'true',
+    /**
+     * When true: ignore critical_low/high (no CRIT flags, no critical alerts).
+     * Min/Max → LOW/HIGH unchanged. Default false = current behaviour.
+     */
+    disableCriticalFlags: process.env.DISABLE_CRITICAL_FLAGS === 'true',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',

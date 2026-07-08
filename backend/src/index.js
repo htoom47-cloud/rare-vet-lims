@@ -55,6 +55,12 @@ const start = async () => {
       } catch (err) {
         logger.warn('Animal species cache warmup skipped', { error: err.message });
       }
+      try {
+        const disabled = await require('./utils/critical-flags').loadCriticalFlagsSetting();
+        logger.info('Critical flags setting loaded', { disableCriticalFlags: disabled });
+      } catch (err) {
+        logger.warn('Critical flags setting load skipped', { error: err.message });
+      }
     }
 
     app.listen(env.port, '0.0.0.0', () => {

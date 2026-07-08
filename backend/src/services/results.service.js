@@ -368,6 +368,9 @@ const getPreviousResults = async (animalId, parameterId, limit = 5) => {
 };
 
 const getCriticalAlerts = async () => {
+  const { isCriticalFlagsDisabled } = require('../utils/critical-flags');
+  if (isCriticalFlagsDisabled()) return [];
+
   const result = await query(
     `SELECT r.*, s.sample_code, c.full_name as customer_name, a.animal_code, t.name as test_name
      FROM results r

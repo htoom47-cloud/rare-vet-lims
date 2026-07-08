@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, settingsAPI } from '../services/api';
 
 const StatusDot = ({ ok }) => (
   <span className={`inline-block w-3 h-3 rounded-full mr-2 ${ok ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -15,10 +15,13 @@ export default function Settings() {
   const { user, hasPermission } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role_name === 'admin';
   const canManageSettings = hasPermission('settings.manage');
+  const canViewSettings = hasPermission('settings.view') || canManageSettings;
 
   const [notifConfig, setNotifConfig] = useState(null);
   const [testNumber, setTestNumber] = useState('');
   const [testSending, setTestSending] = useState(false);
+  const [disableCriticalFlags, setDisableCriticalFlags] = useState(false);
+  const [criticalSaving, setCriticalSaving] = useState(false);
 
   useEffect(() => {
     if (isAdmin || canManageSettings) {
@@ -27,6 +30,33 @@ export default function Settings() {
         .catch(() => {});
     }
   }, [isAdmin, canManageSettings]);
+
+  useEffect(() => {
+    if (!canViewSettings) return;
+    settingsAPI.get()
+      .then(({ data }) => {
+        const raw = data.data?.disable_critical_flags;
+        setDisableCriticalFlags(raw === true || raw === 'true');
+      })
+      .catch(() => {});
+  }, [canViewSettings]);
+
+  const handleCriticalToggle = async () => {
+    if (!canManageSettings) return;
+    const next = !disableCriticalFlags;
+    setCriticalSaving(true);
+    try {
+      await settingsAPI.update('disable_critical_flags', next);
+      setDisableCriticalFlags(next);
+      toast.success(next
+        ? t('settings.criticalDisabledToast')
+        : t('settings.criticalEnabledToast'));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setCriticalSaving(false);
+    }
+  };
 
   const handleTestSend = async () => {
     if (!testNumber.trim()) return;
@@ -152,6 +182,35 @@ export default function Settings() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {canViewSettings && (
+          <div className="card space-y-4 md:col-span-2">
+            <h3 className="font-semibold">{t('settings.criticalFlagsTitle')}</h3>
+            <p className="text-sm text-gray-500">{t('settings.criticalFlagsHint')}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+              <div>
+                <p className="font-medium">{t('settings.disableCriticalFlags')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('settings.criticalFlagsKeepHighLow')}</p>
+              </div>
+              <button
+                type="button"
+                disabled={!canManageSettings || criticalSaving}
+                onClick={handleCriticalToggle}
+                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${
+                  disableCriticalFlags
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-primary-600 text-white'
+                }`}
+              >
+                {criticalSaving
+                  ? '...'
+                  : (disableCriticalFlags
+                    ? t('settings.criticalOff')
+                    : t('settings.criticalOn'))}
+              </button>
+            </div>
           </div>
         )}
 
