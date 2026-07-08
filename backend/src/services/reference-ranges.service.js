@@ -16,9 +16,7 @@ const isRefreshableAutoRow = (notes) => {
   const n = String(notes || '').trim();
   if (!n || isDeviceNormaNotes(n)) return false;
   if (isManualLimsNotes(n)) return false;
-  return n.startsWith('Synced from norma-defaults')
-    || n.startsWith('Synced from norma-profile')
-    || n.startsWith('Species default');
+  return n.startsWith('Synced from norma-defaults') || n.startsWith('Species default');
 };
 
 const rowMissingBounds = (row) => (
