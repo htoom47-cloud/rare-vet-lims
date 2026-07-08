@@ -22,7 +22,7 @@ const pickId = (field) => {
   return primary || null;
 };
 
-const { normalizeSampleScanId } = require('./barcode-scan');
+const { normalizeSampleScanId, extractDigits } = require('./barcode-scan');
 
 const normalizeSampleId = (id) => {
   const value = normalizeSampleScanId(id) || String(id || '').trim();
@@ -50,6 +50,26 @@ const firstId = (...candidates) => {
     if (id) return id;
   }
   return null;
+};
+
+/** Mindray BS-120 may send rack Sample ID (1,2) while full barcode is elsewhere in HL7. */
+const isShortInternalSampleId = (id) => {
+  const digits = extractDigits(id || '');
+  return digits.length > 0 && digits.length <= 4;
+};
+
+const extractLongestDigitBarcode = (raw) => {
+  const matches = String(raw || '').match(/\d{8,14}/g) || [];
+  if (!matches.length) return null;
+  return matches.sort((a, b) => b.length - a.length || b.localeCompare(a))[0];
+};
+
+const preferBarcodeOverInternalSampleId = (raw, sampleId) => {
+  const normalized = normalizeSampleId(sampleId);
+  if (!isShortInternalSampleId(normalized)) return normalized;
+  const fromPattern = extractFromRaw(raw);
+  const fromLong = extractLongestDigitBarcode(raw);
+  return normalizeSampleId(fromPattern || fromLong || normalized);
 };
 
 /** WBC diff sent as LYM + unit % → store refs on LYM_PCT parameter. */
@@ -197,7 +217,7 @@ function parseHl7(raw) {
 
   return {
     protocol: 'HL7',
-    sampleId: normalizeSampleId(sampleId),
+    sampleId: preferBarcodeOverInternalSampleId(raw, sampleId),
     animalType: animalType || null,
     animalTypeRaw: animalTypeRaw || null,
     observedAt,
