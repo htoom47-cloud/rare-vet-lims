@@ -74,10 +74,16 @@ if (process.env.RUN_SEED === 'true') {
 bootScripts.push('src/scripts/ensure-admin.js');
 
 (async () => {
+  // Give the HTTP process a few seconds to settle before spawning boot child processes
+  // (each child = second Node heap; overlapping boot + traffic OOM on Starter).
+  await new Promise((r) => setTimeout(r, 5000));
   try {
     for (const script of bootScripts) {
       // eslint-disable-next-line no-await-in-loop
       await runScript(script);
+      // Brief gap so RSS can drop between heavy ensure-* scripts.
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 750));
     }
     try {
       await runScript('src/scripts/purge-demo-users.js');
@@ -85,6 +91,8 @@ bootScripts.push('src/scripts/ensure-admin.js');
       logger.warn('purge-demo-users skipped', { error: purgeErr.message });
     }
     logger.info('Cloud boot tasks completed');
+    const { logMemory } = require('../utils/memory-monitor');
+    logMemory('boot-complete');
   } catch (err) {
     logger.error('Cloud boot tasks failed', { error: err.message });
   }

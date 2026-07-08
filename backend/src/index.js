@@ -4,8 +4,25 @@ const { LAB_NAME_EN } = require('./constants/brand');
 const logger = require('./config/logger');
 const { pool } = require('./config/database');
 const notificationsService = require('./services/notifications.service');
+const { startMemoryMonitor, logMemory } = require('./utils/memory-monitor');
 
 const NOTIFICATION_POLL_MS = 60_000;
+
+// Prevent crash-restart loops from unhandled rejections exhausting Render RAM.
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  logMemory('unhandledRejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  logMemory('uncaughtException');
+  // Exit after a brief flush — continuing after uncaughtException risks corrupt state / OOM loops.
+  setTimeout(() => process.exit(1), 500).unref?.();
+});
 
 const start = async () => {
   try {
@@ -44,14 +61,17 @@ const start = async () => {
       logger.info(`${LAB_NAME_EN} LIMS API running on port ${env.port}`);
       if (env.serveFrontend) logger.info('Serving frontend from /frontend/dist');
 
+      startMemoryMonitor({ intervalMs: 5 * 60 * 1000 });
+
       notificationsService.validateConfigOnStartup();
 
       if (env.notifications.sms || env.notifications.whatsapp || env.notifications.email) {
-        setInterval(() => {
+        const timer = setInterval(() => {
           notificationsService.processPending().catch((err) => {
             logger.error('Notification queue processing failed', { error: err.message });
           });
         }, NOTIFICATION_POLL_MS);
+        if (typeof timer.unref === 'function') timer.unref();
         logger.info('Notification queue processor started');
       }
     });

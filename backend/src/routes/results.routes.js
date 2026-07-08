@@ -5,8 +5,10 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { resultEntrySchema, resultApproveBatchSchema, resultValidateSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
+const { diskStorage, readAndCleanupUpload, cleanupUploadFile } = require('../utils/upload-disk');
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — sharper peak RAM than previous 20 MB
 
 const isImageUpload = (file) => {
   const mime = String(file.mimetype || '').toLowerCase();
@@ -21,8 +23,8 @@ const isImageUpload = (file) => {
 };
 
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  storage: diskStorage,
+  limits: { fileSize: MAX_IMAGE_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (isImageUpload(file)) return cb(null, true);
     cb(new Error('Only image files are allowed (JPEG, PNG, WEBP, HEIC)'));
@@ -40,10 +42,10 @@ const pickUploadFile = (req) => {
 };
 
 const handleUpload = (req, res, next) => {
-  upload.fields([{ name: 'image', maxCount: 1 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
+  upload.fields([{ name: 'image', maxCount: 1 }, { name: 'file', maxCount: 1 }])(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ success: false, error: { message: 'Image must be under 20 MB' } });
+        return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
       }
       return res.status(400).json({
         success: false,
@@ -52,8 +54,12 @@ const handleUpload = (req, res, next) => {
     }
     try {
       req.file = pickUploadFile(req);
+      if (req.file) {
+        await readAndCleanupUpload(req.file);
+      }
       return next();
     } catch (pickErr) {
+      await cleanupUploadFile(req.file).catch(() => {});
       return res.status(400).json({
         success: false,
         error: { message: pickErr.message || 'Invalid image upload' },

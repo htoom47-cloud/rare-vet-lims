@@ -50,6 +50,7 @@ router.use('/portal', portalRoutes);
 router.get('/health', async (_req, res) => {
   const staffDist = path.join(__dirname, '../../../frontend/dist/index.html');
   const portalDist = path.join(__dirname, '../../../frontend-portal/dist/index.html');
+  const { snapshot } = require('../utils/memory-monitor');
 
   let database = 'ok';
   try {
@@ -70,9 +71,18 @@ router.get('/health', async (_req, res) => {
   }
 
   const healthy = database === 'ok';
+  const mem = snapshot();
   res.status(healthy ? 200 : 503).json({
     success: healthy,
     status: healthy ? 'healthy' : 'degraded',
+    uptime: Math.floor(process.uptime()),
+    memoryUsage: {
+      rss: mem.rssMb,
+      heapUsed: mem.heapUsedMb,
+      heapTotal: mem.heapTotalMb,
+      external: mem.externalMb,
+      unit: 'MB',
+    },
     timestamp: new Date().toISOString(),
     database,
     storage: {

@@ -52,13 +52,16 @@ app.use('/api', cors({
   credentials: true,
 }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Keep JSON bodies small — large payloads (images/PDF) must use multipart + disk, not RAM.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 if (env.nodeEnv === 'production') {
   app.use(rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 500,
+    standardHeaders: true,
+    legacyHeaders: false,
     message: { success: false, error: { message: 'Too many requests' } },
   }));
 }
@@ -112,6 +115,24 @@ if (env.nodeEnv !== 'production' || process.env.SERVE_API_DOCS === 'true') {
 }
 
 app.use('/api', routes);
+
+/** Lightweight root health (Render healthCheckPath uses /api/health; keep both). */
+app.get('/health', (_req, res) => {
+  const { snapshot } = require('./utils/memory-monitor');
+  const mem = snapshot();
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    memoryUsage: {
+      rss: mem.rssMb,
+      heapUsed: mem.heapUsedMb,
+      heapTotal: mem.heapTotalMb,
+      external: mem.externalMb,
+      unit: 'MB',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
 
 const staffDistPath = path.join(__dirname, '../../frontend/dist');
 const portalDistPath = path.join(__dirname, '../../frontend-portal/dist');

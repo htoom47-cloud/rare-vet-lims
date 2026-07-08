@@ -344,7 +344,8 @@ const processRefund = async (data, userId, req) => {
 };
 
 const exportInvoicesCsv = async (filters) => {
-  const { data } = await listInvoices({ ...filters, page: 1, limit: 10000 });
+  // Cap export size — previous hard-coded 10000 ignored paginate's max(100) but still risky if cap changes.
+  const { data } = await listInvoices({ ...filters, page: 1, limit: 500 });
   const header = ['Invoice No', 'Customer', 'Date', 'Subtotal', 'VAT', 'Total', 'Paid', 'Balance', 'Status', 'Methods'];
   const rows = data.map((r) => [
     r.invoice_number,

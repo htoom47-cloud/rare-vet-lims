@@ -7,8 +7,9 @@ const { animalSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 const { saveFile } = require('../config/storage');
 const { auditLog } = require('../middleware/audit');
+const { diskStorage, readAndCleanupUpload, cleanupUploadFile } = require('../utils/upload-disk');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage: diskStorage, limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const router = express.Router();
 router.use(authenticate);
 
@@ -53,10 +54,14 @@ router.put('/:id', authorize(PERMISSIONS.ANIMALS_UPDATE), validate(animalSchema)
 router.post('/:id/image', authorize(PERMISSIONS.ANIMALS_UPDATE), upload.single('image'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: { message: 'No image provided' } });
-    const saved = await saveFile(req.file.buffer, 'animals', req.file.originalname);
+    const buffer = await readAndCleanupUpload(req.file);
+    const saved = await saveFile(buffer, 'animals', req.file.originalname);
     const data = await service.updateImage(req.params.id, saved.url);
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    await cleanupUploadFile(req.file).catch(() => {});
+    next(err);
+  }
 });
 
 router.delete('/:id', authorize(PERMISSIONS.ANIMALS_DELETE), auditLog('delete', 'animals'), async (req, res, next) => {

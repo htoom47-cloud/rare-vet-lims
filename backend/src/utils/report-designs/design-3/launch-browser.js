@@ -9,6 +9,16 @@ const BASE_ARGS = [
   '--disable-dev-shm-usage',
   '--disable-gpu',
   '--font-render-hinting=none',
+  // Lower Chromium process / renderer footprint on Render Starter (~512MB).
+  '--single-process',
+  '--no-zygote',
+  '--disable-extensions',
+  '--disable-background-networking',
+  '--disable-default-apps',
+  '--disable-sync',
+  '--disable-translate',
+  '--mute-audio',
+  '--js-flags=--max-old-space-size=192',
 ];
 
 const setCacheDir = () => {
