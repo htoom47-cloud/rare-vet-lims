@@ -71,22 +71,41 @@ async function seedMappings(deviceId) {
     [MINDRAY_TEST_CODE]
   );
   const byCode = Object.fromEntries(params.rows.map((p) => [p.code, p.id]));
+  const resolveParamId = (limsCode) => {
+    if (byCode[limsCode]) return byCode[limsCode];
+    const row = params.rows.find((p) => p.code.toUpperCase() === String(limsCode).toUpperCase());
+    return row?.id || null;
+  };
   let seeded = 0;
   let skipped = 0;
 
   for (const [deviceCode, limsCode, valueType] of MINDRAY_CHEM_MAPPINGS) {
-    const paramId = byCode[limsCode];
+    const paramId = resolveParamId(limsCode);
     if (!paramId) {
       skipped += 1;
       continue;
     }
-    await query(
-      `INSERT INTO device_parameter_mappings
-         (device_id, device_name, device_parameter_code, system_parameter_id, value_type, is_active)
-       VALUES ($1,$2,$3,$4,$5,true)
-       ON CONFLICT DO NOTHING`,
-      [deviceId, MINDRAY_DEVICE_NAME, deviceCode, paramId, valueType]
+    const existing = await query(
+      `SELECT id FROM device_parameter_mappings
+       WHERE device_name = $1 AND UPPER(device_parameter_code) = UPPER($2)
+       LIMIT 1`,
+      [MINDRAY_DEVICE_NAME, deviceCode]
     );
+    if (existing.rows[0]) {
+      await query(
+        `UPDATE device_parameter_mappings
+         SET device_id = $1, system_parameter_id = $2, value_type = $3, is_active = true, updated_at = NOW()
+         WHERE id = $4`,
+        [deviceId, paramId, valueType, existing.rows[0].id]
+      );
+    } else {
+      await query(
+        `INSERT INTO device_parameter_mappings
+           (device_id, device_name, device_parameter_code, system_parameter_id, value_type, is_active)
+         VALUES ($1,$2,$3,$4,$5,true)`,
+        [deviceId, MINDRAY_DEVICE_NAME, deviceCode, paramId, valueType]
+      );
+    }
     seeded += 1;
   }
   return { seeded, skipped, panelParams: Object.keys(byCode) };

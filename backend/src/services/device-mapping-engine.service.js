@@ -11,6 +11,7 @@ const {
   NORMA_CBC_PCT_BY_ABS,
   DEFAULT_CBC_TEST_CODE,
 } = require('../utils/norma-cbc-map');
+const { mapMindrayDeviceCodeToLims } = require('../utils/mindray-chem-map');
 
 const VALUE_TYPES = {
   COUNT: 'count',
@@ -130,6 +131,21 @@ const resolveDeviceParameterMapping = async (
     limsCode: context.limsCode,
   });
 
+  if (!resolvedCode && deviceName && /mindray/i.test(deviceName)) {
+    const mindrayLims = mapMindrayDeviceCodeToLims(raw);
+    if (mindrayLims) {
+      return {
+        source: 'static-mindray',
+        device_parameter_code: raw,
+        normalized_device_code: raw.toUpperCase(),
+        system_parameter_code: mindrayLims,
+        system_parameter_id: null,
+        value_type: inferValueType(mindrayLims, { unit, deviceParameterCode: raw }),
+        unit: unit || null,
+      };
+    }
+  }
+
   if (!resolvedCode) {
     return {
       source: 'unknown',
@@ -159,7 +175,7 @@ const resolveSystemParameterId = async (testCode, systemParameterCode) => {
     `SELECT tp.id, tp.code, tp.name, tp.unit
      FROM test_parameters tp
      JOIN tests t ON tp.test_id = t.id
-     WHERE t.code = $1 AND tp.code = $2
+     WHERE t.code = $1 AND UPPER(tp.code) = UPPER($2)
      LIMIT 1`,
     [testCode, systemParameterCode]
   );
@@ -259,7 +275,8 @@ const validateMappedDeviceResult = (mappedResult = {}) => {
 
   const deviceRaw = String(mappedResult.device_parameter_code || '').toUpperCase();
 
-  if (mappedResult.mapping?.source !== 'database') {
+  if (mappedResult.mapping?.source !== 'database'
+    && mappedResult.mapping?.source !== 'static-mindray') {
     const expectedCode = resolveSystemParameterCodeSync({
       code: mappedResult.device_parameter_code,
       unit: mappedResult.unit,

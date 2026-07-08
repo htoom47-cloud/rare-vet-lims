@@ -29,14 +29,14 @@ const MINDRAY_CHEM_MAPPINGS = [
   ['BILI', 'TBIL', 'numeric'],
   ['LDH', 'LDH', 'numeric'],
   ['CK', 'CK', 'numeric'],
-  ['FE', 'IRON', 'numeric'],
-  ['Iron', 'IRON', 'numeric'],
-  ['IRON', 'IRON', 'numeric'],
-  ['IP', 'PHOS', 'numeric'],
-  ['PHOS', 'PHOS', 'numeric'],
-  ['Ca', 'CA', 'numeric'],
-  ['CA', 'CA', 'numeric'],
-  ['Calcium', 'CA', 'numeric'],
+  ['FE', 'Fe', 'numeric'],
+  ['Iron', 'Fe', 'numeric'],
+  ['IRON', 'Fe', 'numeric'],
+  ['IP', 'phos', 'numeric'],
+  ['PHOS', 'phos', 'numeric'],
+  ['Ca', 'Ca', 'numeric'],
+  ['CA', 'Ca', 'numeric'],
+  ['Calcium', 'Ca', 'numeric'],
   ['Mg', 'MG', 'numeric'],
   ['MG', 'MG', 'numeric'],
   ['Magnesium', 'MG', 'numeric'],
@@ -44,9 +44,21 @@ const MINDRAY_CHEM_MAPPINGS = [
   ['Albumin', 'ALB', 'numeric'],
 ];
 
+const MINDRAY_CHEM_LIMS_BY_DEVICE = new Map();
+for (const [deviceCode, limsCode] of MINDRAY_CHEM_MAPPINGS) {
+  MINDRAY_CHEM_LIMS_BY_DEVICE.set(String(deviceCode).trim().toUpperCase(), limsCode);
+}
+
+/** Mindray OBX code → LIMS CHEM-BASIC test_parameters.code (case-sensitive in DB). */
+function mapMindrayDeviceCodeToLims(deviceCode) {
+  if (deviceCode == null || deviceCode === '') return null;
+  return MINDRAY_CHEM_LIMS_BY_DEVICE.get(String(deviceCode).trim().toUpperCase()) || null;
+}
+
 module.exports = {
   MINDRAY_DEVICE_NAME,
   MINDRAY_TEST_CODE,
   MINDRAY_DEFAULT_PORT,
   MINDRAY_CHEM_MAPPINGS,
+  mapMindrayDeviceCodeToLims,
 };

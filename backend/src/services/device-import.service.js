@@ -130,7 +130,7 @@ const resolveParameter = async (testCode, deviceCode, device) => {
     `SELECT tp.id, tp.code, tp.name
      FROM test_parameters tp
      JOIN tests t ON tp.test_id = t.id
-     WHERE t.code = $1 AND tp.code = $2
+     WHERE t.code = $1 AND UPPER(tp.code) = UPPER($2)
      LIMIT 1`,
     [testCode, limsCode]
   );
@@ -223,7 +223,7 @@ const importCbcResults = async ({
 
   if (!values.length) {
     const codes = (results || []).map((r) => r.code).join(', ') || 'none';
-    throw new AppError(`No matching CBC parameters found in message (received: ${codes})`, 400, 'NO_MAPPED_PARAMS');
+    throw new AppError(`No matching ${testCode} parameters found in message (received: ${codes})`, 400, 'NO_MAPPED_PARAMS');
   }
 
   let mergedValues = values;
