@@ -16,7 +16,9 @@ const isRefreshableAutoRow = (notes) => {
   const n = String(notes || '').trim();
   if (!n || isDeviceNormaNotes(n)) return false;
   if (isManualLimsNotes(n)) return false;
-  return n.startsWith('Synced from norma-defaults') || n.startsWith('Species default');
+  return n.startsWith('Synced from norma-defaults')
+    || n.startsWith('Synced from norma-profile')
+    || n.startsWith('Species default');
 };
 
 const rowMissingBounds = (row) => (
@@ -69,7 +71,8 @@ const upsertReferenceRange = async ({
     const result = await query(
       `UPDATE test_reference_ranges
        SET min_value = $1, max_value = $2, critical_low = $3, critical_high = $4,
-           unit = COALESCE($5, unit), notes = $6
+           unit = COALESCE($5, unit), notes = $6,
+           is_active = true, updated_at = NOW()
        WHERE id = $7 RETURNING *`,
       [min, max, cLow, cHigh, unit, noteText, prev.id]
     );

@@ -104,7 +104,7 @@ const create = async (body, userId) => {
   const rangeError = validateMinMax(min_value, max_value);
   if (rangeError) throw new AppError(rangeError, 400, 'INVALID_RANGE');
 
-  const dup = await query(
+  const dupActive = await query(
     `SELECT id FROM test_reference_ranges
      WHERE parameter_id = $1 AND animal_type = $2
        AND COALESCE(sex, '') = COALESCE($3, '')
@@ -112,24 +112,57 @@ const create = async (body, userId) => {
        AND is_active = true`,
     [parameter_id, speciesCode, sex || null, device_id || null]
   );
-  if (dup.rows[0]) throw new AppError('Duplicate reference range', 409, 'DUPLICATE');
+  if (dupActive.rows[0]) throw new AppError('Duplicate reference range', 409, 'DUPLICATE');
 
   const crit = defaultCritical(min_value, max_value);
-  const result = await query(
-    `INSERT INTO test_reference_ranges
-       (parameter_id, animal_type, min_value, max_value, critical_low, critical_high,
-        unit, notes, text_reference, sex, age_min, age_max, age_unit, device_id,
-        created_by, updated_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) RETURNING *`,
-    [parameter_id, speciesCode, min_value, max_value,
-      critical_low ?? crit.crit_low, critical_high ?? crit.crit_high,
-      unit, notes, text_reference, sex || null, age_min, age_max, age_unit, device_id || null, userId]
+  const cLow = critical_low ?? crit.crit_low;
+  const cHigh = critical_high ?? crit.crit_high;
+
+  // Inactive row still occupies unique (parameter_id, animal_type) — reactivate instead of INSERT.
+  const inactive = await query(
+    `SELECT * FROM test_reference_ranges
+     WHERE parameter_id = $1 AND animal_type = $2
+       AND COALESCE(sex, '') = COALESCE($3, '')
+       AND COALESCE(device_id::text, '') = COALESCE($4::text, '')
+       AND is_active = false
+     ORDER BY updated_at DESC NULLS LAST
+     LIMIT 1`,
+    [parameter_id, speciesCode, sex || null, device_id || null]
   );
 
-  await logChange(result.rows[0].id, userId, 'create', null, result.rows[0]);
+  let row;
+  if (inactive.rows[0]) {
+    const result = await query(
+      `UPDATE test_reference_ranges SET
+         min_value = $1, max_value = $2, critical_low = $3, critical_high = $4,
+         unit = COALESCE($5, unit), notes = COALESCE($6, notes),
+         text_reference = COALESCE($7, text_reference),
+         age_min = COALESCE($8, age_min), age_max = COALESCE($9, age_max),
+         age_unit = COALESCE($10, age_unit),
+         is_active = true, updated_by = $11, updated_at = NOW()
+       WHERE id = $12 RETURNING *`,
+      [min_value, max_value, cLow, cHigh, unit, notes, text_reference,
+        age_min, age_max, age_unit, userId, inactive.rows[0].id]
+    );
+    row = result.rows[0];
+    await logChange(row.id, userId, 'reactivate', inactive.rows[0], row);
+  } else {
+    const result = await query(
+      `INSERT INTO test_reference_ranges
+         (parameter_id, animal_type, min_value, max_value, critical_low, critical_high,
+          unit, notes, text_reference, sex, age_min, age_max, age_unit, device_id,
+          created_by, updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) RETURNING *`,
+      [parameter_id, speciesCode, min_value, max_value, cLow, cHigh,
+        unit, notes, text_reference, sex || null, age_min, age_max, age_unit, device_id || null, userId]
+    );
+    row = result.rows[0];
+    await logChange(row.id, userId, 'create', null, row);
+  }
+
   const lifecycle = require('./report-lifecycle.service');
   await lifecycle.markReportsNeedsUpdateByParameterId(parameter_id, 'REFERENCE');
-  return result.rows[0];
+  return row;
 };
 
 const update = async (id, body, userId) => {
