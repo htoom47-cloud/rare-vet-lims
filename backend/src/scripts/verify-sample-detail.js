@@ -40,6 +40,18 @@ function ok(label, cond) {
     const pq = await samplesSvc.getParasitologyQueue();
     ok('Parasitology queue loads', Array.isArray(pq));
 
+    // 4b. Lab queues must not include soft-deleted samples
+    const deletedInLab = await query(
+      `SELECT s.id FROM samples s
+       WHERE s.deleted_at IS NOT NULL AND s.status IN ('received', 'running')
+       LIMIT 5`
+    );
+    const labQueue = await samplesSvc.getQueue();
+    const ghost = deletedInLab.rows.some((r) => labQueue.some((q) => q.id === r.id));
+    ok('Workbench queue excludes soft-deleted samples', !ghost);
+    const ghostParas = deletedInLab.rows.some((r) => pq.some((q) => q.id === r.id));
+    ok('Parasitology queue excludes soft-deleted samples', !ghostParas);
+
     // 5. Check for parasitology-type tests
     const paraTests = await query(
       `SELECT st.sample_id, t.code

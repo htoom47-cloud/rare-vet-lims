@@ -351,7 +351,7 @@ const WORKBENCH_PENDING = `
 
 const getQueue = async (technicianId) => {
   const params = [PARAS_CATEGORY_CODE];
-  let where = `WHERE ${queueStatusWhere()}`;
+  let where = `WHERE ${notDeleted('s')} AND ${queueStatusWhere()}`;
 
   if (technicianId) {
     params.push(technicianId);
@@ -405,7 +405,7 @@ const getParasitologyQueue = async () => {
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE ${queueStatusWhere()}
+     WHERE ${notDeleted('s')} AND ${queueStatusWhere()}
        AND EXISTS (
          SELECT 1 FROM sample_tests st
          JOIN tests t ON st.test_id = t.id
