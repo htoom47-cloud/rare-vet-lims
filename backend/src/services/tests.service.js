@@ -187,8 +187,8 @@ const updateParameter = async (parameterId, param) => {
 
 const deleteParameter = async (parameterId) => {
   const existing = await getParameterById(parameterId);
-  if (existing.code === 'NOTES') {
-    throw new AppError('Cannot delete the notes field', 400, 'PROTECTED_PARAMETER');
+  if (existing.code === 'NOTES' || existing.code === 'RESULT') {
+    throw new AppError('Cannot delete a protected parameter', 400, 'PROTECTED_PARAMETER');
   }
   await query('UPDATE test_parameters SET is_active = false WHERE id = $1', [parameterId]);
   return { deleted: true };

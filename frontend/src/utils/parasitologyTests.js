@@ -5,11 +5,23 @@ export const PARAS_BRUCELLA = 'BRUCELLA';
 export const PARAS_BLOOD = 'PARAS-BLOOD';
 export const PARAS_STOOL = 'PARAS-STOOL';
 
+/** Official report phrases for panels with no organism detected. */
+export const NO_PARASITE_FOUND_VALUE = 'لم يتم العثور على أي طفيلي بعد الفحص';
+export const NO_MALTA_FOUND_VALUE = 'لا توجد مالطيه';
+
 /** Lab brucella test codes — BRUCELLA is canonical; BRU-ROSE-BENGAL is legacy catalog. */
 export const BRUCELLA_TEST_CODES = new Set([PARAS_BRU_ROSE, PARAS_BRUCELLA]);
 
 export const isBrucellaTestCode = (code) =>
   BRUCELLA_TEST_CODES.has(code) || (code && /^BRU/i.test(code));
+
+export const noneFoundValueForTest = (testCode) =>
+  (isBrucellaTestCode(testCode) ? NO_MALTA_FOUND_VALUE : NO_PARASITE_FOUND_VALUE);
+
+export const isNoneFoundValue = (value) => {
+  const v = String(value || '').trim();
+  return v === NO_PARASITE_FOUND_VALUE || v === NO_MALTA_FOUND_VALUE;
+};
 
 export const MICRO_PANEL_ORDER = {
   [PARAS_BLOOD]: 0,

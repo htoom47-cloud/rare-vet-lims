@@ -14,7 +14,6 @@ const { readImageBuffer } = require('../../config/storage');
 const { isAbnormalFlag } = require('./layout-mode');
 const {
   buildResultCounts,
-  buildClinicalSummary,
 } = require('./design-2-clinical');
 const { calcChangePct, shouldShowTrend } = require('./design-2-sparkline');
 
@@ -713,7 +712,6 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
 
   const lang = reportData.language || 'ar';
   const counts = buildResultCounts(reportData.results || []);
-  const summaryItems = buildClinicalSummary(reportData.results || [], lang);
 
   return new Promise((resolve, reject) => {
     (async () => {
@@ -728,7 +726,6 @@ const generateReportPDF = async (reportData, outputDir, options = {}) => {
         y = drawPatientCard(doc, reportData, y);
         y = drawResultOverview(doc, y, counts, lang);
         y = drawResultsTable(doc, reportData.results || [], { ...reportData, _logoBuf: logoBuf }, y);
-        y = drawClinicalSummaryCard(doc, y, summaryItems, lang, logoBuf);
         y = drawTreatmentRecommendations(doc, y, reportData.treatmentRecommendations, logoBuf);
         y = await drawAttachments(doc, y, reportData.attachments || [], logoBuf);
         y = drawSignatures(doc, y, reportData, qrBuffer);

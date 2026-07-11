@@ -443,11 +443,23 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
   await reconcileSampleStatuses();
 
   const existingReport = await query(
-    'SELECT id FROM reports WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1',
+    `SELECT id, treatment_recommendations FROM reports
+     WHERE sample_id = $1 AND deleted_at IS NULL
+     ORDER BY created_at DESC LIMIT 1`,
     [sampleId]
   );
   if (existingReport.rows[0] && !options.forceRegenerate) {
-    return getById(existingReport.rows[0].id);
+    const existing = existingReport.rows[0];
+    // Allow editing recommendations when "creating" again for the same sample.
+    if (options.treatment_recommendations !== undefined) {
+      const next = (options.treatment_recommendations || '').trim() || null;
+      const prev = (existing.treatment_recommendations || '').trim() || null;
+      if (next !== prev) {
+        await updateNotes(existing.id, { treatment_recommendations: options.treatment_recommendations });
+        return regeneratePdfById(existing.id);
+      }
+    }
+    return getById(existing.id);
   }
 
   const sampleResult = await query(
@@ -507,7 +519,12 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
   );
   if (dupBeforeInsert.rows[0] && !options.forceRegenerate) {
     try { await deleteFile(savedPdf.url); } catch { /* ignore */ }
-    return getById(dupBeforeInsert.rows[0].id);
+    const existingId = dupBeforeInsert.rows[0].id;
+    if (options.treatment_recommendations !== undefined) {
+      await updateNotes(existingId, { treatment_recommendations: options.treatment_recommendations });
+      return regeneratePdfById(existingId);
+    }
+    return getById(existingId);
   }
 
   const result = await query(

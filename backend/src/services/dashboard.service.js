@@ -62,7 +62,7 @@ const getOperationsStats = async () => {
          AND r.vet_approved_by IS NULL
          AND r.is_final IS NOT TRUE`
     ),
-    query(reportNotify.countCustomersWaitingToSend()),
+    reportNotify.countCustomersWaitingToSend(),
     query(
       `SELECT COUNT(*)::int AS count FROM notification_queue
        WHERE status = 'failed'

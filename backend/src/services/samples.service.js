@@ -102,7 +102,16 @@ const list = async ({ status, search, awaiting_validation, page, limit }) => {
             a.animal_code, a.animal_type, a.name_tag as animal_name,
             u.full_name as technician_name,
             (SELECT COUNT(DISTINCT st.test_id) FROM sample_tests st WHERE st.sample_id = s.id) as test_count,
-            (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id) as reports_count,
+            (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL) as reports_count,
+            (SELECT rep.id FROM reports rep
+             WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
+             ORDER BY rep.created_at DESC LIMIT 1) as latest_report_id,
+            (SELECT rep.treatment_recommendations FROM reports rep
+             WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
+             ORDER BY rep.created_at DESC LIMIT 1) as treatment_recommendations,
+            (SELECT rep.language FROM reports rep
+             WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
+             ORDER BY rep.created_at DESC LIMIT 1) as report_language,
             (SELECT COUNT(*) FROM notification_queue nq
              WHERE nq.metadata::jsonb->>'sample_id' = s.id::text) as notifications_count
      FROM samples s

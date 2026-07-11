@@ -142,8 +142,10 @@ export default function Reports() {
 
   const openGenerateForSample = (sample) => {
     setSelectedSample(sample);
-    setTreatment('');
-    setLanguage('ar');
+    const fromSample = sample.treatment_recommendations;
+    const fromList = reports.find((r) => r.sample_id === sample.id)?.treatment_recommendations;
+    setTreatment(fromSample || fromList || '');
+    setLanguage(sample.report_language === 'en' ? 'en' : 'ar');
     setApproveLabOnGenerate(false);
     setApproveVetOnGenerate(false);
     setGenerateOpen(true);
@@ -190,7 +192,12 @@ export default function Reports() {
         }
       }
 
-      toast.success(`${t('reports.created')} ${data.data.report_number}`);
+      const wasExisting = Boolean(selectedSample.latest_report_id || selectedSample.has_report || selectedSample.reports_count > 0);
+      toast.success(
+        wasExisting
+          ? t('reports.updateReportDone')
+          : `${t('reports.created')} ${data.data.report_number}`
+      );
       setGenerateOpen(false);
       setSelectedSample(null);
       load();
@@ -371,7 +378,11 @@ export default function Reports() {
                 placeholder={t('reports.treatmentPlaceholder')}
                 rows={5}
               />
-              <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">{t('reports.treatmentHint')}</p>
+              <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">
+                {selectedSample.latest_report_id || Number(selectedSample.reports_count) > 0
+                  ? t('reports.treatmentEditHint')
+                  : t('reports.treatmentHint')}
+              </p>
             </div>
 
             <div className="space-y-2">

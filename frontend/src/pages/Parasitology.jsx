@@ -14,6 +14,8 @@ import {
   PARAS_STOOL,
   PARAS_CATEGORY_CODE,
   MICRO_PANEL_ORDER,
+  noneFoundValueForTest,
+  isNoneFoundValue,
 } from '../utils/parasitologyTests';
 import mediaUrl from '../utils/mediaUrl';
 
@@ -128,7 +130,7 @@ function ParasiteTypeList({ title, icon: Icon, testMeta, params, canManage, onAd
               className="flex items-center justify-between gap-2 p-2 rounded-lg bg-primary-50/60 dark:bg-primary-900/20 text-sm"
             >
               <span>{displayName(p)}</span>
-              {canManage && p.code !== 'NOTES' && (
+              {canManage && p.code !== 'NOTES' && p.code !== 'RESULT' && (
                 <div className="flex gap-1 shrink-0">
                   <button type="button" onClick={() => onEdit(p)} className="p-1 text-primary-600 hover:bg-primary-100 rounded">
                     <Pencil size={14} />
@@ -165,8 +167,22 @@ function FindingPanel({
 
   if (!test) return null;
 
-  const qualOptions = (testMeta?.parameters || []).filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
+  const allQual = (testMeta?.parameters || []).filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
+  const resultParam = allQual.find((p) => p.code === 'RESULT');
+  const parasiteOptions = allQual.filter((p) => p.code !== 'RESULT');
+  // Brucella panel is RESULT-only; blood/stool pick individual organisms.
+  const selectableOptions = parasiteOptions.length > 0 ? parasiteOptions : allQual;
   const usedParamIds = new Set(findings.map((f) => f.parameter_id).filter(Boolean));
+  const noneValue = noneFoundValueForTest(testMeta?.code);
+  const noneLabel = isBrucellaTestCode(testMeta?.code)
+    ? t('parasitology.noMaltaFound')
+    : t('parasitology.noParasiteFound');
+  const isNoneSelected = Boolean(
+    resultParam
+    && findings.length === 1
+    && String(findings[0].parameter_id) === String(resultParam.id)
+    && isNoneFoundValue(findings[0].value)
+  );
 
   const updateFinding = (clientId, patch) => {
     onFindingsChange(findings.map((f) => (f.clientId === clientId ? { ...f, ...patch } : f)));
@@ -180,11 +196,45 @@ function FindingPanel({
   };
 
   const addFinding = () => {
+    if (isNoneSelected) return;
     onFindingsChange([...findings, createFinding()]);
   };
 
+  const applyNoneFound = () => {
+    if (!resultParam) {
+      toast.error(t('parasitology.noneResultMissing'));
+      return;
+    }
+    onFindingsChange([{
+      clientId: `none-${resultParam.id}`,
+      parameter_id: resultParam.id,
+      value: noneValue,
+      pendingFile: null,
+      attachment: null,
+      uploadingImage: false,
+      previewUrl: null,
+    }]);
+  };
+
+  const clearNoneFound = () => {
+    const primary = selectableOptions[0] || resultParam;
+    if (!primary) {
+      onFindingsChange([]);
+      return;
+    }
+    onFindingsChange([{
+      clientId: `${primary.id}-default`,
+      parameter_id: primary.id,
+      value: '',
+      pendingFile: null,
+      attachment: null,
+      uploadingImage: false,
+      previewUrl: null,
+    }]);
+  };
+
   const paramLabel = (parameterId) => {
-    const p = qualOptions.find((o) => o.id === parameterId);
+    const p = allQual.find((o) => o.id === parameterId);
     return p ? displayName(p) : '';
   };
 
@@ -195,7 +245,23 @@ function FindingPanel({
         {title}
       </h3>
 
-      {findings.length === 0 ? (
+      <button
+        type="button"
+        onClick={() => (isNoneSelected ? clearNoneFound() : applyNoneFound())}
+        className={`mb-4 w-full text-start px-3 py-2.5 rounded-lg border text-sm transition ${
+          isNoneSelected
+            ? 'border-green-600 bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+            : 'border-primary-200 dark:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20'
+        }`}
+      >
+        {noneLabel}
+      </button>
+
+      {isNoneSelected ? (
+        <p className="text-sm text-green-700 dark:text-green-300 text-center py-3 px-2 rounded-lg bg-green-50/80 dark:bg-green-900/20">
+          {noneValue}
+        </p>
+      ) : findings.length === 0 ? (
         <p className="text-sm text-gray-500 text-center py-4">{t('parasitology.noFindings')}</p>
       ) : (
         <div className="space-y-4">
@@ -213,7 +279,7 @@ function FindingPanel({
                     className="input-field text-sm"
                   >
                     <option value="">{t('parasitology.selectParasite')}</option>
-                    {qualOptions
+                    {selectableOptions
                       .filter((p) => p.id === finding.parameter_id || !usedParamIds.has(p.id))
                       .map((p) => (
                         <option key={p.id} value={p.id}>{displayName(p)}</option>
@@ -320,14 +386,16 @@ function FindingPanel({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={addFinding}
-        className="mt-4 w-full btn-secondary text-sm flex items-center justify-center gap-2 py-2.5"
-      >
-        <Plus size={16} />
-        {t('parasitology.addFinding')}
-      </button>
+      {!isNoneSelected && (
+        <button
+          type="button"
+          onClick={addFinding}
+          className="mt-4 w-full btn-secondary text-sm flex items-center justify-center gap-2 py-2.5"
+        >
+          <Plus size={16} />
+          {t('parasitology.addFinding')}
+        </button>
+      )}
 
       <div className="mt-4 pt-4 border-t border-primary-200 dark:border-primary-700">
         <label className="text-sm font-medium block mb-1">{labels.notes}</label>
@@ -374,9 +442,8 @@ function ensureDefaultFindings(testDetail, findings) {
   if (findings.length > 0) return findings;
   const qualParams = (testDetail?.parameters || []).filter((p) => p.unit === 'qual' && p.code !== 'NOTES');
   if (!qualParams.length) return findings;
-  const primary = qualParams.length === 1
-    ? qualParams[0]
-    : qualParams.find((p) => p.code === 'RESULT') || qualParams[0];
+  const parasites = qualParams.filter((p) => p.code !== 'RESULT');
+  const primary = parasites[0] || qualParams.find((p) => p.code === 'RESULT') || qualParams[0];
   return [{
     clientId: `${primary.id}-default`,
     parameter_id: primary.id,

@@ -13,6 +13,7 @@ const PARAS_TESTS = [
 const PARAS_PARAMS = {
   'PARAS-BLOOD': {
     params: [
+      { code: 'RESULT', name: 'Result', name_ar: 'النتيجة', unit: 'qual' },
       { code: 'BABESIA', name: 'Babesia', name_ar: 'بابيسيا', unit: 'qual' },
       { code: 'THEILERIA', name: 'Theileria', name_ar: 'ثيليريا', unit: 'qual' },
       { code: 'TRYPANO', name: 'Trypanosoma', name_ar: 'تريبانوسوما (إيفانسى)', unit: 'qual' },
@@ -25,6 +26,7 @@ const PARAS_PARAMS = {
   },
   'PARAS-STOOL': {
     params: [
+      { code: 'RESULT', name: 'Result', name_ar: 'النتيجة', unit: 'qual' },
       { code: 'STRONGYLES', name: 'Strongyles', name_ar: 'ديدان معوية قوية', unit: 'qual' },
       { code: 'HAEMONCHUS', name: 'Haemonchus', name_ar: 'هيمونكوس', unit: 'qual' },
       { code: 'TRICHOSTRONG', name: 'Trichostrongylus', name_ar: 'تريكوسترونجيلوس', unit: 'qual' },

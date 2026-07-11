@@ -5,7 +5,6 @@ const { generateQR, generateCode128 } = require('../../barcode');
 const { HAS_LOGO, getBrandLogoBuffer } = require('../../pdf-logo');
 const {
   buildResultCounts,
-  buildClinicalSummary,
 } = require('../design-2-clinical');
 const {
   escapeHtml,
@@ -266,7 +265,6 @@ const buildReportHtml = async (reportData) => {
   } catch { /* */ }
 
   const counts = buildResultCounts(reportData.results || []);
-  const summaryItems = buildClinicalSummary(reportData.results || [], lang);
   const css = loadStyles();
   const dynamicSections = reportData.sections?.length
     ? await buildDynamicSections(reportData.sections, lang)
@@ -282,7 +280,6 @@ const buildReportHtml = async (reportData) => {
 
   const clinicalBlock = `
     <div class="clinical-page">
-      ${buildClinicalSummarySection(summaryItems, lang)}
       ${buildTreatmentRecommendationsSection(reportData.treatmentRecommendations, lang)}
       ${buildSignatures(reportData, lab, qrDataUri, lang)}
       ${buildIssueBar(reportData, lang)}
