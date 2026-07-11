@@ -436,11 +436,25 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
   let committed = false;
   try {
     await client.query('BEGIN');
-    const st = await client.query('SELECT id FROM sample_tests WHERE id = $1', [sampleTestId]);
+    const st = await client.query(
+      'SELECT id, sample_id, test_id FROM sample_tests WHERE id = $1',
+      [sampleTestId]
+    );
     if (!st.rows[0]) throw new AppError('Sample test not found', 404, 'NOT_FOUND');
 
     if (!file?.buffer?.length) {
       throw new AppError('Empty or unreadable image file', 400, 'VALIDATION_ERROR');
+    }
+
+    const paramId = parameter_id && String(parameter_id).trim() ? String(parameter_id).trim() : null;
+    if (paramId) {
+      const paramOk = await client.query(
+        'SELECT id FROM test_parameters WHERE id = $1 AND test_id = $2',
+        [paramId, st.rows[0].test_id]
+      );
+      if (!paramOk.rows[0]) {
+        throw new AppError('Invalid parasite parameter for this image', 400, 'VALIDATION_ERROR');
+      }
     }
 
     const resultId = await ensureResultId(client, sampleTestId, userId);
@@ -474,8 +488,6 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
       );
     }
 
-    const paramId = parameter_id && String(parameter_id).trim() ? String(parameter_id).trim() : null;
-
     const attachmentId = uuidv4();
     await client.query(
       `INSERT INTO result_attachments (id, result_id, parameter_id, file_url, caption, uploaded_by)
@@ -490,6 +502,12 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
 
     await client.query('COMMIT');
     committed = true;
+
+    try {
+      const lifecycle = require('./report-lifecycle.service');
+      await lifecycle.markReportsNeedsUpdateBySampleId(st.rows[0].sample_id, 'ATTACHMENTS');
+    } catch { /* lifecycle optional */ }
+
     return getBySampleTest(sampleTestId);
   } catch (err) {
     if (!committed) {
@@ -512,11 +530,25 @@ const addAttachment = async (sampleTestId, file, userId, { caption, parameter_id
 };
 
 const removeAttachment = async (attachmentId) => {
-  const existing = await query('SELECT file_url FROM result_attachments WHERE id = $1', [attachmentId]);
+  const existing = await query(
+    `SELECT ra.file_url, st.sample_id
+     FROM result_attachments ra
+     JOIN results res ON res.id = ra.result_id
+     JOIN sample_tests st ON st.id = res.sample_test_id
+     WHERE ra.id = $1`,
+    [attachmentId]
+  );
   if (!existing.rows[0]) throw new AppError('Attachment not found', 404, 'NOT_FOUND');
 
   await deleteFile(existing.rows[0].file_url);
   await query('DELETE FROM result_attachments WHERE id = $1', [attachmentId]);
+
+  if (existing.rows[0].sample_id) {
+    try {
+      const lifecycle = require('./report-lifecycle.service');
+      await lifecycle.markReportsNeedsUpdateBySampleId(existing.rows[0].sample_id, 'ATTACHMENTS');
+    } catch { /* lifecycle optional */ }
+  }
   return { deleted: true };
 };
 
