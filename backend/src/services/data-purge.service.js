@@ -31,19 +31,21 @@ async function hardPurgeSample(client, sampleId) {
 }
 
 async function hardPurgeInvoice(client, invoiceId) {
-  const invoiceIds = [invoiceId];
+  const paymentRows = await client.query('SELECT id FROM payments WHERE invoice_id = $1', [invoiceId]);
+  const paymentIds = paymentRows.rows.map((r) => r.id);
+  const refundRows = await client.query('SELECT id FROM refunds WHERE invoice_id = $1', [invoiceId]);
+  const refundIds = refundRows.rows.map((r) => r.id);
+  const sourceIds = [invoiceId, ...paymentIds, ...refundIds];
+
   await client.query(
     `DELETE FROM journal_lines jl
      USING journal_entries je
-     WHERE jl.entry_id = je.id
-       AND je.source_id = ANY($1::uuid[])
-       AND je.source_type IN ('invoice', 'payment', 'refund')`,
-    [invoiceIds]
+     WHERE jl.entry_id = je.id AND je.source_id = ANY($1::uuid[])`,
+    [sourceIds]
   );
   await client.query(
-    `DELETE FROM journal_entries
-     WHERE source_id = ANY($1::uuid[]) AND source_type IN ('invoice', 'payment', 'refund')`,
-    [invoiceIds]
+    `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
+    [sourceIds]
   );
   await client.query('DELETE FROM refunds WHERE invoice_id = $1', [invoiceId]);
   await client.query('DELETE FROM payments WHERE invoice_id = $1', [invoiceId]);
@@ -94,18 +96,25 @@ async function hardPurgeCustomer(client, customerId) {
   }
 
   if (invoiceIds.length) {
+    const paymentIds = (await client.query(
+      'SELECT id FROM payments WHERE invoice_id = ANY($1::uuid[])',
+      [invoiceIds]
+    )).rows.map((r) => r.id);
+    const refundIds = (await client.query(
+      'SELECT id FROM refunds WHERE invoice_id = ANY($1::uuid[])',
+      [invoiceIds]
+    )).rows.map((r) => r.id);
+    const sourceIds = [...invoiceIds, ...paymentIds, ...refundIds];
+
     await client.query(
       `DELETE FROM journal_lines jl
        USING journal_entries je
-       WHERE jl.entry_id = je.id
-         AND je.source_id = ANY($1::uuid[])
-         AND je.source_type IN ('invoice', 'payment', 'refund')`,
-      [invoiceIds]
+       WHERE jl.entry_id = je.id AND je.source_id = ANY($1::uuid[])`,
+      [sourceIds]
     );
     await client.query(
-      `DELETE FROM journal_entries
-       WHERE source_id = ANY($1::uuid[]) AND source_type IN ('invoice', 'payment', 'refund')`,
-      [invoiceIds]
+      `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
+      [sourceIds]
     );
     await client.query('DELETE FROM refunds WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
   }

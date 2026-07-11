@@ -254,16 +254,16 @@ const getStatus = () => ({
 
 const purgeExpired = async () => {
   if (!env.softDelete?.enabled) {
-    logger.info('Soft delete disabled — skipping purge');
-    return { purged: { customers: 0, samples: 0, reports: 0, invoices: 0 } };
+    throw new AppError('Data trash is not enabled', 404, 'FEATURE_DISABLED');
   }
 
   const client = await pool.connect();
   const counts = { customers: 0, samples: 0, reports: 0, invoices: 0 };
+  const failures = [];
 
   try {
     const expiredCustomers = await client.query(
-      `SELECT id FROM customers WHERE deleted_at IS NOT NULL AND purge_after < NOW()`
+      `SELECT id FROM customers WHERE deleted_at IS NOT NULL AND purge_after <= NOW()`
     );
     for (const row of expiredCustomers.rows) {
       await client.query('BEGIN');
@@ -273,6 +273,7 @@ const purgeExpired = async () => {
         counts.customers += 1;
       } catch (err) {
         await client.query('ROLLBACK');
+        failures.push({ type: 'customers', id: row.id, error: err.message });
         logger.error('Failed to purge expired customer', { id: row.id, error: err.message });
       }
     }
@@ -280,7 +281,7 @@ const purgeExpired = async () => {
     const expiredSamples = await client.query(
       `SELECT s.id FROM samples s
        JOIN customers c ON c.id = s.customer_id
-       WHERE s.deleted_at IS NOT NULL AND s.purge_after < NOW()
+       WHERE s.deleted_at IS NOT NULL AND s.purge_after <= NOW()
          AND c.deleted_at IS NULL`
     );
     for (const row of expiredSamples.rows) {
@@ -291,6 +292,7 @@ const purgeExpired = async () => {
         counts.samples += 1;
       } catch (err) {
         await client.query('ROLLBACK');
+        failures.push({ type: 'samples', id: row.id, error: err.message });
         logger.error('Failed to purge expired sample', { id: row.id, error: err.message });
       }
     }
@@ -298,7 +300,7 @@ const purgeExpired = async () => {
     const expiredReports = await client.query(
       `SELECT r.id FROM reports r
        JOIN samples s ON s.id = r.sample_id
-       WHERE r.deleted_at IS NOT NULL AND r.purge_after < NOW()
+       WHERE r.deleted_at IS NOT NULL AND r.purge_after <= NOW()
          AND s.deleted_at IS NULL`
     );
     for (const row of expiredReports.rows) {
@@ -309,15 +311,16 @@ const purgeExpired = async () => {
         counts.reports += 1;
       } catch (err) {
         await client.query('ROLLBACK');
+        failures.push({ type: 'reports', id: row.id, error: err.message });
         logger.error('Failed to purge expired report', { id: row.id, error: err.message });
       }
     }
 
     const expiredInvoices = await client.query(
-      `SELECT i.id FROM invoices i
-       JOIN customers c ON c.id = i.customer_id
-       WHERE i.deleted_at IS NOT NULL AND i.purge_after < NOW()
-         AND c.deleted_at IS NULL`
+      `SELECT i.id, i.invoice_number FROM invoices i
+       LEFT JOIN customers c ON c.id = i.customer_id
+       WHERE i.deleted_at IS NOT NULL AND i.purge_after <= NOW()
+         AND (c.id IS NULL OR c.deleted_at IS NULL)`
     );
     for (const row of expiredInvoices.rows) {
       await client.query('BEGIN');
@@ -327,11 +330,21 @@ const purgeExpired = async () => {
         counts.invoices += 1;
       } catch (err) {
         await client.query('ROLLBACK');
-        logger.error('Failed to purge expired invoice', { id: row.id, error: err.message });
+        failures.push({
+          type: 'invoices',
+          id: row.id,
+          invoice_number: row.invoice_number,
+          error: err.message,
+        });
+        logger.error('Failed to purge expired invoice', {
+          id: row.id,
+          invoice_number: row.invoice_number,
+          error: err.message,
+        });
       }
     }
 
-    return { purged: counts };
+    return { purged: counts, failures };
   } finally {
     client.release();
   }

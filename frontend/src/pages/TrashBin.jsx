@@ -156,12 +156,24 @@ export default function TrashBin() {
     try {
       const { data } = await trashAPI.purgeExpired();
       const p = data?.data?.purged || {};
-      toast.success(t('trash.purgeExpiredDone', {
-        customers: p.customers || 0,
-        samples: p.samples || 0,
-        reports: p.reports || 0,
-        invoices: p.invoices || 0,
-      }));
+      const failures = data?.data?.failures || [];
+      const total = (p.customers || 0) + (p.samples || 0) + (p.reports || 0) + (p.invoices || 0);
+      if (failures.length) {
+        toast.error(t('trash.purgePartial', {
+          ok: total,
+          failed: failures.length,
+          detail: failures[0]?.error || '',
+        }));
+      } else if (total === 0) {
+        toast.error(t('trash.purgeNothing'));
+      } else {
+        toast.success(t('trash.purgeExpiredDone', {
+          customers: p.customers || 0,
+          samples: p.samples || 0,
+          reports: p.reports || 0,
+          invoices: p.invoices || 0,
+        }));
+      }
       await loadTrash();
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('trash.purgeFailed'));
