@@ -4,6 +4,8 @@
  */
 
 async function hardPurgeSample(client, sampleId) {
+  // invoices.sample_id FK — unlink before deleting sample
+  await client.query('UPDATE invoices SET sample_id = NULL WHERE sample_id = $1', [sampleId]);
   await client.query('DELETE FROM device_messages WHERE sample_id = $1', [sampleId]);
   await client.query('DELETE FROM reports WHERE sample_id = $1', [sampleId]);
   await client.query(
@@ -68,7 +70,38 @@ async function hardPurgeCustomer(client, customerId) {
     [customerId]
   )).rows.map((r) => r.id);
 
+  // Delete invoices BEFORE samples — invoices.sample_id FK blocks sample delete
+  if (invoiceIds.length) {
+    const paymentIds = (await client.query(
+      'SELECT id FROM payments WHERE invoice_id = ANY($1::uuid[])',
+      [invoiceIds]
+    )).rows.map((r) => r.id);
+    const refundIds = (await client.query(
+      'SELECT id FROM refunds WHERE invoice_id = ANY($1::uuid[])',
+      [invoiceIds]
+    )).rows.map((r) => r.id);
+    const sourceIds = [...invoiceIds, ...paymentIds, ...refundIds];
+
+    await client.query(
+      `DELETE FROM journal_lines jl
+       USING journal_entries je
+       WHERE jl.entry_id = je.id AND je.source_id = ANY($1::uuid[])`,
+      [sourceIds]
+    );
+    await client.query(
+      `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
+      [sourceIds]
+    );
+    await client.query('DELETE FROM refunds WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
+    await client.query('DELETE FROM payments WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
+    await client.query('DELETE FROM invoice_items WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
+    await client.query('DELETE FROM invoices WHERE id = ANY($1::uuid[])', [invoiceIds]);
+  }
+
+  await client.query('DELETE FROM payments WHERE customer_id = $1', [customerId]);
+
   if (sampleIds.length) {
+    await client.query('UPDATE invoices SET sample_id = NULL WHERE sample_id = ANY($1::uuid[])', [sampleIds]);
     await client.query('DELETE FROM device_messages WHERE sample_id = ANY($1::uuid[])', [sampleIds]);
     await client.query('DELETE FROM reports WHERE sample_id = ANY($1::uuid[])', [sampleIds]);
     await client.query(
@@ -94,33 +127,6 @@ async function hardPurgeCustomer(client, customerId) {
     await client.query('DELETE FROM sample_tests WHERE sample_id = ANY($1::uuid[])', [sampleIds]);
     await client.query('DELETE FROM samples WHERE id = ANY($1::uuid[])', [sampleIds]);
   }
-
-  if (invoiceIds.length) {
-    const paymentIds = (await client.query(
-      'SELECT id FROM payments WHERE invoice_id = ANY($1::uuid[])',
-      [invoiceIds]
-    )).rows.map((r) => r.id);
-    const refundIds = (await client.query(
-      'SELECT id FROM refunds WHERE invoice_id = ANY($1::uuid[])',
-      [invoiceIds]
-    )).rows.map((r) => r.id);
-    const sourceIds = [...invoiceIds, ...paymentIds, ...refundIds];
-
-    await client.query(
-      `DELETE FROM journal_lines jl
-       USING journal_entries je
-       WHERE jl.entry_id = je.id AND je.source_id = ANY($1::uuid[])`,
-      [sourceIds]
-    );
-    await client.query(
-      `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
-      [sourceIds]
-    );
-    await client.query('DELETE FROM refunds WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
-  }
-
-  await client.query('DELETE FROM payments WHERE customer_id = $1', [customerId]);
-  await client.query('DELETE FROM invoices WHERE customer_id = $1', [customerId]);
 
   const quoteIds = (await client.query(
     'SELECT id FROM price_quotes WHERE customer_id = $1',
