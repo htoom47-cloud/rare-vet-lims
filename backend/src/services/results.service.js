@@ -129,7 +129,7 @@ const enterResults = async (data, userId) => {
 
     await assertSampleNotReportLocked(stResult.rows[0].sample_id);
 
-    const { animal_type, gender, age } = stResult.rows[0];
+    const { animal_type, gender, age, test_id: sampleTestIdTestId } = stResult.rows[0];
     let hasCritical = false;
 
     let resultId;
@@ -180,9 +180,16 @@ const enterResults = async (data, userId) => {
       const raw = String(val.value ?? '').trim();
 
       const paramMeta = await client.query(
-        'SELECT unit, code FROM test_parameters WHERE id = $1',
+        'SELECT unit, code, test_id FROM test_parameters WHERE id = $1',
         [val.parameter_id]
       );
+      if (!paramMeta.rows[0] || paramMeta.rows[0].test_id !== sampleTestIdTestId) {
+        throw new AppError(
+          'Parameter does not belong to this test',
+          400,
+          'INVALID_PARAMETER'
+        );
+      }
       const unit = paramMeta.rows[0]?.unit;
       const parameterCode = paramMeta.rows[0]?.code;
       const range = await getLimsReferenceRange(val.parameter_id, animal_type, {

@@ -205,6 +205,22 @@ const create = async (data, userId) => {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock($1)', [SAMPLE_SEQUENCE_LOCK]);
 
+    const animalCheck = await client.query(
+      `SELECT id, owner_id FROM animals
+       WHERE id = $1 AND is_active = true AND ${notDeleted()}`,
+      [data.animal_id]
+    );
+    if (!animalCheck.rows[0]) {
+      throw new AppError('Animal not found', 404, 'NOT_FOUND');
+    }
+    if (animalCheck.rows[0].owner_id !== data.customer_id) {
+      throw new AppError(
+        'Animal must belong to the same customer as the sample',
+        400,
+        'ANIMAL_OWNER_MISMATCH'
+      );
+    }
+
     const sampleCode = await generateNextSampleCode(client.query.bind(client));
 
     let barcode = null;

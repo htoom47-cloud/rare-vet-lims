@@ -173,6 +173,7 @@ const createInvoice = async (data, userId) => {
 
 const recordPayment = async (data, userId, req = null) => {
   const client = await getClient();
+  let committed = false;
   try {
     await client.query('BEGIN');
 
@@ -237,30 +238,35 @@ const recordPayment = async (data, userId, req = null) => {
     await client.query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
 
     await client.query('COMMIT');
+    committed = true;
     const payment = paymentResult.rows[0];
     await syncCustomerArBalance(invoice.customer_id);
     if (data.method !== 'credit') {
       try { await ledger.postPayment(payment, invoice, userId); } catch (_) { /* ledger optional */ }
     }
-    await logBillingAudit({
-      userId,
-      action: 'record_payment',
-      entityType: 'payment',
-      entityId: payment.id,
-      newValues: {
-        invoice_number: invoice.invoice_number,
-        amount,
-        method: data.method,
-        status,
-        discount_amount: discountAmount,
-        discount_percent: discountPercent,
-        total: newTotal,
-      },
-      req,
-    });
+    try {
+      await logBillingAudit({
+        userId,
+        action: 'record_payment',
+        entityType: 'payment',
+        entityId: payment.id,
+        newValues: {
+          invoice_number: invoice.invoice_number,
+          amount,
+          method: data.method,
+          status,
+          discount_amount: totals.discount_amount,
+          discount_percent: totals.discount_percent,
+          total: newTotal,
+        },
+        req,
+      });
+    } catch (_) { /* audit must not fail a committed payment */ }
     return payment;
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+    }
     throw err;
   } finally {
     client.release();
