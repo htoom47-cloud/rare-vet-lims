@@ -200,10 +200,17 @@ function FindingPanel({
     onFindingsChange([...findings, createFinding()]);
   };
 
-  const applyNoneFound = () => {
+  const applyNoneFound = async () => {
     if (!resultParam) {
       toast.error(t('parasitology.noneResultMissing'));
       return;
+    }
+    for (const finding of findings) {
+      if (finding.attachment?.id) {
+        try {
+          await resultsAPI.deleteAttachment(finding.attachment.id);
+        } catch { /* backend also clears on save */ }
+      }
     }
     onFindingsChange([{
       clientId: `none-${resultParam.id}`,

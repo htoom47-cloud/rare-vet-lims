@@ -778,7 +778,8 @@ const listDocuments = async (customerIds, { animalId, type } = {}) => {
               END as doc_type
        FROM result_attachments ra
        JOIN results res ON ra.result_id = res.id
-       JOIN samples s ON res.sample_id = s.id
+       JOIN sample_tests st ON st.id = res.sample_test_id
+       JOIN samples s ON s.id = st.sample_id
        JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
        LEFT JOIN animals a ON s.animal_id = a.id
        WHERE ${attachWhere}
@@ -868,6 +869,15 @@ const getReportPreview = async (reportId, customerIds) => {
   return sanitizePortalPreview(preview);
 };
 
+const getReportHtml = async (reportId, customerIds) => {
+  const ids = asArray(customerIds);
+  await assertReportOwnership(reportId, ids);
+  logPortalAccess(ids[0], 'report_html', reportId);
+  const preview = await reportsService.getPreview(reportId);
+  portalSync.assertPortalReportVisible(preview);
+  return reportsService.getReportHtml(reportId);
+};
+
 const serveReportPdf = async (filename, customerIds, res) => {
   const ids = asArray(customerIds);
   const report = await query(
@@ -930,6 +940,7 @@ module.exports = {
   listDocuments,
   searchPortal,
   getReportPreview,
+  getReportHtml,
   serveReportPdf,
   listInvoices,
   serveInvoicePdf,

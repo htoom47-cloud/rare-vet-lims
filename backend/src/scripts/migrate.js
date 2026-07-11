@@ -260,7 +260,11 @@ async function applyPatches() {
          AND EXISTS (SELECT 1 FROM test_categories WHERE code = 'MICRO')`
     );
     await client.query(`UPDATE test_categories SET is_active = false WHERE code = 'PARAS'`);
-    await ensureParasitologyCatalog();
+    try {
+      await ensureParasitologyCatalog();
+    } catch (parasErr) {
+      logger.warn('Parasitology catalog ensure failed — continuing migrate', { error: parasErr.message });
+    }
     await syncPermissionsCatalog(client);
     await syncRolePermissions(client);
     await client.query(`

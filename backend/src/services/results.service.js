@@ -14,6 +14,7 @@ const { saveFile, deleteFile } = require('../config/storage');
 const { normalizeMicroscopeImage } = require('../utils/image-normalize');
 const autoInvoice = require('./auto-invoice.service');
 const { assertSampleNotReportLocked } = require('./report-lock.service');
+const { isNoneFoundValue } = require('../utils/parasitologyTests');
 
 const formatQualValue = (value, unit) => {
   if (unit !== 'qual' || !value) return value;
@@ -250,6 +251,32 @@ const enterResults = async (data, userId) => {
        WHERE id = (SELECT sample_id FROM sample_tests WHERE id = $1) AND status IN ('received', 'pending')`,
       [data.sample_test_id]
     );
+
+    // None-found parasitology results must not keep prior microscope images on the report.
+    const paramIds = [...new Set((data.values || []).map((v) => v.parameter_id).filter(Boolean))];
+    if (paramIds.length) {
+      const metas = await client.query(
+        'SELECT id, code FROM test_parameters WHERE id = ANY($1::uuid[])',
+        [paramIds]
+      );
+      const codeById = new Map(metas.rows.map((r) => [String(r.id), r.code]));
+      const meaningful = (data.values || []).filter((v) => {
+        const code = codeById.get(String(v.parameter_id));
+        return code && code !== 'NOTES' && String(v.value ?? '').trim();
+      });
+      const noneOnly = meaningful.length > 0
+        && meaningful.every((v) => isNoneFoundValue(v.value));
+      if (noneOnly) {
+        const stale = await client.query(
+          'SELECT id, file_url FROM result_attachments WHERE result_id = $1',
+          [resultId]
+        );
+        for (const att of stale.rows) {
+          await client.query('DELETE FROM result_attachments WHERE id = $1', [att.id]);
+          try { await deleteFile(att.file_url); } catch { /* ignore missing */ }
+        }
+      }
+    }
 
     await client.query('COMMIT');
     committed = true;

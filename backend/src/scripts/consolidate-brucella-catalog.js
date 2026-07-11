@@ -204,7 +204,7 @@ async function consolidateBrucellaCatalog(client, { apply = false } = {}) {
          SELECT 1 FROM package_tests pt2
          WHERE pt2.package_id = package_tests.package_id AND pt2.test_id = $1
        )
-     RETURNING id`,
+     RETURNING package_id, test_id`,
     [keeper.id, duplicate.id]
   );
   report.packagesUpdated = pkg.rowCount;
