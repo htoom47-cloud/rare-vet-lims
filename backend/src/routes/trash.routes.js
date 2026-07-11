@@ -12,6 +12,13 @@ router.get('/status', authenticate, (req, res) => {
 
 router.use(authenticate);
 
+router.post('/purge-expired', authorize(PERMISSIONS.DATA_TRASH_MANAGE), auditLog('purge_expired', 'trash'), async (req, res, next) => {
+  try {
+    const data = await service.purgeExpired();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/:type', authorize(PERMISSIONS.DATA_TRASH_VIEW), async (req, res, next) => {
   try {
     const data = await service.listTrash(req.params.type, req.query);
@@ -29,6 +36,13 @@ router.post('/:type/:id', authorize(PERMISSIONS.DATA_TRASH_MANAGE), auditLog('so
 router.post('/:type/:id/restore', authorize(PERMISSIONS.DATA_TRASH_MANAGE), auditLog('restore', 'trash'), async (req, res, next) => {
   try {
     const data = await service.restoreEntity(req.params.type, req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/:type/:id/purge', authorize(PERMISSIONS.DATA_TRASH_MANAGE), auditLog('purge', 'trash'), async (req, res, next) => {
+  try {
+    const data = await service.purgeEntity(req.params.type, req.params.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

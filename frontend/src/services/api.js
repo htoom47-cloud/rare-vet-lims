@@ -259,6 +259,18 @@ export const downloadReportPdf = async (pdfUrl, saveAs) => {
 export const reportsAPI = {
   list: (params) => api.get('/reports', { params }),
   getPreview: (id) => api.get(`/reports/${id}/preview`),
+  getReportHtml: async (id) => {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${API_URL}/reports/${id}/html`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const err = new Error('HTML preview failed');
+      err.response = { status: response.status };
+      throw err;
+    }
+    return response.text();
+  },
   generate: (sampleId, opts = {}) =>
     api.post(`/reports/generate/${sampleId}`, {
       language: opts.language ?? 'ar',
@@ -470,6 +482,8 @@ export const trashAPI = {
   list: (type, params) => api.get(`/trash/${type}`, { params }),
   delete: (type, id) => api.post(`/trash/${type}/${id}`),
   restore: (type, id) => api.post(`/trash/${type}/${id}/restore`),
+  purge: (type, id) => api.post(`/trash/${type}/${id}/purge`),
+  purgeExpired: () => api.post('/trash/purge-expired'),
 };
 
 export default api;

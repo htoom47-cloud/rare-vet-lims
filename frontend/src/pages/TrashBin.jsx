@@ -136,6 +136,40 @@ export default function TrashBin() {
     }
   };
 
+  const handlePurge = async (row) => {
+    if (!window.confirm(t('trash.purgeConfirm', { name: labelForRow(row) }))) return;
+    setBusyId(row.id);
+    try {
+      await trashAPI.purge(activeTab, row.id);
+      toast.success(t('trash.purged'));
+      await loadTrash();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('trash.purgeFailed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handlePurgeExpired = async () => {
+    if (!window.confirm(t('trash.purgeExpiredConfirm'))) return;
+    setBusyId('purge-expired');
+    try {
+      const { data } = await trashAPI.purgeExpired();
+      const p = data?.data?.purged || {};
+      toast.success(t('trash.purgeExpiredDone', {
+        customers: p.customers || 0,
+        samples: p.samples || 0,
+        reports: p.reports || 0,
+        invoices: p.invoices || 0,
+      }));
+      await loadTrash();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('trash.purgeFailed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleDelete = async () => {
     const id = deleteId.trim();
     if (!id) return;
@@ -179,16 +213,28 @@ export default function TrashBin() {
       key: 'actions',
       label: t('common.actions'),
       render: (r) => (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busyId === r.id}
-          onClick={(e) => { e.stopPropagation(); handleRestore(r); }}
-        >
-          <RotateCcw size={14} className="me-1" />
-          {t('trash.restore')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busyId === r.id}
+            onClick={(e) => { e.stopPropagation(); handleRestore(r); }}
+          >
+            <RotateCcw size={14} className="me-1" />
+            {t('trash.restore')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            disabled={busyId === r.id}
+            onClick={(e) => { e.stopPropagation(); handlePurge(r); }}
+          >
+            <Trash2 size={14} className="me-1" />
+            {t('trash.purgeNow')}
+          </Button>
+        </div>
       ),
     }] : []),
   ];
@@ -214,6 +260,16 @@ export default function TrashBin() {
             {t('trash.subtitle', { hours: retentionHours })}
           </p>
         </div>
+        {canManage && (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={busyId === 'purge-expired'}
+            onClick={handlePurgeExpired}
+          >
+            {t('trash.purgeExpired')}
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">

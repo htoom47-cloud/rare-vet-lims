@@ -337,11 +337,51 @@ const purgeExpired = async () => {
   }
 };
 
+/** Permanently delete one soft-deleted record (must already be in trash). */
+const purgeEntity = async (type, id) => {
+  assertEnabled();
+  if (!TRASH_TYPES.has(type)) {
+    throw new AppError('Invalid trash type', 400, 'INVALID_TYPE');
+  }
+
+  const table = type;
+  const exists = await query(
+    `SELECT id FROM ${table} WHERE id = $1 AND deleted_at IS NOT NULL`,
+    [id]
+  );
+  if (!exists.rows[0]) {
+    throw new AppError('Record not in trash', 404, 'NOT_IN_TRASH');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (type === 'customers') {
+      await dataPurge.hardPurgeCustomer(client, id);
+    } else if (type === 'samples') {
+      await dataPurge.hardPurgeSample(client, id);
+    } else if (type === 'reports') {
+      await dataPurge.hardPurgeReport(client, id);
+    } else if (type === 'invoices') {
+      await dataPurge.hardPurgeInvoice(client, id);
+    }
+    await client.query('COMMIT');
+    logger.info('Hard purged trash item', { type, id });
+    return { purged: true, type, id };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   deleteEntity,
   restoreEntity,
   listTrash,
   getStatus,
   purgeExpired,
+  purgeEntity,
   assertEnabled,
 };
