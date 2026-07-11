@@ -14,6 +14,7 @@ const {
   MINDRAY_TEST_CODE,
   MINDRAY_DEFAULT_PORT,
   MINDRAY_CHEM_MAPPINGS,
+  MINDRAY_CHEM_PARAM_DEFS,
 } = require('../utils/mindray-chem-map');
 
 const regenerateKey = process.argv.includes('--regenerate-key');
@@ -62,6 +63,35 @@ async function regenerateDeviceKey(device) {
     [JSON.stringify(config), device.id]
   );
   return { device: result.rows[0], apiKey: plaintextKey };
+}
+
+/** Create missing CHEM-BASIC params used by Mindray (idempotent). Does not alter existing rows. */
+async function ensureChemBasicParams() {
+  const test = await query('SELECT id FROM tests WHERE code = $1 LIMIT 1', [MINDRAY_TEST_CODE]);
+  if (!test.rows[0]) {
+    throw new Error(`${MINDRAY_TEST_CODE} test not found — run seed first`);
+  }
+  const testId = test.rows[0].id;
+  let created = 0;
+
+  for (const def of MINDRAY_CHEM_PARAM_DEFS) {
+    const existing = await query(
+      `SELECT id FROM test_parameters
+       WHERE test_id = $1 AND UPPER(code) = UPPER($2)
+       LIMIT 1`,
+      [testId, def.code]
+    );
+    if (existing.rows[0]) continue;
+
+    await query(
+      `INSERT INTO test_parameters (test_id, code, name, name_ar, unit, value_type, sort_order)
+       VALUES ($1, $2, $3, $4, $5, 'numeric', 100)`,
+      [testId, def.code, def.name, def.name_ar, def.unit]
+    );
+    created += 1;
+    console.log(`Created CHEM-BASIC parameter: ${def.code}`);
+  }
+  return { created };
 }
 
 async function seedMappings(deviceId) {
@@ -153,6 +183,11 @@ async function main() {
     device = created.device;
     apiKey = created.apiKey;
     console.log(`Created ${MINDRAY_DEVICE_NAME} (${device.id})`);
+  }
+
+  const ensured = await ensureChemBasicParams();
+  if (ensured.created) {
+    console.log(`Ensured ${ensured.created} missing CHEM-BASIC parameter(s) for Mindray`);
   }
 
   const mapping = await seedMappings(device.id);

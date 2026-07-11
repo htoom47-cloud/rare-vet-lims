@@ -26,6 +26,7 @@ const MINDRAY_CHEM_MAPPINGS = [
   ['Total Protein', 'TP', 'numeric'],
   ['T.BILI', 'TBIL', 'numeric'],
   ['TBILI', 'TBIL', 'numeric'],
+  ['TBIL', 'TBIL', 'numeric'],
   ['BILI', 'TBIL', 'numeric'],
   ['LDH', 'LDH', 'numeric'],
   ['CK', 'CK', 'numeric'],
@@ -44,6 +45,18 @@ const MINDRAY_CHEM_MAPPINGS = [
   ['Albumin', 'ALB', 'numeric'],
 ];
 
+/** LIMS CHEM-BASIC params required for Mindray ingest (created if missing). */
+const MINDRAY_CHEM_PARAM_DEFS = [
+  { code: 'MG', name: 'Magnesium', name_ar: 'المغنيسيوم', unit: 'mg/dL' },
+  { code: 'TBIL', name: 'Total Bilirubin', name_ar: 'البيليروبين الكلي', unit: 'mg/dL' },
+  { code: 'GGT', name: 'GGT', name_ar: 'GGT', unit: 'U/L' },
+  { code: 'LDH', name: 'LDH', name_ar: 'LDH', unit: 'U/L' },
+  { code: 'CK', name: 'CK', name_ar: 'CK', unit: 'U/L' },
+  { code: 'Fe', name: 'Iron', name_ar: 'الحديد', unit: 'µg/dL' },
+  { code: 'phos', name: 'Phosphorus', name_ar: 'الفوسفور', unit: 'mg/dL' },
+  { code: 'Ca', name: 'Calcium', name_ar: 'الكالسيوم', unit: 'mg/dL' },
+];
+
 const MINDRAY_CHEM_LIMS_BY_DEVICE = new Map();
 for (const [deviceCode, limsCode] of MINDRAY_CHEM_MAPPINGS) {
   MINDRAY_CHEM_LIMS_BY_DEVICE.set(String(deviceCode).trim().toUpperCase(), limsCode);
@@ -60,5 +73,6 @@ module.exports = {
   MINDRAY_TEST_CODE,
   MINDRAY_DEFAULT_PORT,
   MINDRAY_CHEM_MAPPINGS,
+  MINDRAY_CHEM_PARAM_DEFS,
   mapMindrayDeviceCodeToLims,
 };
