@@ -10,6 +10,7 @@ import {
 } from '../utils/parasitologyTests';
 import mediaUrl from '../utils/mediaUrl';
 import { normalizeSampleScanId } from '../utils/barcodeScan';
+import { compressImageForUpload } from '../utils/compressImageUpload';
 
 const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
 
@@ -134,23 +135,33 @@ export default function ParasitologyUpload() {
   };
 
   const onFilePick = async (e) => {
-    const file = normalizeUploadFile(e.target.files?.[0]);
+    const raw = normalizeUploadFile(e.target.files?.[0]);
     e.target.value = '';
-    if (!file || !activeTest?.id) {
+    if (!raw || !activeTest?.id) {
       if (!activeTest?.id) toast.error(t('parasitology.noParasTests'));
       return;
     }
     setUploading(true);
     try {
+      const file = await compressImageForUpload(raw);
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(t('parasitology.imageTooLarge'));
+        return;
+      }
       await resultsAPI.uploadAttachment(activeTest.id, file);
       toast.success(t('parasitology.imageUploaded'));
       await loadAttachments(activeTest);
       barcodeRef.current?.focus();
     } catch (err) {
       const status = err.response?.status;
+      const apiMsg = err.response?.data?.error?.message || '';
       if (status === 403) toast.error(t('parasitology.uploadForbidden'));
       else if (status === 502 || status === 503) toast.error(t('parasitology.serverWaking'));
-      else toast.error(err.response?.data?.error?.message || t('parasitology.imageUploadFailed'));
+      else if (
+        err.response?.data?.error?.code === 'IMAGE_TOO_LARGE'
+        || /under 10 MB|too large|file size/i.test(apiMsg)
+      ) toast.error(t('parasitology.imageTooLarge'));
+      else toast.error(apiMsg || t('parasitology.imageUploadFailed'));
     } finally {
       setUploading(false);
     }

@@ -18,6 +18,7 @@ import {
   isNoneFoundValue,
 } from '../utils/parasitologyTests';
 import mediaUrl from '../utils/mediaUrl';
+import { compressImageForUpload } from '../utils/compressImageUpload';
 
 const sortMicroTests = (tests = []) =>
   [...tests].sort((a, b) => {
@@ -588,7 +589,8 @@ export default function Parasitology() {
 
   const uploadOneImage = async (testId, finding, setFindings) => {
     if (!finding.pendingFile || !finding.parameter_id || !testId) return null;
-    const file = normalizeUploadFile(finding.pendingFile);
+    const raw = normalizeUploadFile(finding.pendingFile);
+    const file = await compressImageForUpload(raw);
     await withRetry(() => resultsAPI.uploadAttachment(testId, file, {
       parameter_id: finding.parameter_id,
     }), { retries: 2, delayMs: 1200 });

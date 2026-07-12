@@ -45,7 +45,14 @@ const handleUpload = (req, res, next) => {
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'file', maxCount: 1 }])(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ success: false, error: { message: 'Image must be under 10 MB' } });
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Image must be under 10 MB',
+            code: 'IMAGE_TOO_LARGE',
+            message_ar: 'الصورة يجب أن تكون أقل من 10 ميجابايت',
+          },
+        });
       }
       return res.status(400).json({
         success: false,
