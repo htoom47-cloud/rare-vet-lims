@@ -10,7 +10,7 @@ import {
 } from '../utils/parasitologyTests';
 import mediaUrl from '../utils/mediaUrl';
 import { normalizeSampleScanId } from '../utils/barcodeScan';
-import { compressImageForUpload } from '../utils/compressImageUpload';
+import { compressImageForUpload, UPLOAD_MAX_BYTES } from '../utils/compressImageUpload';
 
 const API_ORIGIN = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
 
@@ -144,7 +144,7 @@ export default function ParasitologyUpload() {
     setUploading(true);
     try {
       const file = await compressImageForUpload(raw);
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > UPLOAD_MAX_BYTES) {
         toast.error(t('parasitology.imageTooLarge'));
         return;
       }
@@ -155,11 +155,12 @@ export default function ParasitologyUpload() {
     } catch (err) {
       const status = err.response?.status;
       const apiMsg = err.response?.data?.error?.message || '';
-      if (status === 403) toast.error(t('parasitology.uploadForbidden'));
+      if (err?.code === 'HEIC_UNSUPPORTED') toast.error(t('parasitology.imageHeicUnsupported'));
+      else if (status === 403) toast.error(t('parasitology.uploadForbidden'));
       else if (status === 502 || status === 503) toast.error(t('parasitology.serverWaking'));
       else if (
         err.response?.data?.error?.code === 'IMAGE_TOO_LARGE'
-        || /under 10 MB|too large|file size/i.test(apiMsg)
+        || /under \d+ MB|too large|file size/i.test(apiMsg)
       ) toast.error(t('parasitology.imageTooLarge'));
       else toast.error(apiMsg || t('parasitology.imageUploadFailed'));
     } finally {

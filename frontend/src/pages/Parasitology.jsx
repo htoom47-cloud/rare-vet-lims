@@ -653,8 +653,12 @@ export default function Parasitology() {
         f.clientId === finding.clientId ? { ...f, uploadingImage: false } : f
       )));
       const status = err.response?.status;
-      if (status === 502 || status === 503 || status === 504) {
+      if (err?.code === 'HEIC_UNSUPPORTED') {
+        toast.error(t('parasitology.imageHeicUnsupported'));
+      } else if (status === 502 || status === 503 || status === 504) {
         toast.error(t('parasitology.serverWaking'));
+      } else if (err.response?.data?.error?.code === 'IMAGE_TOO_LARGE') {
+        toast.error(t('parasitology.imageTooLarge'));
       } else {
         toast.error(err.response?.data?.error?.message || t('parasitology.imageUploadFailed'));
       }

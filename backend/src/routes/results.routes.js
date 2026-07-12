@@ -8,7 +8,8 @@ const { PERMISSIONS } = require('../utils/permissions');
 const { diskStorage, readAndCleanupUpload, cleanupUploadFile } = require('../utils/upload-disk');
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — sharper peak RAM than previous 20 MB
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB — microscope camera JPEGs; disk-backed upload
+const MAX_IMAGE_MB = 20;
 
 const isImageUpload = (file) => {
   const mime = String(file.mimetype || '').toLowerCase();
@@ -48,9 +49,9 @@ const handleUpload = (req, res, next) => {
         return res.status(400).json({
           success: false,
           error: {
-            message: 'Image must be under 10 MB',
+            message: `Image must be under ${MAX_IMAGE_MB} MB`,
             code: 'IMAGE_TOO_LARGE',
-            message_ar: 'الصورة يجب أن تكون أقل من 10 ميجابايت',
+            message_ar: `الصورة يجب أن تكون أقل من ${MAX_IMAGE_MB} ميجابايت`,
           },
         });
       }
