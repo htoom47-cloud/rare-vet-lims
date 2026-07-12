@@ -11,9 +11,38 @@ const { normalizeSampleScanId } = require('../utils/barcode-scan');
 const { mapNormaSpeciesToRefSpeciesExact, normalizeSpeciesKey } = require('../utils/norma-species-map');
 const logger = require('../config/logger');
 
+/** Device chemistry (Mindray): show like 12.2 — one digit after decimal unless param overrides. */
+const DEFAULT_CHEM_DECIMAL_PLACES = 1;
+
 const resultLimsCode = (row) => (
   mappingEngine.resolveSystemParameterCodeSync(row) || row.code
 );
+
+/**
+ * Round device-imported numeric values for display/storage.
+ * Qualitative / non-numeric strings are left unchanged.
+ * CHEM-BASIC (Mindray): always 1 decimal (e.g. 12.2). Other tests: use param decimal_places if set.
+ */
+const formatDeviceImportedValue = (raw, { unit, decimalPlaces, testCode } = {}) => {
+  if (unit === 'qual') return String(raw ?? '').trim();
+  const s = String(raw ?? '').trim();
+  if (!s) return s;
+  const num = Number(String(s).replace(',', '.'));
+  if (!Number.isFinite(num)) return s;
+
+  const isChem = String(testCode || '').toUpperCase() === 'CHEM-BASIC';
+  let places;
+  if (isChem) {
+    places = DEFAULT_CHEM_DECIMAL_PLACES;
+  } else if (decimalPlaces != null && decimalPlaces !== '') {
+    places = parseInt(decimalPlaces, 10);
+  } else {
+    return s;
+  }
+  if (!Number.isFinite(places)) return s;
+  const n = Math.min(6, Math.max(0, places));
+  return String(Number(num.toFixed(n)));
+};
 
 
 const enrichPctFromAbs = async (results, values, testCode) => {
@@ -127,7 +156,7 @@ const resolveParameter = async (testCode, deviceCode, device) => {
     });
   if (!limsCode) return null;
   const result = await query(
-    `SELECT tp.id, tp.code, tp.name
+    `SELECT tp.id, tp.code, tp.name, tp.unit, tp.decimal_places
      FROM test_parameters tp
      JOIN tests t ON tp.test_id = t.id
      WHERE t.code = $1 AND UPPER(tp.code) = UPPER($2)
@@ -202,9 +231,17 @@ const importCbcResults = async ({
     }
 
     const limsCode = mapped.system_parameter_code;
-    const param = mapped.system_parameter_id
-      ? { id: mapped.system_parameter_id, code: limsCode, name: limsCode }
-      : await resolveParameter(testCode, row.code || limsCode, device);
+    let param = null;
+    if (mapped.system_parameter_id) {
+      const paramRow = await query(
+        `SELECT id, code, name, unit, decimal_places FROM test_parameters WHERE id = $1`,
+        [mapped.system_parameter_id]
+      );
+      param = paramRow.rows[0] || null;
+    }
+    if (!param) {
+      param = await resolveParameter(testCode, row.code || limsCode, device);
+    }
 
     if (!param) {
       skipped.push(row.code || row.limsCode);
@@ -213,7 +250,11 @@ const importCbcResults = async ({
     paramIdToCode.set(param.id, limsCode);
     values.push({
       parameter_id: param.id,
-      value: String(row.value),
+      value: formatDeviceImportedValue(row.value, {
+        unit: param.unit || mapped.unit,
+        decimalPlaces: param.decimal_places,
+        testCode,
+      }),
     });
   }
 
