@@ -117,9 +117,10 @@ check('SMS channel uses short body (no per-report list)', () => {
     channel: 'sms',
     reports: many,
   });
-  assert.ok(body.includes('13'));
+  assert.ok(body.includes('تقاريرك جاهزة'));
   assert.ok(body.includes('https://portal.example.com'));
   assert.ok(!body.includes('RPT-001'));
+  assert.ok(!body.includes('تقرير رقم'));
   assert.ok(body.length < 650);
 });
 

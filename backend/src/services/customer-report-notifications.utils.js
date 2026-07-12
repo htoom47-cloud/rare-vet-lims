@@ -35,14 +35,11 @@ const buildDetailedReportMessage = ({ name, lab, reports, portalUrl }) => {
   return lines.join('\n');
 };
 
-/** Short body for SMS — count + portal link (fits Msegat length limit). */
-const buildSmsReportMessage = ({ name, lab, reports, portalUrl }) => {
-  const count = reports.length;
+/** Short body when text is large / SMS — ready notice + portal link only (no report numbers). */
+const buildSmsReportMessage = ({ name, lab, portalUrl }) => {
   const lines = [
     `مرحبًا ${name}`,
-    count === 1
-      ? `تم إصدار تقرير تحاليل من ${lab}.`
-      : `تم إصدار ${count} تقارير تحاليل من ${lab}.`,
+    `تقاريرك جاهزة من ${lab}.`,
   ];
   if (portalUrl) {
     lines.push('للاطلاع وتحميل التقارير:');
@@ -54,6 +51,7 @@ const buildSmsReportMessage = ({ name, lab, reports, portalUrl }) => {
 
 /**
  * Consolidated customer notification body.
+ * Long detailed lists are shortened to ready + portal link (no report numbers).
  * @param {{ customerName?: string, reports: object[], portalUrl?: string, labNameAr?: string, channel?: string }} opts
  */
 const buildConsolidatedReportMessage = ({
@@ -63,15 +61,13 @@ const buildConsolidatedReportMessage = ({
   const lab = labNameAr || 'مركز رعاية النوادر البيطري';
   const list = Array.isArray(reports) ? reports : [];
   const ch = String(channel || '').toLowerCase();
+  const short = () => buildSmsReportMessage({ name, lab, portalUrl });
 
-  if (ch === 'sms') {
-    return buildSmsReportMessage({ name, lab, reports: list, portalUrl });
-  }
+  if (ch === 'sms') return short();
 
   const detailed = buildDetailedReportMessage({ name, lab, reports: list, portalUrl });
-  if (detailed.length <= MSEGAT_SMS_SAFE_CHARS) return detailed;
-  // WhatsApp/long batches: fall back to short form if somehow oversized
-  return buildSmsReportMessage({ name, lab, reports: list, portalUrl });
+  if (detailed.length > MSEGAT_SMS_SAFE_CHARS) return short();
+  return detailed;
 };
 
 const messageHash = (body) => crypto.createHash('sha256').update(String(body), 'utf8').digest('hex');
