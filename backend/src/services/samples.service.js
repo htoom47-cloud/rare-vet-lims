@@ -87,11 +87,20 @@ const list = async ({ status, search, awaiting_validation, page, limit }) => {
   }
   if (search) {
     params.push(`%${search}%`);
-    where += ` AND (s.sample_code ILIKE $${params.length} OR s.barcode ILIKE $${params.length} OR c.full_name ILIKE $${params.length})`;
+    where += ` AND (
+      s.sample_code ILIKE $${params.length}
+      OR s.barcode ILIKE $${params.length}
+      OR c.full_name ILIKE $${params.length}
+      OR a.animal_code ILIKE $${params.length}
+      OR a.name_tag ILIKE $${params.length}
+    )`;
   }
 
   const countResult = await query(
-    `SELECT COUNT(*) FROM samples s LEFT JOIN customers c ON s.customer_id = c.id ${where}`,
+    `SELECT COUNT(*) FROM samples s
+     LEFT JOIN customers c ON s.customer_id = c.id
+     LEFT JOIN animals a ON s.animal_id = a.id
+     ${where}`,
     params
   );
   const total = parseInt(countResult.rows[0].count, 10);
@@ -135,13 +144,19 @@ const getById = async (id) => {
             (SELECT COUNT(DISTINCT st.test_id) FROM results r
              JOIN sample_tests st ON r.sample_test_id = st.id
              WHERE st.sample_id = s.id AND r.is_validated = true) as validated_results_count,
-            (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id) as reports_count,
+            (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL) as reports_count,
             (SELECT COUNT(*) FROM notification_queue nq
              WHERE nq.metadata::jsonb->>'sample_id' = s.id::text) as notifications_count
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     LEFT JOIN invoices inv ON inv.sample_id = s.id
+     LEFT JOIN LATERAL (
+       SELECT id, invoice_number, status, total
+       FROM invoices
+       WHERE sample_id = s.id AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) inv ON true
      WHERE s.id = $1 AND ${notDeleted('s')}`,
     [id]
   );

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin } from 'lucide-react';
+import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -75,6 +75,7 @@ export default function Billing() {
   const [paymentFieldVisitDiscountType, setPaymentFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [paymentFieldVisitDiscountValue, setPaymentFieldVisitDiscountValue] = useState('');
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
+  const [selectedPackageId, setSelectedPackageId] = useState('');
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
@@ -132,6 +133,26 @@ export default function Billing() {
     setNewItem({ test_id: '', description: '', quantity: 1, unit_price: 0 });
   };
 
+  const addPackageItem = () => {
+    if (!selectedPackageId) return;
+    const pkg = packages.find((p) => p.id === selectedPackageId);
+    if (!pkg) return;
+    if (invoiceForm.items.some((i) => i.package_id === pkg.id)) {
+      toast.error(t('priceList.alreadyAdded', { defaultValue: 'Already added' }));
+      return;
+    }
+    setInvoiceForm({
+      ...invoiceForm,
+      items: [...invoiceForm.items, {
+        package_id: pkg.id,
+        description: pkg.name,
+        quantity: 1,
+        unit_price: parseFloat(pkg.price) || 0,
+      }],
+    });
+    setSelectedPackageId('');
+  };
+
   const addFieldVisitItem = () => {
     const km = parseFloat(fieldVisitKm);
     if (!Number.isFinite(km) || km < 0) {
@@ -162,6 +183,8 @@ export default function Billing() {
       toast.success('تم إنشاء الفاتورة');
       setInvoiceModal(false);
       setInvoiceForm({ customer_id: '', sample_id: '', notes: '', items: [] });
+      setSelectedPackageId('');
+      setNewItem({ test_id: '', description: '', quantity: 1, unit_price: 0 });
       setDiscountType(DISCOUNT_TYPES.NONE);
       setDiscountValue('');
       setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
@@ -522,6 +545,30 @@ export default function Billing() {
               <input type="number" min="0" placeholder="السعر" value={newItem.unit_price} onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })} className="input-field" />
             </div>
             <button type="button" onClick={addItem} className="btn-secondary text-sm">+ إضافة بند</button>
+            {packages.length > 0 && (
+              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <select
+                  className="input-field flex-1"
+                  value={selectedPackageId}
+                  onChange={(e) => setSelectedPackageId(e.target.value)}
+                >
+                  <option value="">{t('priceList.selectPackage')}</option>
+                  {packages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.name} ({fmtCatalog(pkg.price)})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={addPackageItem}
+                  disabled={!selectedPackageId}
+                  className="btn-secondary text-sm flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Package size={16} /> {t('priceList.selectPackage')}
+                </button>
+              </div>
+            )}
             <div className="mt-3 p-3 border rounded-lg bg-primary-50/40 space-y-2">
               <p className="text-sm font-medium flex items-center gap-2">
                 <MapPin size={16} />

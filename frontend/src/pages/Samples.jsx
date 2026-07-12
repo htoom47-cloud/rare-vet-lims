@@ -29,15 +29,16 @@ import { testDisplayName } from '../utils/formatResultValue';
 import { packageLabel, packageTestIds } from '../utils/packageSelection';
 import { useAuth } from '../context/AuthContext';
 
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
-
+const PAGE_SIZE = 20;
 
 export default function Samples() {
 
   const { t, i18n } = useTranslation();
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission, hasAnyPermission } = useAuth();
   const canGenerateReport = hasPermission('reports.generate');
   const canReviewResults = hasAnyPermission(
@@ -56,6 +57,9 @@ export default function Samples() {
   const [search, setSearch] = useState('');
 
   const [statusFilter, setStatusFilter] = useState('');
+
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
 
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -79,13 +83,41 @@ export default function Samples() {
 
     setLoading(true);
 
-    samplesAPI.list({ search, status: statusFilter }).then(({ data }) => setSamples(data.data)).finally(() => setLoading(false));
+    samplesAPI.list({ search, status: statusFilter, page, limit: PAGE_SIZE })
+      .then(({ data }) => {
+        setSamples(data.data || []);
+        setPagination(data.pagination || { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
+      })
+      .finally(() => setLoading(false));
 
   };
 
 
 
-  useEffect(() => { load(); }, [search, statusFilter]);
+  useEffect(() => { load(); }, [search, statusFilter, page]);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+    samplesAPI.get(id)
+      .then(({ data }) => {
+        setDetailSample(data.data);
+        setReassignAnimalId(data.data.animal_id || '');
+        if (data.data.customer_id) {
+          animalsAPI.list({ owner_id: data.data.customer_id, limit: 50 })
+            .then(({ data: resp }) => setDetailAnimals(resp.data || []))
+            .catch(() => setDetailAnimals([]));
+        } else {
+          setDetailAnimals([]);
+        }
+      })
+      .catch(() => toast.error('Sample not found'))
+      .finally(() => {
+        const next = new URLSearchParams(searchParams);
+        next.delete('id');
+        setSearchParams(next, { replace: true });
+      });
+  }, []);
 
 
 
@@ -424,11 +456,20 @@ export default function Samples() {
 
             <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
 
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('common.search')} className="input-field ps-10 w-48" />
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder={t('common.search')}
+              className="input-field ps-10 w-48"
+            />
 
           </div>
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input-field w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="input-field w-auto"
+          >
 
             <option value="">All Status</option>
 
@@ -453,6 +494,39 @@ export default function Samples() {
 
 
       <DataTable columns={columns} data={samples} loading={loading} onRowClick={viewDetail} />
+
+      {pagination.total > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {i18n.language?.startsWith('ar')
+              ? `عرض ${samples.length} من ${pagination.total}`
+              : `Showing ${samples.length} of ${pagination.total}`}
+            {pagination.totalPages > 1 && (
+              <> · {i18n.language?.startsWith('ar') ? `صفحة ${pagination.page} / ${pagination.totalPages}` : `Page ${pagination.page} / ${pagination.totalPages}`}</>
+            )}
+          </span>
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary py-1 px-3 disabled:opacity-40"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                {i18n.language?.startsWith('ar') ? 'السابق' : 'Previous'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary py-1 px-3 disabled:opacity-40"
+                disabled={page >= pagination.totalPages || loading}
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+              >
+                {i18n.language?.startsWith('ar') ? 'التالي' : 'Next'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
 
 
