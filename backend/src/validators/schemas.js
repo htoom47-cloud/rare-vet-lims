@@ -123,7 +123,7 @@ const resultApproveBatchSchema = Joi.object({
 
 const invoiceSchema = Joi.object({
   customer_id: Joi.string().uuid().required(),
-  sample_id: Joi.string().uuid().allow(null),
+  sample_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   items: Joi.array().items(Joi.object({
     test_id: Joi.string().uuid().allow(null),
     package_id: Joi.string().uuid().allow(null),

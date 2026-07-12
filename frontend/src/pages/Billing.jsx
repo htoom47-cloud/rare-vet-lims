@@ -188,7 +188,21 @@ export default function Billing() {
         invoiceForm.items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
         { catalogPrices: true },
       );
-      await billingAPI.createInvoice({ ...invoiceForm, ...discountFields });
+      await billingAPI.createInvoice({
+        customer_id: invoiceForm.customer_id,
+        sample_id: invoiceForm.sample_id || null,
+        notes: invoiceForm.notes || null,
+        items: invoiceForm.items.map(({ test_id, package_id, animal_id, service_code, description, quantity, unit_price }) => ({
+          test_id: test_id || null,
+          package_id: package_id || null,
+          animal_id: animal_id || null,
+          service_code: service_code || null,
+          description,
+          quantity: parseInt(quantity, 10) || 1,
+          unit_price: parseFloat(unit_price) || 0,
+        })),
+        ...discountFields,
+      });
       toast.success('تم إنشاء الفاتورة');
       setInvoiceModal(false);
       setInvoiceForm({ customer_id: '', sample_id: '', notes: '', items: [] });
@@ -201,7 +215,11 @@ export default function Billing() {
       setFieldVisitDiscountValue('');
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'خطأ');
+      const details = err.response?.data?.error?.details;
+      const detailMsg = Array.isArray(details) && details.length
+        ? details.map((d) => d.message).join(' · ')
+        : null;
+      toast.error(detailMsg || err.response?.data?.error?.message || 'خطأ');
     }
   };
 
