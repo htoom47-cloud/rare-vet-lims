@@ -300,6 +300,7 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
     reports: reportsResult.rows,
     portalUrl: env.portalAppUrl,
     labNameAr: env.lab.nameAr,
+    channel: selectedChannel,
   });
 
   const batchId = randomUUID();

@@ -5,6 +5,9 @@ const crypto = require('crypto');
 
 const BATCH_TYPE = 'customer_report_batch';
 
+/** Msegat rejects SMS over ~700 chars (error 1140). Keep SMS compact. */
+const MSEGAT_SMS_SAFE_CHARS = 650;
+
 const isReportReadyForCustomer = (report = {}) => {
   if (!report.pdf_url) return false;
   const approved = Boolean(report.lab_specialist_approved_by || report.vet_approved_by);
@@ -12,9 +15,7 @@ const isReportReadyForCustomer = (report = {}) => {
   return approved || published;
 };
 
-const buildConsolidatedReportMessage = ({ customerName, reports, portalUrl, labNameAr }) => {
-  const name = (customerName || 'العميل').trim();
-  const lab = labNameAr || 'مركز رعاية النوادر البيطري';
+const buildDetailedReportMessage = ({ name, lab, reports, portalUrl }) => {
   const lines = [
     `مرحبًا ${name}`,
     `تم إصدار نتائج التحاليل التالية من ${lab}:`,
@@ -32,6 +33,45 @@ const buildConsolidatedReportMessage = ({ customerName, reports, portalUrl, labN
   lines.push('');
   lines.push(`مع تحيات ${lab}`);
   return lines.join('\n');
+};
+
+/** Short body for SMS — count + portal link (fits Msegat length limit). */
+const buildSmsReportMessage = ({ name, lab, reports, portalUrl }) => {
+  const count = reports.length;
+  const lines = [
+    `مرحبًا ${name}`,
+    count === 1
+      ? `تم إصدار تقرير تحاليل من ${lab}.`
+      : `تم إصدار ${count} تقارير تحاليل من ${lab}.`,
+  ];
+  if (portalUrl) {
+    lines.push('للاطلاع وتحميل التقارير:');
+    lines.push(portalUrl);
+  }
+  lines.push(`مع تحيات ${lab}`);
+  return lines.join('\n');
+};
+
+/**
+ * Consolidated customer notification body.
+ * @param {{ customerName?: string, reports: object[], portalUrl?: string, labNameAr?: string, channel?: string }} opts
+ */
+const buildConsolidatedReportMessage = ({
+  customerName, reports, portalUrl, labNameAr, channel,
+} = {}) => {
+  const name = (customerName || 'العميل').trim();
+  const lab = labNameAr || 'مركز رعاية النوادر البيطري';
+  const list = Array.isArray(reports) ? reports : [];
+  const ch = String(channel || '').toLowerCase();
+
+  if (ch === 'sms') {
+    return buildSmsReportMessage({ name, lab, reports: list, portalUrl });
+  }
+
+  const detailed = buildDetailedReportMessage({ name, lab, reports: list, portalUrl });
+  if (detailed.length <= MSEGAT_SMS_SAFE_CHARS) return detailed;
+  // WhatsApp/long batches: fall back to short form if somehow oversized
+  return buildSmsReportMessage({ name, lab, reports: list, portalUrl });
 };
 
 const messageHash = (body) => crypto.createHash('sha256').update(String(body), 'utf8').digest('hex');

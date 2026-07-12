@@ -105,6 +105,24 @@ check('Consolidated message lists all reports + portal link', () => {
   assert.ok(body.includes('2.'));
 });
 
+check('SMS channel uses short body (no per-report list)', () => {
+  const many = Array.from({ length: 13 }, (_, i) => ({
+    report_number: `RPT-${String(i + 1).padStart(3, '0')}`,
+    animal_name: `Animal${i + 1}`,
+  }));
+  const body = buildConsolidatedReportMessage({
+    customerName: 'أحمد',
+    portalUrl: 'https://portal.example.com',
+    labNameAr: 'مركز رعاية النوادر البيطري',
+    channel: 'sms',
+    reports: many,
+  });
+  assert.ok(body.includes('13'));
+  assert.ok(body.includes('https://portal.example.com'));
+  assert.ok(!body.includes('RPT-001'));
+  assert.ok(body.length < 650);
+});
+
 check('Duplicate detection via notification metadata', () => {
   const sent = extractSentReportIds([
     { metadata: { type: BATCH_TYPE, report_ids: ['a', 'b'] } },
