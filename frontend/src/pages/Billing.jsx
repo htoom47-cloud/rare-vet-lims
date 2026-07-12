@@ -76,6 +76,7 @@ export default function Billing() {
   const [paymentFieldVisitDiscountValue, setPaymentFieldVisitDiscountValue] = useState('');
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
   const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [packageQuantity, setPackageQuantity] = useState(1);
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
@@ -137,20 +138,28 @@ export default function Billing() {
     if (!selectedPackageId) return;
     const pkg = packages.find((p) => p.id === selectedPackageId);
     if (!pkg) return;
-    if (invoiceForm.items.some((i) => i.package_id === pkg.id)) {
-      toast.error(t('priceList.alreadyAdded', { defaultValue: 'Already added' }));
-      return;
+    const qty = Math.max(1, parseInt(packageQuantity, 10) || 1);
+    const existingIdx = invoiceForm.items.findIndex((i) => i.package_id === pkg.id);
+    if (existingIdx >= 0) {
+      const items = [...invoiceForm.items];
+      items[existingIdx] = {
+        ...items[existingIdx],
+        quantity: (parseInt(items[existingIdx].quantity, 10) || 1) + qty,
+      };
+      setInvoiceForm({ ...invoiceForm, items });
+    } else {
+      setInvoiceForm({
+        ...invoiceForm,
+        items: [...invoiceForm.items, {
+          package_id: pkg.id,
+          description: pkg.name,
+          quantity: qty,
+          unit_price: parseFloat(pkg.price) || 0,
+        }],
+      });
     }
-    setInvoiceForm({
-      ...invoiceForm,
-      items: [...invoiceForm.items, {
-        package_id: pkg.id,
-        description: pkg.name,
-        quantity: 1,
-        unit_price: parseFloat(pkg.price) || 0,
-      }],
-    });
     setSelectedPackageId('');
+    setPackageQuantity(1);
   };
 
   const addFieldVisitItem = () => {
@@ -184,6 +193,7 @@ export default function Billing() {
       setInvoiceModal(false);
       setInvoiceForm({ customer_id: '', sample_id: '', notes: '', items: [] });
       setSelectedPackageId('');
+      setPackageQuantity(1);
       setNewItem({ test_id: '', description: '', quantity: 1, unit_price: 0 });
       setDiscountType(DISCOUNT_TYPES.NONE);
       setDiscountValue('');
@@ -559,6 +569,15 @@ export default function Billing() {
                     </option>
                   ))}
                 </select>
+                <input
+                  type="number"
+                  min="1"
+                  className="input-field w-24"
+                  value={packageQuantity}
+                  onChange={(e) => setPackageQuantity(e.target.value)}
+                  placeholder={t('priceList.quantity', { defaultValue: 'الكمية' })}
+                  title={t('priceList.quantity', { defaultValue: 'الكمية' })}
+                />
                 <button
                   type="button"
                   onClick={addPackageItem}
