@@ -62,14 +62,17 @@ check('^BC ^FD contains barcode digits only (no Arabic)', () => {
   assert.ok(!ARABIC_RE.test(fd));
 });
 
-check('ZPL English-only — Sample, test, animal type, no Arabic', () => {
+check('ZPL — Sample/test English; animal type+name as UTF-8 hex (no raw Arabic bytes)', () => {
   const payload = engine.buildBarcodePayload(sampleFixture());
   const zpl = engine.buildZplLabel(payload);
   assert.ok(zpl.includes('^CI0'), 'ASCII ZPL mode missing');
-  assert.ok(!ARABIC_RE.test(zpl), 'Arabic must not appear in ZPL');
+  assert.ok(!ARABIC_RE.test(zpl), 'Raw Arabic must not appear in ZPL source');
   assert.ok(zpl.includes('Sample 26000003'), 'Sample line missing');
   assert.ok(zpl.includes('CBC'), 'Test line missing');
-  assert.ok(zpl.includes('Camel'), 'Animal type missing');
+  assert.ok(zpl.includes('^FH^FD_'), 'Animal line must use UTF-8 hex encoding');
+  assert.ok(zpl.includes('^CI28'), 'UTF-8 charset switch missing for animal line');
+  assert.ok(payload.textLines[2].text.includes('شاهين'), 'Payload animal name as stored');
+  assert.ok(payload.textLines[2].text.includes('·'), 'Type and name joined on one line');
 });
 
 check('No Arabic inside barcode encode value', () => {
@@ -123,13 +126,15 @@ check('Norma HL7 PID sampleId unchanged (scanner / Norma chain)', () => {
   assert.strictEqual(payload.normaSampleId, normalizeSampleScanId(payload.barcodeValue));
 });
 
-check('Label text lines: Sample, test, animal type only', () => {
+check('Label text lines: Sample, test, animal type + name', () => {
   const payload = engine.buildBarcodePayload(sampleFixture());
   const keys = payload.textLines.map((l) => l.key);
   assert.deepStrictEqual(keys, ['sample', 'test', 'animalType']);
   assert.ok(payload.textLines[0].text.includes('26000003'));
   assert.ok(payload.textLines[1].text.includes('CBC'));
-  assert.ok(payload.textLines[2].text.includes('Camel'));
+  assert.ok(payload.textLines[2].text.includes('شاهين'));
+  assert.ok(payload.textLines[2].text.includes('·'));
+  assert.ok(payload.textLines[2].utf8Hex === true);
 });
 
 check('validateBarcodePayload rejects Arabic in barcodeValue', () => {

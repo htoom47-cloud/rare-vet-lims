@@ -149,11 +149,26 @@ export const formatTestsForLabel = (sample, langOrOptions = false) => {
 
 const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
 
-/** Strip non-Latin text — Zebra ^A0N cannot render Arabic reliably. */
+export const hasArabicText = (text) => ARABIC_RE.test(String(text || ''));
+
+/** Strip non-Latin text — used for ASCII-only ZPL fields (not animal name line). */
 export const asciiLabelText = (text) => {
   const s = String(text || '').trim();
   if (!s || ARABIC_RE.test(s)) return '';
   return s;
+};
+
+/**
+ * Bottom label line: animal type + animal name on one line.
+ * Name is taken as stored (name_tag / animal_name) — no translation.
+ * Type uses Arabic species label when arabic=true.
+ */
+export const buildAnimalTypeAndNameLine = (sample, { arabic = true } = {}) => {
+  const type = arabic
+    ? speciesLabel(sample?.animal_type, true)
+    : speciesLabelForZpl(sample?.animal_type);
+  const name = String(sample?.animal_name || sample?.name_tag || '').trim();
+  return [type, name].filter(Boolean).join(' · ');
 };
 
 /** Code128 scan value — prefer 12-digit barcode column; fall back to sample ID digits. */
@@ -182,9 +197,8 @@ const buildLabelContentCore = (sample, { isArabic = false, englishOnly = false }
   const barcode = barcodeScanValue(sample);
   const sampleId = sampleDisplayId(sample);
   const testLine = formatTestsForLabel(sample, englishOnly ? false : isArabic);
-  const animalTypeLine = englishOnly
-    ? speciesLabelForZpl(sample?.animal_type)
-    : speciesLabel(sample?.animal_type, isArabic);
+  // Animal line: type + name (Arabic as stored) — never ascii-strip the name
+  const animalRaw = buildAnimalTypeAndNameLine(sample, { arabic: true });
 
   const sampleLine = sampleId
     ? (englishOnly || !isArabic ? `Sample ${sampleId}` : `عينة ${sampleId}`)
@@ -198,20 +212,21 @@ const buildLabelContentCore = (sample, { isArabic = false, englishOnly = false }
     barcodeEncode: encodeCode128C(barcode),
     sampleLine: sampleLine ? truncateLabel(sanitize(sampleLine), 28) : '',
     testLine: testLine ? truncateLabel(sanitize(testLine), 28) : '',
-    animalTypeLine: animalTypeLine ? truncateLabel(sanitize(animalTypeLine), 28) : '',
+    animalTypeLine: animalRaw ? truncateLabel(animalRaw, 36) : '',
+    animalLineHasArabic: hasArabicText(animalRaw),
     sampleCode: sampleId,
   };
 };
 
 /**
- * English-only label content for Zebra ZPL (50×25 mm).
- * Order: barcode → digits → Sample ID → test type → animal type.
+ * Label content for Zebra ZPL (50×25 mm).
+ * Sample/test stay English ASCII; animal line is type + name in Arabic (as stored).
  */
 export const buildZebraThermalLabelContent = (sample) => (
   buildLabelContentCore(sample, { englishOnly: true })
 );
 
-/** HTML / browser preview — may use Arabic test/type labels when UI is Arabic. */
+/** HTML / browser preview — may use Arabic test labels when UI is Arabic. */
 export const buildThermalLabelContent = (sample, { isArabic = false } = {}) => (
   buildLabelContentCore(sample, { isArabic })
 );

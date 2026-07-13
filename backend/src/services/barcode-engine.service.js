@@ -99,6 +99,19 @@ const speciesService = require('./animal-species.service');
 const animalTypeLabel = (type, isArabic) => speciesService.speciesLabel(type, isArabic);
 const animalTypeLabelForZpl = (type) => speciesService.speciesLabelForZpl(type);
 
+const buildAnimalTypeAndNameLine = (sample) => {
+  const type = animalTypeLabel(sample?.animal_type, true);
+  const name = String(sample?.animal_name || sample?.name_tag || '').trim();
+  return [type, name].filter(Boolean).join(' · ');
+};
+
+const toZplUtf8HexField = (text) => {
+  const buf = Buffer.from(String(text || ''), 'utf8');
+  if (!buf.length) return '';
+  const hex = [...buf].map((b) => `_${b.toString(16).toUpperCase().padStart(2, '0')}`).join('');
+  return `^FH^FD${hex}^FS`;
+};
+
 const resolvePanelKey = (test) => {
   const cat = String(test?.category_code || '').toUpperCase();
   const code = String(test?.test_code || test?.code || '').toUpperCase();
@@ -144,19 +157,19 @@ const buildBarcodePayload = (sample = {}, context = {}) => {
   const barcodeEncode = encodeCode128C(barcodeValue);
   const sampleId = String(sample.sample_code || '').replace(/\D/g, '') || barcodeValue;
   const testsSummary = formatTestsForLabel(sample, false);
-  const animalType = animalTypeLabelForZpl(sample.animal_type);
+  const animalLine = truncateLabel(buildAnimalTypeAndNameLine(sample), 36);
 
   const humanReadable = {
     sampleId,
     barcodeValue,
-    animalType,
+    animalType: animalLine,
     testsSummary,
   };
 
   const textLines = [
     sampleId && { key: 'sample', text: truncateLabel(`Sample ${sampleId}`) },
     testsSummary && { key: 'test', text: truncateLabel(testsSummary) },
-    animalType && { key: 'animalType', text: truncateLabel(animalType) },
+    animalLine && { key: 'animalType', text: animalLine, utf8Hex: ARABIC_RE.test(animalLine) },
   ].filter(Boolean);
 
   return {
@@ -169,6 +182,7 @@ const buildBarcodePayload = (sample = {}, context = {}) => {
     meta: {
       animal_type: sample.animal_type,
       animal_code: sample.animal_code,
+      animal_name: sample.animal_name || sample.name_tag || null,
       sample_code: sampleId,
       tests: sample.tests || [],
     },
@@ -263,6 +277,18 @@ const textLine = (y, value, width, font = FONT_LINE) => {
   return field(`^FO0,${y}^FB${width},1,0,C,0${font}^FD${text}^FS`);
 };
 
+const textLineUtf8Hex = (y, value, width, font = FONT_LINE) => {
+  const s = String(value || '').trim();
+  if (!s) return '';
+  const hexField = toZplUtf8HexField(s);
+  if (!hexField) return '';
+  return [
+    '^CI28',
+    field(`^FO0,${y}^FB${width},1,0,C,0${font}${hexField}`),
+    '^CI0',
+  ].join('\n');
+};
+
 const barcodeField = (payload, opts) => {
   const digits = payload.barcodeEncode || encodeCode128C(payload.barcodeValue);
   const moduleWidth = 3;
@@ -286,16 +312,25 @@ const asciiLabelText = (text) => {
   return s;
 };
 
-/** English-only text lines for ZPL (no Arabic, no customer/animal name). */
+/** Text lines for ZPL — sample/test English; animal = Arabic type + name (hex when needed). */
 const buildZplTextLines = (payload) => {
   const sampleId = payload.meta?.sample_code || payload.humanReadable?.sampleId || '';
   const testsSummary = formatTestsForLabel({ tests: payload.meta?.tests || [] }, false);
-  const animalType = animalTypeLabelForZpl(payload.meta?.animal_type);
+  const animalLine = truncateLabel(buildAnimalTypeAndNameLine({
+    animal_type: payload.meta?.animal_type,
+    animal_name: payload.meta?.animal_name,
+  }), 36);
 
   const lines = [];
   if (sampleId) lines.push({ key: 'sample', text: truncateLabel(`Sample ${sampleId}`) });
   if (testsSummary) lines.push({ key: 'test', text: truncateLabel(testsSummary) });
-  if (animalType) lines.push({ key: 'animalType', text: truncateLabel(animalType) });
+  if (animalLine) {
+    lines.push({
+      key: 'animalType',
+      text: animalLine,
+      utf8Hex: ARABIC_RE.test(animalLine),
+    });
+  }
   return lines;
 };
 
@@ -324,7 +359,11 @@ const buildZplLabel = (payload, options = {}) => {
   const yByKey = { sample: LAYOUT.sampleY, test: LAYOUT.testY, animalType: LAYOUT.animalY };
   const fontByKey = { sample: FONT_LINE, test: FONT_TEST, animalType: FONT_LINE };
   for (const line of zplLines) {
-    const zplLine = textLine(yByKey[line.key], line.text, labelW, fontByKey[line.key] || FONT_LINE);
+    const y = yByKey[line.key];
+    const font = fontByKey[line.key] || FONT_LINE;
+    const zplLine = line.utf8Hex
+      ? textLineUtf8Hex(y, line.text, labelW, font)
+      : textLine(y, line.text, labelW, font);
     if (zplLine) lines.push(zplLine);
   }
 

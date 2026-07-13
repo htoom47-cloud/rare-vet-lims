@@ -1,4 +1,4 @@
-import { buildZebraThermalLabelContent, asciiLabelText } from './labelPanel';
+import { buildZebraThermalLabelContent, asciiLabelText, hasArabicText } from './labelPanel';
 import { encodeCode128C } from './barcodeScan';
 
 const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
@@ -205,6 +205,24 @@ const textLine = (y, value, font = FONT_LINE) => {
   return field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FD${text}^FS`);
 };
 
+/** Arabic (or mixed) text as ^FH UTF-8 hex — keeps ZPL ASCII-safe so Code128 is not corrupted. */
+const textLineUtf8Hex = (y, value, font = FONT_LINE) => {
+  const s = String(value || '').trim();
+  if (!s) return '';
+  const bytes = typeof TextEncoder !== 'undefined'
+    ? new TextEncoder().encode(s)
+    : Buffer.from(s, 'utf8');
+  let hex = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    hex += `_${Number(bytes[i]).toString(16).toUpperCase().padStart(2, '0')}`;
+  }
+  return [
+    '^CI28',
+    field(`^FO0,${y}^FB${LABEL_WIDTH},1,0,C,0${font}^FH^FD${hex}^FS`),
+    '^CI0',
+  ].join('\n');
+};
+
 /** Thick Code128-C — fits 50 mm, readable by 1D USB scanners (size unchanged). */
 const barcodeField = (barcode) => {
   const digits = thermalScanDigits(barcode);
@@ -217,7 +235,7 @@ const barcodeField = (barcode) => {
 
 export const getLabelPrintFields = (sample) => buildZebraThermalLabelContent(sample);
 
-/** ZPL for Zebra ZD421 50×25 mm — English ASCII only. */
+/** ZPL for Zebra ZD421 50×25 mm — barcode/English ASCII; animal type+name Arabic via hex. */
 export const buildCbcLabelZpl = (sample) => {
   const content = buildZebraThermalLabelContent(sample);
   const lines = [...zplHeader()];
@@ -237,7 +255,10 @@ export const buildCbcLabelZpl = (sample) => {
       if (testLine) lines.push(testLine);
     }
     if (content.animalTypeLine) {
-      const animalLine = textLine(LAYOUT.animalY, content.animalTypeLine, FONT_LINE);
+      const useHex = content.animalLineHasArabic || hasArabicText(content.animalTypeLine);
+      const animalLine = useHex
+        ? textLineUtf8Hex(LAYOUT.animalY, content.animalTypeLine, FONT_LINE)
+        : textLine(LAYOUT.animalY, content.animalTypeLine, FONT_LINE);
       if (animalLine) lines.push(animalLine);
     }
   }
