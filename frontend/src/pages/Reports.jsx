@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Download, Eye, FileText, FilePlus, RotateCcw, Stethoscope } from 'lucide-react';
+import { CheckCircle2, Download, Eye, FileText, FilePlus, RotateCcw, Search, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -9,6 +9,7 @@ import { reportsAPI, samplesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 20;
+const SAMPLE_PAGE_SIZE = 20;
 const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
 
@@ -68,6 +69,10 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
+  const [sampleSearch, setSampleSearch] = useState('');
+  const [samplePage, setSamplePage] = useState(1);
+  const [samplePagination, setSamplePagination] = useState({ total: 0, page: 1, limit: SAMPLE_PAGE_SIZE, totalPages: 0 });
+  const [samplesLoading, setSamplesLoading] = useState(false);
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyResult, setVerifyResult] = useState(null);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -90,27 +95,66 @@ export default function Reports() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([
-      reportsAPI.list({ page, limit: PAGE_SIZE }),
-      samplesAPI.list({ status: 'completed', limit: 50 }),
-    ])
-      .then(([reportsRes, samplesRes]) => {
-        setReports(reportsRes.data.data || []);
-        setPagination(reportsRes.data.pagination || { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
-        setCompletedSamples(samplesRes.data.data || []);
+    reportsAPI.list({ page, limit: PAGE_SIZE })
+      .then(({ data }) => {
+        setReports(data.data || []);
+        setPagination(data.pagination || { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
       })
       .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
       .finally(() => setLoading(false));
   };
 
+  const loadCompletedSamples = (search = sampleSearch, pageNum = samplePage) => {
+    setSamplesLoading(true);
+    samplesAPI.list({
+      status: 'completed',
+      search: search.trim() || undefined,
+      page: pageNum,
+      limit: SAMPLE_PAGE_SIZE,
+    })
+      .then(({ data }) => {
+        setCompletedSamples(data.data || []);
+        setSamplePagination(data.pagination || { total: 0, page: 1, limit: SAMPLE_PAGE_SIZE, totalPages: 0 });
+      })
+      .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
+      .finally(() => setSamplesLoading(false));
+  };
+
   useEffect(() => { load(); }, [page]);
 
   useEffect(() => {
+    if (!generateOpen || selectedSample) return undefined;
+    const timer = setTimeout(() => loadCompletedSamples(sampleSearch, samplePage), sampleSearch ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [generateOpen, selectedSample, sampleSearch, samplePage]);
+
+  const openGenerateModal = () => {
+    setSelectedSample(null);
+    setSampleSearch('');
+    setSamplePage(1);
+    setGenerateOpen(true);
+  };
+
+  const openGenerateForSample = (sample) => {
+    setSelectedSample(sample);
+    const fromSample = sample.treatment_recommendations;
+    const fromList = reports.find((r) => r.sample_id === sample.id)?.treatment_recommendations;
+    setTreatment(fromSample || fromList || '');
+    setLanguage(sample.report_language === 'en' ? 'en' : 'ar');
+    setApproveLabOnGenerate(false);
+    setApproveVetOnGenerate(false);
+    setGenerateOpen(true);
+  };
+
+  useEffect(() => {
     const sampleId = searchParams.get('generate');
-    if (!sampleId || !completedSamples.length || !canRegeneratePdf) return;
-    const sample = completedSamples.find((s) => s.id === sampleId);
-    if (sample) openGenerateForSample(sample);
-  }, [searchParams, completedSamples, canRegeneratePdf]);
+    if (!sampleId || !canRegeneratePdf) return;
+    samplesAPI.get(sampleId)
+      .then(({ data }) => {
+        if (data.data?.status === 'completed') openGenerateForSample(data.data);
+      })
+      .catch(() => toast.error(t('common.error')));
+  }, [searchParams, canRegeneratePdf]);
 
   const handleVerify = async () => {
     try {
@@ -142,17 +186,6 @@ export default function Reports() {
     } finally {
       setRegeneratingId(null);
     }
-  };
-
-  const openGenerateForSample = (sample) => {
-    setSelectedSample(sample);
-    const fromSample = sample.treatment_recommendations;
-    const fromList = reports.find((r) => r.sample_id === sample.id)?.treatment_recommendations;
-    setTreatment(fromSample || fromList || '');
-    setLanguage(sample.report_language === 'en' ? 'en' : 'ar');
-    setApproveLabOnGenerate(false);
-    setApproveVetOnGenerate(false);
-    setGenerateOpen(true);
   };
 
   const handleApprove = async (reportId, type) => {
@@ -306,7 +339,7 @@ export default function Reports() {
           <p className="text-sm text-primary-500 mt-1">{t('reports.subtitle')}</p>
         </div>
         {canRegeneratePdf && (
-          <button onClick={() => { setSelectedSample(null); setGenerateOpen(true); }} className="btn-primary flex items-center gap-2">
+          <button onClick={openGenerateModal} className="btn-primary flex items-center gap-2">
             <FilePlus size={18} /> {t('reports.generate')}
           </button>
         )}
@@ -369,23 +402,69 @@ export default function Reports() {
       >
         {!selectedSample ? (
           <>
-            <p className="text-sm text-gray-500 mb-4">{t('reports.selectSampleHint')}</p>
-            {completedSamples.length === 0 ? (
+            <p className="text-sm text-gray-500 mb-3">{t('reports.selectSampleHint')}</p>
+            <div className="relative mb-3">
+              <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={sampleSearch}
+                onChange={(e) => { setSampleSearch(e.target.value); setSamplePage(1); }}
+                placeholder={t('reports.searchBySample')}
+                className="input-field ps-10"
+                autoFocus
+              />
+            </div>
+            {samplesLoading ? (
+              <p className="text-center text-gray-500 py-8">{t('common.loading')}</p>
+            ) : completedSamples.length === 0 ? (
               <p className="text-center text-gray-500 py-8">{t('reports.noCompleted')}</p>
             ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {completedSamples.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => openGenerateForSample(s)}
-                    className="w-full text-start p-3 border rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition"
-                  >
-                    <p className="font-mono font-medium">{s.sample_code}</p>
-                    <p className="text-sm text-gray-500">{s.customer_name} — {s.animal_code}</p>
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {completedSamples.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => openGenerateForSample(s)}
+                      className="w-full text-start p-3 border rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition"
+                    >
+                      <p className="font-mono font-medium">{s.sample_code}</p>
+                      <p className="text-sm text-gray-500">{s.customer_name} — {s.animal_code}</p>
+                    </button>
+                  ))}
+                </div>
+                {samplePagination.total > 0 && (
+                  <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-600">
+                    <span>
+                      {i18n.language?.startsWith('ar')
+                        ? `عرض ${completedSamples.length} من ${samplePagination.total}`
+                        : `Showing ${completedSamples.length} of ${samplePagination.total}`}
+                      {samplePagination.totalPages > 1 && (
+                        <> · {i18n.language?.startsWith('ar') ? `صفحة ${samplePagination.page} / ${samplePagination.totalPages}` : `Page ${samplePagination.page} / ${samplePagination.totalPages}`}</>
+                      )}
+                    </span>
+                    {samplePagination.totalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="btn-secondary py-1 px-3 disabled:opacity-40"
+                          disabled={samplePage <= 1 || samplesLoading}
+                          onClick={() => setSamplePage((p) => Math.max(1, p - 1))}
+                        >
+                          {i18n.language?.startsWith('ar') ? 'السابق' : 'Previous'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary py-1 px-3 disabled:opacity-40"
+                          disabled={samplePage >= samplePagination.totalPages || samplesLoading}
+                          onClick={() => setSamplePage((p) => Math.min(samplePagination.totalPages, p + 1))}
+                        >
+                          {i18n.language?.startsWith('ar') ? 'التالي' : 'Next'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </>
         ) : (
