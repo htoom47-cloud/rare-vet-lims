@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal';
 import { reportsAPI, samplesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+const PAGE_SIZE = 20;
 const LAB_ROLES = new Set(['lab_specialist', 'lab_technician', 'manager', 'admin']);
 const VET_ROLES = new Set(['veterinarian', 'manager', 'admin']);
 
@@ -65,6 +66,8 @@ export default function Reports() {
   const [reports, setReports] = useState([]);
   const [completedSamples, setCompletedSamples] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyResult, setVerifyResult] = useState(null);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -88,18 +91,19 @@ export default function Reports() {
   const load = () => {
     setLoading(true);
     Promise.all([
-      reportsAPI.list(),
+      reportsAPI.list({ page, limit: PAGE_SIZE }),
       samplesAPI.list({ status: 'completed', limit: 50 }),
     ])
       .then(([reportsRes, samplesRes]) => {
-        setReports(reportsRes.data.data);
-        setCompletedSamples(samplesRes.data.data);
+        setReports(reportsRes.data.data || []);
+        setPagination(reportsRes.data.pagination || { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
+        setCompletedSamples(samplesRes.data.data || []);
       })
       .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [page]);
 
   useEffect(() => {
     const sampleId = searchParams.get('generate');
@@ -323,6 +327,39 @@ export default function Reports() {
       </div>
 
       <DataTable columns={columns} data={reports} loading={loading} />
+
+      {pagination.total > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {i18n.language?.startsWith('ar')
+              ? `عرض ${reports.length} من ${pagination.total}`
+              : `Showing ${reports.length} of ${pagination.total}`}
+            {pagination.totalPages > 1 && (
+              <> · {i18n.language?.startsWith('ar') ? `صفحة ${pagination.page} / ${pagination.totalPages}` : `Page ${pagination.page} / ${pagination.totalPages}`}</>
+            )}
+          </span>
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary py-1 px-3 disabled:opacity-40"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                {i18n.language?.startsWith('ar') ? 'السابق' : 'Previous'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary py-1 px-3 disabled:opacity-40"
+                disabled={page >= pagination.totalPages || loading}
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+              >
+                {i18n.language?.startsWith('ar') ? 'التالي' : 'Next'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal
         isOpen={generateOpen}
