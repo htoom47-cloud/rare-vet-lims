@@ -34,6 +34,7 @@ const animalSchema = Joi.object({
   gender: Joi.string().valid('male', 'female', 'unknown').default('unknown'),
   weight: Joi.number().allow(null),
   color: Joi.string().allow('', null),
+  breed: Joi.string().allow('', null),
   rfid_chip: Joi.string().allow('', null),
   owner_id: Joi.string().uuid().required(),
   medical_history: Joi.string().allow('', null),

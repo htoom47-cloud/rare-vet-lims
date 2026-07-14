@@ -28,6 +28,8 @@ const channelLabel = (channel, t) => {
   return channel || '—';
 };
 
+const PAGE_SIZE = 20;
+
 export default function Customers() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
@@ -36,6 +38,8 @@ export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -53,14 +57,21 @@ export default function Customers() {
     setLoading(true);
     const trimmed = search.trim();
     const looksLikeMobile = /^[\d+\s()-]{3,}$/.test(trimmed);
-    const params = looksLikeMobile ? { mobile: trimmed } : { search: trimmed };
-    customersAPI.list(params).then(({ data }) => setCustomers(data.data)).finally(() => setLoading(false));
+    const params = looksLikeMobile
+      ? { mobile: trimmed, page, limit: PAGE_SIZE }
+      : { search: trimmed, page, limit: PAGE_SIZE };
+    customersAPI.list(params)
+      .then(({ data }) => {
+        setCustomers(data.data || []);
+        setPagination(data.pagination || { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, page]);
 
   const unsentReports = readyReports.filter((r) => !r.previously_sent);
 
@@ -227,7 +238,7 @@ export default function Customers() {
             <input
               type="tel"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder={t('customers.searchByMobile')}
               className="input-field ps-10"
             />
@@ -239,6 +250,39 @@ export default function Customers() {
       </div>
 
       <DataTable columns={columns} data={customers} loading={loading} onRowClick={viewProfile} />
+
+      {pagination.total > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {i18n.language?.startsWith('ar')
+              ? `عرض ${customers.length} من ${pagination.total}`
+              : `Showing ${customers.length} of ${pagination.total}`}
+            {pagination.totalPages > 1 && (
+              <> · {i18n.language?.startsWith('ar') ? `صفحة ${pagination.page} / ${pagination.totalPages}` : `Page ${pagination.page} / ${pagination.totalPages}`}</>
+            )}
+          </span>
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary py-1 px-3 disabled:opacity-40"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                {i18n.language?.startsWith('ar') ? 'السابق' : 'Previous'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary py-1 px-3 disabled:opacity-40"
+                disabled={page >= pagination.totalPages || loading}
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+              >
+                {i18n.language?.startsWith('ar') ? 'التالي' : 'Next'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal
         isOpen={modalOpen}
