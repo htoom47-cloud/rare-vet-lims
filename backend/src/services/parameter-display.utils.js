@@ -41,8 +41,11 @@ const resolveDisplayNameEn = ({
 }) => displayNameEnMap[parameterId] || parameterName || '';
 
 const flagForReport = (evaluated) => {
+  const flag = evaluated?.detailFlag || evaluated?.flag || '';
+  // Qualitative POS/NEG must survive even without numeric reference ranges
+  // (e.g. Rose Bengal) — otherwise portal KPIs treat positives as "normal".
+  if (flag === 'POS' || flag === 'NEG') return flag;
   if (!evaluated?.hasReference) return '';
-  const flag = evaluated.detailFlag || evaluated.flag || '';
   if (flag === 'NORMAL_WITHOUT_REF' || flag === 'MISSING') return '';
   if (flag === 'CRITICAL') return evaluated.detailFlag || 'CRIT_HIGH';
   return flag;

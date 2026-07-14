@@ -10,7 +10,9 @@ const {
   buildReportSections,
   filterReportableAttachments,
 } = require('./report-builder.service');
-const { summarizeResults, flagSeverity } = require('../utils/portal-analytics');
+const {
+  summarizeResults, flagSeverity, effectiveFlag,
+} = require('../utils/portal-analytics');
 
 const LIFECYCLE = {
   DRAFT: 'draft',
@@ -91,18 +93,19 @@ const buildReportFlags = (results = []) => {
   const positive = [];
 
   for (const row of results) {
-    const sev = flagSeverity(row.flag);
+    const flag = effectiveFlag(row);
+    const sev = flagSeverity(flag);
     const entry = {
       code: row.code,
       nameEn: row.nameEn,
       nameAr: row.nameAr,
-      flag: row.flag,
+      flag,
       value: row.value,
       isCritical: row.isCritical,
     };
     if (sev >= 3) critical.push(entry);
     else if (sev >= 2) abnormal.push(entry);
-    else if (row.flag === 'POS') positive.push(entry);
+    else if (flag === 'POS') positive.push(entry);
   }
 
   return { abnormal, critical, positive };

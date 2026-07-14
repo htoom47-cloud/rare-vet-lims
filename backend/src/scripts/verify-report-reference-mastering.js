@@ -71,6 +71,12 @@ check('No HIGH/LOW flag without reference range', () => {
   assert.strictEqual(flagForReport({ hasReference: true, flag: 'HIGH', detailFlag: 'HIGH' }), 'HIGH');
 });
 
+check('POS/NEG flags kept without numeric reference (qualitative)', () => {
+  assert.strictEqual(flagForReport({ hasReference: false, flag: 'POS', detailFlag: 'POS' }), 'POS');
+  assert.strictEqual(flagForReport({ hasReference: false, flag: 'NEG', detailFlag: 'NEG' }), 'NEG');
+  assert.strictEqual(flagForReport({ hasReference: true, flag: 'POS', detailFlag: 'POS' }), 'POS');
+});
+
 check('Reference N/A (en) when missing range', () => {
   assert.strictEqual(formatReferenceForReport(null, false, false), 'N/A');
   assert.strictEqual(formatReferenceForReport('-', false, false), 'N/A');

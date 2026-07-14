@@ -18,6 +18,7 @@ const {
   enrichParameters,
   buildInterpretation,
   flagSeverity,
+  effectiveFlag,
 } = require('../utils/portal-analytics');
 
 const OTP_LENGTH = 4;
@@ -348,7 +349,7 @@ const latestResultsForAnimal = async (customerIds, animalId) => {
 const buildPanels = (results) => buildPanelDetails(results);
 
 const countCriticalFlags = (results) =>
-  (results || []).filter((r) => flagSeverity(r.flag) >= 3).length;
+  (results || []).filter((r) => flagSeverity(effectiveFlag(r)) >= 3).length;
 
 const listAnimals = async (customerIds) => {
   const ids = asArray(customerIds);

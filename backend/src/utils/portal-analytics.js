@@ -2,10 +2,23 @@ const PANELS = [
   { key: 'cbc', codes: ['CBC'] },
   { key: 'chem', codes: ['CHEM'] },
   { key: 'hormones', codes: ['HORM'] },
-  { key: 'infectious', codes: ['ELISA', 'SERO', 'PCR', 'CULT'] },
-  { key: 'parasitology', codes: ['MICRO'] },
+  // MICRO includes Brucella Rose Bengal (qualitative infectious screening)
+  { key: 'infectious', codes: ['ELISA', 'SERO', 'PCR', 'CULT', 'MICRO'] },
+  { key: 'parasitology', codes: ['PARAS'] },
   { key: 'reproduction', codes: [] },
 ];
+
+const isPositiveValue = (value) => /^(positive|إيجابي|\+|pos|yes|نعم)$/i.test(String(value || '').trim());
+const isNegativeValue = (value) => /^(negative|سلبي|\-|neg|no|لا)$/i.test(String(value || '').trim());
+
+/** Prefer stored flag; infer POS/NEG from display value when flag was stripped. */
+const effectiveFlag = (row = {}) => {
+  const flag = String(row.flag || '').trim();
+  if (flag) return flag;
+  if (isPositiveValue(row.value) || isPositiveValue(row.displayValue)) return 'POS';
+  if (isNegativeValue(row.value) || isNegativeValue(row.displayValue)) return 'NEG';
+  return '';
+};
 
 const flagSeverity = (flag) => {
   if (!flag || ['NORMAL', 'NEG', 'PENDING', ''].includes(flag)) return 0;
@@ -36,7 +49,7 @@ const panelDetailFromResults = (results, { codes, key }) => {
   let attention = 0;
   let critical = 0;
   for (const row of rows) {
-    const sev = flagSeverity(row.flag);
+    const sev = flagSeverity(effectiveFlag(row));
     if (sev >= 3) critical += 1;
     if (sev >= 2) abnormal += 1;
     else if (sev === 1) attention += 1;
@@ -67,7 +80,7 @@ const summarizeResults = (results) => {
   let critical = 0;
   let normal = 0;
   for (const row of rows) {
-    const sev = flagSeverity(row.flag);
+    const sev = flagSeverity(effectiveFlag(row));
     if (sev >= 3) critical += 1;
     if (sev >= 2) abnormal += 1;
     else if (sev === 1) attention += 1;
@@ -103,13 +116,13 @@ const enrichParameters = (parameters, previews) => {
     const current = nums.length ? nums[nums.length - 1] : null;
     const previous = nums.length >= 2 ? nums[nums.length - 2] : null;
     const change = pctChange(current, previous);
-    const latestFlag = param.values[param.values.length - 1]?.flag || null;
+    const latestFlag = effectiveFlag(param.values[param.values.length - 1] || {});
     return {
       ...param,
       current,
       previous,
       percentChange: change,
-      latestFlag,
+      latestFlag: latestFlag || null,
     };
   });
 };
@@ -171,4 +184,5 @@ module.exports = {
   buildInterpretation,
   pctChange,
   flagSeverity,
+  effectiveFlag,
 };
