@@ -98,7 +98,7 @@ export default function WorkflowCase() {
 
   useEffect(() => {
     if (customerId) {
-      animalsAPI.list({ owner_id: customerId }).then(({ data }) => setAnimals(data.data));
+      animalsAPI.listByOwner(customerId).then(setAnimals).catch(() => setAnimals([]));
     } else {
       setAnimals([]);
       setSelectedAnimalIds([]);

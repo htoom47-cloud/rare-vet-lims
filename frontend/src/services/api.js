@@ -86,6 +86,23 @@ export const reportMasteringAPI = {
 
 export const animalsAPI = {
   list: (params) => api.get('/animals', { params }),
+  /** All animals for one owner (paginates past default limit 20). */
+  listByOwner: async (ownerId) => {
+    if (!ownerId) return [];
+    const all = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      // eslint-disable-next-line no-await-in-loop
+      const { data } = await api.get('/animals', {
+        params: { owner_id: ownerId, page, limit: 100 },
+      });
+      all.push(...(data.data || []));
+      totalPages = data.pagination?.totalPages || 1;
+      page += 1;
+    } while (page <= totalPages && page <= 50);
+    return all;
+  },
   get: (id, history) => api.get(`/animals/${id}`, { params: { history } }),
   trends: (id, params) => api.get(`/animals/${id}/trends`, { params }),
   create: (data) => api.post('/animals', data),

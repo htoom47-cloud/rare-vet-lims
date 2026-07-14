@@ -104,8 +104,8 @@ export default function Samples() {
         setDetailSample(data.data);
         setReassignAnimalId(data.data.animal_id || '');
         if (data.data.customer_id) {
-          animalsAPI.list({ owner_id: data.data.customer_id, limit: 50 })
-            .then(({ data: resp }) => setDetailAnimals(resp.data || []))
+          animalsAPI.listByOwner(data.data.customer_id)
+            .then(setDetailAnimals)
             .catch(() => setDetailAnimals([]));
         } else {
           setDetailAnimals([]);
@@ -135,7 +135,7 @@ export default function Samples() {
 
     if (form.customer_id) {
 
-      animalsAPI.list({ owner_id: form.customer_id }).then(({ data }) => setAnimals(data.data));
+      animalsAPI.listByOwner(form.customer_id).then(setAnimals).catch(() => setAnimals([]));
 
     }
 
@@ -255,8 +255,8 @@ export default function Samples() {
     setDetailSample(data.data);
     setReassignAnimalId(data.data.animal_id || '');
     if (data.data.customer_id) {
-      animalsAPI.list({ owner_id: data.data.customer_id, limit: 50 })
-        .then(({ data: resp }) => setDetailAnimals(resp.data || []))
+      animalsAPI.listByOwner(data.data.customer_id)
+        .then(setDetailAnimals)
         .catch(() => setDetailAnimals([]));
     } else {
       setDetailAnimals([]);
