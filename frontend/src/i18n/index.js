@@ -785,6 +785,9 @@ const resources = {
         fieldVisitDiscount: 'Field visit discount',
         paymentHistory: 'Payment history', paymentMethod: 'Payment method', amount: 'Amount', reference: 'Reference',
         downloadPdf: 'Download PDF', regeneratePdf: 'Regenerate PDF', pdfFailed: 'Could not open invoice PDF',
+        printThermal: 'Thermal print', thermalPrintFailed: 'Could not open thermal receipt print',
+        thermalPrintDone: 'Thermal print dialog opened',
+        popupBlocked: 'Allow pop-ups to print the thermal receipt',
         paymentMethods: {
           cash: 'Cash', card: 'Network', bank_transfer: 'Bank transfer', credit: 'On account',
         },
@@ -1843,6 +1846,9 @@ const resources = {
         fieldVisitDiscount: 'خصم الزيارة الميدانية',
         paymentHistory: 'سجل المدفوعات', paymentMethod: 'طريقة الدفع', amount: 'المبلغ', reference: 'المرجع',
         downloadPdf: 'تحميل PDF', regeneratePdf: 'إعادة إنشاء PDF', pdfFailed: 'تعذر فتح ملف الفاتورة',
+        printThermal: 'طباعة حرارية', thermalPrintFailed: 'تعذّر فتح طباعة الإيصال الحراري',
+        thermalPrintDone: 'فُتحت نافذة الطباعة الحرارية',
+        popupBlocked: 'اسمح بالنوافذ المنبثقة لطباعة الإيصال الحراري',
         paymentMethods: {
           cash: 'نقدي', card: 'شبكة', bank_transfer: 'تحويل بنكي', credit: 'آجل',
         },

@@ -34,7 +34,7 @@ import {
 } from '../utils/fieldVisitService';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
-import printThermalInvoice from '../utils/thermalInvoicePrint';
+import { printThermalInvoice, labFromInvoiceSettings } from '../utils/thermalInvoicePrint';
 
 
 const EMPTY_ANIMAL = {
@@ -446,17 +446,12 @@ export default function WorkflowCase() {
   const printThermalReceipt = async () => {
     if (!invoiceId) return;
     try {
-      const { data } = await billingAPI.getInvoice(invoiceId);
-      await printThermalInvoice(
-        data.data,
-        {
-          name: 'AL NAWADER VETERINARY CARE CENTER',
-          nameAr: 'مركز رعاية النوادر البيطري',
-          phone: '0115007257',
-          vatNumber: '311042487300003',
-        },
-        { isArabic: i18n.language === 'ar' },
-      );
+      const [{ data }, settingsRes] = await Promise.all([
+        billingAPI.getInvoice(invoiceId),
+        billingAPI.invoiceSettings().catch(() => null),
+      ]);
+      const lab = labFromInvoiceSettings(settingsRes?.data?.data || settingsRes?.data);
+      await printThermalInvoice(data.data, lab, { isArabic: i18n.language === 'ar' });
     } catch (err) {
       if (err.message === 'POPUP_BLOCKED') {
         toast.error(t('workflow.popupBlocked'));

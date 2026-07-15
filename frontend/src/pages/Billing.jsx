@@ -13,6 +13,7 @@ import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceFie
 import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import { billingAPI, testsAPI } from '../services/api';
+import { printThermalInvoice, labFromInvoiceSettings } from '../utils/thermalInvoicePrint';
 import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
@@ -234,10 +235,12 @@ export default function Billing() {
         paymentFieldVisitDiscountValue,
         { catalogPrices: false },
       );
+      const paidMethod = paymentForm.method;
+      const invoiceId = selectedInvoice.id;
       await billingAPI.recordPayment({
-        invoice_id: selectedInvoice.id,
+        invoice_id: invoiceId,
         amount: Number(paymentForm.amount),
-        method: paymentForm.method,
+        method: paidMethod,
         reference_number: paymentForm.reference_number,
         notes: paymentForm.notes,
         ...discountFields,
@@ -250,7 +253,8 @@ export default function Billing() {
       setPaymentFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
       setPaymentFieldVisitDiscountValue('');
       load();
-      if (detailInvoice?.id === selectedInvoice.id) openInvoiceDetail(selectedInvoice);
+      if (detailInvoice?.id === invoiceId) openInvoiceDetail({ id: invoiceId });
+      await printThermalReceipt(invoiceId, { paymentMethod: paidMethod });
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
     }
@@ -329,6 +333,30 @@ export default function Billing() {
     }
   };
 
+  const printThermalReceipt = async (invoiceOrId, { paymentMethod } = {}) => {
+    try {
+      const id = typeof invoiceOrId === 'string' ? invoiceOrId : invoiceOrId?.id;
+      if (!id) return;
+      const [{ data: invRes }, settingsRes] = await Promise.all([
+        billingAPI.getInvoice(id),
+        billingAPI.invoiceSettings().catch(() => null),
+      ]);
+      const invoice = invRes.data;
+      const lab = labFromInvoiceSettings(settingsRes?.data?.data || settingsRes?.data);
+      const methodKey = paymentMethod || invoice.payments?.[0]?.method;
+      await printThermalInvoice(invoice, lab, {
+        isArabic: i18n.language === 'ar',
+        paymentMethodLabel: methodKey ? paymentMethodLabel(methodKey) : '',
+      });
+    } catch (err) {
+      if (err?.message === 'POPUP_BLOCKED') {
+        toast.error(t('billing.popupBlocked'));
+      } else {
+        toast.error(t('billing.thermalPrintFailed'));
+      }
+    }
+  };
+
   const columns = [
     { key: 'invoice_number', label: t('billing.invoice') },
     { key: 'customer_name', label: t('customers.fullName') },
@@ -346,6 +374,14 @@ export default function Billing() {
           title={t('billing.downloadPdf')}
         >
           <Download size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => printThermalReceipt(r)}
+          className="text-primary-600 text-sm flex items-center gap-1"
+          title={t('billing.printThermal')}
+        >
+          <Printer size={14} /> {t('billing.printThermal')}
         </button>
         {canPay && r.status !== 'paid' && r.status !== 'cancelled' ? (
           <button type="button" onClick={() => openPayment(r)} className="text-primary-600 text-sm flex items-center gap-1">
@@ -453,6 +489,13 @@ export default function Billing() {
                 className="btn-secondary flex items-center gap-2 text-sm"
               >
                 <Printer size={16} /> {t('billing.regeneratePdf')}
+              </button>
+              <button
+                type="button"
+                onClick={() => printThermalReceipt(detailInvoice)}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                <Receipt size={16} /> {t('billing.printThermal')}
               </button>
             </div>
 
