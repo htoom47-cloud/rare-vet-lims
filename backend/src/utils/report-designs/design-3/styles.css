@@ -695,23 +695,6 @@ body[dir='rtl'] {
   text-align: center;
 }
 
-/* --- Issue bar --- */
-.issue-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  background: var(--color-surface-header);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-sm);
-  color: var(--color-muted);
-}
-
-.issue-bar strong {
-  color: var(--color-ink);
-}
-
 .disclaimer {
   margin-top: 2px;
   padding: 3px 6px;
@@ -750,8 +733,7 @@ body[dir='rtl'] {
   .clinical-page .card,
   .clinical-page .sig-grid,
   .clinical-page .interp-grid,
-  .clinical-page .interp-card,
-  .clinical-page .issue-bar {
+  .clinical-page .interp-card {
     page-break-inside: auto;
     break-inside: auto;
     overflow: visible;

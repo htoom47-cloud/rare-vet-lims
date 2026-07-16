@@ -8,13 +8,11 @@ const {
 } = require('../design-2-clinical');
 const {
   escapeHtml,
-  formatDateTime,
   formatRef,
   renderResultCell,
   renderTestCell,
   getLabMeta,
   getPatientFields,
-  resolveInstruments,
   t,
 } = require('./helpers');
 
@@ -228,16 +226,6 @@ const buildSignatures = (data, lab, qrDataUri, lang) => {
     </section>`;
 };
 
-const buildIssueBar = (data, lang) => {
-  const issued = formatDateTime(data.issuedDate || data.date);
-  const instrument = data.instrument || resolveInstruments(data.results);
-  return `
-    <section class="issue-bar">
-      <div><strong>${t(lang, 'Issued', 'تاريخ الإصدار')}:</strong> ${escapeHtml(issued)}</div>
-      <div><strong>${t(lang, 'Instrument', 'الجهاز')}:</strong> ${escapeHtml(instrument)}</div>
-    </section>`;
-};
-
 /** Fixed sample-retention / client-collection liability note (all outgoing reports). */
 const buildSampleRetentionNote = (lang) => {
   const note = t(
@@ -292,7 +280,6 @@ const buildReportHtml = async (reportData) => {
     <div class="clinical-page">
       ${buildTreatmentRecommendationsSection(reportData.treatmentRecommendations, lang)}
       ${buildSignatures(reportData, lab, qrDataUri, lang)}
-      ${buildIssueBar(reportData, lang)}
       ${buildSampleRetentionNote(lang)}
     </div>`;
 
