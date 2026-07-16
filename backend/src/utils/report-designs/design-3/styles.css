@@ -713,14 +713,15 @@ body[dir='rtl'] {
 }
 
 .disclaimer {
-  padding: var(--space-1) var(--space-2);
+  margin-top: 2px;
+  padding: 3px 6px;
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: var(--font-xs);
+  font-size: 7.5pt;
   color: var(--color-muted);
-  line-height: var(--line-relaxed);
-  text-align: center;
+  line-height: 1.35;
+  text-align: start;
 }
 
 @media print {

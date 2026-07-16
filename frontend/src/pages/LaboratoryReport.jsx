@@ -666,6 +666,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           <div className="lab-rpt-footer-info">
             <p className="lab-rpt-contact">{labName} · {report.lab.phone} · {report.lab.email}</p>
             <p className="lab-rpt-legal">{t('labReport.legal')}</p>
+            <p className="lab-rpt-legal">{t('labReport.sampleRetentionNote')}</p>
           </div>
         </footer>
       </div>

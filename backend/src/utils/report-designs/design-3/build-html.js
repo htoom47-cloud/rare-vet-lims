@@ -238,6 +238,16 @@ const buildIssueBar = (data, lang) => {
     </section>`;
 };
 
+/** Fixed sample-retention / client-collection liability note (all outgoing reports). */
+const buildSampleRetentionNote = (lang) => {
+  const note = t(
+    lang,
+    'Note: Al Nawader Veterinary Care Center retains samples for (7) days only from the date of issuance and delivery of results. After this period, the Center assumes no responsibility for sample storage, destruction, or disposal. The Center also assumes no responsibility for sample quality or integrity, or for any substitution, damage, contamination, or effect on result accuracy if samples were collected, drawn, or transported by the client or their representative rather than by the Al Nawader Veterinary Care Center team.',
+    'ملاحظة: يحتفظ مركز رعاية النوادر البيطري بالعينات لمدة (7) أيام فقط من تاريخ إصدار وإرسال النتائج، وبعد انقضاء هذه المدة لا يتحمل المركز أي مسؤولية عن حفظ العينات أو إتلافها أو التخلص منها. كما لا يتحمل المركز أي مسؤولية عن جودة العينات أو سلامتها أو أي تبديل أو تلف أو تلوث أو تأثير على دقة النتائج إذا تم جمع العينات أو سحبها أو نقلها بواسطة العميل أو من يمثله، وليس بواسطة فريق مركز رعاية النوادر البيطري.',
+  );
+  return `<div class="disclaimer">${escapeHtml(note)}</div>`;
+};
+
 const buildReportHtml = async (reportData) => {
   const lang = reportData.language || 'ar';
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
@@ -283,6 +293,7 @@ const buildReportHtml = async (reportData) => {
       ${buildTreatmentRecommendationsSection(reportData.treatmentRecommendations, lang)}
       ${buildSignatures(reportData, lab, qrDataUri, lang)}
       ${buildIssueBar(reportData, lang)}
+      ${buildSampleRetentionNote(lang)}
     </div>`;
 
   return `<!DOCTYPE html>
