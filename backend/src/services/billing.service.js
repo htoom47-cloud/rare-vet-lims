@@ -28,6 +28,16 @@ const generateVatQR = (invoice) => {
 
 const invoiceDate = (invoice) => new Date(invoice.created_at).toISOString().slice(0, 10);
 
+/**
+ * Max amount still refundable for an invoice (payments − refunds already issued).
+ * Pure helper for processRefund + verification.
+ */
+const computeRefundableAmount = (totalPaid, alreadyRefunded) => {
+  const paid = Number(totalPaid) || 0;
+  const refunded = Number(alreadyRefunded) || 0;
+  return Math.max(0, paid - refunded);
+};
+
 const listInvoices = async ({
   status, customer_id, page, limit, search, date_from, date_to, payment_method,
 }) => {
@@ -177,7 +187,11 @@ const recordPayment = async (data, userId, req = null) => {
   try {
     await client.query('BEGIN');
 
-    const invoiceResult = await client.query('SELECT * FROM invoices WHERE id = $1', [data.invoice_id]);
+    // Serialize concurrent payments/refunds/cancels on this invoice.
+    const invoiceResult = await client.query(
+      `SELECT * FROM invoices WHERE id = $1 AND ${notDeleted()} FOR UPDATE`,
+      [data.invoice_id]
+    );
     let invoice = invoiceResult.rows[0];
     if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
     if (['cancelled', 'refunded'].includes(invoice.status)) {
@@ -284,23 +298,48 @@ const listPackages = async () => {
 };
 
 const cancelInvoice = async (id, reason, userId, req) => {
-  const invoice = await getInvoiceById(id);
-  if (invoice.status === 'cancelled') throw new AppError('Invoice already cancelled', 400, 'ALREADY_CANCELLED');
-  if (invoice.status === 'refunded') throw new AppError('Cannot cancel refunded invoice', 400, 'INVALID_STATUS');
-  await assertDayOpen(invoiceDate(invoice));
+  const client = await getClient();
+  let committed = false;
+  let customerId = null;
+  let oldStatus = null;
+  let invoiceTotal = null;
+  try {
+    await client.query('BEGIN');
+    const invoiceResult = await client.query(
+      `SELECT * FROM invoices WHERE id = $1 AND ${notDeleted()} FOR UPDATE`,
+      [id]
+    );
+    const invoice = invoiceResult.rows[0];
+    if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+    if (invoice.status === 'cancelled') throw new AppError('Invoice already cancelled', 400, 'ALREADY_CANCELLED');
+    if (invoice.status === 'refunded') throw new AppError('Cannot cancel refunded invoice', 400, 'INVALID_STATUS');
+    await assertDayOpen(invoiceDate(invoice));
 
-  const oldStatus = invoice.status;
-  await query(
-    `UPDATE invoices SET status = 'cancelled', pdf_url = NULL, notes = COALESCE(notes, '') || $2, updated_at = NOW() WHERE id = $1`,
-    [id, reason ? `\n[CANCEL] ${reason}` : '']
-  );
-  await syncCustomerArBalance(invoice.customer_id);
+    oldStatus = invoice.status;
+    customerId = invoice.customer_id;
+    invoiceTotal = invoice.total;
+    await client.query(
+      `UPDATE invoices SET status = 'cancelled', pdf_url = NULL, notes = COALESCE(notes, '') || $2, updated_at = NOW() WHERE id = $1`,
+      [id, reason ? `\n[CANCEL] ${reason}` : '']
+    );
+    await client.query('COMMIT');
+    committed = true;
+  } catch (err) {
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  await syncCustomerArBalance(customerId);
   await logBillingAudit({
     userId,
     action: 'cancel_invoice',
     entityType: 'invoice',
     entityId: id,
-    oldValues: { status: oldStatus, total: invoice.total },
+    oldValues: { status: oldStatus, total: invoiceTotal },
     newValues: { status: 'cancelled', reason },
     req,
   });
@@ -308,45 +347,84 @@ const cancelInvoice = async (id, reason, userId, req) => {
 };
 
 const processRefund = async (data, userId, req) => {
-  const invoice = await getInvoiceById(data.invoice_id);
-  if (invoice.status === 'cancelled') throw new AppError('Cannot refund cancelled invoice', 400, 'INVALID_STATUS');
-  await assertDayOpen(invoiceDate(invoice));
+  const client = await getClient();
+  let committed = false;
+  let refundRow = null;
+  let customerId = null;
+  let oldStatus = null;
+  let totalPaid = 0;
+  let status = null;
+  let amount = 0;
+  try {
+    await client.query('BEGIN');
 
-  const amount = parseFloat(data.amount);
-  if (amount <= 0 || amount > invoice.total_paid + 0.01) {
-    throw new AppError('Invalid refund amount', 400, 'INVALID_AMOUNT');
+    // Serialize concurrent payments/refunds/cancels on this invoice.
+    const invoiceResult = await client.query(
+      `SELECT * FROM invoices WHERE id = $1 AND ${notDeleted()} FOR UPDATE`,
+      [data.invoice_id]
+    );
+    const invoice = invoiceResult.rows[0];
+    if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+    if (invoice.status === 'cancelled') throw new AppError('Cannot refund cancelled invoice', 400, 'INVALID_STATUS');
+    await assertDayOpen(invoiceDate(invoice));
+
+    const paidResult = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total_paid FROM payments WHERE invoice_id = $1`,
+      [data.invoice_id]
+    );
+    const refundedResult = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE invoice_id = $1`,
+      [data.invoice_id]
+    );
+    totalPaid = parseFloat(paidResult.rows[0].total_paid);
+    const alreadyRefunded = parseFloat(refundedResult.rows[0].total);
+    const refundable = computeRefundableAmount(totalPaid, alreadyRefunded);
+
+    amount = parseFloat(data.amount);
+    if (amount <= 0 || amount > refundable + 0.01) {
+      throw new AppError('Invalid refund amount', 400, 'INVALID_AMOUNT');
+    }
+
+    const result = await client.query(
+      `INSERT INTO refunds (id, payment_id, invoice_id, amount, reason, processed_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [uuidv4(), data.payment_id || null, data.invoice_id, amount, data.reason, userId]
+    );
+    refundRow = result.rows[0];
+
+    const refundedTotal = alreadyRefunded + amount;
+    oldStatus = invoice.status;
+    status = invoice.status;
+    if (refundedTotal >= totalPaid - 0.01 && totalPaid > 0) {
+      status = 'refunded';
+    } else if (refundedTotal > 0) {
+      status = 'partial_refunded';
+    }
+    await client.query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
+    customerId = invoice.customer_id;
+
+    await client.query('COMMIT');
+    committed = true;
+  } catch (err) {
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+    }
+    throw err;
+  } finally {
+    client.release();
   }
 
-  const result = await query(
-    `INSERT INTO refunds (id, payment_id, invoice_id, amount, reason, processed_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [uuidv4(), data.payment_id || null, data.invoice_id, amount, data.reason, userId]
-  );
-
-  const refunded = await query(
-    `SELECT COALESCE(SUM(amount), 0) AS total FROM refunds WHERE invoice_id = $1`,
-    [data.invoice_id]
-  );
-  const refundedTotal = parseFloat(refunded.rows[0].total);
-  let status = invoice.status;
-  if (refundedTotal >= parseFloat(invoice.total_paid) - 0.01 && invoice.total_paid > 0) {
-    status = 'refunded';
-  } else if (refundedTotal > 0) {
-    status = 'partial_refunded';
-  }
-  await query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
-  await syncCustomerArBalance(invoice.customer_id);
-
+  await syncCustomerArBalance(customerId);
   await logBillingAudit({
     userId,
     action: 'refund',
     entityType: 'invoice',
     entityId: data.invoice_id,
-    oldValues: { status: invoice.status, total_paid: invoice.total_paid },
+    oldValues: { status: oldStatus, total_paid: totalPaid },
     newValues: { refund_amount: amount, status, reason: data.reason },
     req,
   });
 
-  return result.rows[0];
+  return refundRow;
 };
 
 const exportInvoicesCsv = async (filters) => {
@@ -424,4 +502,5 @@ module.exports = {
   generateVatQR,
   ensureInvoicePdf,
   serveInvoicePdf,
+  computeRefundableAmount,
 };
