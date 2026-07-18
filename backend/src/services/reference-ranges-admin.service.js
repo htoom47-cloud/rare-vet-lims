@@ -50,10 +50,12 @@ const list = async ({ species, test_id, parameter_id, search, device_id, page, l
   const result = await query(
     `SELECT trr.*, tp.code AS parameter_code, tp.name AS parameter_name, tp.name_ar AS parameter_name_ar,
             t.id AS test_id, t.code AS test_code, t.name AS test_name,
+            tc.code AS category_code,
             di.name AS device_name
      FROM test_reference_ranges trr
      JOIN test_parameters tp ON tp.id = trr.parameter_id
      JOIN tests t ON t.id = tp.test_id
+     LEFT JOIN test_categories tc ON tc.id = t.category_id
      LEFT JOIN device_integrations di ON di.id = trr.device_id
      ${whereSql}
      ORDER BY t.code, tp.sort_order, trr.animal_type

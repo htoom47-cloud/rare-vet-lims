@@ -69,11 +69,19 @@ async function loadBrucellaCandidates(client) {
             (SELECT COUNT(*)::int FROM invoice_items ii WHERE ii.test_id = t.id) AS invoice_links
      FROM tests t
      LEFT JOIN test_categories tc ON tc.id = t.category_id
-     WHERE t.code = 'BRU-ROSE-BENGAL'
-        OR t.code ILIKE 'BRUCELLA'
-        OR t.name ILIKE '%BRUCELLA%'
-        OR t.name ILIKE '%rose%bengal%'
-        OR COALESCE(t.name_ar, '') ILIKE '%مالط%'
+     WHERE (
+          t.code = 'BRU-ROSE-BENGAL'
+          OR t.code ILIKE 'BRUCELLA'
+          OR t.name ILIKE '%BRUCELLA%'
+          OR t.name ILIKE '%rose%bengal%'
+          OR COALESCE(t.name_ar, '') ILIKE '%مالط%'
+       )
+       -- Never pull ELISA / serology disease assays into MICRO brucella consolidation
+       AND t.code NOT ILIKE '%ELISA%'
+       AND t.name NOT ILIKE '%ELISA%'
+       AND COALESCE(t.name_ar, '') NOT ILIKE '%إليزا%'
+       AND COALESCE(t.name_ar, '') NOT ILIKE '%اليزا%'
+       AND COALESCE(tc.code, '') <> 'ELISA'
      ORDER BY usage_count DESC, t.created_at ASC`
   );
   return result.rows;

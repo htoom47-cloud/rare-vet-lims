@@ -90,7 +90,12 @@ const TEST_PARAMS = {
   'CHEM-BASIC': { params: CHEM_PARAMS, rangesBySpecies: CHEM_REFERENCE_RANGES },
   'HORM-T4': { params: [{ code: 'T4', name: 'Thyroxine T4', name_ar: 'هرمون T4', unit: 'µg/dL' }], rangesBySpecies: HORM_REFERENCE_RANGES },
   'PCR-BRU': { params: [{ code: 'PCR-RES', name: 'PCR Result', name_ar: 'نتيجة PCR', unit: '' }] },
-  'ELISA-FMD': { params: [{ code: 'SP-RATIO', name: 'S/P Ratio', name_ar: 'نسبة S/P', unit: '' }] },
+  'ELISA-FMD': {
+    params: [
+      { code: 'SP-RATIO', name: 'S/P%', name_ar: 'S/P%', unit: '%' },
+      { code: 'RESULT', name: 'Result', name_ar: 'النتيجة', unit: 'qual' },
+    ],
+  },
   'CULT-BACT': { params: [{ code: 'GROWTH', name: 'Culture Result', name_ar: 'نتيجة المزرعة', unit: '' }] },
   'SERO-BRU': { params: [{ code: 'TITER', name: 'Antibody Titer', name_ar: 'العيار المصلي', unit: '' }] },
   'MICRO-FECAL': { params: [{ code: 'FINDINGS', name: 'Microscopic Findings', name_ar: 'الموجودات المجهرية', unit: '' }] },
@@ -260,6 +265,11 @@ async function seed() {
 
   for (const [code, config] of Object.entries(TEST_PARAMS)) {
     await seedTestParameters(testIdMap[code], config);
+  }
+
+  // ELISA technique label for report matrix (additive; safe if already set)
+  if (testIdMap['ELISA-FMD']) {
+    await query(`UPDATE tests SET method = COALESCE(NULLIF(method, ''), 'ELISA') WHERE id = $1`, [testIdMap['ELISA-FMD']]);
   }
 
   for (const user of USERS) {

@@ -113,6 +113,11 @@ const env = {
      * Min/Max → LOW/HIGH unchanged. Default false = current behaviour.
      */
     disableCriticalFlags: process.env.DISABLE_CRITICAL_FLAGS === 'true',
+    /**
+     * When true: ELISA-only entry/report layout (S/P% + Pos/Neg + text ref).
+     * Default false — no change to existing lab behaviour.
+     */
+    elisaSpecialEntry: process.env.ELISA_SPECIAL_ENTRY === 'true',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',

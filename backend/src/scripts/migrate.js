@@ -5,6 +5,7 @@ const { pool } = require('../config/database');
 const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
 const { ensureParasitologyCatalog } = require('./ensure-parasitology');
+const { ensureElisaCatalog } = require('./ensure-elisa-catalog');
 const { syncPermissionsCatalog, syncRolePermissions } = require('../utils/sync-permissions');
 
 async function syncLabContactInfo(client) {
@@ -316,6 +317,12 @@ async function applyPatches() {
       await ensureParasitologyCatalog();
     } catch (parasErr) {
       logger.warn('Parasitology catalog ensure failed — continuing migrate', { error: parasErr.message });
+    }
+    try {
+      // After parasitology consolidate — restore/ensure ELISA catalog (never leave ELISA under MICRO)
+      await ensureElisaCatalog();
+    } catch (elisaErr) {
+      logger.warn('ELISA catalog ensure failed — continuing migrate', { error: elisaErr.message });
     }
     await syncPermissionsCatalog(client);
     await syncRolePermissions(client);

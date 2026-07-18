@@ -7,10 +7,20 @@ import Modal from '../components/ui/Modal';
 import { samplesAPI, resultsAPI, testsAPI } from '../services/api';
 import { filterNonParasTests } from '../utils/parasitologyTests';
 import { NORMA_CBC_SECTIONS, normaSectionLabel, isNormaCbcTest, buildCbcResultFields } from '../constants/normaCbcPanel';
+import { useAuth } from '../context/AuthContext';
+import {
+  isElisaTest,
+  findSpParamIndex,
+  findQualParamIndex,
+  elisaTechniqueLabel,
+} from '../utils/elisaEntry';
 
 export default function TechnicianWorkbench() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const elisaSpecial = !!user?.features?.elisaSpecialEntry;
+  const isAr = i18n.language === 'ar';
   const [searchParams] = useSearchParams();
   const [queue, setQueue] = useState([]);
   const [imported, setImported] = useState([]);
@@ -58,7 +68,6 @@ export default function TechnicianWorkbench() {
       navigate(`/parasitology?sample=${sample.id}`);
       return;
     }
-    setSelectedSample({ ...data.data, tests: labTests });
     const form = {};
     const validated = {};
     for (const test of labTests) {
@@ -70,10 +79,15 @@ export default function TechnicianWorkbench() {
         existing = res.data.data;
       } catch { /* no results yet */ }
       validated[test.id] = Boolean(existing?.is_validated);
+      const detail = testDetail.data.data;
+      const rangesByParam = new Map(
+        (detail.reference_ranges || []).map((r) => [r.parameter_id, r.text_reference || r.notes || ''])
+      );
       form[test.id] = isCbc
-        ? buildCbcResultFields(testDetail.data.data.parameters || [], existing)
-        : (testDetail.data.data.parameters || []).map((p) => {
+        ? buildCbcResultFields(detail.parameters || [], existing)
+        : (detail.parameters || []).map((p) => {
           const val = existing?.values?.find((v) => v.parameter_id === p.id);
+          const catalogRef = rangesByParam.get(p.id) || '';
           return {
             parameter_id: p.id,
             code: p.code,
@@ -81,10 +95,14 @@ export default function TechnicianWorkbench() {
             unit: p.unit,
             value: val?.value || '',
             flag: val?.flag,
-            reference: val?.reference || '',
+            reference: val?.reference || catalogRef || '',
           };
         });
+      // Catalog meta for ELISA layout only (does not change save payload)
+      test.method = detail.method || test.method;
+      test.category_code = detail.category_code || test.category_code;
     }
+    setSelectedSample({ ...data.data, tests: labTests });
     setTestValidated(validated);
     setResultForm(form);
   };
@@ -186,7 +204,98 @@ export default function TechnicianWorkbench() {
     </div>
   );
 
+  const updateFieldValue = (test, idx, value) => {
+    const updated = [...resultForm[test.id]];
+    updated[idx] = { ...updated[idx], value };
+    setResultForm({ ...resultForm, [test.id]: updated });
+  };
+
+  const renderElisaFields = (test, fields) => {
+    const spIdx = findSpParamIndex(fields);
+    const qualIdx = findQualParamIndex(fields);
+    const disease = isAr
+      ? (test.test_name_ar || test.test_name || '—')
+      : (test.test_name || test.test_name_ar || '—');
+    const technique = elisaTechniqueLabel(test, i18n.language);
+    const spRef = spIdx >= 0 ? (fields[spIdx].reference || '') : '';
+    const qualRef = qualIdx >= 0 ? (fields[qualIdx].reference || '') : '';
+    const refText = spRef || qualRef || (isAr ? 'غير متوفر' : 'N/A');
+
+    return (
+      <div className="overflow-x-auto rounded-lg border border-primary-200 dark:border-primary-800">
+        <div className="bg-primary-800 text-white text-center text-sm font-semibold py-2">
+          {isAr ? 'تقنية إليزا' : 'ELISA Technique'}
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-primary-800 text-white">
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">{isAr ? 'م' : 'S/N'}</th>
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">{isAr ? 'رقم المختبر' : 'Lab. ID'}</th>
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">{isAr ? 'المرض المفحوص' : 'Investigated Disease'}</th>
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">{isAr ? 'التقنية' : 'Technique'}</th>
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">S/P%</th>
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">{isAr ? 'النتيجة' : 'Result'}</th>
+              <th className="px-2 py-1.5 border border-primary-700 font-medium">{isAr ? 'المجال المرجعي' : 'Reference Range'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="bg-white dark:bg-gray-900">
+              <td className="px-2 py-2 border border-primary-100 text-center">1</td>
+              <td className="px-2 py-2 border border-primary-100 text-center font-mono">{selectedSample?.sample_code || '—'}</td>
+              <td className="px-2 py-2 border border-primary-100 text-center font-semibold">{disease}</td>
+              <td className="px-2 py-2 border border-primary-100 text-center font-semibold">{technique}</td>
+              <td className="px-2 py-2 border border-primary-100">
+                {spIdx >= 0 ? (
+                  <input
+                    value={fields[spIdx].value}
+                    onChange={(e) => updateFieldValue(test, spIdx, e.target.value)}
+                    className="input-field py-1 text-center font-semibold"
+                    placeholder="S/P%"
+                    disabled={!!testValidated[test.id]}
+                  />
+                ) : (
+                  <span className="text-amber-600 text-xs">
+                    {isAr ? 'أضف معامل S/P% من دليل الفحوصات' : 'Add S/P% parameter in Tests'}
+                  </span>
+                )}
+              </td>
+              <td className="px-2 py-2 border border-primary-100">
+                {qualIdx >= 0 ? (
+                  <select
+                    value={fields[qualIdx].value}
+                    onChange={(e) => updateFieldValue(test, qualIdx, e.target.value)}
+                    className="input-field py-1 text-center font-semibold"
+                    disabled={!!testValidated[test.id]}
+                  >
+                    <option value="">—</option>
+                    <option value="Negative">{isAr ? 'سلبي' : 'Negative'}</option>
+                    <option value="Positive">{isAr ? 'إيجابي' : 'Positive'}</option>
+                  </select>
+                ) : (
+                  <span className="text-amber-600 text-xs">
+                    {isAr ? 'أضف معامل النتيجة (qual) من دليل الفحوصات' : 'Add Result (qual) parameter in Tests'}
+                  </span>
+                )}
+              </td>
+              <td className="px-2 py-2 border border-primary-100 text-xs whitespace-pre-line text-start min-w-[140px] text-primary-700 dark:text-primary-300">{refText}</td>
+            </tr>
+          </tbody>
+        </table>
+        {(spIdx < 0 || qualIdx < 0) && (
+          <p className="text-xs text-amber-700 p-2">
+            {isAr
+              ? 'فحص إليزا يحتاج معامل رقمي (S/P%) ومعامل نوعي للنتيجة (إيجابي/سلبي)، ومدى مرجعي نصي.'
+              : 'ELISA needs a numeric S/P% parameter, a qualitative Result (Positive/Negative), and a text reference range.'}
+          </p>
+        )}
+      </div>
+    );
+  };
+
   const renderTestFields = (test, fields) => {
+    if (elisaSpecial && isElisaTest(test)) {
+      return renderElisaFields(test, fields);
+    }
     if (!isNormaCbcTest(test)) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

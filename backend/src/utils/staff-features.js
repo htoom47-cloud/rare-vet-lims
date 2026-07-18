@@ -10,6 +10,8 @@ const getStaffFeatures = () => ({
   softDeleteRetentionHours: env.softDelete?.retentionHours ?? 48,
   /** When true: critical rates/alerts suppressed; HIGH/LOW from Min/Max remain */
   disableCriticalFlags: isCriticalFlagsDisabled(),
+  /** When true: ELISA entry/report uses S/P% + Pos/Neg + text reference layout */
+  elisaSpecialEntry: !!env.features?.elisaSpecialEntry,
 });
 
 module.exports = { getStaffFeatures };

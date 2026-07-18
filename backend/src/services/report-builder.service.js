@@ -37,27 +37,33 @@ const SECTION_META = {
     categoryCodes: ['HORM'],
   },
   elisa: {
-    titleEn: 'ELISA',
-    titleAr: 'ELISA',
+    titleEn: 'ELISA Technique',
+    titleAr: 'تقنية إليزا',
     sortOrder: 6,
-    categoryCodes: ['ELISA', 'SERO', 'IMMUNO'],
+    categoryCodes: ['ELISA'],
+  },
+  serology: {
+    titleEn: 'Serology',
+    titleAr: 'المصلية',
+    sortOrder: 7,
+    categoryCodes: ['SERO', 'IMMUNO'],
   },
   pcr: {
     titleEn: 'PCR',
     titleAr: 'PCR',
-    sortOrder: 7,
+    sortOrder: 8,
     categoryCodes: ['PCR'],
   },
   microscopy: {
     titleEn: 'Microscopy / Parasite Images',
     titleAr: 'صور الميكروسكوب / الطفيليات',
-    sortOrder: 8,
+    sortOrder: 9,
     isImageSection: true,
   },
   comparison: {
     titleEn: 'Comparison Report',
     titleAr: 'تقرير المقارنة',
-    sortOrder: 9,
+    sortOrder: 10,
     isComparisonSection: true,
   },
   other: {
@@ -80,7 +86,8 @@ const resolveSectionType = (testCode, categoryCode) => {
   if (/PARAS-BLOOD|BLOOD-PARAS|PARAS-B/.test(code)) return 'blood_parasites';
   if (/PARAS-STOOL|FECAL|STOOL|PARAS-F/.test(code)) return 'fecal';
   if (/^HORM/.test(code) || cat === 'HORM') return 'hormones';
-  if (/^ELISA/.test(code) || ['ELISA', 'SERO', 'IMMUNO'].includes(cat)) return 'elisa';
+  if (cat === 'ELISA' || /ELISA/i.test(code)) return 'elisa';
+  if (['SERO', 'IMMUNO'].includes(cat) || /^SERO/.test(code)) return 'serology';
   if (/PCR/.test(code) || cat === 'PCR') return 'pcr';
   return 'other';
 };

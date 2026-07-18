@@ -8,6 +8,7 @@ import { referenceRangesAPI, testsAPI, animalSpeciesAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext';
 import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 import { NORMA_CBC_PCT_BY_ABS } from '../constants/normaCbcPanel';
+import { isElisaTest } from '../utils/elisaEntry';
 
 const PCT_LABEL = Object.fromEntries(
   Object.entries(NORMA_CBC_PCT_BY_ABS).map(([abs, pct]) => [pct, `${abs}%`])
@@ -42,9 +43,10 @@ const emptySpeciesForm = () => ({ code: '', name_en: '', name_ar: '', sort_order
 
 export default function ReferenceRanges() {
   const { t, i18n } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const isAr = i18n.language === 'ar';
   const canManage = hasPermission('reference_ranges.manage');
+  const elisaSpecial = !!user?.features?.elisaSpecialEntry;
   const { species, codes, label, reload: reloadSpecies } = useAnimalSpecies();
 
   const [rows, setRows] = useState([]);
@@ -106,20 +108,25 @@ export default function ReferenceRanges() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (elisaTextMode && !String(form.text_reference || '').trim()) {
+      toast.error(isAr ? 'أدخل النص المرجعي لـ ELISA' : 'Enter ELISA text reference');
+      return;
+    }
     if (form.min_value !== '' && form.max_value !== '' && Number(form.min_value) > Number(form.max_value)) {
       toast.error(isAr ? 'الحد الأدنى أكبر من الأعلى' : 'Min cannot be greater than Max');
       return;
     }
     const payload = {
       ...form,
-      min_value: form.min_value !== '' ? Number(form.min_value) : null,
-      max_value: form.max_value !== '' ? Number(form.max_value) : null,
-      critical_low: form.critical_low !== '' ? Number(form.critical_low) : null,
-      critical_high: form.critical_high !== '' ? Number(form.critical_high) : null,
+      min_value: elisaTextMode ? null : (form.min_value !== '' ? Number(form.min_value) : null),
+      max_value: elisaTextMode ? null : (form.max_value !== '' ? Number(form.max_value) : null),
+      critical_low: elisaTextMode ? null : (form.critical_low !== '' ? Number(form.critical_low) : null),
+      critical_high: elisaTextMode ? null : (form.critical_high !== '' ? Number(form.critical_high) : null),
       age_min: form.age_min !== '' ? Number(form.age_min) : null,
       age_max: form.age_max !== '' ? Number(form.age_max) : null,
       sex: form.sex || null,
       device_id: form.device_id || null,
+      text_reference: form.text_reference || null,
     };
     try {
       if (editingId) {
@@ -188,6 +195,13 @@ export default function ReferenceRanges() {
 
   const selectedTest = tests.find((tst) => tst.id === filters.test_id);
   const isCbcTest = selectedTest?.code === 'CBC-FULL';
+  const isElisaSelected = elisaSpecial && isElisaTest(selectedTest || {});
+  const editingRow = editingId ? rows.find((r) => r.id === editingId) : null;
+  const isElisaEditing = elisaSpecial && editingRow && (
+    String(editingRow.category_code || '').toUpperCase() === 'ELISA'
+    || String(editingRow.test_code || '').toUpperCase().startsWith('ELISA')
+  );
+  const elisaTextMode = isElisaSelected || isElisaEditing;
 
   const parameterOptions = isCbcTest
     ? parameters.map((p) => ({ id: cbcRefParameterId(p), label: cbcRefParameterLabel(p, isAr), code: p.pct_code || p.code }))
@@ -370,12 +384,34 @@ export default function ReferenceRanges() {
           <select className="input-field" value={form.animal_type} onChange={(e) => setForm({ ...form, animal_type: e.target.value })} required disabled={!!editingId}>
             {codes.map((c) => <option key={c} value={c}>{label(c, isAr)}</option>)}
           </select>
-          <div className="grid grid-cols-2 gap-3">
-            <input type="number" step="any" placeholder="Min" className="input-field" value={form.min_value} onChange={(e) => setForm({ ...form, min_value: e.target.value })} />
-            <input type="number" step="any" placeholder="Max" className="input-field" value={form.max_value} onChange={(e) => setForm({ ...form, max_value: e.target.value })} />
-          </div>
-          <input className="input-field" placeholder={isAr ? 'نص مرجعي (وصفي)' : 'Text reference'} value={form.text_reference} onChange={(e) => setForm({ ...form, text_reference: e.target.value })} />
-          <input className="input-field" placeholder={isAr ? 'الوحدة' : 'Unit'} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+          {elisaTextMode ? (
+            <>
+              <p className="text-xs text-primary-600">
+                {isAr
+                  ? 'مدى ELISA نصي. مثال: Negative: S/P% ≤ 110% ثم Suspect ثم Positive — كل شرط في سطر.'
+                  : 'ELISA uses a text reference. Example: one line each for Negative / Suspect / Positive S/P% criteria.'}
+              </p>
+              <textarea
+                className="input-field min-h-[120px] font-mono text-sm"
+                placeholder={isAr
+                  ? 'Negative: S/P% ≤ 110%\nSuspect: 110% < S/P% < 120%\nPositive: S/P% ≥ 120%'
+                  : 'Negative: S/P% ≤ 110%\nSuspect: 110% < S/P% < 120%\nPositive: S/P% ≥ 120%'}
+                value={form.text_reference}
+                onChange={(e) => setForm({ ...form, text_reference: e.target.value })}
+                required
+              />
+              <input className="input-field" placeholder={isAr ? 'الوحدة (اختياري، مثل %)' : 'Unit (optional, e.g. %)'} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" step="any" placeholder="Min" className="input-field" value={form.min_value} onChange={(e) => setForm({ ...form, min_value: e.target.value })} />
+                <input type="number" step="any" placeholder="Max" className="input-field" value={form.max_value} onChange={(e) => setForm({ ...form, max_value: e.target.value })} />
+              </div>
+              <input className="input-field" placeholder={isAr ? 'نص مرجعي (وصفي)' : 'Text reference'} value={form.text_reference} onChange={(e) => setForm({ ...form, text_reference: e.target.value })} />
+              <input className="input-field" placeholder={isAr ? 'الوحدة' : 'Unit'} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+            </>
+          )}
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setFormOpen(false)} className="btn-secondary">{t('common.cancel')}</button>
             <button type="submit" className="btn-primary">{t('common.save')}</button>

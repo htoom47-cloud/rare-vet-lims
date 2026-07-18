@@ -15,6 +15,11 @@ const {
   getPatientFields,
   t,
 } = require('./helpers');
+const {
+  buildElisaMatrixRows,
+  splitElisaSectionResults,
+  isElisaRow,
+} = require('../../elisa-report');
 
 const ASSETS = path.join(__dirname, '../../../assets');
 const FONTS = path.join(ASSETS, 'fonts');
@@ -143,6 +148,43 @@ const buildResultsTable = (results, lang, sectionTitle) => {
     </section>`;
 };
 
+const formatElisaRefHtml = (text) => escapeHtml(text || '')
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .join('<br />');
+
+/** ELISA disease matrix — only when ELISA_SPECIAL_ENTRY=true. */
+const buildElisaResultsTable = (results, lang, sectionTitle, sampleCode) => {
+  const matrix = buildElisaMatrixRows(results, { sampleCode, lang });
+  if (!matrix.length) return '';
+  const title = sectionTitle || t(lang, 'ELISA Technique', 'تقنية إليزا');
+  const headers = lang === 'ar'
+    ? ['م', 'رقم المختبر', 'المرض المفحوص', 'التقنية', 'S/P%', 'النتيجة', 'المجال المرجعي']
+    : ['S/N', 'Lab. ID', 'Investigated Disease', 'Technique', 'S/P%', 'Result', 'Reference Range'];
+  const headRow = headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('');
+  const bodyRows = matrix.map((row) => `
+    <tr class="results-row elisa-row">
+      <td class="col-sn">${escapeHtml(String(row.sn))}</td>
+      <td class="col-labid">${escapeHtml(row.labId)}</td>
+      <td class="col-disease"><strong>${escapeHtml(row.disease)}</strong></td>
+      <td class="col-technique"><strong>${escapeHtml(row.technique)}</strong></td>
+      <td class="col-sp"><strong>${escapeHtml(row.spPercent)}</strong></td>
+      <td class="col-elisa-result"><strong>${escapeHtml(row.result)}</strong></td>
+      <td class="col-elisa-ref">${formatElisaRefHtml(row.reference)}</td>
+    </tr>`).join('');
+  return `
+    <section class="section section--table section--elisa card">
+      <div class="section__head section__head--elisa">${escapeHtml(title)}</div>
+      <div class="table-wrap elisa-box__body">
+        <table class="results-table results-table--elisa">
+          <thead><tr>${headRow}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+    </section>`;
+};
+
 const buildImagesSection = async (attachments, lang, sectionTitle) => {
   if (!attachments?.length) return '';
   const { readImageBuffer } = require('../../../config/storage');
@@ -162,14 +204,26 @@ const buildImagesSection = async (attachments, lang, sectionTitle) => {
     </section>`;
 };
 
-const buildDynamicSections = async (sections, lang) => {
+const buildDynamicSections = async (sections, lang, sampleCode = '') => {
   if (!sections?.length) return '';
+  const elisaSpecial = !!env.features?.elisaSpecialEntry;
   const blocks = [];
   for (const section of sections) {
     if (section.isImageSection && section.attachments?.length) {
       blocks.push(await buildImagesSection(section.attachments, lang, section.title));
     } else if (section.results?.length) {
-      blocks.push(buildResultsTable(section.results, lang, section.title));
+      if (elisaSpecial && section.sectionType === 'elisa') {
+        const { elisa, other } = splitElisaSectionResults(section.results);
+        const elisaTitle = t(lang, 'ELISA Technique', 'تقنية إليزا');
+        if (elisa.length) {
+          blocks.push(buildElisaResultsTable(elisa, lang, elisaTitle, sampleCode));
+        }
+        if (other.length) {
+          blocks.push(buildResultsTable(other, lang, elisa.length ? null : section.title));
+        }
+      } else {
+        blocks.push(buildResultsTable(section.results, lang, section.title));
+      }
     }
   }
   return blocks.join('');
@@ -262,17 +316,19 @@ const buildReportHtml = async (reportData) => {
     });
   } catch { /* */ }
 
-  const counts = buildResultCounts(reportData.results || []);
+  // ELISA qualitative results must not feed HIGH/LOW/NORMAL overview counts
+  const overviewResults = (reportData.results || []).filter((r) => !isElisaRow(r));
+  const counts = buildResultCounts(overviewResults);
   const css = loadStyles();
   const dynamicSections = reportData.sections?.length
-    ? await buildDynamicSections(reportData.sections, lang)
+    ? await buildDynamicSections(reportData.sections, lang, reportData.sampleCode || '')
     : buildResultsTable(reportData.results || [], lang);
 
   const mainBlock = `
     <div class="report-main">
       ${buildHeader(reportData, lab, logoDataUri, barcodeDataUri, lang)}
       ${buildPatientSection(reportData, lang)}
-      ${buildOverview(counts, lang)}
+      ${overviewResults.length ? buildOverview(counts, lang) : ''}
       ${dynamicSections}
     </div>`;
 

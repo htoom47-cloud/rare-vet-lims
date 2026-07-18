@@ -12,8 +12,12 @@ export const NO_MALTA_FOUND_VALUE = 'لا توجد مالطيه';
 /** Lab brucella test codes — BRUCELLA is canonical; BRU-ROSE-BENGAL is legacy catalog. */
 export const BRUCELLA_TEST_CODES = new Set([PARAS_BRU_ROSE, PARAS_BRUCELLA]);
 
-export const isBrucellaTestCode = (code) =>
-  BRUCELLA_TEST_CODES.has(code) || (code && /^BRU/i.test(code));
+export const isBrucellaTestCode = (code) => {
+  if (!code) return false;
+  // ELISA assays (e.g. BRU-ELISA) are not parasitology Rose Bengal panels
+  if (/ELISA/i.test(code)) return false;
+  return BRUCELLA_TEST_CODES.has(code) || /^BRU/i.test(code);
+};
 
 export const noneFoundValueForTest = (testCode) =>
   (isBrucellaTestCode(testCode) ? NO_MALTA_FOUND_VALUE : NO_PARASITE_FOUND_VALUE);
