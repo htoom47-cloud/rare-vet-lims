@@ -19,6 +19,53 @@ const resultLimsCode = (row) => (
 );
 
 /**
+ * Manual Edit > Device Import (charter).
+ *
+ * When results were saved by a staff user (`entered_by` set), existing non-empty
+ * parameter values must not be replaced by device data. Device may only fill
+ * parameters that are still empty/missing.
+ *
+ * Pure helper — used by importCbcResults and unit verification.
+ *
+ * @param {Array<{parameter_id: string, value: string, notes?: string|null}>} existingRows
+ * @param {Array<{parameter_id: string, value: string, notes?: string|null}>} deviceValues
+ * @param {{ protectManual: boolean }} options
+ */
+const mergeDeviceValuesWithManualProtection = (existingRows, deviceValues, { protectManual }) => {
+  const byParam = new Map(
+    (existingRows || []).map((row) => [
+      row.parameter_id,
+      { value: String(row.value), notes: row.notes || null },
+    ])
+  );
+
+  let preserved = 0;
+  let applied = 0;
+
+  for (const v of deviceValues || []) {
+    const prev = byParam.get(v.parameter_id);
+    const hasPrev = Boolean(prev && prev.value != null && String(prev.value).trim() !== '');
+    if (protectManual && hasPrev) {
+      preserved += 1;
+      continue;
+    }
+    byParam.set(v.parameter_id, {
+      value: v.value,
+      notes: v.notes != null ? v.notes : (prev?.notes ?? null),
+    });
+    applied += 1;
+  }
+
+  const mergedValues = [...byParam.entries()].map(([parameter_id, { value, notes }]) => ({
+    parameter_id,
+    value,
+    ...(notes ? { notes } : {}),
+  }));
+
+  return { mergedValues, preserved, applied };
+};
+
+/**
  * Round device-imported numeric values for display/storage.
  * Qualitative / non-numeric strings are left unchanged.
  * CHEM-BASIC (Mindray): always 1 decimal (e.g. 12.2). Other tests: use param decimal_places if set.
@@ -267,45 +314,74 @@ const importCbcResults = async ({
     throw new AppError(`No matching ${testCode} parameters found in message (received: ${codes})`, 400, 'NO_MAPPED_PARAMS');
   }
 
-  let mergedValues = values;
+  // Manual Edit > Device Import: protect staff-entered values (entered_by set).
+  let existingMeta = null;
+  let existingRawRows = [];
   try {
-    const existingRaw = await query(
-      `SELECT rv.parameter_id, rv.value, rv.notes
-       FROM results r
-       JOIN result_values rv ON rv.result_id = r.id
-       WHERE r.sample_test_id = $1
-         AND rv.value IS NOT NULL AND TRIM(rv.value) <> ''`,
+    const meta = await query(
+      `SELECT id, entered_by, is_validated, technician_notes
+       FROM results
+       WHERE sample_test_id = $1
+       LIMIT 1`,
       [sampleTest.id]
     );
-    if (existingRaw.rows.length) {
-      const byParam = new Map(
-        existingRaw.rows.map((row) => [
-          row.parameter_id,
-          { value: String(row.value), notes: row.notes || null },
-        ])
+    existingMeta = meta.rows[0] || null;
+    if (existingMeta) {
+      const existingRaw = await query(
+        `SELECT rv.parameter_id, rv.value, rv.notes
+         FROM result_values rv
+         WHERE rv.result_id = $1
+           AND rv.value IS NOT NULL AND TRIM(rv.value) <> ''`,
+        [existingMeta.id]
       );
-      for (const v of values) {
-        const prev = byParam.get(v.parameter_id);
-        byParam.set(v.parameter_id, {
-          value: v.value,
-          notes: v.notes != null ? v.notes : (prev?.notes ?? null),
-        });
-      }
-      mergedValues = [...byParam.entries()].map(([parameter_id, { value, notes }]) => ({
-        parameter_id,
-        value,
-        ...(notes ? { notes } : {}),
-      }));
+      existingRawRows = existingRaw.rows;
     }
   } catch {
     /* first import */
   }
 
+  const protectManual = Boolean(existingMeta?.entered_by);
+  const { mergedValues, preserved, applied } = mergeDeviceValuesWithManualProtection(
+    existingRawRows,
+    values,
+    { protectManual }
+  );
+
+  if (protectManual && applied === 0) {
+    logger.info('Device import did not overwrite manual results', {
+      sampleId,
+      sampleTestId: sampleTest.id,
+      preserved,
+      deviceName: deviceName || null,
+    });
+    return {
+      sample_test_id: sampleTest.id,
+      test_code: testCode,
+      imported: 0,
+      added: values.length,
+      preserved_manual: preserved,
+      manual_protected: true,
+      skipped,
+      mapping_warnings: mappingWarnings,
+      reference_animal_type: species,
+      species_exact_match: exactMatch,
+      lims_animal_type: limsAnimalType,
+      species_mismatch: Boolean(speciesRaw && limsAnimalType && species !== limsAnimalType),
+      result: await resultsService.getBySampleTest(sampleTest.id),
+    };
+  }
+
+  // Keep staff authorship when protecting manual edits; never null out entered_by.
+  const enterAsUserId = protectManual ? existingMeta.entered_by : null;
+  const technicianNotes = protectManual
+    ? (existingMeta.technician_notes || null)
+    : `Imported from ${deviceName || 'Norma CBC'} (${new Date().toISOString()})`;
+
   const saved = await resultsService.enterResults({
     sample_test_id: sampleTest.id,
-    technician_notes: `Imported from ${deviceName || 'Norma CBC'} (${new Date().toISOString()})`,
+    technician_notes: technicianNotes,
     values: mergedValues,
-  }, null);
+  }, enterAsUserId);
 
   await query(
     `UPDATE samples SET status = 'running' WHERE id = $1 AND status IN ('pending', 'received')`,
@@ -317,6 +393,8 @@ const importCbcResults = async ({
     test_code: testCode,
     imported: mergedValues.length,
     added: values.length,
+    preserved_manual: preserved,
+    manual_protected: protectManual,
     skipped,
     mapping_warnings: mappingWarnings,
     reference_animal_type: species,
@@ -352,4 +430,9 @@ const importFromParsed = async (parsed, device) => {
   };
 };
 
-module.exports = { findSampleByBarcode, importFromParsed, importCbcResults };
+module.exports = {
+  findSampleByBarcode,
+  importFromParsed,
+  importCbcResults,
+  mergeDeviceValuesWithManualProtection,
+};
