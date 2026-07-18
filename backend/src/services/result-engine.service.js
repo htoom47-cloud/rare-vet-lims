@@ -252,6 +252,8 @@ const evaluateResult = (result = {}, context = {}) => {
     };
   }
 
+  // Numeric value without min/max: keep text_reference for report display,
+  // but do not apply HIGH/LOW (no numeric bounds to evaluate against).
   if (normalized.numericValue != null) {
     return {
       ...normalized,
@@ -259,7 +261,7 @@ const evaluateResult = (result = {}, context = {}) => {
       unit: result.unit ?? context.unit ?? null,
       reference,
       referenceRange,
-      hasReference: false,
+      hasReference,
       ...mapEvaluatedFlag({ flag: '', isCritical: false }, {
         isMissing: false,
         hasReference: false,

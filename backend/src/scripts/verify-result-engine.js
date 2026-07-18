@@ -153,5 +153,22 @@ check('normalizeResultValue keeps percentage numeric', () => {
   assert.strictEqual(n.isMissing, false);
 });
 
+check('Numeric value + text_reference only → show text, no HIGH/LOW', () => {
+  const text = 'Negative: S/P% < 40\nSuspect: 40–50\nPositive: S/P% ≥ 50';
+  const row = limsRow('SP-RATIO', null, null, {
+    value: '62',
+    unit: '%',
+    text_reference: text,
+  });
+  const ev = engine.evaluateResult(row);
+  assert.strictEqual(ev.hasReference, true);
+  assert.strictEqual(ev.reference, text);
+  assert.notStrictEqual(ev.flag, engine.RESULT_FLAGS.HIGH);
+  assert.notStrictEqual(ev.flag, engine.RESULT_FLAGS.LOW);
+  const reportRow = engine.buildReportResultRow(row, { language: 'ar' });
+  assert.strictEqual(reportRow.hasReference, true);
+  assert.strictEqual(reportRow.reference, text);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed ? 1 : 0);

@@ -536,7 +536,7 @@ body[dir='rtl'] {
 
 .results-table--elisa .col-elisa-ref {
   text-align: start;
-  white-space: normal;
+  white-space: pre-line;
   line-height: var(--line-normal);
   font-size: var(--font-xs);
   min-width: 140px;
@@ -545,7 +545,7 @@ body[dir='rtl'] {
 
 .results-table--elisa .col-elisa-ref .ref-badge,
 .results-table--elisa .col-elisa-ref {
-  white-space: normal;
+  white-space: pre-line;
 }
 
 .test-name {

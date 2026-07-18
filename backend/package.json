@@ -19,6 +19,11 @@
     "backup": "node src/scripts/backup-db.js",
     "backup:uploads": "node src/scripts/backup-uploads.js",
     "test:s3": "node src/scripts/test-s3-storage.js",
+    "verify:result-engine": "node src/scripts/verify-result-engine.js",
+    "verify:elisa-report": "node src/scripts/verify-elisa-report.js",
+    "audit:elisa-refs": "node src/scripts/audit-elisa-text-refs.js",
+    "ensure:elisa-refs": "node src/scripts/ensure-elisa-text-refs.js",
+    "ensure:elisa-refs:apply": "node src/scripts/ensure-elisa-text-refs.js --apply",
     "test": "echo \"No tests configured\" && exit 0"
   },
   "dependencies": {

@@ -51,8 +51,12 @@ const displayResultValue = (qualRow, lang) => {
   return raw;
 };
 
-const pickReference = (spRow, qualRow) => {
-  const candidates = [spRow?.reference, qualRow?.reference].filter(Boolean);
+const pickReference = (...rows) => {
+  const candidates = [];
+  for (const row of rows) {
+    if (!row) continue;
+    if (row.reference != null) candidates.push(row.reference);
+  }
   for (const ref of candidates) {
     const s = String(ref).trim();
     if (s && s !== '-' && s !== 'N/A' && s !== 'غير متوفر') return s;
@@ -104,7 +108,8 @@ const buildElisaMatrixRows = (results = [], { sampleCode = '', lang = 'ar' } = {
       technique: displayTechnique(method, lang),
       spPercent: displaySpValue(spRow),
       result: displayResultValue(qualRow, lang),
-      reference: pickReference(spRow, qualRow) || (lang === 'ar' ? 'غير متوفر' : 'N/A'),
+      // Prefer SP-RATIO text, then RESULT, then any other param in the assay group
+      reference: pickReference(spRow, qualRow, ...rows) || (lang === 'ar' ? 'غير متوفر' : 'N/A'),
     });
   }
   return matrix;
