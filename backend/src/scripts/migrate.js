@@ -213,19 +213,49 @@ async function fixDuplicateSampleTests(client) {
  * UNIQUE(sample_id) index could be created. That ran on every schema-exists
  * boot and permanently destroyed prior report versions.
  *
+ * *** HARD RULES — DO NOT REINTRODUCE ***
+ * - Never delete or truncate report rows to enforce uniqueness.
+ * - Never recreate UNIQUE(sample_id) or idx_reports_sample_id_unique.
+ * - Multiple reports per sample are an intentional design (history / versions).
+ * - Application code selects the latest report; DB must allow history rows.
+ *
+ * *** SAFE ROLLBACK (after this ships) ***
+ * - Do NOT redeploy a prior build that still deletes older reports per sample.
+ * - Do NOT "fix" a bad deploy by deleting reports or recreating UNIQUE(sample_id).
+ * - Hotfix forward on the current release, or restore from a DB backup.
+ * - git revert of the C1 commit is UNSAFE after deploy if it restores destructive migrate SQL.
+ *
  * Safe / idempotent behavior:
- * - Never DELETE / TRUNCATE report rows
- * - Drop the destructive unique index if present
+ * - Drop standalone unique index idx_reports_sample_id_unique if present
+ * - Refuse silently-unsafe DROP when uniqueness is a table CONSTRAINT (log + skip drop)
  * - Keep a non-unique sample_id lookup index
  */
 async function ensureReportsHistoryPreserved(client) {
-  await client.query('DROP INDEX IF EXISTS idx_reports_sample_id_unique');
+  const owned = await client.query(`
+    SELECT con.conname
+    FROM pg_class t
+    JOIN pg_index ix ON ix.indrelid = t.oid
+    JOIN pg_class i ON i.oid = ix.indexrelid
+    JOIN pg_constraint con ON con.conindid = i.oid
+    WHERE t.relname = 'reports'
+      AND i.relname = 'idx_reports_sample_id_unique'
+  `);
+  if (owned.rows[0]) {
+    logger.error(
+      'idx_reports_sample_id_unique is owned by a table CONSTRAINT — DROP INDEX cannot remove it. '
+      + 'Do NOT delete reports. Manual review required before ALTER TABLE ... DROP CONSTRAINT.',
+      { constraint: owned.rows[0].conname }
+    );
+  } else {
+    await client.query('DROP INDEX IF EXISTS idx_reports_sample_id_unique');
+  }
+
   await client.query(`
     CREATE INDEX IF NOT EXISTS idx_reports_sample_id
     ON reports (sample_id)
     WHERE sample_id IS NOT NULL
   `);
-  logger.info('Report history preserved — unique(sample_id) index not enforced; lookup index ensured');
+  logger.info('Report history preserved — unique(sample_id) not enforced; lookup index ensured');
 }
 
 async function applyPatches() {

@@ -45,12 +45,20 @@ const migrateSrc = fs.readFileSync(migratePath, 'utf8');
 
 console.log('\n=== C1 migrate report history — static ===\n');
 
-check('migrate.js has no DELETE FROM reports older', () => {
-  assert.ok(!/DELETE\s+FROM\s+reports\s+older/i.test(migrateSrc));
+check('migrate.js has no executable DELETE of older reports', () => {
+  // Allow documentation warnings; forbid the old SQL payload (DELETE ... USING).
+  assert.ok(!/DELETE\s+FROM\s+reports\s+older\s*\n?\s*USING\s+reports\s+newer/i.test(migrateSrc));
+  assert.ok(!/client\.query\(\s*[`'"]\s*DELETE\s+FROM\s+reports/i.test(migrateSrc));
 });
 
 check('migrate.js has no CREATE UNIQUE INDEX idx_reports_sample_id_unique', () => {
-  assert.ok(!/CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+idx_reports_sample_id_unique/i.test(migrateSrc));
+  assert.ok(!/CREATE\s+UNIQUE\s+INDEX\s+(IF\s+NOT\s+EXISTS\s+)?idx_reports_sample_id_unique/i.test(migrateSrc));
+});
+
+check('migrate.js documents unsafe rollback / no UNIQUE reintroduction', () => {
+  assert.ok(/HARD RULES/i.test(migrateSrc));
+  assert.ok(/SAFE ROLLBACK/i.test(migrateSrc));
+  assert.ok(/git revert of the C1 commit is UNSAFE/i.test(migrateSrc));
 });
 
 check('migrate.js calls ensureReportsHistoryPreserved', () => {
