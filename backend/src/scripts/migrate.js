@@ -206,6 +206,28 @@ async function fixDuplicateSampleTests(client) {
   logger.info('Unique constraint on sample_tests(sample_id, test_id) ensured');
 }
 
+/**
+ * Preserve all report history across migrate / cloud boot.
+ *
+ * Previously applyPatches deleted older reports for the same sample so a
+ * UNIQUE(sample_id) index could be created. That ran on every schema-exists
+ * boot and permanently destroyed prior report versions.
+ *
+ * Safe / idempotent behavior:
+ * - Never DELETE / TRUNCATE report rows
+ * - Drop the destructive unique index if present
+ * - Keep a non-unique sample_id lookup index
+ */
+async function ensureReportsHistoryPreserved(client) {
+  await client.query('DROP INDEX IF EXISTS idx_reports_sample_id_unique');
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_reports_sample_id
+    ON reports (sample_id)
+    WHERE sample_id IS NOT NULL
+  `);
+  logger.info('Report history preserved — unique(sample_id) index not enforced; lookup index ensured');
+}
+
 async function applyPatches() {
   const client = await pool.connect();
   try {
@@ -548,18 +570,8 @@ async function applyPatches() {
       END $$
     `);
     await fixDuplicateSampleTests(client);
-    await client.query(`
-      DELETE FROM reports older
-      USING reports newer
-      WHERE older.sample_id IS NOT NULL
-        AND older.sample_id = newer.sample_id
-        AND older.created_at < newer.created_at
-    `);
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_sample_id_unique
-      ON reports (sample_id)
-      WHERE sample_id IS NOT NULL
-    `);
+    // C1: never delete report rows on migrate/boot. Historical versions must survive.
+    await ensureReportsHistoryPreserved(client);
     await client.query(`
       ALTER TABLE samples
         ADD COLUMN IF NOT EXISTS lab_handover_at TIMESTAMPTZ,
@@ -653,9 +665,16 @@ async function migrate() {
   await applyPatches();
 }
 
-migrate()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    logger.error('Migration failed', { error: err.message });
-    process.exit(1);
-  });
+if (require.main === module) {
+  migrate()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      logger.error('Migration failed', { error: err.message });
+      process.exit(1);
+    });
+}
+
+module.exports = {
+  ensureReportsHistoryPreserved,
+  migrate,
+};
