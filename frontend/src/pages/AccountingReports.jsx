@@ -14,6 +14,7 @@ import DiscountField from '../components/billing/DiscountField';
 import {
   DISCOUNT_TYPES, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals,
 } from '../utils/discount';
+import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -325,21 +326,25 @@ export default function AccountingReports() {
     }
   };
 
-  const printInvoice = async (id) => {
+  const printInvoice = async (id, { thermal = false } = {}) => {
     setPdfLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
-      const API_URL = import.meta.env.VITE_API_URL || '/api';
-      const response = await fetch(`${API_URL}/billing/invoices/${id}/pdf`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) throw new Error();
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const w = window.open(url, '_blank');
-      if (w) w.addEventListener('load', () => w.print());
-    } catch {
-      toast.error(t('billing.pdfFailed'));
+      if (thermal) {
+        const result = await printInvoiceToEpson(id);
+        toast.success(t('billing.thermalPrintOk', { printer: result.printer }));
+      } else {
+        await billingAPI.openInvoicePdf(id, { autoPrint: true });
+      }
+    } catch (error) {
+      if (thermal && error?.code === EPSON_PRINT_ERROR.BRIDGE_UNAVAILABLE) {
+        toast.error(t('billing.thermalBridgeRequired'), { duration: 8000 });
+      } else if (thermal && error?.code === EPSON_PRINT_ERROR.PRINTER_UNAVAILABLE) {
+        toast.error(t('billing.thermalPrinterMissing'), { duration: 8000 });
+      } else if (thermal) {
+        toast.error(t('billing.thermalPrintFailed'));
+      } else {
+        toast.error(t('billing.pdfFailed'));
+      }
     } finally {
       setPdfLoading(false);
     }
@@ -537,7 +542,7 @@ export default function AccountingReports() {
                       <div className="flex flex-wrap gap-1">
                         <button type="button" title={t('common.view')} onClick={() => openDetail(inv)} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Eye size={15} /></button>
                         <button type="button" title={t('billing.downloadPdf')} onClick={() => openInvoicePdf(inv.id)} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Download size={15} /></button>
-                        <button type="button" title={t('accounting.print')} onClick={() => printInvoice(inv.id)} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Printer size={15} /></button>
+                        <button type="button" title={t('billing.printThermal')} onClick={() => printInvoice(inv.id, { thermal: true })} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Printer size={15} /></button>
                         {canPay && !['paid', 'cancelled', 'refunded'].includes(inv.status) && (
                           <button type="button" title={t('billing.payment')} onClick={() => openPayment(inv)} className="p-1.5 rounded hover:bg-gray-100 text-green-600"><CreditCard size={15} /></button>
                         )}
@@ -775,7 +780,8 @@ export default function AccountingReports() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => openInvoicePdf(detailInvoice.id)} disabled={pdfLoading} className="btn-secondary text-sm flex items-center gap-1"><Download size={14} /> PDF</button>
-              <button type="button" onClick={() => printInvoice(detailInvoice.id)} className="btn-secondary text-sm flex items-center gap-1"><Printer size={14} /> {t('accounting.print')}</button>
+              <button type="button" onClick={() => printInvoice(detailInvoice.id, { thermal: true })} disabled={pdfLoading} className="btn-primary text-sm flex items-center gap-1"><Printer size={14} /> {t('billing.printThermal')}</button>
+              <button type="button" onClick={() => printInvoice(detailInvoice.id)} disabled={pdfLoading} className="btn-secondary text-sm flex items-center gap-1"><Printer size={14} /> {t('accounting.print')} A4</button>
             </div>
             {(detailInvoice.payments || []).length > 0 && (
               <div>

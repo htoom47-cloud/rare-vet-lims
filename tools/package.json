@@ -1,0 +1,12 @@
+{
+  "name": "rare-vet-lims-print-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Zebra and Epson print bridge for Rare Vet LIMS",
+  "scripts": {
+    "start": "node zebra-local-bridge.js"
+  },
+  "dependencies": {
+    "pdf-to-printer": "5.8.0"
+  }
+}

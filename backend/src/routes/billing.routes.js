@@ -204,7 +204,10 @@ router.post('/invoices/:id/cancel', authorize(PERMISSIONS.BILLING_CANCEL), async
 
 router.get('/invoices/:id/pdf', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
-    await service.serveInvoicePdf(req.params.id, res, { regenerate: req.query.regenerate === '1' });
+    await service.serveInvoicePdf(req.params.id, res, {
+      regenerate: req.query.regenerate === '1',
+      format: req.query.format,
+    });
   } catch (err) { next(err); }
 });
 

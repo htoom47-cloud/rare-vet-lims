@@ -6,6 +6,7 @@ const { uuidv4 } = require('../utils/uuid');
 const path = require('path');
 const fs = require('fs');
 const { generateInvoicePDF } = require('../utils/invoice-pdf');
+const { generateThermalInvoicePDF } = require('../utils/invoice-thermal-pdf');
 const invoiceSettingsService = require('./invoice-settings.service');
 const { syncCustomerArBalance } = require('./accounting.service');
 const ledger = require('./ledger.service');
@@ -472,7 +473,41 @@ const ensureInvoicePdf = async (id) => {
   return { invoice: { ...invoice, pdf_url: pdf.url }, filename: pdf.filename, url: pdf.url };
 };
 
-const serveInvoicePdf = async (id, res, { regenerate = false } = {}) => {
+const isThermalFormat = (format) => ['thermal', '80mm', 'receipt'].includes(String(format || '').toLowerCase());
+
+const serveThermalInvoicePdf = async (id, res) => {
+  const invoice = await getInvoiceById(id);
+  const freshQr = generateVatQR(invoice);
+  if (invoice.vat_qr_data !== freshQr) {
+    await query('UPDATE invoices SET vat_qr_data = $1 WHERE id = $2', [freshQr, id]);
+    invoice.vat_qr_data = freshQr;
+  }
+
+  const settings = await invoiceSettingsService.getInvoiceSettings();
+  const filename = `invoice-${invoice.invoice_number}-80mm-${uuidv4().slice(0, 8)}.pdf`;
+  const pdf = await generateThermalInvoicePDF(invoice, invoicePdfDir(), { filename, settings });
+  const filePath = path.join(invoicePdfDir(), pdf.filename);
+  if (!fs.existsSync(filePath)) throw new AppError('Invoice PDF not found', 404, 'NOT_FOUND');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${pdf.filename}"`);
+  try {
+    await new Promise((resolve, reject) => {
+      const stream = fs.createReadStream(filePath);
+      stream.on('error', reject);
+      stream.on('end', resolve);
+      stream.pipe(res);
+    });
+  } finally {
+    fs.rmSync(filePath, { force: true });
+  }
+};
+
+const serveInvoicePdf = async (id, res, { regenerate = false, format } = {}) => {
+  if (isThermalFormat(format)) {
+    return serveThermalInvoicePdf(id, res);
+  }
+
   if (regenerate) {
     await query('UPDATE invoices SET pdf_url = NULL WHERE id = $1', [id]);
   }

@@ -319,6 +319,20 @@ export const notificationsAPI = {
   testSend: (channel, recipient) => api.post('/notifications/test-send', { channel, recipient }),
 };
 
+const fetchInvoicePdfBlob = async (id, { regenerate = false, format } = {}) => {
+  const token = localStorage.getItem('accessToken');
+  const params = new URLSearchParams();
+  if (regenerate) params.set('regenerate', '1');
+  if (format) params.set('format', format);
+  const qs = params.toString();
+  const url = `${API_URL}/billing/invoices/${id}/pdf${qs ? `?${qs}` : ''}`;
+  const response = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error('Invoice PDF not found');
+  return response.blob();
+};
+
 export const billingAPI = {
   invoices: (params) => api.get('/billing/invoices', { params }),
   getInvoice: (id) => api.get(`/billing/invoices/${id}`),
@@ -365,23 +379,22 @@ export const billingAPI = {
     window.open(objectUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   },
-  openInvoicePdf: async (id, { regenerate = false } = {}) => {
-    const token = localStorage.getItem('accessToken');
-    const url = `${API_URL}/billing/invoices/${id}/pdf${regenerate ? '?regenerate=1' : ''}`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) throw new Error('Invoice PDF not found');
-    const blob = await response.blob();
+  getInvoicePdfBlob: (id, options) => fetchInvoicePdfBlob(id, options),
+  openInvoicePdf: async (id, { regenerate = false, format, autoPrint = false } = {}) => {
+    const blob = await fetchInvoicePdfBlob(id, { regenerate, format });
     const objectUrl = URL.createObjectURL(blob);
     const opened = window.open(objectUrl, '_blank');
     if (!opened) {
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `invoice-${id}.pdf`;
+      link.download = format === 'thermal' ? `invoice-${id}-80mm.pdf` : `invoice-${id}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
+    } else if (autoPrint) {
+      opened.addEventListener('load', () => {
+        try { opened.print(); } catch { /* */ }
+      });
     }
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   },

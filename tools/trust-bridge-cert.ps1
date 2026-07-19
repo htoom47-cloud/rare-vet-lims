@@ -21,3 +21,4 @@ if (-not $existing) {
   Write-Host 'Certificate already trusted.'
 }
 $root.Close()
+Write-Host "Open https://127.0.0.1:9101/default in Chrome, then restart Chrome if it was already open."

@@ -12,8 +12,8 @@ import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
 import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
+import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { billingAPI, testsAPI } from '../services/api';
-import { printThermalInvoice, labFromInvoiceSettings } from '../utils/thermalInvoicePrint';
 import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
@@ -334,26 +334,22 @@ export default function Billing() {
   };
 
   const printThermalReceipt = async (invoiceOrId, { paymentMethod } = {}) => {
+    setPdfLoading(true);
     try {
       const id = typeof invoiceOrId === 'string' ? invoiceOrId : invoiceOrId?.id;
       if (!id) return;
-      const [{ data: invRes }, settingsRes] = await Promise.all([
-        billingAPI.getInvoice(id),
-        billingAPI.invoiceSettings().catch(() => null),
-      ]);
-      const invoice = invRes.data;
-      const lab = labFromInvoiceSettings(settingsRes?.data?.data || settingsRes?.data);
-      const methodKey = paymentMethod || invoice.payments?.[0]?.method;
-      await printThermalInvoice(invoice, lab, {
-        isArabic: i18n.language === 'ar',
-        paymentMethodLabel: methodKey ? paymentMethodLabel(methodKey) : '',
-      });
-    } catch (err) {
-      if (err?.message === 'POPUP_BLOCKED') {
-        toast.error(t('billing.popupBlocked'));
+      const result = await printInvoiceToEpson(id);
+      toast.success(t('billing.thermalPrintOk', { printer: result.printer }));
+    } catch (error) {
+      if (error?.code === EPSON_PRINT_ERROR.BRIDGE_UNAVAILABLE) {
+        toast.error(t('billing.thermalBridgeRequired'), { duration: 8000 });
+      } else if (error?.code === EPSON_PRINT_ERROR.PRINTER_UNAVAILABLE) {
+        toast.error(t('billing.thermalPrinterMissing'), { duration: 8000 });
       } else {
         toast.error(t('billing.thermalPrintFailed'));
       }
+    } finally {
+      setPdfLoading(false);
     }
   };
 
@@ -484,18 +480,19 @@ export default function Billing() {
               </button>
               <button
                 type="button"
+                onClick={() => printThermalReceipt(detailInvoice)}
+                disabled={pdfLoading}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <Printer size={16} /> {t('billing.printThermal')}
+              </button>
+              <button
+                type="button"
                 onClick={() => openInvoicePdf(detailInvoice.id, true)}
                 disabled={pdfLoading}
                 className="btn-secondary flex items-center gap-2 text-sm"
               >
                 <Printer size={16} /> {t('billing.regeneratePdf')}
-              </button>
-              <button
-                type="button"
-                onClick={() => printThermalReceipt(detailInvoice)}
-                className="btn-secondary flex items-center gap-2 text-sm"
-              >
-                <Receipt size={16} /> {t('billing.printThermal')}
               </button>
             </div>
 
