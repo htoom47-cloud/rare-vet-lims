@@ -2,11 +2,17 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
 const reportNotify = require('./customer-report-notifications.service');
+const { BATCH_TYPE } = require('./customer-report-notifications.utils');
+const portalSync = require('./portal-sync.service');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { uuidv4 } = require('../utils/uuid');
 const { getCustomerStatement } = require('./accounting.service');
 
-const list = async ({ search, mobile, page, limit }) => {
+const visibilitySql = portalSync.portalVisibilitySql('r').replace(/\s+/g, ' ').trim();
+
+const isReadyToSendFilter = (value) => value === true || value === 'true' || value === '1';
+
+const list = async ({ search, mobile, page, limit, readyToSend }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
   let where = `WHERE c.is_active = true AND ${notDeleted('c')}`;
@@ -24,6 +30,29 @@ const list = async ({ search, mobile, page, limit }) => {
     } else {
       where += ` AND (c.full_name ILIKE $${params.length} OR c.mobile ILIKE $${params.length} OR c.farm_company ILIKE $${params.length})`;
     }
+  }
+
+  // Same readiness rule as countCustomersWaitingToSend / listCustomersReadyToSend
+  if (isReadyToSendFilter(readyToSend)) {
+    params.push(BATCH_TYPE);
+    where += ` AND EXISTS (
+      SELECT 1
+      FROM reports r
+      JOIN samples s ON r.sample_id = s.id
+      JOIN customers c2 ON s.customer_id = c2.id
+      WHERE ${visibilitySql}
+        AND (
+          c2.id = c.id
+          OR RIGHT(regexp_replace(c2.mobile, '[^0-9]', '', 'g'), 9)
+            = RIGHT(regexp_replace(c.mobile, '[^0-9]', '', 'g'), 9)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM notification_queue nq
+          WHERE nq.status IN ('sent', 'dry_run')
+            AND nq.metadata->>'type' = $${params.length}
+            AND nq.metadata->'report_ids' ? r.id::text
+        )
+    )`;
   }
 
   const countResult = await query(`SELECT COUNT(*) FROM customers c ${where}`, params);

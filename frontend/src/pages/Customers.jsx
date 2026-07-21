@@ -38,6 +38,7 @@ export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [dispatchFilter, setDispatchFilter] = useState('all'); // all | ready
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [modalOpen, setModalOpen] = useState(false);
@@ -60,6 +61,7 @@ export default function Customers() {
     const params = looksLikeMobile
       ? { mobile: trimmed, page, limit: PAGE_SIZE }
       : { search: trimmed, page, limit: PAGE_SIZE };
+    if (dispatchFilter === 'ready') params.readyToSend = true;
     customersAPI.list(params)
       .then(({ data }) => {
         setCustomers(data.data || []);
@@ -71,7 +73,7 @@ export default function Customers() {
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, page]);
+  }, [search, page, dispatchFilter]);
 
   const unsentReports = readyReports.filter((r) => !r.previously_sent);
 
@@ -232,7 +234,7 @@ export default function Customers() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t('customers.title')}</h1>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -243,6 +245,15 @@ export default function Customers() {
               className="input-field ps-10"
             />
           </div>
+          <select
+            value={dispatchFilter}
+            onChange={(e) => { setDispatchFilter(e.target.value); setPage(1); }}
+            className="input-field w-full sm:w-auto"
+            aria-label={t('customers.dispatchFilterLabel')}
+          >
+            <option value="all">{t('customers.dispatchFilterAll')}</option>
+            <option value="ready">{t('customers.dispatchFilterReady')}</option>
+          </select>
           <button onClick={openCreate} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> {t('common.add')}
           </button>
