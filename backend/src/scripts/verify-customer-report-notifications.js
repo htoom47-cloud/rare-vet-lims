@@ -144,6 +144,7 @@ check('customers routes — ready-reports + send-ready-reports', () => {
   const src = fs.readFileSync(path.join(ROOT, 'routes', 'customers.routes.js'), 'utf8');
   assert.ok(src.includes('/ready-reports'));
   assert.ok(src.includes('/send-ready-reports'));
+  assert.ok(src.includes('/skip-ready-reports'));
   assert.ok(src.includes('NOTIFICATIONS_SEND_REPORT'));
 });
 
@@ -188,9 +189,23 @@ check('Customer profile — dispatch section + send all', () => {
   );
   assert.ok(src.includes('readyReportsSection'));
   assert.ok(src.includes('sendAllReadyReports'));
+  assert.ok(src.includes('skipAllReadyReports'));
   assert.ok(src.includes('report_dispatch_status'));
   assert.ok(src.includes('confirmSendOpen'));
+  assert.ok(src.includes('confirmSkipOpen'));
   assert.ok(src.includes('resendOpen'));
+});
+
+check('skipReadyReports behind feature flag', () => {
+  const envSrc = fs.readFileSync(path.join(ROOT, 'config', 'env.js'), 'utf8');
+  assert.ok(envSrc.includes('SKIP_READY_REPORTS_ENABLED'));
+  assert.ok(envSrc.includes('skipReadyReports'));
+  const svc = fs.readFileSync(path.join(ROOT, 'services', 'customer-report-notifications.service.js'), 'utf8');
+  assert.ok(svc.includes('skipReadyReports'));
+  assert.ok(svc.includes("status = 'skipped'") || svc.includes("'skipped'"));
+  const utils = fs.readFileSync(path.join(ROOT, 'services', 'customer-report-notifications.utils.js'), 'utf8');
+  assert.ok(utils.includes('HANDLED_BATCH_STATUS_SQL'));
+  assert.ok(utils.includes('skipped'));
 });
 
 check('send metadata stores report_numbers and count', () => {

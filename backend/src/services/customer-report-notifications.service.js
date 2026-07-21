@@ -13,6 +13,7 @@ const portalSync = require('./portal-sync.service');
 const notifications = require('./notifications.service');
 const {
   BATCH_TYPE,
+  HANDLED_BATCH_STATUS_SQL,
   buildConsolidatedReportMessage,
   messageHash,
   extractSentReportIds,
@@ -54,7 +55,7 @@ const loadSentBatches = async (customerIds) => {
             u.full_name AS sent_by_name
      FROM notification_queue nq
      LEFT JOIN users u ON u.id::text = nq.metadata->>'sent_by'
-     WHERE nq.status IN ('sent', 'dry_run')
+     WHERE nq.status IN (${HANDLED_BATCH_STATUS_SQL})
        AND (
          nq.metadata->>'type' = $2
          OR nq.metadata->>'batch_id' IS NOT NULL
@@ -118,8 +119,11 @@ const mapReportRow = (row, sentIds, sentBatches, failedBatches) => {
   const sentBatch = previouslySent ? findBatchForReportIds(sentBatches, [row.id]) : null;
   const failedBatch = !previouslySent ? findBatchForReportIds(failedBatches, [row.id]) : null;
   let send_status = 'unsent';
-  if (previouslySent) send_status = 'sent';
-  else if (failedBatch) send_status = 'failed';
+  if (previouslySent) {
+    send_status = sentBatch?.status === 'skipped' ? 'skipped' : 'sent';
+  } else if (failedBatch) {
+    send_status = 'failed';
+  }
 
   return {
     id: row.id,
@@ -226,7 +230,7 @@ const countCustomersWaitingToSend = async () => {
            )
            AND NOT EXISTS (
              SELECT 1 FROM notification_queue nq
-             WHERE nq.status IN ('sent', 'dry_run')
+             WHERE nq.status IN (${HANDLED_BATCH_STATUS_SQL})
                AND nq.metadata->>'type' = $1
                AND nq.metadata->'report_ids' ? r.id::text
            )
@@ -359,6 +363,100 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
   }
 };
 
+/**
+ * Mark unsent ready reports as skipped (do not notify). Does not touch reports/PDF/portal.
+ * Requires features.skipReadyReports (default false).
+ */
+const skipReadyReports = async (customerId, { reportIds, reason } = {}, userId) => {
+  if (!env.features?.skipReadyReports) {
+    throw new AppError('Skip ready reports is disabled', 403, 'FEATURE_DISABLED');
+  }
+
+  const scopeIds = await resolveCustomerIdsByMobile(customerId);
+  const customer = await query(
+    'SELECT id, full_name, full_name_ar, mobile FROM customers WHERE id = $1 AND is_active = true',
+    [customerId]
+  );
+  if (!customer.rows[0]) throw new AppError('Customer not found', 404, 'NOT_FOUND');
+
+  let idsToSkip = Array.isArray(reportIds) ? reportIds.filter(Boolean) : [];
+  if (!idsToSkip.length) {
+    const ready = await listReadyReports(customerId);
+    idsToSkip = ready.unsentReports.map((r) => r.id);
+  }
+  if (!idsToSkip.length) {
+    throw new AppError('No ready reports to skip', 400, 'NO_READY_REPORTS');
+  }
+
+  const reportsResult = await query(
+    `${READY_REPORTS_BASE} AND r.id = ANY($2::uuid[]) ORDER BY r.created_at DESC`,
+    [scopeIds, idsToSkip]
+  );
+  if (reportsResult.rows.length !== idsToSkip.length) {
+    throw new AppError('One or more reports are not ready for customer delivery', 400, 'INVALID_REPORTS');
+  }
+
+  const sentRows = await loadSentBatches(scopeIds);
+  const sentIds = extractSentReportIds(sentRows);
+  const alreadyHandled = findDuplicateReportIds(idsToSkip, sentIds);
+  if (alreadyHandled.length) {
+    throw new AppError(
+      'Some reports were already sent or skipped',
+      409,
+      'ALREADY_HANDLED',
+      { reportIds: alreadyHandled }
+    );
+  }
+
+  const batchId = randomUUID();
+  const reportNumbers = reportsResult.rows.map((r) => r.report_number);
+  const skipReason = String(reason || '').trim().slice(0, 500) || null;
+  const body = skipReason
+    ? `Send skipped: ${skipReason}`
+    : 'Send skipped by staff (no customer notification)';
+  const metadata = {
+    type: BATCH_TYPE,
+    customer_id: customerId,
+    scope_customer_ids: scopeIds,
+    report_ids: idsToSkip,
+    report_numbers: reportNumbers,
+    report_count: idsToSkip.length,
+    batch_id: batchId,
+    sent_by: userId,
+    skipped: true,
+    skip_reason: skipReason,
+  };
+
+  const e164 = formatToE164(customer.rows[0].mobile) || customer.rows[0].mobile || 'skipped';
+  const inserted = await query(
+    `INSERT INTO notification_queue (channel, recipient, subject, body, metadata, status, sent_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, 'skipped', NOW())
+     RETURNING id, status, sent_at, created_at`,
+    ['skip', e164, 'Lab Reports Send Skipped', body, JSON.stringify(metadata)]
+  );
+
+  logger.info('Customer report batch skipped', {
+    customerId,
+    scopeIds,
+    batchId,
+    reportCount: idsToSkip.length,
+    userId,
+    reason: skipReason,
+  });
+
+  return {
+    batchId,
+    notificationId: inserted.rows[0].id,
+    reportIds: idsToSkip,
+    reportNumbers,
+    reportCount: idsToSkip.length,
+    status: 'skipped',
+    skippedAt: inserted.rows[0].sent_at || inserted.rows[0].created_at,
+    skippedBy: userId,
+    reason: skipReason,
+  };
+};
+
 /** @deprecated use countCustomersWaitingToSend */
 const listCustomersReadyToSend = async (limit = 20) => {
   const result = await query(
@@ -370,7 +468,7 @@ const listCustomersReadyToSend = async (limit = 20) => {
      WHERE c.is_active = true
        AND NOT EXISTS (
          SELECT 1 FROM notification_queue nq
-         WHERE nq.status IN ('sent', 'dry_run')
+         WHERE nq.status IN (${HANDLED_BATCH_STATUS_SQL})
            AND nq.metadata->>'type' = $1
            AND nq.metadata->'report_ids' ? r.id::text
        )
@@ -386,6 +484,7 @@ const listCustomersReadyToSend = async (limit = 20) => {
 module.exports = {
   listReadyReports,
   sendReadyReports,
+  skipReadyReports,
   getCustomerDispatchStatus,
   enrichCustomersDispatchStatus,
   countCustomersWaitingToSend,

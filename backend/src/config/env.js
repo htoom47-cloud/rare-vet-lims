@@ -118,6 +118,11 @@ const env = {
      * Default false — no change to existing lab behaviour.
      */
     elisaSpecialEntry: process.env.ELISA_SPECIAL_ENTRY === 'true',
+    /**
+     * When true: staff may skip/cancel pending report notifications from Customers.
+     * Default false — no change to existing send behaviour.
+     */
+    skipReadyReports: process.env.SKIP_READY_REPORTS_ENABLED === 'true',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',

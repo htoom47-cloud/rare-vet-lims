@@ -58,6 +58,22 @@ router.post('/:id/send-ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_
   }
 });
 
+router.post('/:id/skip-ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT), async (req, res, next) => {
+  try {
+    const data = await reportNotify.skipReadyReports(
+      req.params.id,
+      {
+        reportIds: req.body.reportIds,
+        reason: req.body.reason,
+      },
+      req.user.id
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next) => {
   try {
     const data = await service.getProfile(req.params.id);

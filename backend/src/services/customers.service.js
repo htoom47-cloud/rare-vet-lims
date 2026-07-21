@@ -2,7 +2,7 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
 const reportNotify = require('./customer-report-notifications.service');
-const { BATCH_TYPE } = require('./customer-report-notifications.utils');
+const { BATCH_TYPE, HANDLED_BATCH_STATUS_SQL } = require('./customer-report-notifications.utils');
 const portalSync = require('./portal-sync.service');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { uuidv4 } = require('../utils/uuid');
@@ -48,7 +48,7 @@ const list = async ({ search, mobile, page, limit, readyToSend }) => {
         )
         AND NOT EXISTS (
           SELECT 1 FROM notification_queue nq
-          WHERE nq.status IN ('sent', 'dry_run')
+          WHERE nq.status IN (${HANDLED_BATCH_STATUS_SQL})
             AND nq.metadata->>'type' = $${params.length}
             AND nq.metadata->'report_ids' ? r.id::text
         )
