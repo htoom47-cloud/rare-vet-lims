@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -32,12 +32,14 @@ const PAGE_SIZE = 20;
 
 export default function Customers() {
   const { t, i18n } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canEdit = hasPermission('customers.update');
   const canSendReports = hasPermission('notifications.send_report');
+  const canSkipReadyReports = canSendReports && !!user?.features?.skipReadyReports;
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [dispatchFilter, setDispatchFilter] = useState('all'); // all | ready
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [modalOpen, setModalOpen] = useState(false);
@@ -50,6 +52,9 @@ export default function Customers() {
   const [sendingReports, setSendingReports] = useState(false);
   const [sendChannel, setSendChannel] = useState('whatsapp');
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
+  const [confirmSkipOpen, setConfirmSkipOpen] = useState(false);
+  const [skipReason, setSkipReason] = useState('');
+  const [skippingReports, setSkippingReports] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
   const [previousSend, setPreviousSend] = useState(null);
 
@@ -60,6 +65,7 @@ export default function Customers() {
     const params = looksLikeMobile
       ? { mobile: trimmed, page, limit: PAGE_SIZE }
       : { search: trimmed, page, limit: PAGE_SIZE };
+    if (dispatchFilter === 'ready') params.readyToSend = true;
     customersAPI.list(params)
       .then(({ data }) => {
         setCustomers(data.data || []);
@@ -71,7 +77,7 @@ export default function Customers() {
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, page]);
+  }, [search, page, dispatchFilter]);
 
   const unsentReports = readyReports.filter((r) => !r.previously_sent);
 
@@ -138,6 +144,8 @@ export default function Customers() {
     setSelected(data.data);
     setProfileOpen(true);
     setConfirmSendOpen(false);
+    setConfirmSkipOpen(false);
+    setSkipReason('');
     setResendOpen(false);
     setPreviousSend(null);
     await loadReadyReports(customer.id);
@@ -195,9 +203,34 @@ export default function Customers() {
   };
 
   const formatSendStatus = (report) => {
+    if (report.send_status === 'skipped') return t('customers.sendStatus.skipped');
     if (report.send_status === 'sent') return t('customers.sendStatus.sent');
     if (report.send_status === 'failed') return t('customers.sendStatus.failed');
     return t('customers.sendStatus.unsent');
+  };
+
+  const skipAllReadyReports = async () => {
+    if (!selected?.id || !canSkipReadyReports) return;
+    if (!unsentReports.length) {
+      toast.error(t('customers.noReadyReports'));
+      return;
+    }
+    setSkippingReports(true);
+    try {
+      await customersAPI.skipReadyReports(selected.id, {
+        reportIds: unsentReports.map((r) => r.id),
+        reason: skipReason.trim() || undefined,
+      });
+      toast.success(t('customers.reportsSkippedSuccess'));
+      setConfirmSkipOpen(false);
+      setSkipReason('');
+      await loadReadyReports(selected.id);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setSkippingReports(false);
+    }
   };
 
   const columns = [
@@ -232,7 +265,7 @@ export default function Customers() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t('customers.title')}</h1>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -243,6 +276,15 @@ export default function Customers() {
               className="input-field ps-10"
             />
           </div>
+          <select
+            value={dispatchFilter}
+            onChange={(e) => { setDispatchFilter(e.target.value); setPage(1); }}
+            className="input-field w-full sm:w-auto"
+            aria-label={t('customers.dispatchFilterLabel')}
+          >
+            <option value="all">{t('customers.dispatchFilterAll')}</option>
+            <option value="ready">{t('customers.dispatchFilterReady')}</option>
+          </select>
           <button onClick={openCreate} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> {t('common.add')}
           </button>
@@ -401,15 +443,28 @@ export default function Customers() {
                       </table>
                     </div>
                     {unsentReports.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmSendOpen(true)}
-                        disabled={sendingReports}
-                        className="btn-primary inline-flex items-center gap-2 text-sm"
-                      >
-                        <MessageCircle size={16} />
-                        {t('customers.sendAllReadyReports')}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmSendOpen(true)}
+                          disabled={sendingReports || skippingReports}
+                          className="btn-primary inline-flex items-center gap-2 text-sm"
+                        >
+                          <MessageCircle size={16} />
+                          {t('customers.sendAllReadyReports')}
+                        </button>
+                        {canSkipReadyReports && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmSkipOpen(true)}
+                            disabled={sendingReports || skippingReports}
+                            className="btn-secondary inline-flex items-center gap-2 text-sm"
+                          >
+                            <Ban size={16} />
+                            {t('customers.skipAllReadyReports')}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </>
                 )}
@@ -547,6 +602,49 @@ export default function Customers() {
               className="btn-primary"
             >
               {sendingReports ? t('common.loading') : t('customers.confirmSendAction')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={confirmSkipOpen}
+        onClose={() => { setConfirmSkipOpen(false); setSkipReason(''); }}
+        title={t('customers.confirmSkipTitle')}
+        size="md"
+      >
+        <div className="space-y-3 text-sm">
+          <p>{t('customers.confirmSkipIntro')}</p>
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-1">
+            <p><strong>{t('customers.confirmReportCount')}:</strong> {unsentReports.length}</p>
+            <p><strong>{t('customers.confirmRecipient')}:</strong> {customerDisplayName}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('customers.skipReason')}</label>
+            <input
+              value={skipReason}
+              onChange={(e) => setSkipReason(e.target.value)}
+              className="input-field"
+              placeholder={t('customers.skipReasonPlaceholder')}
+              maxLength={500}
+            />
+          </div>
+          <p className="text-xs text-gray-500">{t('customers.confirmSkipNote')}</p>
+          <div className="flex gap-2 justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => { setConfirmSkipOpen(false); setSkipReason(''); }}
+              className="btn-secondary"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={skipAllReadyReports}
+              disabled={skippingReports}
+              className="btn-primary"
+            >
+              {skippingReports ? t('common.loading') : t('customers.confirmSkipAction')}
             </button>
           </div>
         </div>

@@ -12,6 +12,8 @@ const getStaffFeatures = () => ({
   disableCriticalFlags: isCriticalFlagsDisabled(),
   /** When true: ELISA entry/report uses S/P% + Pos/Neg + text reference layout */
   elisaSpecialEntry: !!env.features?.elisaSpecialEntry,
+  /** When true: Customers profile may skip/cancel pending report notifications */
+  skipReadyReports: !!env.features?.skipReadyReports,
 });
 
 module.exports = { getStaffFeatures };

@@ -5,6 +5,10 @@ const crypto = require('crypto');
 
 const BATCH_TYPE = 'customer_report_batch';
 
+/** Queue statuses that clear a report from "ready to send" (no provider send for skipped). */
+const HANDLED_BATCH_STATUSES = ['sent', 'dry_run', 'skipped'];
+const HANDLED_BATCH_STATUS_SQL = `'sent', 'dry_run', 'skipped'`;
+
 /** Msegat rejects SMS over ~700 chars (error 1140). Keep SMS compact. */
 const MSEGAT_SMS_SAFE_CHARS = 650;
 
@@ -105,6 +109,8 @@ const findDuplicateReportIds = (requestedIds, sentIds) => (
 
 module.exports = {
   BATCH_TYPE,
+  HANDLED_BATCH_STATUSES,
+  HANDLED_BATCH_STATUS_SQL,
   isReportReadyForCustomer,
   buildConsolidatedReportMessage,
   messageHash,
