@@ -1,5 +1,6 @@
 import { buildZebraThermalLabelContent, asciiLabelText, hasArabicText } from './labelPanel';
 import { encodeCode128C } from './barcodeScan';
+import { buildGraphicLabelZpl } from './zebraLabelImage';
 
 const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
 
@@ -235,8 +236,21 @@ const barcodeField = (barcode) => {
 
 export const getLabelPrintFields = (sample) => buildZebraThermalLabelContent(sample);
 
-/** ZPL for Zebra ZD421 50×25 mm — barcode/English ASCII; animal type+name Arabic via hex. */
-export const buildCbcLabelZpl = (sample) => {
+/**
+ * ZPL for Zebra ZD421 50×25 mm.
+ * Arabic → graphic bitmap (PC fonts). Falls back to ASCII ZPL if canvas fails.
+ */
+export const buildCbcLabelZpl = (sample, { isArabic = false } = {}) => {
+  if (isArabic && typeof document !== 'undefined') {
+    try {
+      const graphic = buildGraphicLabelZpl(sample, { isArabic: true });
+      if (graphic && graphic.includes('^GFA')) return graphic;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[zebraPrint] graphic label failed, using ASCII ZPL', error);
+    }
+  }
+
   const content = buildZebraThermalLabelContent(sample);
   const lines = [...zplHeader()];
 
@@ -284,19 +298,24 @@ async function sendZplHttp(device, zpl, { timeoutMs = 8000 } = {}) {
 
 /** Send ZPL via local LIMS bridge (RAW) — preferred on Windows with zebra-local-bridge. */
 async function sendZplLocalBridge(zpl) {
-  await sendZplHttp(null, zpl, { timeoutMs: 2000 });
+  const timeoutMs = String(zpl).includes('^GFA') ? 15000 : 4000;
+  await sendZplHttp(null, zpl, { timeoutMs });
 }
 
-export async function printToZebra(sample) {
-  const zpl = buildCbcLabelZpl(sample);
-  if (!zpl || !String(zpl).includes('^FD')) {
+export async function printToZebra(sample, { isArabic = false } = {}) {
+  const zpl = buildCbcLabelZpl(sample, { isArabic });
+  const hasPayload = zpl && (String(zpl).includes('^FD') || String(zpl).includes('^GFA'));
+  if (!hasPayload) {
     throw new ZebraPrintError('Empty label data', 'EMPTY_ZPL');
   }
 
-  // 1) LIMS local bridge (RAW) — reception PC: start-zebra-bridge.bat
+  // 1) LIMS local bridge (RAW) — reception PC: start-lims-print-bridge.bat
   try {
     await sendZplLocalBridge(zpl);
-    return { method: 'zpl-bridge', device: 'LIMS Zebra Bridge' };
+    return {
+      method: isArabic ? 'zpl-bridge-graphic' : 'zpl-bridge',
+      device: 'LIMS Zebra Bridge',
+    };
   } catch (bridgeError) {
     // 2) Official Zebra Browser Print SDK
     try {

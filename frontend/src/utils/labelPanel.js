@@ -219,8 +219,9 @@ const buildLabelContentCore = (sample, { isArabic = false, englishOnly = false }
 };
 
 /**
- * Label content for Zebra ZPL (50×25 mm).
+ * Label content for Zebra native ASCII ZPL (English UI).
  * Sample/test stay English ASCII; animal line is type + name in Arabic (as stored).
+ * Arabic UI uses graphic ZPL instead (see zebraLabelImage.js).
  */
 export const buildZebraThermalLabelContent = (sample) => (
   buildLabelContentCore(sample, { englishOnly: true })

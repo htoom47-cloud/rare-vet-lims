@@ -56,7 +56,7 @@ const openFallbackPrintWindow = () => {
   }
 };
 
-const printJobsToZebra = async (jobs) => {
+const printJobsToZebra = async (jobs, { isArabic = false } = {}) => {
   let printed = 0;
   let lastDevice = 'Zebra';
   let lastError = null;
@@ -64,7 +64,7 @@ const printJobsToZebra = async (jobs) => {
   for (let i = 0; i < jobs.length; i += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      const result = await printToZebra(jobs[i]);
+      const result = await printToZebra(jobs[i], { isArabic });
       printed += 1;
       lastDevice = result.device || lastDevice;
       // eslint-disable-next-line no-await-in-loop
@@ -120,7 +120,8 @@ export async function printSampleLabelFromModal(sample) {
     return 'failed';
   }
 
-  const isArabic = i18n.language === 'ar';
+  // Reception labels are Arabic: test type, animal type, animal name + barcode/sample id.
+  const isArabic = true;
   const fallbackWin = openFallbackPrintWindow();
 
   const { jobs: enrichedJobs } = await enrichPrintJobs(sample);
@@ -132,7 +133,7 @@ export async function printSampleLabelFromModal(sample) {
     return 'failed';
   }
 
-  const zebra = await printJobsToZebra(jobs);
+  const zebra = await printJobsToZebra(jobs, { isArabic });
 
   if (zebra.printed === zebra.total) {
     try { fallbackWin?.close(); } catch { /* ignore */ }
@@ -192,7 +193,9 @@ export async function autoPrintSampleLabels(samples) {
     return { printed: 0, total: jobs.length, reason: 'invalid_barcode' };
   }
 
-  const zebra = await printJobsToZebra(jobs);
+  // Always Arabic graphic labels for reception (test/animal type+name in Arabic).
+  const isArabic = true;
+  const zebra = await printJobsToZebra(jobs, { isArabic });
   return {
     printed: zebra.printed,
     total: jobs.length,
@@ -227,7 +230,9 @@ async function printSampleLabelViaZebra(sample) {
       return 'failed';
     }
 
-    const zebra = await printJobsToZebra(jobs);
+    // Always Arabic graphic labels for reception.
+    const isArabic = true;
+    const zebra = await printJobsToZebra(jobs, { isArabic });
 
     if (zebra.printed === zebra.total) {
       toast.success(
