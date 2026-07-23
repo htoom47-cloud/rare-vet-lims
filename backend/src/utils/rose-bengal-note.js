@@ -5,8 +5,8 @@
 
 const ROSE_BENGAL_CODES = new Set(['BRUCELLA', 'BRU-ROSE-BENGAL']);
 
-const NOTE_AR = 'ملاحظة: النتيجة الإيجابية تستلزم التأكيد باختبار ELISA.';
-const NOTE_EN = 'Note: A positive result requires confirmation by ELISA.';
+const NOTE_AR = 'ملاحظة: النتيجة المالطية الإيجابية يجب التأكيد باختبار ELISA.';
+const NOTE_EN = 'Note: A positive brucellosis (Malta) result must be confirmed by ELISA.';
 
 const isRoseBengalTestCode = (code) => {
   const c = String(code || '').trim().toUpperCase();
