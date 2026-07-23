@@ -133,6 +133,11 @@ body[dir='rtl'] {
   margin-top: 6px;
 }
 
+/* Keep recommendations tight against the first results box below */
+.report-main > .section--recommendations + * {
+  margin-top: 4px;
+}
+
 .clinical-page {
   display: block;
 }
@@ -300,8 +305,13 @@ body[dir='rtl'] {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface);
-  page-break-inside: avoid;
-  break-inside: avoid;
+  /* Allow table to continue under recommendations instead of jumping to next page */
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+.section--recommendations {
+  margin-bottom: 0;
 }
 
 .section__head {
@@ -843,6 +853,10 @@ body[dir='rtl'] {
     margin-top: 6px;
   }
 
+  .report-main > .section--recommendations + * {
+    margin-top: 4px;
+  }
+
   .clinical-page > * + * {
     margin-top: 6px;
   }
@@ -869,6 +883,8 @@ body[dir='rtl'] {
     break-inside: avoid;
   }
 
+  /* Override .card avoid so CBC/CHEM can start right under recommendations */
+  .report-main .section--results-box.card,
   .section--table,
   .table-wrap,
   .results-table,
@@ -927,7 +943,13 @@ body[dir='rtl'] {
     text-align: center;
   }
 
-  .section--results-box,
+  .section--results-box {
+    margin-top: 0;
+    margin-bottom: 0;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
   .section--elisa {
     margin-top: 0;
     margin-bottom: 0;
