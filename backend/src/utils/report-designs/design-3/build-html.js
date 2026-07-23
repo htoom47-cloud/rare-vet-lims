@@ -20,6 +20,10 @@ const {
   splitElisaSectionResults,
   isElisaRow,
 } = require('../../elisa-report');
+const {
+  hasPositiveRoseBengal,
+  roseBengalConfirmNote,
+} = require('../../rose-bengal-note');
 
 const ASSETS = path.join(__dirname, '../../../assets');
 const FONTS = path.join(ASSETS, 'fonts');
@@ -136,6 +140,9 @@ const buildResultsTable = (results, lang, sectionTitle) => {
   const titleBlock = sectionTitle
     ? `<div class="section__head section__head--panel">${escapeHtml(sectionTitle)}</div>`
     : '';
+  const roseNote = hasPositiveRoseBengal(results)
+    ? `<div class="result-note result-note--rose-bengal">${escapeHtml(roseBengalConfirmNote(lang))}</div>`
+    : '';
   return `
     <section class="section section--table">
       ${titleBlock}
@@ -145,6 +152,7 @@ const buildResultsTable = (results, lang, sectionTitle) => {
           <tbody>${bodyRows}</tbody>
         </table>
       </div>
+      ${roseNote}
     </section>`;
 };
 

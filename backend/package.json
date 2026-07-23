@@ -21,6 +21,7 @@
     "test:s3": "node src/scripts/test-s3-storage.js",
     "verify:result-engine": "node src/scripts/verify-result-engine.js",
     "verify:elisa-report": "node src/scripts/verify-elisa-report.js",
+    "verify:rose-bengal-note": "node src/scripts/verify-rose-bengal-note.js",
     "audit:elisa-refs": "node src/scripts/audit-elisa-text-refs.js",
     "ensure:elisa-refs": "node src/scripts/ensure-elisa-text-refs.js",
     "ensure:elisa-refs:apply": "node src/scripts/ensure-elisa-text-refs.js --apply",

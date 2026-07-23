@@ -772,6 +772,23 @@ body[dir='rtl'] {
   text-align: start;
 }
 
+.result-note {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  font-size: 8pt;
+  line-height: 1.4;
+  color: var(--color-ink);
+  text-align: start;
+}
+
+.result-note--rose-bengal {
+  border-color: #c9a86a;
+  background: #faf6ef;
+}
+
 @media print {
   body { background: #fff; }
 
