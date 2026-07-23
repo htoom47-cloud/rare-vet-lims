@@ -323,6 +323,20 @@ body[dir='rtl'] {
   border-radius: 0;
 }
 
+/* Treatment recommendations — +5% size, heavier weight */
+.section__head--recommendations {
+  font-size: calc(var(--font-md) * 1.05);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.recommendations-body,
+.recommendations-body p {
+  font-size: calc(var(--font-sm) * 1.05);
+  font-weight: 600;
+  line-height: var(--line-relaxed);
+}
+
 .results-box__body {
   padding: 0;
 }

@@ -301,9 +301,9 @@ const buildTreatmentRecommendationsSection = (text, lang) => {
   const body = String(text || '').trim();
   if (!body) return '';
   return `
-    <section class="section card">
-      <div class="section__head">${t(lang, 'Treatment Recommendations', 'التوصيات العلاجية')}</div>
-      <div class="card__body interp-card__body"><p>${escapeHtml(body)}</p></div>
+    <section class="section card section--recommendations">
+      <div class="section__head section__head--recommendations">${t(lang, 'Treatment Recommendations', 'التوصيات العلاجية')}</div>
+      <div class="card__body interp-card__body recommendations-body"><p>${escapeHtml(body)}</p></div>
     </section>`;
 };
 
