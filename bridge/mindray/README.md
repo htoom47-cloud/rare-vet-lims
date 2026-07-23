@@ -63,7 +63,7 @@ cd path\to\rare-vet-lims\bridge\mindray
 | اختبار الجهاز | Code On LIS |
 |---------------|-------------|
 | Glu | GLU |
-| Urea | BUN |
+| Urea / UREA / URE | BUN |
 | Crea | CREA |
 | AST | AST |
 | ALT | ALT |
