@@ -73,8 +73,8 @@ const buildHeader = (data, lab, logoDataUri, barcodeDataUri, lang) => {
     <header class="rpt-header">
       ${logoDataUri ? `<div class="rpt-header__logo"><img src="${logoDataUri}" alt="Logo" /></div>` : '<div></div>'}
       <div class="rpt-header__brand">
-        <h1 class="rpt-header__brand-title">${escapeHtml(lab.nameEn)}</h1>
-        <p class="rpt-header__brand-sub">${escapeHtml(lab.nameAr)}</p>
+        <h1 class="rpt-header__brand-title">${escapeHtml(lab.nameAr)}</h1>
+        <p class="rpt-header__brand-sub">${escapeHtml(lab.nameEn)}</p>
         <p class="rpt-header__report-type">${t(lang, 'Laboratory Results Report', 'تقرير نتائج المختبر')}</p>
       </div>
       <div class="rpt-header__meta">

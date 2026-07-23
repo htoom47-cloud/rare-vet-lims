@@ -197,8 +197,10 @@ body[dir='rtl'] {
 
 .rpt-header__brand-sub {
   margin: 2px 0 0;
-  font-size: var(--font-sm);
-  color: var(--color-muted);
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-brand);
+  line-height: var(--line-tight);
 }
 
 .rpt-header__report-type {
