@@ -130,7 +130,7 @@ body[dir='rtl'] {
 }
 
 .report-main > * + * {
-  margin-top: var(--space-1);
+  margin-top: 6px;
 }
 
 .clinical-page {
@@ -294,8 +294,8 @@ body[dir='rtl'] {
 }
 
 .section--results-box {
-  margin-top: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-top: 0;
+  margin-bottom: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -506,8 +506,8 @@ body[dir='rtl'] {
 }
 
 .section--elisa {
-  margin-top: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-top: 0;
+  margin-bottom: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -826,11 +826,11 @@ body[dir='rtl'] {
   }
 
   .report-main > * + * {
-    margin-top: var(--space-1);
+    margin-top: 6px;
   }
 
   .clinical-page > * + * {
-    margin-top: var(--space-1);
+    margin-top: 6px;
   }
 
   .clinical-page .section,
@@ -913,8 +913,9 @@ body[dir='rtl'] {
     text-align: center;
   }
 
-  .section--results-box {
-    margin-top: 8px;
-    margin-bottom: 8px;
+  .section--results-box,
+  .section--elisa {
+    margin-top: 0;
+    margin-bottom: 0;
   }
 }
