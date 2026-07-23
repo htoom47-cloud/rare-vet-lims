@@ -85,7 +85,7 @@ const createFinding = () => ({
   previewUrl: null,
 });
 
-function QualToggle({ value, onChange, labels }) {
+function QualToggle({ value, onChange, labels, disabled = false }) {
   return (
     <div className="flex gap-1">
       {[
@@ -95,8 +95,9 @@ function QualToggle({ value, onChange, labels }) {
         <button
           key={opt.v}
           type="button"
-          onClick={() => onChange(opt.v)}
-          className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium border border-primary-200 dark:border-primary-700 transition ${
+          disabled={disabled}
+          onClick={() => !disabled && onChange(opt.v)}
+          className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium border border-primary-200 dark:border-primary-700 transition disabled:opacity-60 disabled:cursor-not-allowed ${
             value === opt.v ? opt.active : 'hover:bg-primary-50 dark:hover:bg-primary-900/30'
           }`}
         >
@@ -162,9 +163,14 @@ function FindingPanel({
   displayName,
   onQueueImage,
   onDeleteImage,
+  isValidated = false,
+  canApprove = false,
+  onApprove,
+  approving = false,
 }) {
   const { t } = useTranslation();
   const fileRefs = useRef({});
+  const readOnly = isValidated;
 
   if (!test) return null;
 
@@ -247,16 +253,22 @@ function FindingPanel({
   };
 
   return (
-    <div className="card">
+    <div className={`card ${isValidated ? 'opacity-95 ring-1 ring-green-500/40' : ''}`}>
       <h3 className="font-semibold flex items-center gap-2 mb-4 pb-3 border-b border-primary-200 dark:border-primary-700">
         <Icon size={20} className="text-primary-600" />
-        {title}
+        <span className="flex-1">{title}</span>
+        {isValidated && (
+          <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200">
+            {t('parasitology.approvedBadge')}
+          </span>
+        )}
       </h3>
 
       <button
         type="button"
+        disabled={readOnly}
         onClick={() => (isNoneSelected ? clearNoneFound() : applyNoneFound())}
-        className={`mb-4 w-full text-start px-3 py-2.5 rounded-lg border text-sm transition ${
+        className={`mb-4 w-full text-start px-3 py-2.5 rounded-lg border text-sm transition disabled:cursor-not-allowed ${
           isNoneSelected
             ? 'border-green-600 bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-200'
             : 'border-primary-200 dark:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20'
@@ -283,8 +295,9 @@ function FindingPanel({
                   <label className="text-xs text-gray-500 block mb-1">{t('parasitology.selectParasite')}</label>
                   <select
                     value={finding.parameter_id}
+                    disabled={readOnly}
                     onChange={(e) => updateFinding(finding.clientId, { parameter_id: e.target.value })}
-                    className="input-field text-sm"
+                    className="input-field text-sm disabled:opacity-60"
                   >
                     <option value="">{t('parasitology.selectParasite')}</option>
                     {selectableOptions
@@ -301,50 +314,55 @@ function FindingPanel({
                     value={finding.value}
                     onChange={(v) => updateFinding(finding.clientId, { value: v })}
                     labels={labels}
+                    disabled={readOnly}
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => removeFinding(finding)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg mt-5"
-                  title={t('common.delete')}
-                >
-                  <Trash2 size={16} />
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => removeFinding(finding)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg mt-5"
+                    title={t('common.delete')}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-primary-200/60 dark:border-primary-700/60">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">{t('parasitology.imagePerFinding')}</label>
-                  <input
-                    ref={(el) => { fileRefs.current[finding.clientId] = el; }}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) onQueueImage(finding, file);
-                      e.target.value = '';
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!finding.parameter_id || finding.uploadingImage}
-                    onClick={() => {
-                      if (!finding.parameter_id) {
-                        toast.error(t('parasitology.selectParasiteFirst'));
-                        return;
-                      }
-                      fileRefs.current[finding.clientId]?.click();
-                    }}
-                    className="btn-secondary text-xs flex items-center gap-1.5 py-2"
-                  >
-                    <Camera size={14} />
-                    {t('parasitology.uploadImage')}
-                  </button>
-                </div>
+                {!readOnly && (
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">{t('parasitology.imagePerFinding')}</label>
+                    <input
+                      ref={(el) => { fileRefs.current[finding.clientId] = el; }}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onQueueImage(finding, file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!finding.parameter_id || finding.uploadingImage}
+                      onClick={() => {
+                        if (!finding.parameter_id) {
+                          toast.error(t('parasitology.selectParasiteFirst'));
+                          return;
+                        }
+                        fileRefs.current[finding.clientId]?.click();
+                      }}
+                      className="btn-secondary text-xs flex items-center gap-1.5 py-2"
+                    >
+                      <Camera size={14} />
+                      {t('parasitology.uploadImage')}
+                    </button>
+                  </div>
+                )}
 
                 {(finding.attachment?.file_url || finding.previewUrl || finding.pendingFile) && (
                   <div className="relative group">
@@ -368,7 +386,7 @@ function FindingPanel({
                         }}
                       />
                     )}
-                    {finding.attachment?.id && (
+                    {!readOnly && finding.attachment?.id && (
                       <button
                         type="button"
                         onClick={() => onDeleteImage(finding.attachment.id, finding.clientId)}
@@ -377,7 +395,7 @@ function FindingPanel({
                         <Trash2 size={12} />
                       </button>
                     )}
-                    {finding.pendingFile && !finding.attachment?.id && !finding.uploadingImage && (
+                    {!readOnly && finding.pendingFile && !finding.attachment?.id && !finding.uploadingImage && (
                       <button
                         type="button"
                         onClick={() => onQueueImage(finding, null)}
@@ -394,7 +412,7 @@ function FindingPanel({
         </div>
       )}
 
-      {!isNoneSelected && (
+      {!readOnly && !isNoneSelected && (
         <button
           type="button"
           onClick={addFinding}
@@ -409,11 +427,23 @@ function FindingPanel({
         <label className="text-sm font-medium block mb-1">{labels.notes}</label>
         <textarea
           value={notes}
+          disabled={readOnly}
           onChange={(e) => onNotesChange(e.target.value)}
-          className="input-field min-h-[60px] text-sm"
+          className="input-field min-h-[60px] text-sm disabled:opacity-60"
           placeholder={labels.notes}
         />
       </div>
+
+      {!isValidated && (
+        <button
+          type="button"
+          onClick={onApprove}
+          disabled={!canApprove || approving}
+          className="mt-4 w-full btn-primary py-2.5 text-sm disabled:opacity-50"
+        >
+          {approving ? t('common.loading') : t('parasitology.approveTest')}
+        </button>
+      )}
     </div>
   );
 }
@@ -548,7 +578,19 @@ export default function Parasitology() {
         existing = (await resultsAPI.get(sampleTest.id)).data.data;
       } catch { /* none */ }
       const { findings, notes, notesParamId } = buildFindingsFromExisting(testDetail, existing);
-      return { sampleTest, testMeta: testDetail, findings, notes, notesParamId };
+      const isValidated = Boolean(
+        existing?.is_validated
+        || sampleTest.status === 'completed'
+        || sampleTest.is_validated
+      );
+      return {
+        sampleTest,
+        testMeta: testDetail,
+        findings,
+        notes,
+        notesParamId,
+        isValidated,
+      };
     }));
 
     const nextPanels = {};
@@ -583,9 +625,12 @@ export default function Parasitology() {
     return values;
   };
 
-  const canSave = panelList.some(
-    (p) => buildValues(p.findings, p.notesParamId, p.notes).length > 0
+  const panelReady = (panel) => (
+    !panel.isValidated
+    && buildValues(panel.findings, panel.notesParamId, panel.notes).length > 0
   );
+
+  const canApproveAll = panelList.some(panelReady);
 
   const uploadOneImage = async (testId, finding, setFindings) => {
     if (!finding.pendingFile || !finding.parameter_id || !testId) return null;
@@ -677,10 +722,16 @@ export default function Parasitology() {
     }
   };
 
-  const submitResults = async () => {
+  /** Approve one or more panels. Pass sampleTestIds to limit scope; omit for all ready panels. */
+  const approvePanels = async (sampleTestIds = null) => {
     if (!selectedSample) return;
 
-    const jobs = panelList
+    const selected = sampleTestIds
+      ? panelList.filter((p) => sampleTestIds.includes(p.sampleTest.id))
+      : panelList;
+
+    const jobs = selected
+      .filter((panel) => !panel.isValidated)
       .map((panel) => {
         const values = buildValues(panel.findings, panel.notesParamId, panel.notes);
         if (!values.length) return null;
@@ -713,7 +764,6 @@ export default function Parasitology() {
         uploadFailures.push(...failed);
       }
 
-      // Approve in one request (faster than enter + validate separately)
       await withRetry(() => resultsAPI.approveBatch(
         jobs.map((job) => ({
           sample_test_id: job.test.id,
@@ -722,25 +772,29 @@ export default function Parasitology() {
         }))
       ), { retries: 2, delayMs: 1200 });
 
+      for (const job of jobs) {
+        updatePanel(job.sampleTestId, { isValidated: true });
+      }
+
       if (uploadFailures.length) {
         toast.error(uploadFailures[0] || t('parasitology.imageUploadFailed'));
       }
 
       const { data: queueData } = await samplesAPI.parasitologyQueue();
       const stillInQueue = (queueData.data || []).some((s) => s.id === sampleId);
-      const allParasOnSample = parasTests(selectedSample);
-      const approvedAll = jobs.length === allParasOnSample.length && !stillInQueue;
+      const stillPendingPanels = panelList.filter((p) => {
+        const justApproved = jobs.some((j) => j.sampleTestId === p.sampleTest.id);
+        return !justApproved && !p.isValidated;
+      });
+      const approvedAll = stillPendingPanels.length === 0 && !stillInQueue;
 
       loadQueue();
       if (approvedAll) {
         toast.success(t('parasitology.approved'));
         setSelectedSample(null);
-      } else if (stillInQueue) {
+      } else {
         toast.success(t('parasitology.approvedPartial'));
         await openSample({ id: sampleId });
-      } else {
-        toast.success(t('parasitology.approved'));
-        setSelectedSample(null);
       }
     } catch (err) {
       const status = err.response?.status;
@@ -895,6 +949,7 @@ export default function Parasitology() {
                 {panelList.map((panel) => {
                   const { icon: PanelIcon, title } = panelPresentation(panel.testMeta, t, i18n);
                   const sampleTestId = panel.sampleTest.id;
+                  const ready = panelReady(panel);
                   return (
                     <FindingPanel
                       key={sampleTestId}
@@ -904,6 +959,10 @@ export default function Parasitology() {
                       testMeta={panel.testMeta}
                       findings={panel.findings}
                       notes={panel.notes}
+                      isValidated={!!panel.isValidated}
+                      canApprove={ready}
+                      approving={saving}
+                      onApprove={() => approvePanels([sampleTestId])}
                       onFindingsChange={(findings) => updatePanel(sampleTestId, { findings })}
                       onNotesChange={(notes) => updatePanel(sampleTestId, { notes })}
                       labels={labels}
@@ -928,11 +987,11 @@ export default function Parasitology() {
 
               <button
                 type="button"
-                onClick={submitResults}
-                disabled={saving || !canSave}
+                onClick={() => approvePanels()}
+                disabled={saving || !canApproveAll}
                 className="btn-primary w-full py-3 disabled:opacity-50"
               >
-                {saving ? t('common.loading') : t('parasitology.approve')}
+                {saving ? t('common.loading') : t('parasitology.approveAll')}
               </button>
             </div>
           )}

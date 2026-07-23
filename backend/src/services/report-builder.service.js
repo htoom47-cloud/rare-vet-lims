@@ -30,40 +30,47 @@ const SECTION_META = {
     categoryCodes: ['PARAS', 'MICRO'],
     testCodePatterns: [/PARAS-STOOL|FECAL|STOOL|PARAS-F/i],
   },
+  brucella: {
+    titleEn: 'Brucellosis Rose Bengal',
+    titleAr: 'المالطية روز بنغال',
+    sortOrder: 5,
+    categoryCodes: ['MICRO'],
+    testCodePatterns: [/BRUCELLA|BRU-ROSE/i],
+  },
   hormones: {
     titleEn: 'Hormones',
     titleAr: 'الهرمونات',
-    sortOrder: 5,
+    sortOrder: 6,
     categoryCodes: ['HORM'],
   },
   elisa: {
     titleEn: 'ELISA Technique',
     titleAr: 'تقنية إليزا',
-    sortOrder: 6,
+    sortOrder: 7,
     categoryCodes: ['ELISA'],
   },
   serology: {
     titleEn: 'Serology',
     titleAr: 'المصلية',
-    sortOrder: 7,
+    sortOrder: 8,
     categoryCodes: ['SERO', 'IMMUNO'],
   },
   pcr: {
     titleEn: 'PCR',
     titleAr: 'PCR',
-    sortOrder: 8,
+    sortOrder: 9,
     categoryCodes: ['PCR'],
   },
   microscopy: {
     titleEn: 'Microscopy / Parasite Images',
     titleAr: 'صور الميكروسكوب / الطفيليات',
-    sortOrder: 9,
+    sortOrder: 10,
     isImageSection: true,
   },
   comparison: {
     titleEn: 'Comparison Report',
     titleAr: 'تقرير المقارنة',
-    sortOrder: 10,
+    sortOrder: 11,
     isComparisonSection: true,
   },
   other: {
@@ -85,6 +92,8 @@ const resolveSectionType = (testCode, categoryCode) => {
   if (/^CHEM/.test(code) || ['CHEM', 'BIOCHEM'].includes(cat)) return 'chemistry';
   if (/PARAS-BLOOD|BLOOD-PARAS|PARAS-B/.test(code)) return 'blood_parasites';
   if (/PARAS-STOOL|FECAL|STOOL|PARAS-F/.test(code)) return 'fecal';
+  // Rose Bengal / Malta — not ELISA
+  if ((/^BRU/i.test(code) || code === 'BRUCELLA') && !/ELISA/i.test(code)) return 'brucella';
   if (/^HORM/.test(code) || cat === 'HORM') return 'hormones';
   if (cat === 'ELISA' || /ELISA/i.test(code)) return 'elisa';
   if (['SERO', 'IMMUNO'].includes(cat) || /^SERO/.test(code)) return 'serology';

@@ -23,6 +23,7 @@
     "verify:elisa-report": "node src/scripts/verify-elisa-report.js",
     "verify:rose-bengal-note": "node src/scripts/verify-rose-bengal-note.js",
     "verify:mindray-urea": "node src/scripts/verify-mindray-urea-map.js",
+    "verify:report-boxes": "node src/scripts/verify-report-section-boxes.js",
     "inspect:mindray-urea": "node src/scripts/inspect-mindray-urea.js",
     "audit:elisa-refs": "node src/scripts/audit-elisa-text-refs.js",
     "ensure:elisa-refs": "node src/scripts/ensure-elisa-text-refs.js",

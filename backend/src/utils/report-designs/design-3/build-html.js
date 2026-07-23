@@ -125,7 +125,45 @@ const buildOverview = (counts, lang) => {
     </section>`;
 };
 
+/** Title shown on top of a results box. */
+const boxTitleFromRows = (rows, lang, fallback = '') => {
+  const row = (rows || [])[0] || {};
+  if (lang === 'ar') {
+    return (row.testNameAr && String(row.testNameAr).trim())
+      || (row.testNameEn && String(row.testNameEn).trim())
+      || row.testCode
+      || fallback;
+  }
+  return (row.testNameEn && String(row.testNameEn).trim())
+    || (row.testNameAr && String(row.testNameAr).trim())
+    || row.testCode
+    || fallback;
+};
+
+const groupResultsByTestCode = (results = []) => {
+  const map = new Map();
+  for (const row of results || []) {
+    const key = row.testCode || row.testNameEn || row.testNameAr || 'OTHER';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(row);
+  }
+  return [...map.values()];
+};
+
+/** Parasite / MICRO exams: one box per ordered test (blood, stool, brucella, …). */
+const shouldSplitSectionByTest = (section) => {
+  if (['blood_parasites', 'fecal', 'brucella'].includes(section.sectionType)) return true;
+  if (section.sectionType !== 'other') return false;
+  return (section.results || []).some((r) => {
+    const cat = String(r.categoryCode || '').toUpperCase();
+    const code = String(r.testCode || '');
+    return cat === 'MICRO' || cat === 'PARAS'
+      || /PARAS|BRU/i.test(code);
+  });
+};
+
 const buildResultsTable = (results, lang, sectionTitle) => {
+  if (!results?.length) return '';
   const headers = lang === 'ar'
     ? ['اسم الفحص', 'النتيجة', 'الوحدة', 'المجال المرجعي']
     : ['Test', 'Result', 'Unit', 'Reference Range'];
@@ -137,16 +175,17 @@ const buildResultsTable = (results, lang, sectionTitle) => {
       <td class="col-unit">${escapeHtml(row.unit || '-')}</td>
       <td class="col-ref"><span class="ref-badge">${escapeHtml(formatRef(row, lang))}</span></td>
     </tr>`).join('');
-  const titleBlock = sectionTitle
-    ? `<div class="section__head section__head--panel">${escapeHtml(sectionTitle)}</div>`
+  const title = sectionTitle || boxTitleFromRows(results, lang);
+  const titleBlock = title
+    ? `<div class="section__head section__head--box">${escapeHtml(title)}</div>`
     : '';
   const roseNote = hasPositiveRoseBengal(results)
     ? `<div class="result-note result-note--rose-bengal">${escapeHtml(roseBengalConfirmNote(lang))}</div>`
     : '';
   return `
-    <section class="section section--table">
+    <section class="section section--table section--results-box card">
       ${titleBlock}
-      <div class="table-wrap">
+      <div class="table-wrap results-box__body">
         <table class="results-table">
           <thead><tr>${headRow}</tr></thead>
           <tbody>${bodyRows}</tbody>
@@ -229,7 +268,14 @@ const buildDynamicSections = async (sections, lang, sampleCode = '') => {
         if (other.length) {
           blocks.push(buildResultsTable(other, lang, elisa.length ? null : section.title));
         }
+      } else if (shouldSplitSectionByTest(section)) {
+        // One box per parasite / MICRO test, titled with the test name
+        for (const rows of groupResultsByTestCode(section.results)) {
+          const title = boxTitleFromRows(rows, lang, section.title);
+          blocks.push(buildResultsTable(rows, lang, title));
+        }
       } else {
+        // CBC / CHEM / hormones / … — one titled box per category section
         blocks.push(buildResultsTable(section.results, lang, section.title));
       }
     }
@@ -332,17 +378,22 @@ const buildReportHtml = async (reportData) => {
     ? await buildDynamicSections(reportData.sections, lang, reportData.sampleCode || '')
     : buildResultsTable(reportData.results || [], lang);
 
+  const recommendationsBlock = buildTreatmentRecommendationsSection(
+    reportData.treatmentRecommendations,
+    lang
+  );
+
   const mainBlock = `
     <div class="report-main">
       ${buildHeader(reportData, lab, logoDataUri, barcodeDataUri, lang)}
       ${buildPatientSection(reportData, lang)}
       ${overviewResults.length ? buildOverview(counts, lang) : ''}
+      ${recommendationsBlock}
       ${dynamicSections}
     </div>`;
 
   const clinicalBlock = `
     <div class="clinical-page">
-      ${buildTreatmentRecommendationsSection(reportData.treatmentRecommendations, lang)}
       ${buildSignatures(reportData, lab, qrDataUri, lang)}
       ${buildSampleRetentionNote(lang)}
     </div>`;
