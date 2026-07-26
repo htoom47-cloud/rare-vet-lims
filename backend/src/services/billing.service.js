@@ -199,7 +199,8 @@ const recordPayment = async (data, userId, req = null) => {
       throw new AppError('Cannot pay cancelled or refunded invoice', 400, 'INVALID_STATUS');
     }
 
-    await assertDayOpen(invoiceDate(invoice));
+    // Gate on payment day (today), not invoice issue date — credit invoices are collected later.
+    await assertDayOpen(new Date().toISOString().slice(0, 10));
 
     const paidResult = await client.query(
       `SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments WHERE invoice_id = $1`,
