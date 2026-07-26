@@ -69,7 +69,7 @@ export default function AccountingReports() {
   const [paymentModal, setPaymentModal] = useState(false);
   const [refundModal, setRefundModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', reference_number: '', notes: '' });
+  const [paymentForm, setPaymentForm] = useState({ amount: '', method: '', reference_number: '', notes: '' });
   const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
   const [paymentFieldVisitDiscountType, setPaymentFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
@@ -207,7 +207,7 @@ export default function AccountingReports() {
     });
     setPaymentForm({
       amount: String(preview.balanceDue.toFixed(2)),
-      method: 'cash',
+      method: '',
       reference_number: '',
       notes: '',
     });
@@ -245,6 +245,10 @@ export default function AccountingReports() {
 
   const recordPayment = async (e) => {
     e.preventDefault();
+    if (!paymentForm.method) {
+      toast.error(t('billing.selectPaymentMethodRequired'));
+      return;
+    }
     try {
       const discountFields = buildSplitDiscountPayload(
         selectedInvoice.items || [],
@@ -264,7 +268,7 @@ export default function AccountingReports() {
       });
       toast.success(t('accounting.paymentRecorded'));
       setPaymentModal(false);
-      setPaymentForm({ amount: '', method: 'cash', reference_number: '', notes: '' });
+      setPaymentForm({ amount: '', method: '', reference_number: '', notes: '' });
       setPaymentDiscountType(DISCOUNT_TYPES.NONE);
       setPaymentDiscountValue('');
       setPaymentFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
@@ -846,7 +850,13 @@ export default function AccountingReports() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('billing.paymentMethod')}</label>
-            <select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })} className="input-field">
+            <select
+              value={paymentForm.method}
+              onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+              className="input-field"
+              required
+            >
+              <option value="" disabled>{t('billing.selectPaymentMethod')}</option>
               {['cash', 'card', 'bank_transfer', 'credit'].map((m) => (
                 <option key={m} value={m}>{paymentMethodLabel(m)}</option>
               ))}
