@@ -282,7 +282,7 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
     contactId,
     openUrl,
     dialUrl,
-    userMessage: 'تم تجهيز محادثة العميل في هاتِف. افتح التطبيق وابحث عن الرقم ثم اتصل.',
+    userMessage: 'تم بدء الاتصال. محادثة العميل جاهزة في هاتِف.',
   };
 };
 
