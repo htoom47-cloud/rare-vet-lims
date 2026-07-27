@@ -62,6 +62,7 @@ export default function Customers() {
   const [hatifMessage, setHatifMessage] = useState('');
   const [hatifSending, setHatifSending] = useState(false);
   const [hatifCalling, setHatifCalling] = useState(false);
+  const [hatifOpeningChat, setHatifOpeningChat] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -255,6 +256,32 @@ export default function Customers() {
       else toast.error(err.response?.data?.error?.message || t('common.error'));
     } finally {
       setHatifCalling(false);
+    }
+  };
+
+  const openHatifWhatsApp = async () => {
+    if (!selected?.id || !canHatifWhatsapp) return;
+    if (!selected.mobile) {
+      toast.error(t('customers.hatifCallNoMobile'));
+      return;
+    }
+    setHatifOpeningChat(true);
+    try {
+      const { data: resp } = await hatifAPI.openWhatsApp(selected.id);
+      const payload = resp?.data || resp;
+      const openUrl = payload?.openUrl || resp?.openUrl;
+      if (openUrl) {
+        window.open(openUrl, '_blank', 'noopener,noreferrer');
+      }
+      toast.success(resp.userMessage || payload?.userMessage || t('customers.hatifChatReady'));
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      if (code === 'HATIF_DISABLED') toast.error(t('customers.hatifDisabled'));
+      else if (code === 'HATIF_NOT_CONFIGURED') toast.error(t('customers.hatifNotConfigured'));
+      else if (code === 'HATIF_APP_URL_MISSING') toast.error(t('customers.hatifAppUrlMissing'));
+      else toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setHatifOpeningChat(false);
     }
   };
 
@@ -551,20 +578,35 @@ export default function Customers() {
                 <h4 className="font-semibold flex items-center gap-2">
                   <MessageCircle size={16} /> {t('customers.hatifSection')}
                 </h4>
-                {canHatifCall && (
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {canHatifWhatsapp && (
+                    <button
+                      type="button"
+                      onClick={openHatifWhatsApp}
+                      disabled={hatifOpeningChat || hatifCalling || hatifSending}
+                      className="btn-primary inline-flex items-center gap-2 text-sm"
+                    >
+                      <MessageCircle size={16} />
+                      {hatifOpeningChat ? t('common.loading') : t('customers.hatifChat')}
+                    </button>
+                  )}
+                  {canHatifCall && (
                     <button
                       type="button"
                       onClick={prepareHatifCall}
-                      disabled={hatifCalling || hatifSending}
-                      className="btn-primary inline-flex items-center gap-2 text-sm"
+                      disabled={hatifCalling || hatifSending || hatifOpeningChat}
+                      className="btn-secondary inline-flex items-center gap-2 text-sm"
                     >
                       <Phone size={16} />
                       {hatifCalling ? t('common.loading') : t('customers.hatifCall')}
                     </button>
-                    <p className="text-xs text-gray-500 w-full">{t('customers.hatifCallHint')}</p>
-                  </div>
-                )}
+                  )}
+                  {(canHatifWhatsapp || canHatifCall) && (
+                    <p className="text-xs text-gray-500 w-full">
+                      {canHatifWhatsapp ? t('customers.hatifChatHint') : t('customers.hatifCallHint')}
+                    </p>
+                  )}
+                </div>
                 {canHatifWhatsapp && (
                   <>
                     <p className="text-xs text-gray-500">{t('customers.hatifHint')}</p>
@@ -579,7 +621,7 @@ export default function Customers() {
                       <button
                         type="button"
                         onClick={sendHatifWhatsApp}
-                        disabled={hatifSending || hatifCalling || !hatifMessage.trim()}
+                        disabled={hatifSending || hatifCalling || hatifOpeningChat || !hatifMessage.trim()}
                         className="btn-primary inline-flex items-center gap-2 text-sm"
                       >
                         <Send size={16} />
@@ -589,7 +631,7 @@ export default function Customers() {
                         <button
                           type="button"
                           onClick={fillHatifFromReadyReports}
-                          disabled={hatifSending || hatifCalling}
+                          disabled={hatifSending || hatifCalling || hatifOpeningChat}
                           className="btn-secondary text-sm"
                         >
                           {t('customers.hatifFillReportsHint')}

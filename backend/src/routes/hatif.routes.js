@@ -44,6 +44,23 @@ router.post(
   }
 );
 
+/** Open Hatif WhatsApp UI for staff to chat with the customer. */
+router.post(
+  '/customers/:id/whatsapp/open',
+  authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT),
+  async (req, res, next) => {
+    try {
+      const data = await hatif.openCustomerWhatsApp(req.params.id, req.user.id, req);
+      res.json({
+        success: true,
+        data,
+        dryRun: data.dryRun === true,
+        userMessage: data.userMessage,
+      });
+    } catch (err) { next(err); }
+  }
+);
+
 /** Prepare live-agent call: create Hatif conversation + return app URL for staff to dial. */
 router.post(
   '/customers/:id/call',

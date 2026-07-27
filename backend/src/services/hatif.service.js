@@ -231,11 +231,12 @@ const sendCustomerWhatsApp = async (customerId, { message }, userId, req = null)
 };
 
 /**
- * Prepare a live-agent call: create/open Hatif conversation, return app URL for staff to dial.
- * Does not place Outbound IVR (no automated voice / no auto-bridge to agent).
+ * Create/open Hatif conversation and return app URL for staff.
+ * mode: 'call' | 'whatsapp'
  */
-const prepareCustomerCall = async (customerId, userId, req = null) => {
-  assertCallReady();
+const prepareCustomerHatifSession = async (customerId, userId, req, mode) => {
+  if (mode === 'call') assertCallReady();
+  else assertWhatsappReady();
 
   const cust = await query(
     `SELECT id, full_name, full_name_ar, mobile FROM customers WHERE id = $1 AND ${notDeleted('customers')}`,
@@ -260,7 +261,7 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
     contactId = created.contactId || conversation.contactId || null;
   } catch (err) {
     createError = err.message;
-    logger.warn('Hatif create conversation for call prep failed', { error: err.message });
+    logger.warn('Hatif create conversation for session prep failed', { error: err.message, mode });
   }
 
   const openUrl = buildHatifOpenUrl(conversationId);
@@ -272,12 +273,13 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
     );
   }
 
+  const isWhatsapp = mode === 'whatsapp';
   await writeAudit({
     userId,
-    action: 'hatif_call_prepare',
+    action: isWhatsapp ? 'hatif_whatsapp_open' : 'hatif_call_prepare',
     customerId: customer.id,
     values: {
-      channel: 'hatif_live_agent_prep',
+      channel: isWhatsapp ? 'hatif_whatsapp_open' : 'hatif_live_agent_prep',
       to: toNumber,
       conversationId,
       contactId,
@@ -287,6 +289,17 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
     req,
   });
 
+  let userMessage;
+  if (isWhatsapp) {
+    userMessage = conversationId
+      ? 'تم تجهيز واتساب العميل في هاتِف — أكمل المحادثة من التطبيق.'
+      : 'تم فتح هاتِف — ابحث عن رقم العميل وافتح واتسابه.';
+  } else {
+    userMessage = conversationId
+      ? 'تم تجهيز محادثة العميل في هاتِف — افتح التطبيق واضغط اتصال من رقم العيادة.'
+      : 'تم فتح هاتِف — ابحث عن رقم العميل ثم اضغط اتصال من رقم العيادة.';
+  }
+
   return {
     dryRun: false,
     customerId: customer.id,
@@ -295,11 +308,19 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
     conversationId,
     contactId,
     openUrl,
-    userMessage: conversationId
-      ? 'تم تجهيز محادثة العميل في هاتِف — افتح التطبيق واضغط اتصال من رقم العيادة.'
-      : 'تم فتح هاتِف — ابحث عن رقم العميل ثم اضغط اتصال من رقم العيادة.',
+    userMessage,
   };
 };
+
+/** Prepare live-agent call: open Hatif for staff to dial. */
+const prepareCustomerCall = (customerId, userId, req = null) => (
+  prepareCustomerHatifSession(customerId, userId, req, 'call')
+);
+
+/** Open Hatif WhatsApp UI for staff to chat with the customer. */
+const openCustomerWhatsApp = (customerId, userId, req = null) => (
+  prepareCustomerHatifSession(customerId, userId, req, 'whatsapp')
+);
 
 /** Accept leftover Outbound IVR webhooks (no-op; IVR path retired). */
 const handleOutboundIvrWebhook = async (body) => {
@@ -316,6 +337,7 @@ module.exports = {
   isFeatureEnabled: isWhatsappEnabled,
   isConfigured,
   sendCustomerWhatsApp,
+  openCustomerWhatsApp,
   prepareCustomerCall,
   placeCustomerOutboundCall: prepareCustomerCall,
   handleOutboundIvrWebhook,
