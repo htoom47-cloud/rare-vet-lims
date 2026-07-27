@@ -141,9 +141,15 @@ const createConversation = async ({ phoneNumber, contactName }) => {
 };
 
 const buildHatifOpenUrl = (conversationId) => {
+  const template = String(env.hatif?.conversationUrlTemplate || '').trim();
+  if (template && conversationId) {
+    return template
+      .replace(/\{id\}/gi, conversationId)
+      .replace(/\{conversationId\}/gi, conversationId);
+  }
+  // Open Hatif home only — inventing /conversations/{id} caused 404 in production UI.
   const base = String(env.hatif?.appUrl || '').trim().replace(/\/$/, '');
-  if (!base || !conversationId) return null;
-  return `${base}/conversations/${conversationId}`;
+  return base || null;
 };
 
 const writeAudit = async ({ userId, action, customerId, values, req }) => {
@@ -276,9 +282,7 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
     contactId,
     openUrl,
     dialUrl,
-    userMessage: openUrl
-      ? 'تم تجهيز المحادثة في هاتِف. أكمل الاتصال من تطبيق هاتِف.'
-      : 'تم تجهيز المحادثة في هاتِف. افتح تطبيق هاتِف واتصل بالعميل.',
+    userMessage: 'تم تجهيز محادثة العميل في هاتِف. افتح التطبيق وابحث عن الرقم ثم اتصل.',
   };
 };
 

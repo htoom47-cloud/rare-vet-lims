@@ -241,6 +241,12 @@ export default function Customers() {
       if (resp.data?.openUrl) {
         window.open(resp.data.openUrl, '_blank', 'noopener,noreferrer');
       }
+      // Keep customer number handy for the agent softphone in Hatif
+      if (resp.data?.to) {
+        try {
+          await navigator.clipboard.writeText(resp.data.to.startsWith('+') ? resp.data.to : `+${resp.data.to}`);
+        } catch { /* clipboard optional */ }
+      }
     } catch (err) {
       const code = err.response?.data?.error?.code;
       if (code === 'HATIF_CALL_DISABLED') toast.error(t('customers.hatifCallDisabled'));

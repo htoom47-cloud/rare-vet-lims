@@ -142,8 +142,13 @@ const env = {
     clientSecret: process.env.HATIF_CLIENT_SECRET || '',
     channelId: process.env.HATIF_CHANNEL_ID || '',
     webhookSecret: process.env.HATIF_WEBHOOK_SECRET || '',
-    /** Optional deep-link base for agent UI (opens after create-conversation) */
-    appUrl: process.env.HATIF_APP_URL || 'https://app.hatif.io',
+    /** Agent UI home (opened after preparing a call). Do not invent deep links. */
+    appUrl: process.env.HATIF_APP_URL || 'https://app.hatif.io/ar',
+    /**
+     * Optional deep link, e.g. https://app.hatif.io/ar/some-path/{id}
+     * Leave empty until the correct Hatif conversation URL is known.
+     */
+    conversationUrlTemplate: process.env.HATIF_CONVERSATION_URL_TEMPLATE || '',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',
