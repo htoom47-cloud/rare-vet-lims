@@ -241,16 +241,17 @@ export default function Customers() {
     setHatifCalling(true);
     try {
       const { data: resp } = await hatifAPI.prepareCall(selected.id);
-      if (resp.dryRun) {
-        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 6000 });
-      } else {
-        toast.success(resp.userMessage || t('customers.hatifCallReady'));
+      const payload = resp?.data || resp;
+      const openUrl = payload?.openUrl || resp?.openUrl;
+      if (openUrl) {
+        window.open(openUrl, '_blank', 'noopener,noreferrer');
       }
+      toast.success(resp.userMessage || payload?.userMessage || t('customers.hatifCallReady'));
     } catch (err) {
       const code = err.response?.data?.error?.code;
       if (code === 'HATIF_CALL_DISABLED') toast.error(t('customers.hatifCallDisabled'));
       else if (code === 'HATIF_NOT_CONFIGURED') toast.error(t('customers.hatifNotConfigured'));
-      else if (code === 'HATIF_WEBHOOK_MISSING') toast.error(t('customers.hatifWebhookMissing'));
+      else if (code === 'HATIF_APP_URL_MISSING') toast.error(t('customers.hatifAppUrlMissing'));
       else toast.error(err.response?.data?.error?.message || t('common.error'));
     } finally {
       setHatifCalling(false);

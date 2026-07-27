@@ -153,7 +153,7 @@ const env = {
     outboundWebhookUrl: process.env.HATIF_OUTBOUND_WEBHOOK_URL || '',
     /** TTS played when customer answers (Arabic default) */
     outboundTtsText: process.env.HATIF_OUTBOUND_TTS_TEXT
-      || 'مرحباً بكم في مركز رعاية النوادر البيطري. اضغط واحد للمتابعة أو أنهِ المكالمة.',
+      || 'مرحباً بكم في مركز رعاية النوادر البيطري. هذه مكالمة آلية من المختبر. شكراً لاتصالكم، ويمكنكم إنهاء المكالمة الآن.',
     outboundTtsVoice: process.env.HATIF_OUTBOUND_TTS_VOICE === 'Male' ? 'Male' : 'Female',
   },
   softDelete: {

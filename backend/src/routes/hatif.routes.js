@@ -44,13 +44,13 @@ router.post(
   }
 );
 
-/** Place outbound call via Hatif (rings customer from clinic number). */
+/** Prepare live-agent call: create Hatif conversation + return app URL for staff to dial. */
 router.post(
   '/customers/:id/call',
   authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT),
   async (req, res, next) => {
     try {
-      const data = await hatif.placeCustomerOutboundCall(req.params.id, req.user.id, req);
+      const data = await hatif.prepareCustomerCall(req.params.id, req.user.id, req);
       res.json({
         success: true,
         data,
