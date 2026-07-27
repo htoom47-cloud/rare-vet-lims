@@ -232,37 +232,26 @@ export default function Customers() {
     );
   };
 
-  const startImmediateDial = (mobile) => {
-    const raw = String(mobile || '').trim();
-    if (!raw) return false;
-    let digits = raw.replace(/[^\d+]/g, '');
-    if (!digits) return false;
-    if (digits.startsWith('00')) digits = `+${digits.slice(2)}`;
-    else if (digits.startsWith('0')) digits = `+966${digits.slice(1)}`;
-    else if (!digits.startsWith('+')) digits = `+${digits}`;
-    window.location.href = `tel:${digits}`;
-    return true;
-  };
-
   const prepareHatifCall = async () => {
     if (!selected?.id || !canHatifCall) return;
-    // Start the call immediately via the device/softphone dialer.
-    const dialed = startImmediateDial(selected.mobile);
-    if (!dialed) {
+    if (!selected.mobile) {
       toast.error(t('customers.hatifCallNoMobile'));
       return;
     }
     setHatifCalling(true);
     try {
-      // Prepare Hatif conversation in the background (CRM context) — do not block dialing.
       const { data: resp } = await hatifAPI.prepareCall(selected.id);
-      toast.success(resp.userMessage || t('customers.hatifCallReady'));
+      if (resp.dryRun) {
+        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 6000 });
+      } else {
+        toast.success(resp.userMessage || t('customers.hatifCallReady'));
+      }
     } catch (err) {
       const code = err.response?.data?.error?.code;
-      // Call already started locally; only warn if Hatif prep failed.
       if (code === 'HATIF_CALL_DISABLED') toast.error(t('customers.hatifCallDisabled'));
       else if (code === 'HATIF_NOT_CONFIGURED') toast.error(t('customers.hatifNotConfigured'));
-      else toast(err.response?.data?.error?.message || t('customers.hatifCallPrepFailed'), { icon: '⚠️' });
+      else if (code === 'HATIF_WEBHOOK_MISSING') toast.error(t('customers.hatifWebhookMissing'));
+      else toast.error(err.response?.data?.error?.message || t('common.error'));
     } finally {
       setHatifCalling(false);
     }

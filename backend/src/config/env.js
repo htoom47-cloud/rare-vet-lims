@@ -149,6 +149,12 @@ const env = {
      * Leave empty until the correct Hatif conversation URL is known.
      */
     conversationUrlTemplate: process.env.HATIF_CONVERSATION_URL_TEMPLATE || '',
+    /** Public HTTPS webhook Hatif calls after outbound IVR ends */
+    outboundWebhookUrl: process.env.HATIF_OUTBOUND_WEBHOOK_URL || '',
+    /** TTS played when customer answers (Arabic default) */
+    outboundTtsText: process.env.HATIF_OUTBOUND_TTS_TEXT
+      || 'مرحباً بكم في مركز رعاية النوادر البيطري. اضغط واحد للمتابعة أو أنهِ المكالمة.',
+    outboundTtsVoice: process.env.HATIF_OUTBOUND_TTS_VOICE === 'Male' ? 'Male' : 'Female',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',

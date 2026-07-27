@@ -231,10 +231,10 @@ const sendCustomerWhatsApp = async (customerId, { message }, userId, req = null)
 };
 
 /**
- * Prepare a live-agent call: create/open Hatif conversation for the customer.
- * Does not start IVR. Agent completes the call in Hatif softphone/app.
+ * Place an outbound call via Hatif Outbound IVR (rings customer from clinic number).
+ * Honours SEND_REAL_NOTIFICATIONS — dry-run when false.
  */
-const prepareCustomerCall = async (customerId, userId, req = null) => {
+const placeCustomerOutboundCall = async (customerId, userId, req = null) => {
   assertCallReady();
 
   const cust = await query(
@@ -249,41 +249,110 @@ const prepareCustomerCall = async (customerId, userId, req = null) => {
   if (!toNumber || !e164) throw new AppError('Customer mobile is invalid', 400, 'INVALID_MOBILE');
 
   const contactName = customer.full_name_ar || customer.full_name || toNumber;
-  const created = await createConversation({
-    phoneNumber: e164,
-    contactName,
-  });
+  let conversationId = null;
+  let contactId = null;
+  try {
+    const created = await createConversation({ phoneNumber: e164, contactName });
+    const conversation = created.conversation || created;
+    conversationId = conversation.id || created.conversationId || null;
+    contactId = created.contactId || conversation.contactId || null;
+  } catch (err) {
+    logger.warn('Hatif create conversation before outbound failed', { error: err.message });
+  }
 
-  const conversation = created.conversation || created;
-  const conversationId = conversation.id || created.conversationId || null;
-  const contactId = created.contactId || conversation.contactId || null;
-  const openUrl = buildHatifOpenUrl(conversationId);
-  const dialUrl = `tel:${e164}`;
+  const webhookUrl = String(env.hatif.outboundWebhookUrl || '').trim()
+    || `${String(env.appUrl || '').replace(/\/$/, '')}/api/hatif/outbound-ivr-webhook`;
+  if (!/^https:\/\//i.test(webhookUrl)) {
+    throw new AppError(
+      'Outbound call webhook must be a public HTTPS URL (set HATIF_OUTBOUND_WEBHOOK_URL or APP_URL)',
+      503,
+      'HATIF_WEBHOOK_MISSING'
+    );
+  }
+
+  const externalId = `lims-${customer.id}-${uuidv4().slice(0, 8)}`;
+  const dryRun = !env.notifications.sendReal;
+  let outbound = null;
+
+  if (!dryRun) {
+    const token = await getAccessToken();
+    const payload = {
+      ChannelId: env.hatif.channelId,
+      ExternalId: externalId,
+      DestinationNumber: toNumber,
+      AudioFileUrl: null,
+      TtsText: env.hatif.outboundTtsText,
+      TtsVoice: env.hatif.outboundTtsVoice,
+      WelcomeMessageFileUrl: null,
+      SuccessMessageFileUrl: null,
+      FailedMessageFileUrl: null,
+      Options: [
+        { Digit: '1', Description: 'Continue', ResponseMessageFileUrl: null },
+      ],
+      WebhookUrl: webhookUrl,
+      MaxAudioRetries: 2,
+      InputTimeoutMs: 6000,
+      DigitTimeoutMs: 3000,
+    };
+    const res = await fetch(`${env.hatif.apiBase}/v1/outbound-ivr`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    outbound = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new AppError(
+        outbound.message || outbound.title || outbound.error || 'Hatif outbound call failed',
+        502,
+        'HATIF_OUTBOUND_FAILED'
+      );
+    }
+  }
 
   await writeAudit({
     userId,
-    action: 'hatif_call_prepare',
+    action: 'hatif_outbound_call',
     customerId: customer.id,
     values: {
-      channel: 'hatif_call',
+      channel: 'hatif_outbound_ivr',
       to: toNumber,
+      dryRun,
+      externalId,
       conversationId,
       contactId,
-      openUrl,
+      outboundId: outbound?.id || outbound?.callId || null,
     },
     req,
   });
 
   return {
+    dryRun,
     customerId: customer.id,
     customerName: contactName,
     to: toNumber,
     conversationId,
     contactId,
-    openUrl,
-    dialUrl,
-    userMessage: 'تم بدء الاتصال. محادثة العميل جاهزة في هاتِف.',
+    externalId,
+    outbound,
+    userMessage: dryRun
+      ? 'وضع الاختبار: لم يُجرَ اتصال فعلي عبر هاتِف (SEND_REAL_NOTIFICATIONS=false).'
+      : 'تم طلب الاتصال عبر هاتِف — سيُرن على جوال العميل من رقم العيادة.',
   };
+};
+
+/** Accept Hatif outbound IVR completion webhook (public). */
+const handleOutboundIvrWebhook = async (body) => {
+  logger.info('Hatif outbound IVR webhook', {
+    id: body?.id,
+    status: body?.status,
+    result: body?.result,
+    destinationNumber: body?.destinationNumber,
+    externalId: body?.externalId,
+  });
+  return { received: true };
 };
 
 module.exports = {
@@ -291,5 +360,7 @@ module.exports = {
   isFeatureEnabled: isWhatsappEnabled,
   isConfigured,
   sendCustomerWhatsApp,
-  prepareCustomerCall,
+  prepareCustomerCall: placeCustomerOutboundCall,
+  placeCustomerOutboundCall,
+  handleOutboundIvrWebhook,
 };

@@ -4,6 +4,15 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
+
+/** Public webhook — Hatif posts outbound IVR results here (must return 200). */
+router.post('/outbound-ivr-webhook', async (req, res, next) => {
+  try {
+    const data = await hatif.handleOutboundIvrWebhook(req.body || {});
+    res.status(200).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.use(authenticate);
 
 /** Integration status for staff UI (no secrets). */
@@ -35,14 +44,19 @@ router.post(
   }
 );
 
-/** Prepare live-agent call (create/open Hatif conversation — no IVR). */
+/** Place outbound call via Hatif (rings customer from clinic number). */
 router.post(
   '/customers/:id/call',
   authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT),
   async (req, res, next) => {
     try {
-      const data = await hatif.prepareCustomerCall(req.params.id, req.user.id, req);
-      res.json({ success: true, data, userMessage: data.userMessage });
+      const data = await hatif.placeCustomerOutboundCall(req.params.id, req.user.id, req);
+      res.json({
+        success: true,
+        data,
+        dryRun: data.dryRun === true,
+        userMessage: data.userMessage,
+      });
     } catch (err) { next(err); }
   }
 );
