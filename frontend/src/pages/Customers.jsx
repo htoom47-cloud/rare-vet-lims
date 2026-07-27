@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/ui/StatusBadge';
-import { customersAPI, billingAPI } from '../services/api';
+import { customersAPI, billingAPI, hatifAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
@@ -36,6 +36,7 @@ export default function Customers() {
   const canEdit = hasPermission('customers.update');
   const canSendReports = hasPermission('notifications.send_report');
   const canSkipReadyReports = canSendReports && !!user?.features?.skipReadyReports;
+  const canHatifWhatsapp = canSendReports && !!user?.features?.hatifWhatsapp;
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -57,6 +58,8 @@ export default function Customers() {
   const [skippingReports, setSkippingReports] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
   const [previousSend, setPreviousSend] = useState(null);
+  const [hatifMessage, setHatifMessage] = useState('');
+  const [hatifSending, setHatifSending] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -148,6 +151,7 @@ export default function Customers() {
     setSkipReason('');
     setResendOpen(false);
     setPreviousSend(null);
+    setHatifMessage('');
     await loadReadyReports(customer.id);
   };
 
@@ -207,6 +211,49 @@ export default function Customers() {
     if (report.send_status === 'sent') return t('customers.sendStatus.sent');
     if (report.send_status === 'failed') return t('customers.sendStatus.failed');
     return t('customers.sendStatus.unsent');
+  };
+
+  const fillHatifFromReadyReports = () => {
+    if (!readyReports.length) {
+      toast.error(t('customers.noReadyReports'));
+      return;
+    }
+    const lines = readyReports.map((r) => `- ${r.report_number}${r.report_type || r.test_names ? ` (${r.report_type || r.test_names})` : ''}`);
+    const name = selected?.full_name_ar || selected?.full_name || '';
+    setHatifMessage(
+      [
+        name ? `عزيزي/عزيزتي ${name}` : 'عزيزي العميل',
+        'التقارير التالية جاهزة من مركز رعاية النوادر البيطري:',
+        ...lines,
+        'للاستفسار تواصلوا معنا.',
+      ].join('\n')
+    );
+  };
+
+  const sendHatifWhatsApp = async () => {
+    if (!selected?.id || !canHatifWhatsapp) return;
+    const message = hatifMessage.trim();
+    if (!message) {
+      toast.error(t('customers.hatifMessagePlaceholder'));
+      return;
+    }
+    setHatifSending(true);
+    try {
+      const { data: resp } = await hatifAPI.sendWhatsApp(selected.id, { message });
+      if (resp.dryRun) {
+        toast(resp.userMessage || t('notifications.dryRunWarning'), { icon: '⚠️', duration: 5000 });
+      } else {
+        toast.success(t('customers.hatifSent'));
+      }
+      setHatifMessage('');
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      if (code === 'HATIF_DISABLED') toast.error(t('customers.hatifDisabled'));
+      else if (code === 'HATIF_NOT_CONFIGURED') toast.error(t('customers.hatifNotConfigured'));
+      else toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setHatifSending(false);
+    }
   };
 
   const skipAllReadyReports = async () => {
@@ -468,6 +515,43 @@ export default function Customers() {
                     )}
                   </>
                 )}
+              </div>
+            )}
+
+            {canHatifWhatsapp && (
+              <div className="border rounded-lg p-4 space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <MessageCircle size={16} /> {t('customers.hatifSection')}
+                </h4>
+                <p className="text-xs text-gray-500">{t('customers.hatifHint')}</p>
+                <textarea
+                  value={hatifMessage}
+                  onChange={(e) => setHatifMessage(e.target.value)}
+                  rows={4}
+                  className="input-field text-sm"
+                  placeholder={t('customers.hatifMessagePlaceholder')}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={sendHatifWhatsApp}
+                    disabled={hatifSending || !hatifMessage.trim()}
+                    className="btn-primary inline-flex items-center gap-2 text-sm"
+                  >
+                    <Send size={16} />
+                    {t('customers.hatifSend')}
+                  </button>
+                  {readyReports.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={fillHatifFromReadyReports}
+                      disabled={hatifSending}
+                      className="btn-secondary text-sm"
+                    >
+                      {t('customers.hatifFillReportsHint')}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

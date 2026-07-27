@@ -123,6 +123,19 @@ const env = {
      * Default false — no change to existing send behaviour.
      */
     skipReadyReports: process.env.SKIP_READY_REPORTS_ENABLED === 'true',
+    /**
+     * When true: staff may send WhatsApp via Hatif from Customers.
+     * Default false — no change until explicitly enabled after credentials are set.
+     */
+    hatifWhatsapp: process.env.HATIF_WHATSAPP_ENABLED === 'true',
+  },
+  hatif: {
+    apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',
+    tokenUrl: process.env.HATIF_TOKEN_URL || 'https://api.voxa.sa/connect/token',
+    clientId: process.env.HATIF_CLIENT_ID || '',
+    clientSecret: process.env.HATIF_CLIENT_SECRET || '',
+    channelId: process.env.HATIF_CHANNEL_ID || '',
+    webhookSecret: process.env.HATIF_WEBHOOK_SECRET || '',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',

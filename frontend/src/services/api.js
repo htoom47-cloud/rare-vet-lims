@@ -60,6 +60,12 @@ export const customersAPI = {
   skipReadyReports: (id, body) => api.post(`/customers/${id}/skip-ready-reports`, body),
 };
 
+/** Hatif WhatsApp (feature-flagged; no-op until HATIF_WHATSAPP_ENABLED=true) */
+export const hatifAPI = {
+  status: () => api.get('/hatif/status'),
+  sendWhatsApp: (customerId, body) => api.post(`/hatif/customers/${customerId}/whatsapp`, body),
+};
+
 export const referenceRangesAPI = {
   list: (params) => api.get('/reference-ranges', { params }),
   create: (data) => api.post('/reference-ranges', data),

@@ -14,6 +14,8 @@ const getStaffFeatures = () => ({
   elisaSpecialEntry: !!env.features?.elisaSpecialEntry,
   /** When true: Customers profile may skip/cancel pending report notifications */
   skipReadyReports: !!env.features?.skipReadyReports,
+  /** When true: Customers may send WhatsApp via Hatif (requires Hatif credentials) */
+  hatifWhatsapp: !!env.features?.hatifWhatsapp,
 });
 
 module.exports = { getStaffFeatures };

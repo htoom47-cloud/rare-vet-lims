@@ -20,6 +20,7 @@ const settingsRoutes = require('./settings.routes');
 const portalRoutes = require('./portal.routes');
 const publicRoutes = require('./public.routes');
 const trashRoutes = require('./trash.routes');
+const hatifRoutes = require('./hatif.routes');
 
 const router = express.Router();
 
@@ -39,6 +40,7 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/users', usersRoutes);
 router.use('/audit', auditRoutes);
 router.use('/notifications', notificationsRoutes);
+router.use('/hatif', hatifRoutes);
 router.use('/devices', devicesRoutes);
 router.use('/reference-ranges', require('./reference-ranges.routes'));
 router.use('/animal-species', require('./animal-species.routes'));
