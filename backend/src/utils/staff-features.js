@@ -16,6 +16,8 @@ const getStaffFeatures = () => ({
   skipReadyReports: !!env.features?.skipReadyReports,
   /** When true: Customers may send WhatsApp via Hatif (requires Hatif credentials) */
   hatifWhatsapp: !!env.features?.hatifWhatsapp,
+  /** When true: Customers may open/prepare a Hatif call conversation */
+  hatifCall: !!env.features?.hatifCall,
 });
 
 module.exports = { getStaffFeatures };

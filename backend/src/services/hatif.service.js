@@ -1,7 +1,6 @@
 /**
- * Hatif (Voxa) WhatsApp integration — outbound text only (phase 1).
- * Disabled unless HATIF_WHATSAPP_ENABLED=true and credentials are set.
- * Never throws into lab/billing paths; callers handle AppError.
+ * Hatif (Voxa) integration — WhatsApp text + live-agent call prep (no IVR).
+ * Disabled unless feature flags are on and credentials are set.
  */
 const env = require('../config/env');
 const { AppError } = require('../middleware/errorHandler');
@@ -14,7 +13,8 @@ const logger = require('../config/logger');
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
-const isFeatureEnabled = () => !!env.features?.hatifWhatsapp;
+const isWhatsappEnabled = () => !!env.features?.hatifWhatsapp;
+const isCallEnabled = () => !!env.features?.hatifCall;
 
 const isConfigured = () => !!(
   env.hatif?.clientId
@@ -23,19 +23,32 @@ const isConfigured = () => !!(
 );
 
 const getStatus = () => ({
-  enabled: isFeatureEnabled(),
+  enabled: isWhatsappEnabled(),
+  callEnabled: isCallEnabled(),
   configured: isConfigured(),
   sendReal: !!env.notifications?.sendReal,
   channelConfigured: !!env.hatif?.channelId,
+  appUrlConfigured: !!env.hatif?.appUrl,
 });
 
-const assertReady = () => {
-  if (!isFeatureEnabled()) {
-    throw new AppError('Hatif WhatsApp is disabled', 403, 'HATIF_DISABLED');
-  }
+const assertConfigured = () => {
   if (!isConfigured()) {
     throw new AppError('Hatif credentials are not configured', 503, 'HATIF_NOT_CONFIGURED');
   }
+};
+
+const assertWhatsappReady = () => {
+  if (!isWhatsappEnabled()) {
+    throw new AppError('Hatif WhatsApp is disabled', 403, 'HATIF_DISABLED');
+  }
+  assertConfigured();
+};
+
+const assertCallReady = () => {
+  if (!isCallEnabled()) {
+    throw new AppError('Hatif call is disabled', 403, 'HATIF_CALL_DISABLED');
+  }
+  assertConfigured();
 };
 
 const toHatifNumber = (mobile) => {
@@ -100,12 +113,68 @@ const sendWhatsAppText = async ({ toNumber, text }) => {
   return data;
 };
 
+const createConversation = async ({ phoneNumber, contactName }) => {
+  const token = await getAccessToken();
+  const res = await fetch(`${env.hatif.apiBase}/v2/conversations/service-account/create`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      channelId: env.hatif.channelId,
+      phoneNumber,
+      contactName: contactName || null,
+      assignToUserId: null,
+      assignToAiAgentId: null,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new AppError(
+      data.message || data.title || data.error || 'Hatif create conversation failed',
+      502,
+      'HATIF_CONVERSATION_FAILED'
+    );
+  }
+  return data;
+};
+
+const buildHatifOpenUrl = (conversationId) => {
+  const base = String(env.hatif?.appUrl || '').trim().replace(/\/$/, '');
+  if (!base || !conversationId) return null;
+  return `${base}/conversations/${conversationId}`;
+};
+
+const writeAudit = async ({ userId, action, customerId, values, req }) => {
+  try {
+    if (!userId) return;
+    await query(
+      `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, new_values, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        uuidv4(),
+        userId,
+        action,
+        'hatif',
+        'customer',
+        customerId,
+        JSON.stringify(values),
+        req?.ip || null,
+        req?.get?.('user-agent') || null,
+      ]
+    );
+  } catch (err) {
+    logger.warn('Hatif audit log failed', { error: err.message, action });
+  }
+};
+
 /**
  * Send a free-text WhatsApp message to a LIMS customer via Hatif.
  * Honours SEND_REAL_NOTIFICATIONS (dry-run when false).
  */
 const sendCustomerWhatsApp = async (customerId, { message }, userId, req = null) => {
-  assertReady();
+  assertWhatsappReady();
 
   const text = String(message || '').trim();
   if (!text) throw new AppError('Message is required', 400, 'VALIDATION');
@@ -128,34 +197,20 @@ const sendCustomerWhatsApp = async (customerId, { message }, userId, req = null)
     providerResult = await sendWhatsAppText({ toNumber, text });
   }
 
-  try {
-    if (userId) {
-      await query(
-        `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, new_values, ip_address, user_agent)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          uuidv4(),
-          userId,
-          'hatif_whatsapp_send',
-          'hatif',
-          'customer',
-          customer.id,
-          JSON.stringify({
-            channel: 'hatif_whatsapp',
-            to: toNumber,
-            dryRun,
-            messagePreview: text.slice(0, 200),
-            providerStatus: providerResult?.status || (dryRun ? 'dry_run' : null),
-            conversationEventId: providerResult?.conversationEventId || null,
-          }),
-          req?.ip || null,
-          req?.get?.('user-agent') || null,
-        ]
-      );
-    }
-  } catch (err) {
-    logger.warn('Hatif audit log failed', { error: err.message });
-  }
+  await writeAudit({
+    userId,
+    action: 'hatif_whatsapp_send',
+    customerId: customer.id,
+    values: {
+      channel: 'hatif_whatsapp',
+      to: toNumber,
+      dryRun,
+      messagePreview: text.slice(0, 200),
+      providerStatus: providerResult?.status || (dryRun ? 'dry_run' : null),
+      conversationEventId: providerResult?.conversationEventId || null,
+    },
+    req,
+  });
 
   return {
     dryRun,
@@ -169,9 +224,68 @@ const sendCustomerWhatsApp = async (customerId, { message }, userId, req = null)
   };
 };
 
+/**
+ * Prepare a live-agent call: create/open Hatif conversation for the customer.
+ * Does not start IVR. Agent completes the call in Hatif softphone/app.
+ */
+const prepareCustomerCall = async (customerId, userId, req = null) => {
+  assertCallReady();
+
+  const cust = await query(
+    `SELECT id, full_name, full_name_ar, mobile FROM customers WHERE id = $1 AND ${notDeleted('customers')}`,
+    [customerId]
+  );
+  const customer = cust.rows[0];
+  if (!customer) throw new AppError('Customer not found', 404, 'NOT_FOUND');
+
+  const e164 = formatToE164(customer.mobile);
+  const toNumber = toHatifNumber(customer.mobile);
+  if (!toNumber || !e164) throw new AppError('Customer mobile is invalid', 400, 'INVALID_MOBILE');
+
+  const contactName = customer.full_name_ar || customer.full_name || toNumber;
+  const created = await createConversation({
+    phoneNumber: e164,
+    contactName,
+  });
+
+  const conversation = created.conversation || created;
+  const conversationId = conversation.id || created.conversationId || null;
+  const contactId = created.contactId || conversation.contactId || null;
+  const openUrl = buildHatifOpenUrl(conversationId);
+  const dialUrl = `tel:${e164}`;
+
+  await writeAudit({
+    userId,
+    action: 'hatif_call_prepare',
+    customerId: customer.id,
+    values: {
+      channel: 'hatif_call',
+      to: toNumber,
+      conversationId,
+      contactId,
+      openUrl,
+    },
+    req,
+  });
+
+  return {
+    customerId: customer.id,
+    customerName: contactName,
+    to: toNumber,
+    conversationId,
+    contactId,
+    openUrl,
+    dialUrl,
+    userMessage: openUrl
+      ? 'تم تجهيز المحادثة في هاتِف. أكمل الاتصال من تطبيق هاتِف.'
+      : 'تم تجهيز المحادثة في هاتِف. افتح تطبيق هاتِف واتصل بالعميل.',
+  };
+};
+
 module.exports = {
   getStatus,
-  isFeatureEnabled,
+  isFeatureEnabled: isWhatsappEnabled,
   isConfigured,
   sendCustomerWhatsApp,
+  prepareCustomerCall,
 };

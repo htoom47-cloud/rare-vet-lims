@@ -35,4 +35,16 @@ router.post(
   }
 );
 
+/** Prepare live-agent call (create/open Hatif conversation — no IVR). */
+router.post(
+  '/customers/:id/call',
+  authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT),
+  async (req, res, next) => {
+    try {
+      const data = await hatif.prepareCustomerCall(req.params.id, req.user.id, req);
+      res.json({ success: true, data, userMessage: data.userMessage });
+    } catch (err) { next(err); }
+  }
+);
+
 module.exports = router;

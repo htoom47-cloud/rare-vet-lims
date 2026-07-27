@@ -64,6 +64,7 @@ export const customersAPI = {
 export const hatifAPI = {
   status: () => api.get('/hatif/status'),
   sendWhatsApp: (customerId, body) => api.post(`/hatif/customers/${customerId}/whatsapp`, body),
+  prepareCall: (customerId) => api.post(`/hatif/customers/${customerId}/call`),
 };
 
 export const referenceRangesAPI = {

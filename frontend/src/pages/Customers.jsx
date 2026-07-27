@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -37,6 +37,7 @@ export default function Customers() {
   const canSendReports = hasPermission('notifications.send_report');
   const canSkipReadyReports = canSendReports && !!user?.features?.skipReadyReports;
   const canHatifWhatsapp = canSendReports && !!user?.features?.hatifWhatsapp;
+  const canHatifCall = canSendReports && !!user?.features?.hatifCall;
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -60,6 +61,7 @@ export default function Customers() {
   const [previousSend, setPreviousSend] = useState(null);
   const [hatifMessage, setHatifMessage] = useState('');
   const [hatifSending, setHatifSending] = useState(false);
+  const [hatifCalling, setHatifCalling] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -228,6 +230,25 @@ export default function Customers() {
         'للاستفسار تواصلوا معنا.',
       ].join('\n')
     );
+  };
+
+  const prepareHatifCall = async () => {
+    if (!selected?.id || !canHatifCall) return;
+    setHatifCalling(true);
+    try {
+      const { data: resp } = await hatifAPI.prepareCall(selected.id);
+      toast.success(resp.userMessage || t('customers.hatifCallReady'));
+      if (resp.data?.openUrl) {
+        window.open(resp.data.openUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      if (code === 'HATIF_CALL_DISABLED') toast.error(t('customers.hatifCallDisabled'));
+      else if (code === 'HATIF_NOT_CONFIGURED') toast.error(t('customers.hatifNotConfigured'));
+      else toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setHatifCalling(false);
+    }
   };
 
   const sendHatifWhatsApp = async () => {
@@ -518,40 +539,58 @@ export default function Customers() {
               </div>
             )}
 
-            {canHatifWhatsapp && (
+            {(canHatifWhatsapp || canHatifCall) && (
               <div className="border rounded-lg p-4 space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20">
                 <h4 className="font-semibold flex items-center gap-2">
                   <MessageCircle size={16} /> {t('customers.hatifSection')}
                 </h4>
-                <p className="text-xs text-gray-500">{t('customers.hatifHint')}</p>
-                <textarea
-                  value={hatifMessage}
-                  onChange={(e) => setHatifMessage(e.target.value)}
-                  rows={4}
-                  className="input-field text-sm"
-                  placeholder={t('customers.hatifMessagePlaceholder')}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={sendHatifWhatsApp}
-                    disabled={hatifSending || !hatifMessage.trim()}
-                    className="btn-primary inline-flex items-center gap-2 text-sm"
-                  >
-                    <Send size={16} />
-                    {t('customers.hatifSend')}
-                  </button>
-                  {readyReports.length > 0 && (
+                {canHatifCall && (
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={fillHatifFromReadyReports}
-                      disabled={hatifSending}
-                      className="btn-secondary text-sm"
+                      onClick={prepareHatifCall}
+                      disabled={hatifCalling || hatifSending}
+                      className="btn-primary inline-flex items-center gap-2 text-sm"
                     >
-                      {t('customers.hatifFillReportsHint')}
+                      <Phone size={16} />
+                      {hatifCalling ? t('common.loading') : t('customers.hatifCall')}
                     </button>
-                  )}
-                </div>
+                    <p className="text-xs text-gray-500 w-full">{t('customers.hatifCallHint')}</p>
+                  </div>
+                )}
+                {canHatifWhatsapp && (
+                  <>
+                    <p className="text-xs text-gray-500">{t('customers.hatifHint')}</p>
+                    <textarea
+                      value={hatifMessage}
+                      onChange={(e) => setHatifMessage(e.target.value)}
+                      rows={4}
+                      className="input-field text-sm"
+                      placeholder={t('customers.hatifMessagePlaceholder')}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={sendHatifWhatsApp}
+                        disabled={hatifSending || hatifCalling || !hatifMessage.trim()}
+                        className="btn-primary inline-flex items-center gap-2 text-sm"
+                      >
+                        <Send size={16} />
+                        {t('customers.hatifSend')}
+                      </button>
+                      {readyReports.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={fillHatifFromReadyReports}
+                          disabled={hatifSending || hatifCalling}
+                          className="btn-secondary text-sm"
+                        >
+                          {t('customers.hatifFillReportsHint')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

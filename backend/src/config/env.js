@@ -128,6 +128,12 @@ const env = {
      * Default false — no change until explicitly enabled after credentials are set.
      */
     hatifWhatsapp: process.env.HATIF_WHATSAPP_ENABLED === 'true',
+    /**
+     * When true: staff may prepare a Hatif conversation / call from Customers.
+     * Defaults on when WhatsApp flag is on (same credentials); set HATIF_CALL_ENABLED=false to disable only calls.
+     */
+    hatifCall: process.env.HATIF_CALL_ENABLED === 'true'
+      || (process.env.HATIF_CALL_ENABLED !== 'false' && process.env.HATIF_WHATSAPP_ENABLED === 'true'),
   },
   hatif: {
     apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',
@@ -136,6 +142,8 @@ const env = {
     clientSecret: process.env.HATIF_CLIENT_SECRET || '',
     channelId: process.env.HATIF_CHANNEL_ID || '',
     webhookSecret: process.env.HATIF_WEBHOOK_SECRET || '',
+    /** Optional deep-link base for agent UI (opens after create-conversation) */
+    appUrl: process.env.HATIF_APP_URL || 'https://app.hatif.io',
   },
   softDelete: {
     enabled: process.env.SOFT_DELETE_ENABLED === 'true',
