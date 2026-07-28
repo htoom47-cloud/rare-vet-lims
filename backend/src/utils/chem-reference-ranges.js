@@ -1,6 +1,7 @@
 /**
  * Chemistry (CHEM-BASIC) reference intervals per species.
  * Units: mg/dL unless noted on parameter.
+ * BUN (urea / UR) values match LIMS Admin lab table (إبل/ماعز/غنم/مهر).
  */
 const { defaultCritical } = require('./reference-range');
 
@@ -13,7 +14,7 @@ const mk = (min, max, crit_low, crit_high) => ({
 const CHEM_REFERENCE_RANGES = {
   camel: {
     GLU: mk(60, 120, 40, 400),
-    BUN: mk(10, 30, 5, 80),
+    BUN: mk(8, 28, 2, 38),
     CREA: mk(0.8, 2.0, 0.3, 5),
     ALT: mk(10, 60, 5, 300),
     AST: mk(10, 50, 5, 250),
@@ -23,7 +24,8 @@ const CHEM_REFERENCE_RANGES = {
   },
   horse: {
     GLU: mk(70, 120, 45, 350),
-    BUN: mk(10, 25, 5, 60),
+    // مهر (horse) — Admin urea table
+    BUN: mk(8, 20, 2, 26),
     CREA: mk(0.8, 2.0, 0.3, 4.5),
     ALT: mk(4, 50, 2, 250),
     AST: mk(10, 40, 5, 200),
@@ -33,7 +35,7 @@ const CHEM_REFERENCE_RANGES = {
   },
   sheep: {
     GLU: mk(40, 80, 25, 250),
-    BUN: mk(8, 25, 4, 60),
+    BUN: mk(17, 43, 4, 56),
     CREA: mk(0.8, 2.0, 0.3, 4.5),
     ALT: mk(15, 60, 8, 280),
     AST: mk(15, 60, 8, 250),
@@ -43,7 +45,7 @@ const CHEM_REFERENCE_RANGES = {
   },
   goat: {
     GLU: mk(50, 90, 30, 280),
-    BUN: mk(10, 30, 5, 70),
+    BUN: mk(20, 45, 7.5, 57.5),
     CREA: mk(0.8, 2.2, 0.3, 5),
     ALT: mk(10, 80, 5, 320),
     AST: mk(20, 80, 10, 280),

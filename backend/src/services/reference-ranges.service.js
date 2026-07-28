@@ -53,7 +53,8 @@ const upsertReferenceRange = async ({
   );
 
   const prev = existing.rows[0];
-  if (prev && onlyIfMissing && !rowMissingBounds(prev)) return prev;
+  // onlyIfMissing skips complete rows unless we are refreshing auto species defaults.
+  if (prev && onlyIfMissing && !rowMissingBounds(prev) && !refreshAutoDefaults) return prev;
   // Empty-bound rows (even with manual notes) may be filled when onlyIfMissing —
   // do not leave "غير متوفر" forever for a placeholder row.
   if (prev && isManualLimsNotes(prev.notes) && !force && !rowMissingBounds(prev)) {
