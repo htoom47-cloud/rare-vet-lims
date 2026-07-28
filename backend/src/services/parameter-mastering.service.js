@@ -102,7 +102,8 @@ const loadReportDisplayContext = async () => {
 
   result.rows.forEach((row) => {
     const pid = row.system_parameter_id;
-    deviceCodeMap[pid] = row.device_parameter_code || row.param_device_code || row.short_code;
+    // Prefer catalog short/device display codes over raw ingest aliases (e.g. BUN vs Urea).
+    deviceCodeMap[pid] = row.short_code || row.param_device_code || row.device_parameter_code;
     if (row.display_name_ar) displayNameArMap[pid] = row.display_name_ar;
     if (row.display_name_en) displayNameEnMap[pid] = row.display_name_en;
     if (row.value_type) valueTypeMap[pid] = row.value_type;
@@ -114,8 +115,9 @@ const loadReportDisplayContext = async () => {
      FROM test_parameters WHERE is_active = true`
   );
   params.rows.forEach((p) => {
-    if (!deviceCodeMap[p.id]) {
-      deviceCodeMap[p.id] = p.device_code || p.short_code || p.code;
+    const preferred = p.short_code || p.device_code || p.code;
+    if (!deviceCodeMap[p.id] || p.short_code || p.device_code) {
+      deviceCodeMap[p.id] = preferred;
     }
     if (!displayNameArMap[p.id] && p.name_ar) displayNameArMap[p.id] = p.name_ar;
     if (!displayNameEnMap[p.id] && p.name) displayNameEnMap[p.id] = p.name;
