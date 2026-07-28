@@ -319,6 +319,7 @@ const buildReportResultRow = (row = {}, context = {}) => {
 
   const nameAr = resolveDisplayNameAr({
     parameterId: row.parameter_id,
+    parameterCode: row.parameter_code,
     parameterNameAr: panelRow?.name_ar || row.parameter_name_ar,
     parameterName: row.parameter_name || row.test_name_ar || row.test_name,
     displayNameArMap: displayCtx.displayNameArMap || {},
@@ -326,6 +327,7 @@ const buildReportResultRow = (row = {}, context = {}) => {
 
   const nameEn = resolveDisplayNameEn({
     parameterId: row.parameter_id,
+    parameterCode: row.parameter_code,
     parameterName: panelRow?.symbol || row.parameter_name || row.test_name,
     displayNameEnMap: displayCtx.displayNameEnMap || {},
   });

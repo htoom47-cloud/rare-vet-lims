@@ -9,6 +9,7 @@ const {
   formatReferenceForReport,
   resolveDisplayCode,
   resolveDisplayNameAr,
+  resolveDisplayNameEn,
   flagForReport,
   validateMinMax,
 } = require('../services/parameter-display.utils');
@@ -63,6 +64,29 @@ check('LYM% — code from device mapping (not system LYM_PCT)', () => {
     deviceCodeMap: displayContext.deviceCodeMap,
   });
   assert.strictEqual(code, 'LYM%');
+});
+
+check('BUN — report display forced to UR / Urea / اليوريا', () => {
+  const code = resolveDisplayCode({
+    parameterId: 999,
+    parameterCode: 'BUN',
+    deviceCodeMap: { 999: 'BUN' },
+  });
+  const nameEn = resolveDisplayNameEn({
+    parameterId: 999,
+    parameterCode: 'BUN',
+    parameterName: 'Blood Urea Nitrogen',
+    displayNameEnMap: { 999: 'Blood Urea Nitrogen' },
+  });
+  const nameAr = resolveDisplayNameAr({
+    parameterId: 999,
+    parameterCode: 'BUN',
+    parameterNameAr: 'نيتروجين اليوريا',
+    displayNameArMap: { 999: 'نيتروجين اليوريا' },
+  });
+  assert.strictEqual(code, 'UR');
+  assert.strictEqual(nameEn, 'Urea');
+  assert.strictEqual(nameAr, 'اليوريا');
 });
 
 check('No HIGH/LOW flag without reference range', () => {

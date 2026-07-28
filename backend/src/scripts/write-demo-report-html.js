@@ -36,7 +36,7 @@ const results = [
   },
   {
     testCode: 'CHEM-BASIC', categoryCode: 'CHEM', testNameAr: 'كيمياء الدم', testNameEn: 'Chemistry',
-    code: 'BUN', nameAr: 'اليوريا', nameEn: 'Urea', value: '38', unit: 'mg/dL',
+    code: 'UR', nameAr: 'اليوريا', nameEn: 'Urea', value: '38', unit: 'mg/dL',
     reference: '10 - 30', flag: 'HIGH',
   },
   {

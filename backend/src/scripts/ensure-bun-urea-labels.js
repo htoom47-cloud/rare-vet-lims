@@ -1,5 +1,5 @@
 /**
- * Idempotent: display labels for CHEM BUN as Urea / اليوريا.
+ * Idempotent: display labels for CHEM BUN as UR / Urea / اليوريا.
  * Updates name, name_ar, short_code, device_code only.
  * Does not change internal code, unit, reference ranges, results, or ingest mappings.
  *
@@ -11,7 +11,7 @@ const logger = require('../config/logger');
 
 const EN_NAME = 'Urea';
 const AR_NAME = 'اليوريا';
-const DISPLAY_CODE = 'Urea';
+const DISPLAY_CODE = 'UR';
 
 async function main() {
   const result = await query(

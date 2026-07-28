@@ -5,6 +5,11 @@
 const REFERENCE_NA = { en: 'N/A', ar: 'غير متوفر' };
 const VALUE_NA = { en: 'N/A', ar: '—' };
 
+/** Lab-facing report labels (internal codes stay unchanged, e.g. BUN). */
+const CANONICAL_REPORT_DISPLAY = {
+  BUN: { code: 'UR', nameEn: 'Urea', nameAr: 'اليوريا' },
+};
+
 const referenceNa = (isArabic) => (isArabic ? REFERENCE_NA.ar : REFERENCE_NA.en);
 
 const formatReferenceForReport = (reference, hasReference, isArabic) => {
@@ -21,6 +26,8 @@ const resolveDisplayCode = ({
   shortCode,
   deviceCodeMap = {},
 }) => {
+  const canonical = CANONICAL_REPORT_DISPLAY[String(parameterCode || '').toUpperCase()];
+  if (canonical?.code) return canonical.code;
   if (parameterId && deviceCodeMap[parameterId]) return deviceCodeMap[parameterId];
   if (deviceCode) return deviceCode;
   if (shortCode) return shortCode;
@@ -29,16 +36,26 @@ const resolveDisplayCode = ({
 
 const resolveDisplayNameAr = ({
   parameterId,
+  parameterCode,
   parameterNameAr,
   parameterName,
   displayNameArMap = {},
-}) => displayNameArMap[parameterId] || parameterNameAr || parameterName || '';
+}) => {
+  const canonical = CANONICAL_REPORT_DISPLAY[String(parameterCode || '').toUpperCase()];
+  if (canonical?.nameAr) return canonical.nameAr;
+  return displayNameArMap[parameterId] || parameterNameAr || parameterName || '';
+};
 
 const resolveDisplayNameEn = ({
   parameterId,
+  parameterCode,
   parameterName,
   displayNameEnMap = {},
-}) => displayNameEnMap[parameterId] || parameterName || '';
+}) => {
+  const canonical = CANONICAL_REPORT_DISPLAY[String(parameterCode || '').toUpperCase()];
+  if (canonical?.nameEn) return canonical.nameEn;
+  return displayNameEnMap[parameterId] || parameterName || '';
+};
 
 const flagForReport = (evaluated) => {
   const flag = evaluated?.detailFlag || evaluated?.flag || '';
@@ -62,6 +79,7 @@ const validateMinMax = (minValue, maxValue) => {
 
 module.exports = {
   REFERENCE_NA,
+  CANONICAL_REPORT_DISPLAY,
   referenceNa,
   formatReferenceForReport,
   resolveDisplayCode,
