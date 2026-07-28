@@ -76,7 +76,7 @@ const CBC_PARAMS = [
 
 const CHEM_PARAMS = [
   { code: 'GLU', name: 'Glucose', name_ar: 'الجلوكوز', unit: 'mg/dL' },
-  { code: 'BUN', name: 'Blood Urea Nitrogen', name_ar: 'نيتروجين اليوريا', unit: 'mg/dL' },
+  { code: 'BUN', name: 'Urea', name_ar: 'اليوريا', unit: 'mg/dL' },
   { code: 'CREA', name: 'Creatinine', name_ar: 'الكرياتينين', unit: 'mg/dL' },
   { code: 'ALT', name: 'ALT', name_ar: 'ALT', unit: 'U/L' },
   { code: 'AST', name: 'AST', name_ar: 'AST', unit: 'U/L' },

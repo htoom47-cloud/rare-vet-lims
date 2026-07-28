@@ -11,7 +11,7 @@ const MINDRAY_CHEM_MAPPINGS = [
   ['Glu', 'GLU', 'numeric'],
   ['GLU', 'GLU', 'numeric'],
   ['Glucose', 'GLU', 'numeric'],
-  // Urea → BUN (Blood Urea Nitrogen). Include common BS-120 / LIS / LOINC aliases.
+  // Device Urea / BUN aliases → LIMS code BUN (display name: Urea / اليوريا).
   ['Urea', 'BUN', 'numeric'],
   ['UREA', 'BUN', 'numeric'],
   ['URE', 'BUN', 'numeric'],
