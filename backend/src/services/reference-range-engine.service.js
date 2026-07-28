@@ -178,6 +178,10 @@ const engineRefLateralJoin = (
     WHERE trr.parameter_id = ${paramExpr}
       AND (trr.is_active IS NULL OR trr.is_active = true)
       AND (
+        (trr.min_value IS NOT NULL AND trr.max_value IS NOT NULL)
+        OR (trr.text_reference IS NOT NULL AND BTRIM(trr.text_reference::text) <> '')
+      )
+      AND (
         trr.animal_type = ${speciesExpr}
         OR trr.animal_type = 'other'
       )
@@ -250,7 +254,11 @@ const fetchLimsCandidates = async (context) => {
      JOIN test_parameters tp ON tp.id = trr.parameter_id
      WHERE trr.parameter_id = $1
        AND (trr.is_active IS NULL OR trr.is_active = true)
-       AND trr.animal_type IN ($2, 'other')`,
+       AND trr.animal_type IN ($2, 'other')
+       AND (
+         (trr.min_value IS NOT NULL AND trr.max_value IS NOT NULL)
+         OR (trr.text_reference IS NOT NULL AND BTRIM(trr.text_reference::text) <> '')
+       )`,
     [parameter_id, sp]
   );
   return result.rows;
