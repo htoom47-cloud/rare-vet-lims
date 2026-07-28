@@ -54,7 +54,9 @@ const upsertReferenceRange = async ({
 
   const prev = existing.rows[0];
   if (prev && onlyIfMissing && !rowMissingBounds(prev)) return prev;
-  if (prev && isManualLimsNotes(prev.notes) && !force) {
+  // Empty-bound rows (even with manual notes) may be filled when onlyIfMissing —
+  // do not leave "غير متوفر" forever for a placeholder row.
+  if (prev && isManualLimsNotes(prev.notes) && !force && !rowMissingBounds(prev)) {
     return { ...prev, skipped_manual: true };
   }
   if (prev && refreshAutoDefaults && !force && !rowMissingBounds(prev)
