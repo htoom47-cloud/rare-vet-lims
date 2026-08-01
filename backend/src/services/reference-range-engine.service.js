@@ -10,6 +10,9 @@
  */
 const { query } = require('../config/database');
 const { evaluateFlag } = require('../utils/helpers');
+const { getChemReference } = require('../utils/chem-reference-ranges');
+
+const UREA_PARAM_CODES = new Set(['BUN', 'UREA', 'UR', 'URE']);
 
 const RANGE_SOURCES = {
   LIMS_MANUAL: 'lims-manual',
@@ -186,7 +189,11 @@ const engineRefLateralJoin = (
         OR trr.animal_type = 'other'
       )
       AND (
-        trr.sex IS NULL OR trr.sex = '' OR LOWER(trr.sex) = LOWER(${sexExpr}::text)
+        trr.sex IS NULL OR BTRIM(COALESCE(trr.sex, '')) = ''
+        OR ${sexExpr} IS NULL
+        OR BTRIM(COALESCE(${sexExpr}::text, '')) = ''
+        OR LOWER(BTRIM(COALESCE(${sexExpr}::text, ''))) IN ('unknown', 'null')
+        OR LOWER(trr.sex) = LOWER(${sexExpr}::text)
       )
       AND (
         ${deviceExpr
@@ -265,8 +272,30 @@ const fetchLimsCandidates = async (context) => {
 };
 
 
+const chemFallbackForUrea = (row) => {
+  const code = String(row?.parameter_code || row?.code || '').trim().toUpperCase();
+  if (!UREA_PARAM_CODES.has(code)) return null;
+  const species = String(row?.animal_type || row?.species || '').trim().toLowerCase();
+  if (!species) return null;
+  const ref = getChemReference(species, 'BUN');
+  if (!ref || ref.min == null || ref.max == null) return null;
+  return normalizeLimsRow({
+    id: null,
+    parameter_id: row.parameter_id,
+    animal_type: species,
+    min_value: ref.min,
+    max_value: ref.max,
+    critical_low: ref.crit_low,
+    critical_high: ref.crit_high,
+    text_reference: null,
+    unit: row.unit || 'mg/dL',
+    notes: `Chem default (${species})`,
+  }, RANGE_SOURCES.LIMS_SPECIES);
+};
+
 /**
  * Resolve range from a SQL row (lateral join prefixes trr_*).
+ * Urea/BUN: if Admin join misses, fall back to CHEM_REFERENCE_RANGES for the animal species.
  */
 const resolveReferenceRangeFromRow = (context = {}) => {
   const { row } = context;
@@ -278,7 +307,7 @@ const resolveReferenceRangeFromRow = (context = {}) => {
       return normalizeLimsRow(limsRaw, tier);
     }
   }
-  return null;
+  return chemFallbackForUrea(row);
 };
 
 /**

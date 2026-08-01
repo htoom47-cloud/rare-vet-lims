@@ -25,7 +25,10 @@ async function ensureLabels() {
          name_ar = $2,
          short_code = $3,
          device_code = $3
-     WHERE UPPER(code) = 'BUN'
+     WHERE (
+         UPPER(code) IN ('BUN', 'UREA', 'UR', 'URE')
+         OR UPPER(COALESCE(short_code, '')) IN ('BUN', 'UREA', 'UR', 'URE')
+       )
        AND (
          name IS DISTINCT FROM $1
          OR name_ar IS DISTINCT FROM $2
@@ -35,7 +38,7 @@ async function ensureLabels() {
      RETURNING id`,
     [EN_NAME, AR_NAME, DISPLAY_CODE]
   );
-  console.log(`Updated ${result.rowCount} BUN label(s) → ${DISPLAY_CODE} / ${AR_NAME}`);
+  console.log(`Updated ${result.rowCount} urea label(s) → ${DISPLAY_CODE} / ${AR_NAME}`);
   return result.rowCount;
 }
 
@@ -44,7 +47,11 @@ async function listBunParams() {
     `SELECT tp.id, tp.code, tp.unit, t.code AS test_code
      FROM test_parameters tp
      JOIN tests t ON t.id = tp.test_id
-     WHERE UPPER(tp.code) = 'BUN' AND tp.is_active = true`
+     WHERE tp.is_active = true
+       AND (
+         UPPER(tp.code) IN ('BUN', 'UREA', 'UR', 'URE')
+         OR UPPER(COALESCE(tp.short_code, '')) IN ('BUN', 'UREA', 'UR', 'URE')
+       )`
   );
   return result.rows;
 }

@@ -236,6 +236,7 @@ const buildReportData = async (sampleId, opts) => {
             tp.name as parameter_name, tp.name_ar as parameter_name_ar,
             rv.value, rv.numeric_value, rv.notes AS rv_notes, tp.unit,
             rv.flag, rv.is_critical, res.doctor_notes,
+            a.animal_type, a.gender AS animal_gender, a.age AS animal_age,
             ${LIMS_REF_SELECT_SQL}
      FROM sample_tests st
      JOIN tests t ON st.test_id = t.id
