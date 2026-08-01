@@ -5,12 +5,14 @@ const env = require('../config/env');
 const portalSync = require('./portal-sync.service');
 const reportNotify = require('./customer-report-notifications.service');
 
-/** Lab calendar day (Saudi Arabia) for dashboard “today” metrics. */
+/** Lab calendar (Saudi Arabia) for dashboard “today” / “this month” metrics. */
 const LAB_TZ = 'Asia/Riyadh';
 const todayMatch = (column) =>
   `(${column} AT TIME ZONE '${LAB_TZ}')::date = (NOW() AT TIME ZONE '${LAB_TZ}')::date`;
+/** Calendar month in lab TZ (1st → end of month), not a rolling 30-day window. */
 const monthMatch = (column) =>
-  `(${column} AT TIME ZONE '${LAB_TZ}')::date >= ((NOW() AT TIME ZONE '${LAB_TZ}')::date - INTERVAL '30 days')`;
+  `DATE_TRUNC('month', (${column} AT TIME ZONE '${LAB_TZ}'))
+   = DATE_TRUNC('month', (NOW() AT TIME ZONE '${LAB_TZ}'))`;
 
 const portalVisible = portalSync.portalVisibilitySql('r');
 
