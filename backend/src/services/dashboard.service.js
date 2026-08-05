@@ -4,6 +4,7 @@ const workflowEngine = require('./laboratory-workflow.service');
 const env = require('../config/env');
 const portalSync = require('./portal-sync.service');
 const reportNotify = require('./customer-report-notifications.service');
+const { notDeleted } = require('../utils/soft-delete-sql');
 
 /** Lab calendar (Saudi Arabia) for dashboard “today” / “this month” metrics. */
 const LAB_TZ = 'Asia/Riyadh';
@@ -73,7 +74,8 @@ const getOperationsStats = async () => {
     query(
       `SELECT COUNT(*)::int AS count FROM samples s
        JOIN animals a ON a.id = s.animal_id
-       WHERE a.owner_id IS DISTINCT FROM s.customer_id`
+       WHERE a.owner_id IS DISTINCT FROM s.customer_id
+         AND ${notDeleted('s')} AND ${notDeleted('a')}`
     ),
   ]);
 
@@ -86,6 +88,33 @@ const getOperationsStats = async () => {
     failed_messages: failedMessages.rows[0]?.count || 0,
     data_errors: dataErrors.rows[0]?.count || 0,
   };
+};
+
+/** Samples where animal owner ≠ sample customer (dashboard data_errors detail). */
+const listDataErrors = async (limit = 50) => {
+  const capped = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const result = await query(
+    `SELECT s.id AS sample_id, s.sample_code,
+            a.id AS animal_id, a.animal_code, a.name_tag, a.animal_type,
+            a.owner_id,
+            s.customer_id AS sample_customer_id,
+            owner_c.full_name AS owner_name,
+            owner_c.full_name_ar AS owner_name_ar,
+            owner_c.mobile AS owner_mobile,
+            sample_c.full_name AS sample_customer_name,
+            sample_c.full_name_ar AS sample_customer_name_ar,
+            sample_c.mobile AS sample_customer_mobile
+     FROM samples s
+     JOIN animals a ON a.id = s.animal_id
+     LEFT JOIN customers owner_c ON owner_c.id = a.owner_id
+     LEFT JOIN customers sample_c ON sample_c.id = s.customer_id
+     WHERE a.owner_id IS DISTINCT FROM s.customer_id
+       AND ${notDeleted('s')} AND ${notDeleted('a')}
+     ORDER BY s.created_at DESC
+     LIMIT $1`,
+    [capped]
+  );
+  return result.rows;
 };
 
 const getStats = async () => {
@@ -200,6 +229,7 @@ const getStats = async () => {
     })),
     operations: await getOperationsStats(),
     customers_ready_to_send: await reportNotify.listCustomersReadyToSend(10),
+    data_errors_list: await listDataErrors(50),
     ...(workflowEngine.isEnabled()
       ? { workflow: await workflowEngine.getWorkflowDashboardCounts() }
       : {}),
@@ -236,4 +266,4 @@ const getTechnicianDashboard = async (userId) => {
   };
 };
 
-module.exports = { getStats, getTechnicianDashboard };
+module.exports = { getStats, getTechnicianDashboard, listDataErrors };

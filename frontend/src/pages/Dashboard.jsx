@@ -215,6 +215,90 @@ export default function Dashboard() {
             <StatCard title={t('dashboard.failedMessages')} value={stats.operations.failed_messages || 0} icon={Bell} color="orange" />
             <StatCard title={t('dashboard.dataErrors')} value={stats.operations.data_errors || 0} icon={AlertTriangle} color="orange" />
           </div>
+
+          {(stats.data_errors_list?.length > 0 || (stats.operations.data_errors || 0) > 0) && (
+            <Card className="mt-4 border-amber-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle size={18} className="text-amber-600" />
+                  {t('dashboard.dataErrorsTitle')}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground font-normal">{t('dashboard.dataErrorsHint')}</p>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-start text-muted-foreground border-b">
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.dataErrorSample')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.dataErrorAnimal')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.dataErrorOwner')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.dataErrorSampleCustomer')}</th>
+                      <th className="py-2 font-medium" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(stats.data_errors_list || []).map((row) => {
+                      const isAr = i18n.language === 'ar';
+                      const animalLabel = [row.animal_code, row.name_tag].filter(Boolean).join(' — ') || '—';
+                      const ownerLabel = (isAr ? row.owner_name_ar : row.owner_name)
+                        || row.owner_name_ar || row.owner_name || '—';
+                      const sampleCust = (isAr ? row.sample_customer_name_ar : row.sample_customer_name)
+                        || row.sample_customer_name_ar || row.sample_customer_name || '—';
+                      return (
+                        <tr key={row.sample_id} className="border-b border-border/60 last:border-0">
+                          <td className="py-2.5 pe-3 font-mono tabular-nums">{row.sample_code || '—'}</td>
+                          <td className="py-2.5 pe-3">
+                            <span className="font-medium">{animalLabel}</span>
+                            {row.animal_type ? (
+                              <span className="block text-xs text-muted-foreground">{row.animal_type}</span>
+                            ) : null}
+                          </td>
+                          <td className="py-2.5 pe-3">
+                            <span>{ownerLabel}</span>
+                            {row.owner_mobile ? (
+                              <span className="block text-xs text-muted-foreground dir-ltr">{row.owner_mobile}</span>
+                            ) : null}
+                          </td>
+                          <td className="py-2.5 pe-3">
+                            <span>{sampleCust}</span>
+                            {row.sample_customer_mobile ? (
+                              <span className="block text-xs text-muted-foreground dir-ltr">{row.sample_customer_mobile}</span>
+                            ) : null}
+                          </td>
+                          <td className="py-2.5 whitespace-nowrap">
+                            <div className="flex flex-wrap gap-1.5 justify-end">
+                              {hasPermission('animals.view') && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary text-xs px-2 py-1"
+                                  onClick={() => navigate('/animals')}
+                                  title={row.animal_code || ''}
+                                >
+                                  {t('dashboard.openAnimals')}
+                                </button>
+                              )}
+                              {hasPermission('customers.view') && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary text-xs px-2 py-1"
+                                  onClick={() => navigate('/customers')}
+                                >
+                                  {t('dashboard.openCustomers')}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {(stats.data_errors_list || []).length === 0 && (stats.operations.data_errors || 0) > 0 && (
+                  <p className="text-sm text-muted-foreground py-2">{t('common.loading')}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </m.div>
       )}
 

@@ -485,6 +485,7 @@ export const qualityAPI = {
 
 export const dashboardAPI = {
   stats: () => api.get('/dashboard/stats'),
+  dataErrors: (params) => api.get('/dashboard/data-errors', { params }),
 };
 
 export const usersAPI = {
