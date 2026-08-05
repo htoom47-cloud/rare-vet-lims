@@ -103,6 +103,19 @@ router.patch('/:id/animal', authorize(PERMISSIONS.SAMPLES_UPDATE), validate(samp
   } catch (err) { next(err); }
 });
 
+/** Set sample.customer_id = animal.owner_id (data-error correction). Does not change animal owner. */
+router.post('/:id/align-customer', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog('align_customer_to_owner', 'samples'), async (req, res, next) => {
+  try {
+    const data = await service.alignCustomerToAnimalOwner(
+      req.params.id,
+      req.user.id,
+      req.user.role_name,
+      { ip: req.ip, userAgent: req.get('user-agent') }
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.post('/:id/lab-handover', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog('lab_handover', 'samples'), async (req, res, next) => {
   try {
     const data = await service.recordLabHandover(

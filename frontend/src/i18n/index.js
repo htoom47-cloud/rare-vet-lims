@@ -468,6 +468,10 @@ const resources = {
         dataErrorSampleCustomer: 'Sample customer',
         openAnimals: 'Open animals',
         openCustomers: 'Open customers',
+        alignSampleCustomer: 'Fix sample customer',
+        alignSampleCustomerConfirm: 'Set sample customer to the animal owner? Animal owner and results will not change.',
+        alignSampleCustomerDone: 'Sample customer corrected',
+        alignSampleCustomerInvoiceWarn: 'Sample customer updated. Linked invoice(s) still belong to another customer — review accounting if needed.',
       },
       invoiceSettings: {
         title: 'Invoice Design',
@@ -1579,6 +1583,10 @@ const resources = {
         dataErrorSampleCustomer: 'عميل العينة',
         openAnimals: 'فتح الحيوانات',
         openCustomers: 'فتح العملاء',
+        alignSampleCustomer: 'تصحيح عميل العينة',
+        alignSampleCustomerConfirm: 'تعيين عميل العينة ليطابق مالك الحيوان؟ لن يتغير مالك الحيوان ولا النتائج.',
+        alignSampleCustomerDone: 'تم تصحيح عميل العينة',
+        alignSampleCustomerInvoiceWarn: 'تم تصحيح عميل العينة. توجد فاتورة/فواتير مرتبطة ما زالت على عميل آخر — راجع المحاسبة عند الحاجة.',
       },
       invoiceSettings: {
         title: 'تصميم الفاتورة',

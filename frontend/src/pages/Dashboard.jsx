@@ -10,7 +10,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { staggerContainer, staggerItem } from '../components/motion/AnimatedPage';
-import { dashboardAPI, notificationsAPI } from '../services/api';
+import { dashboardAPI, notificationsAPI, samplesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const COLORS = ['#4A3728', '#C5A059', '#A88644', '#D9C48A', '#3D2E22'];
@@ -37,16 +37,39 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notifStats, setNotifStats] = useState(null);
+  const [aligningSampleId, setAligningSampleId] = useState(null);
 
-  useEffect(() => {
+  const reloadStats = () =>
     dashboardAPI.stats()
       .then(({ data }) => setStats(data.data))
-      .catch(() => toast.error(t('common.error')))
-      .finally(() => setLoading(false));
+      .catch(() => toast.error(t('common.error')));
+
+  useEffect(() => {
+    reloadStats().finally(() => setLoading(false));
     notificationsAPI.stats()
       .then(({ data }) => setNotifStats(data.data))
       .catch(() => {});
   }, [t]);
+
+  const handleAlignSampleCustomer = async (row) => {
+    if (!window.confirm(t('dashboard.alignSampleCustomerConfirm'))) return;
+    setAligningSampleId(row.sample_id);
+    try {
+      const { data } = await samplesAPI.alignCustomer(row.sample_id);
+      const payload = data?.data;
+      const invoiceWarn = (payload?.invoices_still_on_other_customer || []).length > 0;
+      if (invoiceWarn) {
+        toast(t('dashboard.alignSampleCustomerInvoiceWarn'), { icon: '⚠️' });
+      } else {
+        toast.success(t('dashboard.alignSampleCustomerDone'));
+      }
+      await reloadStats();
+    } catch (err) {
+      toast.error(err?.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setAligningSampleId(null);
+    }
+  };
 
   if (loading) return <DashboardSkeleton />;
 
@@ -267,6 +290,18 @@ export default function Dashboard() {
                           </td>
                           <td className="py-2.5 whitespace-nowrap">
                             <div className="flex flex-wrap gap-1.5 justify-end">
+                              {hasPermission('samples.update') && (
+                                <button
+                                  type="button"
+                                  className="btn-primary text-xs px-2 py-1"
+                                  disabled={aligningSampleId === row.sample_id}
+                                  onClick={() => handleAlignSampleCustomer(row)}
+                                >
+                                  {aligningSampleId === row.sample_id
+                                    ? t('common.loading')
+                                    : t('dashboard.alignSampleCustomer')}
+                                </button>
+                              )}
                               {hasPermission('animals.view') && (
                                 <button
                                   type="button"

@@ -562,6 +562,100 @@ const recordLabHandover = async (sampleId, userId, auditCtx = {}) => {
   return getById(sampleId);
 };
 
+/**
+ * Correct data error: set sample.customer_id = animal.owner_id.
+ * Does not change animal owner, results, or invoices.
+ */
+const alignCustomerToAnimalOwner = async (sampleId, userId, userRole, auditCtx = {}) => {
+  if (!MANAGER_ROLES.includes(userRole)) {
+    throw new AppError(
+      'Admin or manager required to correct sample customer',
+      403,
+      'FORBIDDEN'
+    );
+  }
+
+  const sample = await getById(sampleId);
+  if (!sample.animal_id) {
+    throw new AppError('Sample has no animal', 400, 'NO_ANIMAL');
+  }
+
+  const animalResult = await query(
+    `SELECT id, owner_id, animal_code, name_tag FROM animals
+     WHERE id = $1 AND is_active = true`,
+    [sample.animal_id]
+  );
+  if (!animalResult.rows[0]) {
+    throw new AppError('Animal not found', 404, 'NOT_FOUND');
+  }
+
+  const ownerId = animalResult.rows[0].owner_id;
+  if (!ownerId) {
+    throw new AppError('Animal has no owner; cannot align sample customer', 400, 'ANIMAL_NO_OWNER');
+  }
+
+  if (sample.customer_id === ownerId) {
+    return {
+      sample: await getById(sampleId),
+      already_aligned: true,
+      invoices_still_on_other_customer: [],
+    };
+  }
+
+  const previousCustomerId = sample.customer_id;
+  await query(
+    'UPDATE samples SET customer_id = $1, updated_at = NOW() WHERE id = $2',
+    [ownerId, sampleId]
+  );
+
+  await query(
+    `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
+     VALUES ($1, $2, 'align_customer_to_owner', 'samples', 'sample', $3, $4, $5, $6, $7)`,
+    [
+      uuidv4(),
+      userId,
+      sampleId,
+      JSON.stringify({
+        customer_id: previousCustomerId,
+        sample_code: sample.sample_code,
+        animal_id: sample.animal_id,
+        animal_code: animalResult.rows[0].animal_code,
+      }),
+      JSON.stringify({
+        customer_id: ownerId,
+        sample_code: sample.sample_code,
+        animal_id: sample.animal_id,
+        animal_code: animalResult.rows[0].animal_code,
+        reason: 'align_sample_customer_to_animal_owner',
+      }),
+      auditCtx.ip || null,
+      auditCtx.userAgent || null,
+    ]
+  );
+
+  const reportLifecycle = require('./report-lifecycle.service');
+  await reportLifecycle.markReportsNeedsUpdateBySampleId(sampleId, 'CUSTOMER');
+  if (previousCustomerId) {
+    await reportLifecycle.markReportsNeedsUpdateByCustomerId(previousCustomerId, 'CUSTOMER');
+  }
+  await reportLifecycle.markReportsNeedsUpdateByCustomerId(ownerId, 'CUSTOMER');
+
+  const mismatchedInvoices = await query(
+    `SELECT id, invoice_number, customer_id, status FROM invoices
+     WHERE sample_id = $1
+       AND status NOT IN ('cancelled', 'refunded')
+       AND customer_id IS DISTINCT FROM $2`,
+    [sampleId, ownerId]
+  );
+
+  return {
+    sample: await getById(sampleId),
+    already_aligned: false,
+    previous_customer_id: previousCustomerId,
+    invoices_still_on_other_customer: mismatchedInvoices.rows,
+  };
+};
+
 module.exports = {
   list,
   getById,
@@ -569,6 +663,7 @@ module.exports = {
   create,
   updateStatus,
   reassignAnimal,
+  alignCustomerToAnimalOwner,
   recordLabHandover,
   reconcileSampleStatuses,
   getQueue,
