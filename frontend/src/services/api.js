@@ -327,6 +327,7 @@ export const notificationsAPI = {
   configStatus: () => api.get('/notifications/config-status'),
   stats: () => api.get('/notifications/stats'),
   testSend: (channel, recipient) => api.post('/notifications/test-send', { channel, recipient }),
+  dismissFailed: (id) => api.post(`/notifications/${id}/dismiss`),
 };
 
 const fetchInvoicePdfBlob = async (id, { regenerate = false, format } = {}) => {

@@ -5,6 +5,18 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const provider = require('./notification-providers');
 const { formatToE164 } = require('../utils/phone');
+const { uuidv4 } = require('../utils/uuid');
+
+const markFailed = async (id, errorMessage) => {
+  const errText = String(errorMessage || 'send failed').slice(0, 500);
+  await query(
+    `UPDATE notification_queue
+     SET status = 'failed',
+         metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+     WHERE id = $1`,
+    [id, JSON.stringify({ error: errText })]
+  );
+};
 
 const CHANNEL_ENABLED = {
   sms: () => env.notifications.sms,
@@ -164,7 +176,7 @@ const sendReportNotification = async (sampleId, channel, recipient) => {
   try {
     return await dispatchOne(queued);
   } catch (err) {
-    await query(`UPDATE notification_queue SET status = 'failed' WHERE id = $1`, [queued.id]);
+    await markFailed(queued.id, err.message);
     logger.error('Notification failed', { id: queued.id, error: err.message });
     throw new AppError(err.message || 'Failed to send notification', 502, 'SEND_FAILED');
   }
@@ -185,12 +197,61 @@ const processPending = async () => {
       sent += 1;
     } catch (err) {
       failed += 1;
-      await query(`UPDATE notification_queue SET status = 'failed' WHERE id = $1`, [notification.id]);
+      await markFailed(notification.id, err.message);
       logger.error('Notification failed', { id: notification.id, error: err.message });
     }
   }
 
   return { processed: pending.rows.length, sent, failed };
+};
+
+/** Acknowledge a failed notification so it no longer counts on the dashboard. Does not resend. */
+const dismissFailed = async (notificationId, userId, auditCtx = {}) => {
+  const existing = await query(
+    `SELECT id, status, channel, recipient, metadata FROM notification_queue WHERE id = $1`,
+    [notificationId]
+  );
+  if (!existing.rows[0]) {
+    throw new AppError('Notification not found', 404, 'NOT_FOUND');
+  }
+  if (existing.rows[0].status !== 'failed') {
+    throw new AppError('Only failed notifications can be dismissed', 400, 'NOT_FAILED');
+  }
+
+  await query(
+    `UPDATE notification_queue
+     SET status = 'dismissed',
+         metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+     WHERE id = $1 AND status = 'failed'`,
+    [
+      notificationId,
+      JSON.stringify({
+        dismissed_at: new Date().toISOString(),
+        dismissed_by: userId,
+      }),
+    ]
+  );
+
+  await query(
+    `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
+     VALUES ($1, $2, 'dismiss_failed_notification', 'notifications', 'notification_queue', $3, $4, $5, $6, $7)`,
+    [
+      uuidv4(),
+      userId,
+      notificationId,
+      JSON.stringify({
+        status: 'failed',
+        channel: existing.rows[0].channel,
+        recipient: existing.rows[0].recipient,
+      }),
+      JSON.stringify({ status: 'dismissed' }),
+      auditCtx.ip || null,
+      auditCtx.userAgent || null,
+    ]
+  );
+
+  const updated = await query(`SELECT * FROM notification_queue WHERE id = $1`, [notificationId]);
+  return updated.rows[0];
 };
 
 const validateConfigOnStartup = () => {
@@ -277,6 +338,7 @@ module.exports = {
   sendReportNotification,
   processPending,
   dispatchOne,
+  dismissFailed,
   validateConfigOnStartup,
   getConfigStatus,
   getDailyStats,

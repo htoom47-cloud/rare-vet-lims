@@ -80,4 +80,15 @@ router.post('/test-send', authorize(PERMISSIONS.SETTINGS_MANAGE), async (req, re
   } catch (err) { next(err); }
 });
 
+/** Clear a failed notification from the dashboard counter (no resend). */
+router.post('/:id/dismiss', authorize(PERMISSIONS.NOTIFICATIONS_SEND_REPORT, PERMISSIONS.SETTINGS_MANAGE), async (req, res, next) => {
+  try {
+    const data = await service.dismissFailed(req.params.id, req.user.id, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

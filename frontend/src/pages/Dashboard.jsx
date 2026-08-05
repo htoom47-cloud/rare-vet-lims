@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [notifStats, setNotifStats] = useState(null);
   const [aligningSampleId, setAligningSampleId] = useState(null);
+  const [dismissingNotifId, setDismissingNotifId] = useState(null);
 
   const reloadStats = () =>
     dashboardAPI.stats()
@@ -50,6 +51,20 @@ export default function Dashboard() {
       .then(({ data }) => setNotifStats(data.data))
       .catch(() => {});
   }, [t]);
+
+  const handleDismissFailed = async (row) => {
+    if (!window.confirm(t('dashboard.dismissFailedConfirm'))) return;
+    setDismissingNotifId(row.id);
+    try {
+      await notificationsAPI.dismissFailed(row.id);
+      toast.success(t('dashboard.dismissFailedDone'));
+      await reloadStats();
+    } catch (err) {
+      toast.error(err?.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setDismissingNotifId(null);
+    }
+  };
 
   const handleAlignSampleCustomer = async (row) => {
     if (!window.confirm(t('dashboard.alignSampleCustomerConfirm'))) return;
@@ -238,6 +253,78 @@ export default function Dashboard() {
             <StatCard title={t('dashboard.failedMessages')} value={stats.operations.failed_messages || 0} icon={Bell} color="orange" />
             <StatCard title={t('dashboard.dataErrors')} value={stats.operations.data_errors || 0} icon={AlertTriangle} color="orange" />
           </div>
+
+          {(stats.failed_messages_list?.length > 0 || (stats.operations.failed_messages || 0) > 0) && (
+            <Card className="mt-4 border-amber-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bell size={18} className="text-amber-600" />
+                  {t('dashboard.failedMessagesTitle')}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground font-normal">{t('dashboard.failedMessagesHint')}</p>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-start text-muted-foreground border-b">
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.failedMsgDate')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.failedMsgChannel')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.failedMsgCustomer')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.failedMsgRecipient')}</th>
+                      <th className="py-2 pe-3 font-medium">{t('dashboard.failedMsgError')}</th>
+                      <th className="py-2 font-medium" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(stats.failed_messages_list || []).map((row) => {
+                      const when = row.created_at
+                        ? new Date(row.created_at).toLocaleString(i18n.language === 'ar' ? 'ar-SA' : 'en-GB', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })
+                        : '—';
+                      const reports = Array.isArray(row.report_numbers) && row.report_numbers.length
+                        ? row.report_numbers.join(', ')
+                        : row.sample_code || null;
+                      return (
+                        <tr key={row.id} className="border-b border-border/60 last:border-0">
+                          <td className="py-2.5 pe-3 whitespace-nowrap tabular-nums">{when}</td>
+                          <td className="py-2.5 pe-3 font-medium uppercase">{row.channel || '—'}</td>
+                          <td className="py-2.5 pe-3">
+                            <span>{row.customer_name || '—'}</span>
+                            {reports ? (
+                              <span className="block text-xs text-muted-foreground font-mono">{reports}</span>
+                            ) : null}
+                          </td>
+                          <td className="py-2.5 pe-3 dir-ltr text-start">{row.recipient || '—'}</td>
+                          <td className="py-2.5 pe-3 max-w-[16rem] truncate" title={row.error_message || ''}>
+                            {row.error_message || '—'}
+                          </td>
+                          <td className="py-2.5 whitespace-nowrap">
+                            {hasPermission('notifications.send_report') && (
+                              <button
+                                type="button"
+                                className="btn-secondary text-xs px-2 py-1"
+                                disabled={dismissingNotifId === row.id}
+                                onClick={() => handleDismissFailed(row)}
+                              >
+                                {dismissingNotifId === row.id
+                                  ? t('common.loading')
+                                  : t('dashboard.dismissFailed')}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {(stats.failed_messages_list || []).length === 0 && (stats.operations.failed_messages || 0) > 0 && (
+                  <p className="text-sm text-muted-foreground py-2">{t('common.loading')}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {(stats.data_errors_list?.length > 0 || (stats.operations.data_errors || 0) > 0) && (
             <Card className="mt-4 border-amber-200/80">

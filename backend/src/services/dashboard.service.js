@@ -117,6 +117,40 @@ const listDataErrors = async (limit = 50) => {
   return result.rows;
 };
 
+/** Failed notification_queue rows (last 7 days) for dashboard ops list. */
+const listFailedMessages = async (limit = 50) => {
+  const capped = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const result = await query(
+    `SELECT nq.id,
+            nq.channel,
+            nq.recipient,
+            nq.subject,
+            nq.created_at,
+            COALESCE(
+              nq.metadata->>'error',
+              nq.metadata->'provider_result'->>'message',
+              nq.metadata->'provider_result'->>'error'
+            ) AS error_message,
+            COALESCE(
+              nq.metadata->>'customer',
+              c.full_name_ar,
+              c.full_name
+            ) AS customer_name,
+            nq.metadata->>'sample_code' AS sample_code,
+            nq.metadata->>'customer_id' AS customer_id,
+            nq.metadata->'report_numbers' AS report_numbers
+     FROM notification_queue nq
+     LEFT JOIN customers c ON nq.metadata->>'customer_id' ~ '^[0-9a-fA-F-]{36}$'
+       AND c.id = (nq.metadata->>'customer_id')::uuid
+     WHERE nq.status = 'failed'
+       AND nq.created_at >= NOW() - INTERVAL '7 days'
+     ORDER BY nq.created_at DESC
+     LIMIT $1`,
+    [capped]
+  );
+  return result.rows;
+};
+
 const getStats = async () => {
   await reconcileSampleStatuses();
 
@@ -230,6 +264,7 @@ const getStats = async () => {
     operations: await getOperationsStats(),
     customers_ready_to_send: await reportNotify.listCustomersReadyToSend(10),
     data_errors_list: await listDataErrors(50),
+    failed_messages_list: await listFailedMessages(50),
     ...(workflowEngine.isEnabled()
       ? { workflow: await workflowEngine.getWorkflowDashboardCounts() }
       : {}),
@@ -266,4 +301,4 @@ const getTechnicianDashboard = async (userId) => {
   };
 };
 
-module.exports = { getStats, getTechnicianDashboard, listDataErrors };
+module.exports = { getStats, getTechnicianDashboard, listDataErrors, listFailedMessages };

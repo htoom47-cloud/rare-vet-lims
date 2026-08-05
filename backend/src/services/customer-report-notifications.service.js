@@ -358,7 +358,14 @@ const sendReadyReports = async (customerId, { reportIds, channel, forceResend = 
       duplicatesIgnored: forceResend ? duplicates : [],
     };
   } catch (err) {
-    await query(`UPDATE notification_queue SET status = 'failed' WHERE id = $1`, [queued.id]);
+    const errText = String(err.message || 'send failed').slice(0, 500);
+    await query(
+      `UPDATE notification_queue
+       SET status = 'failed',
+           metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+       WHERE id = $1`,
+      [queued.id, JSON.stringify({ error: errText })]
+    );
     throw new AppError(err.message || 'Failed to send notification', 502, 'SEND_FAILED');
   }
 };
