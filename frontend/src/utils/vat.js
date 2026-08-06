@@ -1,5 +1,12 @@
 export const VAT_RATE = 15;
 
+/** Round to 2 decimal places (halalas) for money fields. */
+export const roundMoney = (n) => {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.round((x + Number.EPSILON) * 100) / 100;
+};
+
 export const netToGross = (net, rate = VAT_RATE) => {
   const n = parseFloat(net) || 0;
   return n * (1 + (parseFloat(rate) || VAT_RATE) / 100);
@@ -24,20 +31,22 @@ export const fmtNet = (net) => `SAR ${(parseFloat(net) || 0).toFixed(2)}`;
 export const fmtGross = (gross) => `SAR ${(parseFloat(gross) || 0).toFixed(2)}`;
 
 export const splitVat = (net, rate = VAT_RATE) => {
-  const subtotal = parseFloat(net) || 0;
+  const taxableRaw = parseFloat(net) || 0;
   const r = parseFloat(rate) || VAT_RATE;
-  const taxAmount = subtotal * (r / 100);
-  return { subtotal, taxRate: r, taxAmount, total: subtotal + taxAmount };
+  const subtotal = roundMoney(taxableRaw);
+  const total = roundMoney(taxableRaw * (1 + r / 100));
+  const taxAmount = roundMoney(total - subtotal);
+  return { subtotal, taxRate: r, taxAmount, total };
 };
 
 /** Sum catalog line items (unit_price × qty) — prices are VAT-inclusive. */
-export const catalogLinesGrossTotal = (items) => (items || []).reduce(
+export const catalogLinesGrossTotal = (items) => roundMoney((items || []).reduce(
   (s, i) => s + (parseFloat(i.unit_price) || 0) * (parseInt(i.quantity, 10) || 1),
   0,
-);
+));
 
 /** Net subtotal for invoices/quotes from catalog gross line prices. */
-export const catalogLinesNetSubtotal = (items, rate = VAT_RATE) => (items || []).reduce(
+export const catalogLinesNetSubtotal = (items, rate = VAT_RATE) => roundMoney((items || []).reduce(
   (s, i) => s + grossToNet(parseFloat(i.unit_price) || 0, rate) * (parseInt(i.quantity, 10) || 1),
   0,
-);
+));

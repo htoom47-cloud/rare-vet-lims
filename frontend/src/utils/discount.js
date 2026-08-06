@@ -1,4 +1,4 @@
-import { VAT_RATE, grossToNet } from './vat';
+import { VAT_RATE, grossToNet, roundMoney } from './vat';
 import { isFieldVisitItem } from './fieldVisitService';
 
 export const DISCOUNT_TYPES = {
@@ -11,14 +11,17 @@ export const DISCOUNT_TYPES = {
 export function resolveDiscountAmount(subtotal, type, value) {
   const sub = Math.max(0, parseFloat(subtotal) || 0);
   const v = parseFloat(value) || 0;
-  if (type === DISCOUNT_TYPES.PERCENT && v > 0) return Math.min(sub, sub * (v / 100));
-  if (type === DISCOUNT_TYPES.AMOUNT && v > 0) return Math.min(sub, v);
+  if (type === DISCOUNT_TYPES.PERCENT && v > 0) return roundMoney(Math.min(sub, sub * (v / 100)));
+  if (type === DISCOUNT_TYPES.AMOUNT && v > 0) return roundMoney(Math.min(sub, v));
   return 0;
 }
 
 const lineNetTotal = (item, catalogPrices, taxRate = VAT_RATE) => {
   const unit = parseFloat(item.unit_price) || 0;
   const qty = parseInt(item.quantity, 10) || 1;
+  if (!catalogPrices && item.total_price != null && item.total_price !== '') {
+    return parseFloat(item.total_price) || 0;
+  }
   const netUnit = catalogPrices ? grossToNet(unit, taxRate) : unit;
   return netUnit * qty;
 };
@@ -35,7 +38,11 @@ export function splitLineSubtotals(items = [], { catalogPrices = false, taxRate 
     if (isFieldVisitItem(item)) fieldVisitSubtotal += line;
     else serviceSubtotal += line;
   }
-  return { serviceSubtotal, fieldVisitSubtotal, subtotal: serviceSubtotal + fieldVisitSubtotal };
+  return {
+    serviceSubtotal,
+    fieldVisitSubtotal,
+    subtotal: serviceSubtotal + fieldVisitSubtotal,
+  };
 }
 
 export function calcSplitTotals(
@@ -48,16 +55,19 @@ export function calcSplitTotals(
   options = {},
 ) {
   const { catalogPrices = false } = options;
-  const { serviceSubtotal, fieldVisitSubtotal, subtotal } = splitLineSubtotals(items, { catalogPrices, taxRate });
+  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitLineSubtotals(items, { catalogPrices, taxRate });
   const discountAmount = resolveDiscountAmount(serviceSubtotal, serviceDiscountType, serviceDiscountValue);
   const fieldVisitDiscountAmount = resolveDiscountAmount(fieldVisitSubtotal, fieldVisitDiscountType, fieldVisitDiscountValue);
-  const taxable = Math.max(0, serviceSubtotal - discountAmount) + Math.max(0, fieldVisitSubtotal - fieldVisitDiscountAmount);
-  const taxAmount = taxable * ((parseFloat(taxRate) || 15) / 100);
-  const total = taxable + taxAmount;
+  const rate = parseFloat(taxRate) || 15;
+  const taxableRaw = Math.max(0, serviceSubtotal - discountAmount)
+    + Math.max(0, fieldVisitSubtotal - fieldVisitDiscountAmount);
+  const subtotal = roundMoney(subtotalRaw);
+  const total = roundMoney(taxableRaw * (1 + rate / 100));
+  const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   return {
     subtotal,
-    serviceSubtotal,
-    fieldVisitSubtotal,
+    serviceSubtotal: roundMoney(serviceSubtotal),
+    fieldVisitSubtotal: roundMoney(fieldVisitSubtotal),
     discountAmount,
     fieldVisitDiscountAmount,
     taxAmount,
@@ -130,11 +140,13 @@ export function calcInvoiceTotals(
     const paid = parseFloat(alreadyPaid) || 0;
     return { ...totals, balanceDue: Math.max(0, totals.total - paid) };
   }
-  const sub = parseFloat(subtotal) || 0;
-  const discountAmount = resolveDiscountAmount(sub, discountType, discountValue);
-  const taxable = Math.max(0, sub - discountAmount);
-  const taxAmount = taxable * ((parseFloat(taxRate) || 15) / 100);
-  const total = taxable + taxAmount;
+  const subRaw = parseFloat(subtotal) || 0;
+  const discountAmount = resolveDiscountAmount(subRaw, discountType, discountValue);
+  const rate = parseFloat(taxRate) || 15;
+  const taxableRaw = Math.max(0, subRaw - discountAmount);
+  const sub = roundMoney(subRaw);
+  const total = roundMoney(taxableRaw * (1 + rate / 100));
+  const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   const paid = parseFloat(alreadyPaid) || 0;
   return {
     subtotal: sub,
@@ -142,6 +154,6 @@ export function calcInvoiceTotals(
     fieldVisitDiscountAmount: 0,
     taxAmount,
     total,
-    balanceDue: Math.max(0, total - paid),
+    balanceDue: Math.max(0, roundMoney(total - paid)),
   };
 }
