@@ -217,7 +217,7 @@ export default function AccountingReports() {
   const paymentPreview = useMemo(() => {
     if (!selectedInvoice) return null;
     const paid = parseFloat(selectedInvoice.total_paid || 0);
-    return calcInvoiceTotals(
+    const preview = calcInvoiceTotals(
       selectedInvoice.subtotal,
       paymentDiscountType,
       paymentDiscountValue,
@@ -230,6 +230,31 @@ export default function AccountingReports() {
         catalogPrices: false,
       },
     );
+    const { type: invDiscType, value: invDiscValue } = initDiscountFromInvoice(selectedInvoice);
+    const invFv = initFieldVisitDiscountFromInvoice(selectedInvoice);
+    const discountsMatch = (
+      paymentDiscountType === invDiscType
+      && String(paymentDiscountValue || '') === String(invDiscValue || '')
+      && paymentFieldVisitDiscountType === invFv.type
+      && String(paymentFieldVisitDiscountValue || '') === String(invFv.value || '')
+    );
+    const storedTotal = parseFloat(selectedInvoice.total) || 0;
+    const isWholeRiyal = (n) => Math.abs(n - Math.round(n)) < 0.001;
+    const healHalala = discountsMatch
+      && isWholeRiyal(preview.total)
+      && !isWholeRiyal(storedTotal)
+      && Math.abs(preview.total - storedTotal) <= 0.02;
+    if (discountsMatch && !healHalala && selectedInvoice.total != null) {
+      const total = storedTotal;
+      return {
+        ...preview,
+        total,
+        taxAmount: parseFloat(selectedInvoice.tax_amount) || preview.taxAmount,
+        subtotal: parseFloat(selectedInvoice.subtotal) || preview.subtotal,
+        balanceDue: Math.max(0, total - paid),
+      };
+    }
+    return preview;
   }, [
     selectedInvoice,
     paymentDiscountType,

@@ -38,12 +38,49 @@ const splitCatalogSubtotals = (items = []) => {
   };
 };
 
+/** Snap classic VAT 0.01/0.02 drift back to whole riyals (catalog prices are VAT-inclusive). */
+const snapHalalaDrift = (amount) => {
+  const whole = Math.round(amount);
+  const drift = Math.abs(amount - whole);
+  if (drift > 0 && drift <= 0.02) return whole;
+  return roundMoney(amount);
+};
+
 /**
- * Compute quote/invoice totals with separate service and field-visit discounts.
- * Total is rounded from net×(1+VAT) so VAT-inclusive catalog prices (e.g. 350) stay 350.00.
+ * Choose VAT-inclusive total resilient to DECIMAL(10,2) net line storage.
+ * Per-line gross + factor, then snap ≤2-halala drift (1499.99→1500, 349.99→350).
  */
+const resolveVatInclusiveTotal = (items, taxableRaw, taxRate) => {
+  const rate = parseFloat(taxRate) || 15;
+  const factor = 1 + rate / 100;
+  const factorTotal = roundMoney(taxableRaw * factor);
+
+  let netSum = 0;
+  let perLineGross = 0;
+  for (const item of items || []) {
+    const net = lineNetAmount(item);
+    netSum += net;
+    perLineGross += roundMoney(net * factor);
+  }
+  perLineGross = roundMoney(perLineGross);
+
+  let candidate = factorTotal;
+  if (netSum > 0 && Math.abs(taxableRaw - netSum) >= 0.000001) {
+    candidate = roundMoney(perLineGross * (taxableRaw / netSum));
+  } else if (netSum > 0) {
+    const perLineClean = Math.abs(perLineGross - Math.round(perLineGross)) < 0.001;
+    const factorClean = Math.abs(factorTotal - Math.round(factorTotal)) < 0.001;
+    if (perLineClean && !factorClean) candidate = perLineGross;
+    else if (factorClean && !perLineClean) candidate = factorTotal;
+    else candidate = factorTotal;
+  }
+  return snapHalalaDrift(candidate);
+};
+
+/** Compute quote/invoice totals with separate service and field-visit discounts. */
 const calcDocumentTotals = (items, data = {}) => {
-  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitCatalogSubtotals(items);
+  const list = items || [];
+  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitCatalogSubtotals(list);
   const discount_amount = resolveDiscount(serviceSubtotal, data);
   const field_visit_discount_amount = resolveDiscount(fieldVisitSubtotal, {
     discount_amount: data.field_visit_discount_amount,
@@ -55,7 +92,7 @@ const calcDocumentTotals = (items, data = {}) => {
   const taxableRaw = Math.max(0, serviceSubtotal - discount_amount)
     + Math.max(0, fieldVisitSubtotal - field_visit_discount_amount);
   const subtotal = roundMoney(subtotalRaw);
-  const total = roundMoney(taxableRaw * (1 + taxRate / 100));
+  const total = resolveVatInclusiveTotal(list, taxableRaw, taxRate);
   const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   return {
     subtotal,

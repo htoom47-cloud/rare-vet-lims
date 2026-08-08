@@ -45,6 +45,61 @@ export function splitLineSubtotals(items = [], { catalogPrices = false, taxRate 
   };
 }
 
+/** Snap classic VAT 0.01/0.02 drift back to whole riyals (catalog prices are VAT-inclusive). */
+function snapHalalaDrift(amount) {
+  const whole = Math.round(amount);
+  const drift = Math.abs(amount - whole);
+  if (drift > 0 && drift <= 0.02) return whole;
+  return roundMoney(amount);
+}
+
+/**
+ * VAT-inclusive total resilient to DECIMAL(10,2) net storage at payment time.
+ * Catalog (gross) lines sum directly; net lines combine per-line + factor rounding.
+ */
+function resolveVatInclusiveTotal(items, taxableRaw, taxRate, catalogPrices) {
+  const rate = parseFloat(taxRate) || 15;
+  const factor = 1 + rate / 100;
+  const factorTotal = roundMoney(taxableRaw * factor);
+
+  if (catalogPrices) {
+    let grossSum = 0;
+    let netSum = 0;
+    for (const item of items || []) {
+      const qty = parseInt(item.quantity, 10) || 1;
+      const gross = roundMoney((parseFloat(item.unit_price) || 0) * qty);
+      grossSum += gross;
+      netSum += grossToNet(gross, rate);
+    }
+    grossSum = roundMoney(grossSum);
+    if (!(netSum > 0)) return snapHalalaDrift(factorTotal);
+    if (Math.abs(taxableRaw - netSum) < 0.000001) return snapHalalaDrift(grossSum);
+    return snapHalalaDrift(grossSum * (taxableRaw / netSum));
+  }
+
+  let netSum = 0;
+  let perLineGross = 0;
+  for (const item of items || []) {
+    const qty = parseInt(item.quantity, 10) || 1;
+    const net = (item.total_price != null && item.total_price !== '')
+      ? (parseFloat(item.total_price) || 0)
+      : (parseFloat(item.unit_price) || 0) * qty;
+    netSum += net;
+    perLineGross += roundMoney(net * factor);
+  }
+  perLineGross = roundMoney(perLineGross);
+
+  if (!(netSum > 0)) return snapHalalaDrift(factorTotal);
+  if (Math.abs(taxableRaw - netSum) >= 0.000001) {
+    return snapHalalaDrift(perLineGross * (taxableRaw / netSum));
+  }
+  const perLineClean = Math.abs(perLineGross - Math.round(perLineGross)) < 0.001;
+  const factorClean = Math.abs(factorTotal - Math.round(factorTotal)) < 0.001;
+  if (perLineClean && !factorClean) return snapHalalaDrift(perLineGross);
+  if (factorClean && !perLineClean) return snapHalalaDrift(factorTotal);
+  return snapHalalaDrift(factorTotal);
+}
+
 export function calcSplitTotals(
   items,
   serviceDiscountType,
@@ -55,14 +110,15 @@ export function calcSplitTotals(
   options = {},
 ) {
   const { catalogPrices = false } = options;
-  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitLineSubtotals(items, { catalogPrices, taxRate });
+  const list = items || [];
+  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitLineSubtotals(list, { catalogPrices, taxRate });
   const discountAmount = resolveDiscountAmount(serviceSubtotal, serviceDiscountType, serviceDiscountValue);
   const fieldVisitDiscountAmount = resolveDiscountAmount(fieldVisitSubtotal, fieldVisitDiscountType, fieldVisitDiscountValue);
   const rate = parseFloat(taxRate) || 15;
   const taxableRaw = Math.max(0, serviceSubtotal - discountAmount)
     + Math.max(0, fieldVisitSubtotal - fieldVisitDiscountAmount);
   const subtotal = roundMoney(subtotalRaw);
-  const total = roundMoney(taxableRaw * (1 + rate / 100));
+  const total = resolveVatInclusiveTotal(list, taxableRaw, rate, catalogPrices);
   const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   return {
     subtotal,

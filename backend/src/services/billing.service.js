@@ -213,29 +213,48 @@ const recordPayment = async (data, userId, req = null) => {
       [data.invoice_id]
     );
     const totals = calcDocumentTotals(itemsResult.rows, data);
-    const newTotal = totals.total;
+    const storedTotal = parseFloat(invoice.total) || 0;
+    const calcTotal = totals.total;
+    const isWholeRiyal = (n) => Math.abs(n - Math.round(n)) < 0.001;
+
+    // Keep issued invoice total when discounts are unchanged — but heal classic
+    // 1499.99 drift when recalculation recovers a whole-riyal catalog total.
+    const sameDiscount = (
+      Math.abs((totals.discount_amount || 0) - (parseFloat(invoice.discount_amount) || 0)) < 0.001
+      && Math.abs((totals.discount_percent || 0) - (parseFloat(invoice.discount_percent) || 0)) < 0.001
+      && Math.abs((totals.field_visit_discount_amount || 0) - (parseFloat(invoice.field_visit_discount_amount) || 0)) < 0.001
+      && Math.abs((totals.field_visit_discount_percent || 0) - (parseFloat(invoice.field_visit_discount_percent) || 0)) < 0.001
+    );
+    const shouldHealHalala = sameDiscount
+      && isWholeRiyal(calcTotal)
+      && !isWholeRiyal(storedTotal)
+      && Math.abs(calcTotal - storedTotal) <= 0.02;
+    const newTotal = (!sameDiscount || shouldHealHalala) ? calcTotal : storedTotal;
+    const newTaxAmount = (!sameDiscount || shouldHealHalala) ? totals.taxAmount : (parseFloat(invoice.tax_amount) || 0);
 
     if (alreadyPaid > newTotal + 0.01) {
       throw new AppError('Discount exceeds amount already paid', 400, 'INVALID_DISCOUNT');
     }
 
-    await client.query(
-      `UPDATE invoices SET discount_amount = $1, discount_percent = $2, field_visit_discount_amount = $3, field_visit_discount_percent = $4, tax_amount = $5, total = $6, pdf_url = NULL, updated_at = NOW() WHERE id = $7`,
-      [
-        totals.discount_amount, totals.discount_percent,
-        totals.field_visit_discount_amount, totals.field_visit_discount_percent,
-        totals.taxAmount, newTotal, data.invoice_id,
-      ]
-    );
-    invoice = {
-      ...invoice,
-      discount_amount: totals.discount_amount,
-      discount_percent: totals.discount_percent,
-      field_visit_discount_amount: totals.field_visit_discount_amount,
-      field_visit_discount_percent: totals.field_visit_discount_percent,
-      tax_amount: totals.taxAmount,
-      total: newTotal,
-    };
+    if (!sameDiscount || shouldHealHalala) {
+      await client.query(
+        `UPDATE invoices SET discount_amount = $1, discount_percent = $2, field_visit_discount_amount = $3, field_visit_discount_percent = $4, tax_amount = $5, total = $6, pdf_url = NULL, updated_at = NOW() WHERE id = $7`,
+        [
+          totals.discount_amount, totals.discount_percent,
+          totals.field_visit_discount_amount, totals.field_visit_discount_percent,
+          newTaxAmount, newTotal, data.invoice_id,
+        ]
+      );
+      invoice = {
+        ...invoice,
+        discount_amount: totals.discount_amount,
+        discount_percent: totals.discount_percent,
+        field_visit_discount_amount: totals.field_visit_discount_amount,
+        field_visit_discount_percent: totals.field_visit_discount_percent,
+        tax_amount: newTaxAmount,
+        total: newTotal,
+      };
+    }
 
     const balance = Math.max(0, newTotal - alreadyPaid);
     const amount = parseFloat(data.amount);
