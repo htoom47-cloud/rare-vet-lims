@@ -266,13 +266,15 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
             </div>
           )}
           {children}
-          <footer className="mt-10 pt-6 border-t border-border text-center space-y-3 pb-2">
-            <p className="text-sm text-foreground/90">© {new Date().getFullYear()} {t('portal.labName')}</p>
+          <footer className="mt-10 pt-6 border-t border-primary-800/20 text-center space-y-3 pb-2">
+            <p className="text-sm font-semibold text-primary-900 dark:text-primary-50">
+              © {new Date().getFullYear()} {t('portal.labName')}
+            </p>
             <div
-              className="inline-flex items-center justify-center rounded-xl border border-primary-500/40 bg-primary-600/15 dark:bg-primary-500/20 px-5 py-2.5 shadow-sm mx-auto"
+              className="inline-flex items-center justify-center rounded-2xl bg-primary-800 dark:bg-primary-200 px-6 py-3 shadow-md mx-auto"
               dir="ltr"
             >
-              <p className="text-sm sm:text-base font-semibold text-foreground tracking-wide">
+              <p className="text-sm sm:text-base font-bold tracking-wide text-primary-50 dark:text-primary-950">
                 {t('site.footer.credit')}
               </p>
             </div>

@@ -17,20 +17,24 @@ const FOOTER_LINKS = [
 export default function PublicFooter() {
   const { t } = useTranslation();
   return (
-    <footer className="border-t border-border bg-card mt-auto">
+    <footer className="relative z-10 border-t-2 border-primary-800/20 bg-white dark:bg-[hsl(25_25%_12%)] mt-auto shadow-[0_-8px_30px_rgba(61,40,23,0.08)]">
       <div className="site-container py-12 grid gap-10 md:grid-cols-3">
         <div className="space-y-4">
           <LabBrandLockup compact embedded noDivider className="!w-auto max-w-xs" />
-          <p className="text-sm text-foreground/85 leading-relaxed max-w-sm">{t('site.footer.tagline')}</p>
+          <p className="text-sm text-primary-900 dark:text-primary-50 leading-relaxed max-w-sm font-medium">
+            {t('site.footer.tagline')}
+          </p>
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">{t('site.footer.explore')}</h3>
+          <h3 className="text-sm font-bold text-primary-900 dark:text-primary-50 mb-3">
+            {t('site.footer.explore')}
+          </h3>
           <ul className="grid grid-cols-2 gap-2 text-sm">
             {FOOTER_LINKS.map(({ to, key }) => (
               <li key={to}>
                 <Link
                   to={to}
-                  className="text-foreground/80 hover:text-primary-600 dark:hover:text-primary-300 transition-colors"
+                  className="text-primary-800 dark:text-primary-100 hover:text-primary-600 dark:hover:text-white font-medium transition-colors"
                 >
                   {t(key)}
                 </Link>
@@ -39,24 +43,26 @@ export default function PublicFooter() {
           </ul>
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">{t('site.footer.contact')}</h3>
-          <ul className="text-sm text-foreground/85 space-y-2">
+          <h3 className="text-sm font-bold text-primary-900 dark:text-primary-50 mb-3">
+            {t('site.footer.contact')}
+          </h3>
+          <ul className="text-sm text-primary-900 dark:text-primary-50 space-y-2 font-medium">
             <li dir="ltr">0115007257</li>
             <li>alnwader.10hz@gmail.com</li>
             <li>{t('home.address')}</li>
           </ul>
         </div>
       </div>
-      <div className="border-t border-border py-6">
-        <div className="site-container flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-foreground/90">
+      <div className="border-t border-primary-800/15 bg-primary-50/80 dark:bg-primary-950/40 py-6">
+        <div className="site-container flex flex-col items-center gap-4 text-center">
+          <p className="text-sm font-semibold text-primary-900 dark:text-primary-50">
             © {new Date().getFullYear()} {t('portal.labName')} — {t('site.footer.rights')}
           </p>
           <div
-            className="inline-flex items-center justify-center rounded-xl border border-primary-500/40 bg-primary-600/15 dark:bg-primary-500/20 px-5 py-2.5 shadow-sm"
+            className="inline-flex items-center justify-center rounded-2xl bg-primary-800 dark:bg-primary-200 px-6 py-3 shadow-md"
             dir="ltr"
           >
-            <p className="text-sm sm:text-base font-semibold text-foreground tracking-wide">
+            <p className="text-sm sm:text-base font-bold tracking-wide text-primary-50 dark:text-primary-950">
               {t('site.footer.credit')}
             </p>
           </div>
