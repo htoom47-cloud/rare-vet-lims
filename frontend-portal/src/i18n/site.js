@@ -250,6 +250,7 @@ export const siteEn = {
     explore: 'Explore',
     contact: 'Contact',
     rights: 'All rights reserved.',
+    credit: 'Riyayat Alnawadir Veterinary Center',
   },
   legal: {
     privacyTitle: 'Privacy policy',
@@ -514,6 +515,7 @@ export const siteAr = {
     explore: 'استكشف',
     contact: 'تواصل',
     rights: 'جميع الحقوق محفوظة.',
+    credit: 'Riyayat Alnawadir Veterinary Center',
   },
   legal: {
     privacyTitle: 'سياسة الخصوصية',

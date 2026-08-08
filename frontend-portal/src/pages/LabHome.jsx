@@ -449,9 +449,10 @@ export default function LabHome() {
           </m.div>
         </section>
 
-        <footer className="py-8 text-center text-sm text-muted-foreground border-t border-border/60">
+        <footer className="py-8 text-center text-sm text-muted-foreground border-t border-border/60 space-y-1">
           <LabBrandLockup compact embedded noDivider className="!w-auto mx-auto max-w-xs mb-3 opacity-80" />
           <p>© {new Date().getFullYear()} — {t('portal.labName')}</p>
+          <p className="text-xs text-muted-foreground/90" dir="ltr">({t('site.footer.credit')})</p>
         </footer>
       </main>
 

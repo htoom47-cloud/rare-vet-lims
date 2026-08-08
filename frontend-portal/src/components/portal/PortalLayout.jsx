@@ -266,6 +266,10 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
             </div>
           )}
           {children}
+          <footer className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground space-y-1 pb-2">
+            <p>© {new Date().getFullYear()} {t('portal.labName')}</p>
+            <p className="text-muted-foreground/90" dir="ltr">({t('site.footer.credit')})</p>
+          </footer>
         </main>
 
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border/80 bg-card/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">

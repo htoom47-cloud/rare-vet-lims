@@ -40,8 +40,9 @@ export default function PublicFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-border/40 py-5 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} {t('portal.labName')} — {t('site.footer.rights')}
+      <div className="border-t border-border/40 py-5 text-center text-xs text-muted-foreground space-y-1">
+        <p>© {new Date().getFullYear()} {t('portal.labName')} — {t('site.footer.rights')}</p>
+        <p className="text-muted-foreground/90" dir="ltr">({t('site.footer.credit')})</p>
       </div>
     </footer>
   );
