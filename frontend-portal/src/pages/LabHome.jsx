@@ -449,10 +449,17 @@ export default function LabHome() {
           </m.div>
         </section>
 
-        <footer className="py-8 text-center text-sm text-muted-foreground border-t border-border/60 space-y-1">
-          <LabBrandLockup compact embedded noDivider className="!w-auto mx-auto max-w-xs mb-3 opacity-80" />
-          <p>© {new Date().getFullYear()} — {t('portal.labName')}</p>
-          <p className="text-xs text-muted-foreground/90" dir="ltr">({t('site.footer.credit')})</p>
+        <footer className="py-8 text-center border-t border-border space-y-3 bg-card">
+          <LabBrandLockup compact embedded noDivider className="!w-auto mx-auto max-w-xs" />
+          <p className="text-sm text-foreground/90">© {new Date().getFullYear()} — {t('portal.labName')}</p>
+          <div
+            className="inline-flex items-center justify-center rounded-xl border border-primary-500/40 bg-primary-600/15 dark:bg-primary-500/20 px-5 py-2.5 shadow-sm mx-auto"
+            dir="ltr"
+          >
+            <p className="text-sm sm:text-base font-semibold text-foreground tracking-wide">
+              {t('site.footer.credit')}
+            </p>
+          </div>
         </footer>
       </main>
 
