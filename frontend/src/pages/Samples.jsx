@@ -39,11 +39,12 @@ export default function Samples() {
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { hasPermission, hasAnyPermission } = useAuth();
+  const { hasPermission, hasAnyPermission, user } = useAuth();
   const canGenerateReport = hasPermission('reports.generate');
   const canReviewResults = hasAnyPermission(
     'results.validate', 'results.edit', 'results.unvalidate', 'results.enter'
   );
+  const canAddTest = !!user?.features?.addTestToSample && hasPermission('sample_tests.add');
 
   const [samples, setSamples] = useState([]);
 
@@ -337,6 +338,9 @@ export default function Samples() {
   const [testMenuId, setTestMenuId] = useState(null);
   const [historyModal, setHistoryModal] = useState(null);
   const [duplicates, setDuplicates] = useState([]);
+  const [addTestModal, setAddTestModal] = useState(false);
+  const [addTestIds, setAddTestIds] = useState([]);
+  const [addingTests, setAddingTests] = useState(false);
 
   const refreshDetail = async () => {
     if (!detailSample) return;
@@ -391,6 +395,37 @@ export default function Samples() {
       setHistoryModal({ test, entries: data.data || [] });
     } catch { setHistoryModal({ test, entries: [] }); }
   };
+
+  const openAddTestModal = () => {
+    setAddTestIds([]);
+    setAddTestModal(true);
+  };
+
+  const handleAddTests = async () => {
+    if (!detailSample || !addTestIds.length) return;
+    if (!window.confirm(t('samples.testActions.addConfirm'))) return;
+    setAddingTests(true);
+    try {
+      const { data } = await samplesAPI.addTests(detailSample.id, addTestIds);
+      const inv = data.data?.supplemental_invoice?.invoice_number || '—';
+      toast.success(t('samples.testActions.added', { invoice: inv }));
+      setAddTestModal(false);
+      setAddTestIds([]);
+      await refreshDetail();
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('samples.testActions.reportLocked'));
+    } finally {
+      setAddingTests(false);
+    }
+  };
+
+  const existingActiveTestIds = new Set(
+    (detailSample?.tests || [])
+      .filter((st) => st.status !== 'cancelled')
+      .map((st) => st.test_id)
+  );
+  const addableTests = tests.filter((t) => t.is_active !== false && !existingActiveTestIds.has(t.id));
 
   useEffect(() => {
     if (detailSample) {
@@ -737,7 +772,14 @@ export default function Samples() {
 
             <div>
 
-              <h4 className="font-medium mb-2">{t('samples.selectTests')}</h4>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h4 className="font-medium">{t('samples.selectTests')}</h4>
+                {canAddTest && (
+                  <button type="button" onClick={openAddTestModal} className="btn-secondary text-xs py-1 px-2">
+                    {t('samples.testActions.add')}
+                  </button>
+                )}
+              </div>
 
               {detailSample.tests?.map((test) => (
 
@@ -910,6 +952,49 @@ export default function Samples() {
             <p className="text-sm text-gray-500">{t('samples.testActions.noHistory')}</p>
           )
         )}
+      </Modal>
+
+      <Modal isOpen={addTestModal} onClose={() => !addingTests && setAddTestModal(false)} title={t('samples.testActions.addTitle')}>
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">{t('samples.testActions.addHint')}</p>
+          <div className="max-h-72 overflow-y-auto border rounded-lg divide-y">
+            {addableTests.length === 0 ? (
+              <p className="p-3 text-sm text-gray-500">{t('samples.testActions.selectTestsToAdd')}</p>
+            ) : (
+              addableTests.map((test) => {
+                const checked = addTestIds.includes(test.id);
+                return (
+                  <label key={test.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setAddTestIds((prev) =>
+                          checked ? prev.filter((id) => id !== test.id) : [...prev, test.id]
+                        );
+                      }}
+                    />
+                    <span className="flex-1">{testDisplayName(test, i18n.language)}</span>
+                    <span className="text-gray-500">{fmtCatalog(test.price)}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" disabled={addingTests} onClick={() => setAddTestModal(false)} className="btn-secondary">
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={addingTests || !addTestIds.length}
+              onClick={handleAddTests}
+              className="btn-primary"
+            >
+              {addingTests ? t('common.loading') : t('samples.testActions.add')}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {printSample && (

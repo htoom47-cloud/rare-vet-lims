@@ -129,6 +129,14 @@ router.post('/:id/lab-handover', authorize(PERMISSIONS.SAMPLES_UPDATE), auditLog
 
 // --- Sample Test Management ---
 
+router.post('/:id/tests', authorize(PERMISSIONS.SAMPLE_TESTS_ADD), auditLog('add_sample_tests', 'samples'), async (req, res, next) => {
+  try {
+    const testIds = req.body.test_ids || (req.body.test_id ? [req.body.test_id] : []);
+    const data = await testMgmt.addTests(req.params.id, testIds, req.user.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.delete('/:id/tests/:testId', authorize(PERMISSIONS.SAMPLE_TESTS_REMOVE), async (req, res, next) => {
   try {
     const data = await testMgmt.removeTest(req.params.id, req.params.testId, req.user.id, { role: req.user.role_name });

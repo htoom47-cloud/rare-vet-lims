@@ -18,6 +18,8 @@ const getStaffFeatures = () => ({
   hatifWhatsapp: !!env.features?.hatifWhatsapp,
   /** When true: Customers may open/prepare a Hatif call conversation */
   hatifCall: !!env.features?.hatifCall,
+  /** When true: Samples detail may add tests to an existing sample */
+  addTestToSample: !!env.features?.addTestToSample,
 });
 
 module.exports = { getStaffFeatures };

@@ -69,7 +69,8 @@ export default function AccountingReports() {
   const [paymentModal, setPaymentModal] = useState(false);
   const [refundModal, setRefundModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: '', reference_number: '', notes: '' });
+  const [paymentForm, setPaymentForm] = useState({ reference_number: '', notes: '' });
+  const [paymentLines, setPaymentLines] = useState([{ method: '', amount: '' }]);
   const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
   const [paymentFieldVisitDiscountType, setPaymentFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
@@ -205,12 +206,8 @@ export default function AccountingReports() {
       fvDiscountValue: fv.value,
       catalogPrices: false,
     });
-    setPaymentForm({
-      amount: String(preview.balanceDue.toFixed(2)),
-      method: '',
-      reference_number: '',
-      notes: '',
-    });
+    setPaymentForm({ reference_number: '', notes: '' });
+    setPaymentLines([{ method: '', amount: String(preview.balanceDue.toFixed(2)) }]);
     setPaymentModal(true);
   };
 
@@ -265,13 +262,29 @@ export default function AccountingReports() {
 
   useEffect(() => {
     if (!paymentModal || !paymentPreview) return;
-    setPaymentForm((prev) => ({ ...prev, amount: String(paymentPreview.balanceDue.toFixed(2)) }));
+    setPaymentLines((prev) => {
+      if (prev.length !== 1) return prev;
+      return [{ ...prev[0], amount: String(paymentPreview.balanceDue.toFixed(2)) }];
+    });
   }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue, paymentFieldVisitDiscountType, paymentFieldVisitDiscountValue]);
 
   const recordPayment = async (e) => {
     e.preventDefault();
-    if (!paymentForm.method) {
+    const lines = paymentLines
+      .map((l) => ({ method: l.method, amount: Number(l.amount) }))
+      .filter((l) => l.amount > 0);
+    if (!lines.length) {
       toast.error(t('billing.selectPaymentMethodRequired'));
+      return;
+    }
+    if (lines.some((l) => !l.method)) {
+      toast.error(t('billing.splitPaymentNeedMethod'));
+      return;
+    }
+    const balance = paymentPreview?.balanceDue ?? Number(selectedInvoice?.balance_due || 0);
+    const sum = lines.reduce((s, l) => s + l.amount, 0);
+    if (Math.abs(sum - balance) > 0.02) {
+      toast.error(t('billing.splitPaymentSumMismatch', { balance: balance.toFixed(2) }));
       return;
     }
     try {
@@ -283,17 +296,21 @@ export default function AccountingReports() {
         paymentFieldVisitDiscountValue,
         { catalogPrices: false },
       );
-      await billingAPI.recordPayment({
-        invoice_id: selectedInvoice.id,
-        amount: Number(paymentForm.amount),
-        method: paymentForm.method,
-        reference_number: paymentForm.reference_number,
-        notes: paymentForm.notes,
-        ...discountFields,
-      });
+      const invoiceId = selectedInvoice.id;
+      for (let i = 0; i < lines.length; i += 1) {
+        await billingAPI.recordPayment({
+          invoice_id: invoiceId,
+          amount: lines[i].amount,
+          method: lines[i].method,
+          reference_number: paymentForm.reference_number,
+          notes: paymentForm.notes,
+          ...discountFields,
+        });
+      }
       toast.success(t('accounting.paymentRecorded'));
       setPaymentModal(false);
-      setPaymentForm({ amount: '', method: '', reference_number: '', notes: '' });
+      setPaymentForm({ reference_number: '', notes: '' });
+      setPaymentLines([{ method: '', amount: '' }]);
       setPaymentDiscountType(DISCOUNT_TYPES.NONE);
       setPaymentDiscountValue('');
       setPaymentFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
@@ -302,7 +319,7 @@ export default function AccountingReports() {
       loadDashboard();
       loadDayStatus();
       loadDayStatus();
-      if (detailInvoice?.id === selectedInvoice.id) openDetail(selectedInvoice);
+      if (detailInvoice?.id === invoiceId) openDetail({ id: invoiceId });
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('accounting.loadFailed'));
     }
@@ -869,23 +886,62 @@ export default function AccountingReports() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('billing.amount')} (SAR)</label>
-            <input type="number" step="0.01" min="0" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="input-field" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">{t('billing.paymentMethod')}</label>
-            <select
-              value={paymentForm.method}
-              onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
-              className="input-field"
-              required
-            >
-              <option value="" disabled>{t('billing.selectPaymentMethod')}</option>
-              {['cash', 'card', 'bank_transfer', 'credit'].map((m) => (
-                <option key={m} value={m}>{paymentMethodLabel(m)}</option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium">{t('billing.splitPayment')}</label>
+              <button
+                type="button"
+                className="text-xs text-primary-600 hover:underline"
+                onClick={() => setPaymentLines((prev) => [...prev, { method: '', amount: '' }])}
+              >
+                {t('billing.addPaymentLine')}
+              </button>
+            </div>
+            {paymentLines.map((line, idx) => (
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">{t('billing.paymentMethod')}</label>
+                  <select
+                    value={line.method}
+                    onChange={(e) => {
+                      const method = e.target.value;
+                      setPaymentLines((prev) => prev.map((l, i) => (i === idx ? { ...l, method } : l)));
+                    }}
+                    className="input-field"
+                    required
+                  >
+                    <option value="" disabled>{t('billing.selectPaymentMethod')}</option>
+                    {['cash', 'card', 'bank_transfer', 'credit'].map((m) => (
+                      <option key={m} value={m}>{paymentMethodLabel(m)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">{t('billing.amount')} (SAR)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={line.amount}
+                    onChange={(e) => {
+                      const amount = e.target.value;
+                      setPaymentLines((prev) => prev.map((l, i) => (i === idx ? { ...l, amount } : l)));
+                    }}
+                    className="input-field"
+                    required
+                  />
+                </div>
+                {paymentLines.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs py-2"
+                    onClick={() => setPaymentLines((prev) => prev.filter((_, i) => i !== idx))}
+                  >
+                    {t('billing.removePaymentLine')}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setPaymentModal(false)} className="btn-secondary">{t('common.cancel')}</button>

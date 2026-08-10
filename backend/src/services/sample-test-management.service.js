@@ -5,6 +5,7 @@ const { uuidv4 } = require('../utils/uuid');
 
 const env = require('../config/env');
 const { assertSampleNotReportLocked } = require('./report-lock.service');
+const billing = require('./billing.service');
 
 const LOCKED_INVOICE_STATUSES = ['paid', 'cancelled', 'refunded'];
 
@@ -205,6 +206,192 @@ const getTestHistory = async (sampleTestId) => {
 };
 
 /**
+ * Add one or more tests to an existing sample.
+ * Creates a supplemental invoice for the new tests only.
+ * Blocked while any report for the sample is approved (must reopen first).
+ */
+const addTests = async (sampleId, testIds, userId) => {
+  if (!env.features?.addTestToSample) {
+    throw new AppError('Add test to sample is disabled', 403, 'FEATURE_DISABLED');
+  }
+
+  const ids = [...new Set((testIds || []).map(String).filter(Boolean))];
+  if (!ids.length) {
+    throw new AppError('اختر فحصاً واحداً على الأقل', 400, 'NO_TESTS');
+  }
+
+  const sampleResult = await query(
+    `SELECT id, sample_code, customer_id, animal_id, status
+     FROM samples WHERE id = $1`,
+    [sampleId]
+  );
+  const sample = sampleResult.rows[0];
+  if (!sample) throw new AppError('Sample not found', 404, 'NOT_FOUND');
+  if (!sample.customer_id || !sample.animal_id) {
+    throw new AppError('العينة بلا عميل أو حيوان', 400, 'SAMPLE_INCOMPLETE');
+  }
+
+  // Always block when approved — even if lockApprovedReports is off.
+  const approved = await query(
+    `SELECT id, report_number FROM reports
+     WHERE sample_id = $1
+       AND (
+         lab_specialist_approved_by IS NOT NULL
+         OR vet_approved_by IS NOT NULL
+         OR is_final = true
+       )
+     ORDER BY created_at DESC LIMIT 1`,
+    [sampleId]
+  );
+  if (approved.rows[0]) {
+    throw new AppError(
+      'التقرير معتمد — ألغِ الاعتماد أولاً ثم أضف الفحص',
+      403,
+      'REPORT_APPROVED'
+    );
+  }
+  await assertSampleNotReportLocked(sampleId);
+
+  const testsResult = await query(
+    `SELECT id, code, name, name_ar, price, is_active
+     FROM tests WHERE id = ANY($1::uuid[])`,
+    [ids]
+  );
+  if (testsResult.rows.length !== ids.length) {
+    throw new AppError('فحص غير موجود', 404, 'TEST_NOT_FOUND');
+  }
+  const inactive = testsResult.rows.filter((t) => t.is_active === false);
+  if (inactive.length) {
+    throw new AppError('لا يمكن إضافة فحص غير نشط', 400, 'TEST_INACTIVE');
+  }
+
+  const existing = await query(
+    `SELECT st.test_id, st.status, t.code AS test_code
+     FROM sample_tests st
+     JOIN tests t ON t.id = st.test_id
+     WHERE st.sample_id = $1 AND st.test_id = ANY($2::uuid[])`,
+    [sampleId, ids]
+  );
+  const blocking = existing.rows.filter((r) => r.status !== 'cancelled');
+  if (blocking.length) {
+    throw new AppError(
+      `الفحص موجود مسبقاً على العينة: ${blocking.map((b) => b.test_code).join(', ')}`,
+      409,
+      'TEST_ALREADY_ON_SAMPLE'
+    );
+  }
+
+  const cancelledIds = new Set(existing.rows.filter((r) => r.status === 'cancelled').map((r) => r.test_id));
+  const toInsert = testsResult.rows.filter((t) => !cancelledIds.has(t.id));
+  const toReactivate = testsResult.rows.filter((t) => cancelledIds.has(t.id));
+
+  const client = await getClient();
+  const addedSampleTests = [];
+  try {
+    await client.query('BEGIN');
+
+    for (const t of toReactivate) {
+      const upd = await client.query(
+        `UPDATE sample_tests SET status = 'pending', price = $1, updated_at = NOW()
+         WHERE sample_id = $2 AND test_id = $3 AND status = 'cancelled'
+         RETURNING id, test_id, price, status`,
+        [t.price || 0, sampleId, t.id]
+      );
+      if (upd.rows[0]) {
+        addedSampleTests.push({ ...upd.rows[0], test_code: t.code, reactivated: true });
+        await logAudit(client, {
+          userId,
+          action: 'add_sample_test_reactivate',
+          sampleId,
+          sampleTestId: upd.rows[0].id,
+          reason: 'Reactivated cancelled test via add',
+          oldValues: { test_code: t.code, status: 'cancelled' },
+          newValues: { status: 'pending', price: t.price || 0 },
+        });
+      }
+    }
+
+    for (const t of toInsert) {
+      const ins = await client.query(
+        `INSERT INTO sample_tests (id, sample_id, test_id, price, status)
+         VALUES ($1, $2, $3, $4, 'pending')
+         RETURNING id, test_id, price, status`,
+        [uuidv4(), sampleId, t.id, t.price || 0]
+      );
+      addedSampleTests.push({ ...ins.rows[0], test_code: t.code, reactivated: false });
+      await logAudit(client, {
+        userId,
+        action: 'add_sample_test',
+        sampleId,
+        sampleTestId: ins.rows[0].id,
+        reason: 'Added test to existing sample',
+        oldValues: {},
+        newValues: { test_code: t.code, price: t.price || 0, status: 'pending' },
+      });
+    }
+
+    await client.query(
+      `UPDATE samples SET
+         status = CASE WHEN status IN ('completed', 'reported') THEN 'running' ELSE status END,
+         updated_at = NOW()
+       WHERE id = $1`,
+      [sampleId]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const invoiceItems = testsResult.rows.map((t) => ({
+    test_id: t.id,
+    description: t.name_ar || t.name || t.code,
+    quantity: 1,
+    unit_price: parseFloat(t.price) || 0,
+    animal_id: sample.animal_id,
+  }));
+
+  let supplementalInvoice = null;
+  try {
+    supplementalInvoice = await billing.createInvoice(
+      {
+        customer_id: sample.customer_id,
+        sample_id: sampleId,
+        items: invoiceItems,
+        notes: `فاتورة تكميلية — إضافة فحص على العينة ${sample.sample_code || sampleId}`,
+      },
+      userId
+    );
+  } catch (err) {
+    logger.error('Supplemental invoice failed after addTests', {
+      sampleId,
+      error: err.message,
+      added: addedSampleTests.map((a) => a.test_code),
+    });
+    throw new AppError(
+      err.message || 'تمت إضافة الفحص لكن فشل إنشاء الفاتورة التكميلية',
+      err.statusCode || 502,
+      err.code || 'SUPPLEMENTAL_INVOICE_FAILED'
+    );
+  }
+
+  await markReportStale(sampleId, 'SAMPLE');
+
+  return {
+    added: addedSampleTests,
+    supplemental_invoice: {
+      id: supplementalInvoice.id,
+      invoice_number: supplementalInvoice.invoice_number,
+      total: supplementalInvoice.total,
+      status: supplementalInvoice.status,
+    },
+  };
+};
+
+/**
  * Check for duplicate tests within a sample.
  */
 const checkDuplicateTests = async (sampleId) => {
@@ -231,6 +418,7 @@ module.exports = {
   removeTest,
   cancelTest,
   reactivateTest,
+  addTests,
   getTestHistory,
   checkDuplicateTests,
 };

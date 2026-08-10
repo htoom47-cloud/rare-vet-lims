@@ -134,6 +134,11 @@ const env = {
      */
     hatifCall: process.env.HATIF_CALL_ENABLED === 'true'
       || (process.env.HATIF_CALL_ENABLED !== 'false' && process.env.HATIF_WHATSAPP_ENABLED === 'true'),
+    /**
+     * When true: reception/manager may add tests to an existing sample (supplemental invoice).
+     * Default false — no change until explicitly enabled.
+     */
+    addTestToSample: process.env.ADD_TEST_TO_SAMPLE === 'true',
   },
   hatif: {
     apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',
