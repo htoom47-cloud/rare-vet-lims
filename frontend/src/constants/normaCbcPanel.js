@@ -110,6 +110,20 @@ function resolveCbcScreenField(screenCode, byCode, valuesByParam, valuesByCode) 
         missing_in_db: !pctParam,
       };
     }
+    // Empty row for manual entry (prefer % field when catalog has it)
+    if (pctParam?.id || absParam?.id) {
+      return {
+        parameter_id: pctParam?.id || absParam?.id || null,
+        code: pctParam?.id ? pctCode : screenCode,
+        name: pctParam?.id ? pctMeta.symbol : (screenMeta.symbol || screenCode),
+        unit: pctParam?.id ? '%' : (absParam?.unit || screenMeta.unit),
+        norma_section: screenMeta.section,
+        value: '',
+        flag: undefined,
+        reference: '',
+        missing_in_db: false,
+      };
+    }
     return null;
   }
 
@@ -148,6 +162,7 @@ export const buildCbcResultFields = (apiParameters = [], existing = null) => {
   const apiValues = existing?.values || [];
   const { valuesByParam, valuesByCode } = indexApiValues(apiValues);
 
+  // Imported/display path: only rows that already have values
   if (apiValues.some((v) => v.norma_section && String(v.value ?? '').trim() !== '')) {
     return NORMA_CBC_SCREEN_ORDER.map((screenCode) => {
       const pctCode = NORMA_CBC_PCT_BY_ABS[screenCode];
@@ -160,9 +175,10 @@ export const buildCbcResultFields = (apiParameters = [], existing = null) => {
     }).filter((row) => row && String(row.value ?? '').trim() !== '');
   }
 
+  // Manual entry: show empty editable CBC fields (do not hide blank values)
   return NORMA_CBC_SCREEN_ORDER
     .map((code) => resolveCbcScreenField(code, byCode, valuesByParam, valuesByCode))
-    .filter((row) => row && String(row.value ?? '').trim() !== '');
+    .filter((row) => row && row.parameter_id);
 };
 
 function realmParam(code, p, meta) {
