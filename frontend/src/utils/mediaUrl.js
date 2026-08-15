@@ -5,6 +5,7 @@ const SENSITIVE_UPLOAD_PREFIXES = [
   '/uploads/invoices/',
   '/uploads/microscope/',
   '/uploads/ministry-docs/',
+  '/uploads/purchases/',
 ];
 
 /** Resolve upload URL; append staff JWT for sensitive paths (reports, microscope, invoices). */

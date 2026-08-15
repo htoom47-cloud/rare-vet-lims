@@ -18,6 +18,7 @@ export const routeTitleKey = (pathname, isReception) => {
     '/price-list': 'nav.priceList',
     '/inventory': 'nav.inventory',
     '/suppliers': 'nav.suppliers',
+    '/purchases': 'nav.purchases',
     '/quality': 'nav.quality',
     '/devices': 'nav.devices',
     '/users': 'nav.users',
