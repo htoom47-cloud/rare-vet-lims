@@ -468,6 +468,14 @@ export const billingAPI = {
   },
 };
 
+export const suppliersAPI = {
+  list: (params) => api.get('/suppliers', { params }),
+  get: (id) => api.get(`/suppliers/${id}`),
+  create: (data) => api.post('/suppliers', data),
+  update: (id, data) => api.put(`/suppliers/${id}`, data),
+  disable: (id) => api.delete(`/suppliers/${id}`),
+};
+
 export const inventoryAPI = {
   list: (params) => api.get('/inventory', { params }),
   get: (id) => api.get(`/inventory/${id}`),

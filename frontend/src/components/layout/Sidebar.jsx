@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, PawPrint, FlaskConical, TestTube, FileText, Activity, Stethoscope,
-  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags, GitCompare, TrendingUp, Trash2,
+  CreditCard, Package, Shield, UserCog, ScrollText, Settings, PanelLeftClose, PanelLeft, Route, Cpu, Bug, Camera, BarChart3, Receipt, Tags, GitCompare, TrendingUp, Trash2, Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isReception, userRole } from '../../utils/roles';
@@ -21,6 +21,7 @@ const receptionNavSections = [
       { path: '/price-list', icon: Tags, label: 'nav.priceList', permissions: ['price_list.view', 'tests.view'] },
       { path: '/billing', icon: CreditCard, label: 'reception.billing', permission: 'billing.view' },
       { path: '/accounting', icon: BarChart3, label: 'nav.accounting', permission: 'billing.view' },
+      { path: '/suppliers', icon: Truck, label: 'nav.suppliers', permission: 'suppliers.view' },
       { path: '/invoice-settings', icon: Receipt, label: 'nav.invoiceSettings', permission: 'billing.view' },
     ],
   },
@@ -38,6 +39,7 @@ const navSections = [
       { path: '/price-list', icon: Tags, label: 'nav.priceList', permissions: ['price_list.view', 'tests.view'] },
       { path: '/billing', icon: CreditCard, label: 'nav.billing', permission: 'billing.view' },
       { path: '/accounting', icon: BarChart3, label: 'nav.accounting', permission: 'billing.view' },
+      { path: '/suppliers', icon: Truck, label: 'nav.suppliers', permission: 'suppliers.view' },
       { path: '/invoice-settings', icon: Receipt, label: 'nav.invoiceSettings', permission: 'billing.view' },
       { path: '/reports', icon: FileText, label: 'nav.reports', permission: 'reports.view' },
     ],

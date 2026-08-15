@@ -188,6 +188,20 @@ const refundSchema = Joi.object({
   reason: Joi.string().allow('', null),
 });
 
+const supplierSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(255).required(),
+  name_ar: Joi.string().trim().min(2).max(255).required(),
+  tax_number: Joi.string().trim().max(30).allow('', null),
+  phone: Joi.string().trim().max(30).allow('', null),
+  email: Joi.string().trim().email().max(255).allow('', null),
+  address: Joi.string().trim().max(1000).allow('', null),
+  iban: Joi.forbidden(),
+  notes: Joi.string().trim().max(2000).allow('', null),
+  is_active: Joi.boolean().default(true),
+  supplier_number: Joi.forbidden(),
+  balance: Joi.forbidden(),
+});
+
 const inventorySchema = Joi.object({
   sku: Joi.string().required(),
   name: Joi.string().required(),
@@ -233,4 +247,5 @@ module.exports = {
   creditNoteSchema,
   refundSchema,
   inventorySchema,
+  supplierSchema,
 };
