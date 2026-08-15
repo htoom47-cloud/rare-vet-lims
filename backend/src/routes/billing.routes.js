@@ -7,7 +7,8 @@ const ledger = require('../services/ledger.service');
 const quoteService = require('../services/quote.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { invoiceSchema, quoteSchema, paymentSchema } = require('../validators/schemas');
+const { invoiceSchema, quoteSchema, paymentSchema, creditNoteSchema, refundSchema } = require('../validators/schemas');
+const creditNoteService = require('../services/credit-note.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { listExtraBillingServices } = require('../constants/fieldVisit');
 
@@ -249,10 +250,24 @@ router.post('/payments', authorize(PERMISSIONS.BILLING_PAYMENT), validate(paymen
   } catch (err) { next(err); }
 });
 
-router.post('/refunds', authorize(PERMISSIONS.BILLING_REFUND), async (req, res, next) => {
+router.post('/refunds', authorize(PERMISSIONS.BILLING_REFUND), validate(refundSchema), async (req, res, next) => {
   try {
     const data = await service.processRefund(req.body, req.user.id, req);
     res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/credit-notes', authorize(PERMISSIONS.BILLING_REFUND), validate(creditNoteSchema), async (req, res, next) => {
+  try {
+    const data = await creditNoteService.createCreditNote(req.body, req.user.id, req);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/invoices/:id/credit-notes', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await creditNoteService.listCreditNotes(req.params.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

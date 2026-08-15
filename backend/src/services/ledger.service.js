@@ -1,4 +1,12 @@
 const { query } = require('../config/database');
+const { AppError } = require('../middleware/errorHandler');
+const {
+  journalIsBalanced,
+  buildInvoiceJournalLines,
+  buildPaymentJournalLines,
+  buildRefundJournalLines,
+  buildCreditNoteJournalLines,
+} = require('../utils/invoice-settlement');
 
 const DEFAULT_ACCOUNTS = [
   { code: '1010', name: 'Cash', name_ar: 'النقد', type: 'asset' },
@@ -10,10 +18,13 @@ const DEFAULT_ACCOUNTS = [
 
 let accountsReady = false;
 
-const ensureAccountsSeeded = async () => {
-  if (accountsReady) return;
+const exec = (client, text, params) => (client ? client.query(text, params) : query(text, params));
+
+const ensureAccountsSeeded = async (client) => {
+  if (accountsReady && !client) return;
   for (const acc of DEFAULT_ACCOUNTS) {
-    await query(
+    await exec(
+      client,
       `INSERT INTO ledger_accounts (code, name, name_ar, type)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (code) DO NOTHING`,
@@ -23,22 +34,46 @@ const ensureAccountsSeeded = async () => {
   accountsReady = true;
 };
 
-const getAccountId = async (code) => {
-  await ensureAccountsSeeded();
-  const result = await query('SELECT id FROM ledger_accounts WHERE code = $1', [code]);
-  return result.rows[0]?.id;
+const getAccountId = async (code, client) => {
+  await ensureAccountsSeeded(client);
+  const result = await exec(client, 'SELECT id FROM ledger_accounts WHERE code = $1', [code]);
+  const id = result.rows[0]?.id;
+  if (!id) throw new AppError(`Ledger account ${code} is missing`, 500, 'LEDGER_ACCOUNT_MISSING');
+  return id;
 };
 
-const createEntry = async (description, sourceType, sourceId, userId, lines) => {
-  await ensureAccountsSeeded();
-  const entry = await query(
-    `INSERT INTO journal_entries (description, source_type, source_id, created_by)
-     VALUES ($1, $2, $3, $4) RETURNING id`,
-    [description, sourceType, sourceId, userId]
+const assertNoDuplicateJournal = async (client, sourceType, sourceId) => {
+  const existing = await exec(
+    client,
+    `SELECT id FROM journal_entries WHERE source_type = $1 AND source_id = $2 LIMIT 1`,
+    [sourceType, sourceId]
+  );
+  if (existing.rows[0]) {
+    throw new AppError('Journal already posted for this source', 409, 'DUPLICATE_JOURNAL');
+  }
+};
+
+const createEntry = async (description, sourceType, sourceId, userId, lines, client, options = {}) => {
+  if (!journalIsBalanced(lines)) {
+    throw new AppError('Unbalanced journal entry', 500, 'UNBALANCED_JOURNAL');
+  }
+  if (lines.some((line) => !line.accountId)) {
+    throw new AppError('Ledger account missing', 500, 'LEDGER_ACCOUNT_MISSING');
+  }
+
+  await ensureAccountsSeeded(client);
+  await assertNoDuplicateJournal(client, sourceType, sourceId);
+
+  const entry = await exec(
+    client,
+    `INSERT INTO journal_entries (description, source_type, source_id, created_by, entry_date)
+     VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW())) RETURNING id`,
+    [description, sourceType, sourceId, userId, options.entryDate || null]
   );
   const entryId = entry.rows[0].id;
   for (const line of lines) {
-    await query(
+    await exec(
+      client,
       `INSERT INTO journal_lines (entry_id, account_id, debit, credit)
        VALUES ($1, $2, $3, $4)`,
       [entryId, line.accountId, line.debit || 0, line.credit || 0]
@@ -47,47 +82,87 @@ const createEntry = async (description, sourceType, sourceId, userId, lines) => 
   return entryId;
 };
 
-const postInvoice = async (invoice, userId) => {
-  const total = parseFloat(invoice.total);
-  const tax = parseFloat(invoice.tax_amount || 0);
-  const revenue = Math.max(total - tax, 0);
-  if (total <= 0) return null;
-
-  const [arId, revId, vatId] = await Promise.all([
-    getAccountId('1100'),
-    getAccountId('4100'),
-    getAccountId('2100'),
-  ]);
-
-  const lines = [{ accountId: arId, debit: total, credit: 0 }];
-  if (revenue > 0) lines.push({ accountId: revId, debit: 0, credit: revenue });
-  if (tax > 0) lines.push({ accountId: vatId, debit: 0, credit: tax });
+const postInvoice = async (invoice, userId, client) => {
+  const arId = await getAccountId('1100', client);
+  const revId = await getAccountId('4100', client);
+  const vatId = await getAccountId('2100', client);
+  const lines = buildInvoiceJournalLines({
+    total: invoice.total,
+    tax_amount: invoice.tax_amount,
+    arId,
+    revId,
+    vatId,
+  });
+  if (!lines.length) return null;
 
   return createEntry(
     `Invoice ${invoice.invoice_number}`,
     'invoice',
     invoice.id,
     userId,
-    lines
+    lines,
+    client
   );
 };
 
-const postPayment = async (payment, invoice, userId) => {
-  const amount = parseFloat(payment.amount);
-  if (amount <= 0) return null;
-
+const postPayment = async (payment, invoice, userId, client) => {
   const cashCode = payment.method === 'bank_transfer' ? '1020' : '1010';
-  const [cashId, arId] = await Promise.all([getAccountId(cashCode), getAccountId('1100')]);
+  const cashId = await getAccountId(cashCode, client);
+  const arId = await getAccountId('1100', client);
+  const lines = buildPaymentJournalLines({ amount: payment.amount, cashId, arId });
+  if (!lines.length) return null;
 
   return createEntry(
     `Payment ${invoice.invoice_number} (${payment.method})`,
     'payment',
     payment.id,
     userId,
-    [
-      { accountId: cashId, debit: amount, credit: 0 },
-      { accountId: arId, debit: 0, credit: amount },
-    ]
+    lines,
+    client
+  );
+};
+
+const postRefund = async (refund, invoice, userId, client, method) => {
+  if (!method) {
+    throw new AppError('Refund journal requires the original payment method', 400, 'PAYMENT_METHOD_REQUIRED');
+  }
+  const cashCode = method === 'bank_transfer' ? '1020' : '1010';
+  const cashId = await getAccountId(cashCode, client);
+  const arId = await getAccountId('1100', client);
+  const lines = buildRefundJournalLines({ amount: refund.amount, cashId, arId });
+  if (!lines.length) return null;
+
+  return createEntry(
+    `Refund ${invoice.invoice_number} (${method})`,
+    'refund',
+    refund.id,
+    userId,
+    lines,
+    client,
+    { entryDate: refund.created_at || new Date() }
+  );
+};
+
+const postCreditNote = async (note, invoice, userId, client) => {
+  const arId = await getAccountId('1100', client);
+  const revId = await getAccountId('4100', client);
+  const vatId = await getAccountId('2100', client);
+  const lines = buildCreditNoteJournalLines({
+    total: note.total,
+    tax_amount: note.tax_amount,
+    arId,
+    revId,
+    vatId,
+  });
+  if (!lines.length) return null;
+
+  return createEntry(
+    `Credit note ${note.credit_note_number} for ${invoice.invoice_number}`,
+    'credit_note',
+    note.id,
+    userId,
+    lines,
+    client
   );
 };
 
@@ -112,5 +187,8 @@ module.exports = {
   ensureAccountsSeeded,
   postInvoice,
   postPayment,
+  postRefund,
+  postCreditNote,
+  createEntry,
   listJournalEntries,
 };

@@ -168,10 +168,24 @@ const paymentSchema = Joi.object({
   method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit').required(),
   reference_number: Joi.string().allow('', null),
   notes: Joi.string().allow('', null),
-  discount_amount: Joi.number().min(0).default(0),
-  discount_percent: Joi.number().min(0).max(100).default(0),
-  field_visit_discount_amount: Joi.number().min(0).default(0),
-  field_visit_discount_percent: Joi.number().min(0).max(100).default(0),
+  discount_amount: Joi.forbidden(),
+  discount_percent: Joi.forbidden(),
+  field_visit_discount_amount: Joi.forbidden(),
+  field_visit_discount_percent: Joi.forbidden(),
+});
+
+const creditNoteSchema = Joi.object({
+  invoice_id: Joi.string().uuid().required(),
+  reason: Joi.string().trim().min(3).max(1000).required(),
+  total: Joi.number().positive().optional(),
+  notes: Joi.string().allow('', null),
+});
+
+const refundSchema = Joi.object({
+  invoice_id: Joi.string().uuid().required(),
+  payment_id: Joi.string().uuid().required(),
+  amount: Joi.number().positive().required(),
+  reason: Joi.string().allow('', null),
 });
 
 const inventorySchema = Joi.object({
@@ -216,5 +230,7 @@ module.exports = {
   invoiceSchema,
   quoteSchema,
   paymentSchema,
+  creditNoteSchema,
+  refundSchema,
   inventorySchema,
 };

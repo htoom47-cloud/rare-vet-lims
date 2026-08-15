@@ -10,14 +10,18 @@ import { billingAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
-import DiscountField from '../components/billing/DiscountField';
-import {
-  DISCOUNT_TYPES, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals,
-} from '../utils/discount';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
+import { labDay } from '../utils/accountingTime';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => labDay();
+const refundableOf = (payment) => {
+  if (!payment) return 0;
+  if (payment.refundable_amount != null && payment.refundable_amount !== '') {
+    return Number(payment.refundable_amount);
+  }
+  return Math.max(0, Number(payment.amount || 0) - Number(payment.refunded_amount || 0));
+};
 
 function SummaryCard({ label, value, accent }) {
   return (
@@ -71,11 +75,7 @@ export default function AccountingReports() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ reference_number: '', notes: '' });
   const [paymentLines, setPaymentLines] = useState([{ method: '', amount: '' }]);
-  const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
-  const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
-  const [paymentFieldVisitDiscountType, setPaymentFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
-  const [paymentFieldVisitDiscountValue, setPaymentFieldVisitDiscountValue] = useState('');
-  const [refundForm, setRefundForm] = useState({ amount: '', reason: '' });
+  const [refundForm, setRefundForm] = useState({ amount: '', reason: '', payment_id: '' });
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
@@ -193,72 +193,34 @@ export default function AccountingReports() {
       }
     }
     setSelectedInvoice(inv);
-    const { type, value } = initDiscountFromInvoice(inv);
-    const fv = initFieldVisitDiscountFromInvoice(inv);
-    setPaymentDiscountType(type);
-    setPaymentDiscountValue(value);
-    setPaymentFieldVisitDiscountType(fv.type);
-    setPaymentFieldVisitDiscountValue(fv.value);
     const paid = parseFloat(inv.total_paid || 0);
-    const preview = calcInvoiceTotals(inv.subtotal, type, value, inv.tax_rate || 15, paid, {
-      items: inv.items || [],
-      fvDiscountType: fv.type,
-      fvDiscountValue: fv.value,
-      catalogPrices: false,
-    });
+    const credited = parseFloat(inv.credit_notes_total || 0);
+    const total = parseFloat(inv.total) || 0;
+    const balanceDue = inv.balance_due != null
+      ? Math.max(0, parseFloat(inv.balance_due))
+      : Math.max(0, total - paid - credited);
     setPaymentForm({ reference_number: '', notes: '' });
-    setPaymentLines([{ method: '', amount: String(preview.balanceDue.toFixed(2)) }]);
+    setPaymentLines([{ method: '', amount: String(balanceDue.toFixed(2)) }]);
     setPaymentModal(true);
   };
 
   const paymentPreview = useMemo(() => {
     if (!selectedInvoice) return null;
     const paid = parseFloat(selectedInvoice.total_paid || 0);
-    const preview = calcInvoiceTotals(
-      selectedInvoice.subtotal,
-      paymentDiscountType,
-      paymentDiscountValue,
-      selectedInvoice.tax_rate || 15,
-      paid,
-      {
-        items: selectedInvoice.items || [],
-        fvDiscountType: paymentFieldVisitDiscountType,
-        fvDiscountValue: paymentFieldVisitDiscountValue,
-        catalogPrices: false,
-      },
-    );
-    const { type: invDiscType, value: invDiscValue } = initDiscountFromInvoice(selectedInvoice);
-    const invFv = initFieldVisitDiscountFromInvoice(selectedInvoice);
-    const discountsMatch = (
-      paymentDiscountType === invDiscType
-      && String(paymentDiscountValue || '') === String(invDiscValue || '')
-      && paymentFieldVisitDiscountType === invFv.type
-      && String(paymentFieldVisitDiscountValue || '') === String(invFv.value || '')
-    );
-    const storedTotal = parseFloat(selectedInvoice.total) || 0;
-    const isWholeRiyal = (n) => Math.abs(n - Math.round(n)) < 0.001;
-    const healHalala = discountsMatch
-      && isWholeRiyal(preview.total)
-      && !isWholeRiyal(storedTotal)
-      && Math.abs(preview.total - storedTotal) <= 0.02;
-    if (discountsMatch && !healHalala && selectedInvoice.total != null) {
-      const total = storedTotal;
-      return {
-        ...preview,
-        total,
-        taxAmount: parseFloat(selectedInvoice.tax_amount) || preview.taxAmount,
-        subtotal: parseFloat(selectedInvoice.subtotal) || preview.subtotal,
-        balanceDue: Math.max(0, total - paid),
-      };
-    }
-    return preview;
-  }, [
-    selectedInvoice,
-    paymentDiscountType,
-    paymentDiscountValue,
-    paymentFieldVisitDiscountType,
-    paymentFieldVisitDiscountValue,
-  ]);
+    const credited = parseFloat(selectedInvoice.credit_notes_total || 0);
+    const total = parseFloat(selectedInvoice.total) || 0;
+    const balanceDue = selectedInvoice.balance_due != null
+      ? Math.max(0, parseFloat(selectedInvoice.balance_due))
+      : Math.max(0, total - paid - credited);
+    return {
+      subtotal: parseFloat(selectedInvoice.subtotal) || 0,
+      discountAmount: parseFloat(selectedInvoice.discount_amount) || 0,
+      fieldVisitDiscountAmount: parseFloat(selectedInvoice.field_visit_discount_amount) || 0,
+      taxAmount: parseFloat(selectedInvoice.tax_amount) || 0,
+      total,
+      balanceDue,
+    };
+  }, [selectedInvoice]);
 
   useEffect(() => {
     if (!paymentModal || !paymentPreview) return;
@@ -266,7 +228,7 @@ export default function AccountingReports() {
       if (prev.length !== 1) return prev;
       return [{ ...prev[0], amount: String(paymentPreview.balanceDue.toFixed(2)) }];
     });
-  }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue, paymentFieldVisitDiscountType, paymentFieldVisitDiscountValue]);
+  }, [paymentModal, paymentPreview?.balanceDue]);
 
   const recordPayment = async (e) => {
     e.preventDefault();
@@ -288,14 +250,6 @@ export default function AccountingReports() {
       return;
     }
     try {
-      const discountFields = buildSplitDiscountPayload(
-        selectedInvoice.items || [],
-        paymentDiscountType,
-        paymentDiscountValue,
-        paymentFieldVisitDiscountType,
-        paymentFieldVisitDiscountValue,
-        { catalogPrices: false },
-      );
       const invoiceId = selectedInvoice.id;
       for (let i = 0; i < lines.length; i += 1) {
         await billingAPI.recordPayment({
@@ -304,17 +258,12 @@ export default function AccountingReports() {
           method: lines[i].method,
           reference_number: paymentForm.reference_number,
           notes: paymentForm.notes,
-          ...discountFields,
         });
       }
       toast.success(t('accounting.paymentRecorded'));
       setPaymentModal(false);
       setPaymentForm({ reference_number: '', notes: '' });
       setPaymentLines([{ method: '', amount: '' }]);
-      setPaymentDiscountType(DISCOUNT_TYPES.NONE);
-      setPaymentDiscountValue('');
-      setPaymentFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
-      setPaymentFieldVisitDiscountValue('');
       loadInvoices();
       loadDashboard();
       loadDayStatus();
@@ -328,8 +277,19 @@ export default function AccountingReports() {
   const handleRefund = async (e) => {
     e.preventDefault();
     try {
+      if (!refundForm.payment_id) {
+        toast.error(t('billing.refundPaymentRequired'));
+        return;
+      }
+      const selectedPayment = (selectedInvoice?.payments || []).find((p) => p.id === refundForm.payment_id);
+      const remaining = refundableOf(selectedPayment);
+      if (Number(refundForm.amount) > remaining) {
+        toast.error(t('billing.refundExceedsRemaining'));
+        return;
+      }
       await billingAPI.refund({
         invoice_id: selectedInvoice.id,
+        payment_id: refundForm.payment_id,
         amount: Number(refundForm.amount),
         reason: refundForm.reason,
       });
@@ -596,7 +556,22 @@ export default function AccountingReports() {
                           <button type="button" title={t('accounting.cancelInvoice')} onClick={() => handleCancel(inv)} className="p-1.5 rounded hover:bg-gray-100 text-red-600"><XCircle size={15} /></button>
                         )}
                         {canRefund && parseFloat(inv.total_paid || 0) > 0 && inv.status !== 'cancelled' && (
-                          <button type="button" title={t('billing.refund')} onClick={() => { setSelectedInvoice(inv); setRefundForm({ amount: '', reason: '' }); setRefundModal(true); }} className="p-1.5 rounded hover:bg-gray-100 text-amber-600"><RotateCcw size={15} /></button>
+                          <button type="button" title={t('billing.refund')} onClick={async () => {
+                            let detail = inv;
+                            try {
+                              const { data } = await billingAPI.getInvoice(inv.id);
+                              detail = data.data;
+                            } catch { /* list row */ }
+                            const payments = detail.payments || [];
+                            const firstPay = payments.find((p) => refundableOf(p) > 0);
+                            setSelectedInvoice(detail);
+                            setRefundForm({
+                              amount: firstPay ? String(refundableOf(firstPay)) : '',
+                              reason: '',
+                              payment_id: firstPay?.id || '',
+                            });
+                            setRefundModal(true);
+                          }} className="p-1.5 rounded hover:bg-gray-100 text-amber-600"><RotateCcw size={15} /></button>
                         )}
                       </div>
                     </td>
@@ -653,6 +628,7 @@ export default function AccountingReports() {
                   [t('billing.paymentMethods.credit'), closingData.summary.by_method?.credit],
                   [t('accounting.totalVat'), closingData.summary.tax_total],
                   [t('billing.discount'), closingData.summary.discount_total],
+                  [t('accounting.refundsTotal'), closingData.summary.refunds_total],
                   [t('accounting.netCollection'), closingData.summary.net_collections],
                   [t('accounting.invoiceCount'), closingData.summary.invoice_count],
                   [t('accounting.unpaidCount'), closingData.summary.unpaid_count],
@@ -710,6 +686,14 @@ export default function AccountingReports() {
                   <p className="text-sm text-gray-500">{t('accounting.totalCollected')}</p>
                   <p className="text-2xl font-bold text-green-700">{fmt(collections.total)}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">{t('accounting.refundsTotal')}</p>
+                  <p className="text-2xl font-bold text-amber-700">{fmt(collections.refunds_total)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">{t('accounting.netCollection')}</p>
+                  <p className="text-2xl font-bold">{fmt(collections.net_total ?? collections.total)}</p>
+                </div>
                 {Object.entries(collections.by_method || {}).map(([method, amount]) => (
                   <div key={method}>
                     <p className="text-sm text-gray-500">{paymentMethodLabel(method)}</p>
@@ -722,6 +706,13 @@ export default function AccountingReports() {
                 rows={collections.payments.map((p) => [p.invoice_number, p.customer_name, paymentMethodLabel(p.method), fmt(p.amount)])}
                 empty={t('accounting.noData')}
               />
+              {(collections.refunds || []).length > 0 && (
+                <ReportTable
+                  headers={[t('billing.invoice'), t('customers.fullName'), t('accounting.refundsTotal'), t('billing.amount')]}
+                  rows={collections.refunds.map((r) => [r.invoice_number, r.customer_name, t('billing.refund'), fmt(r.amount)])}
+                  empty={t('accounting.noData')}
+                />
+              )}
             </div>
           )}
 
@@ -776,10 +767,23 @@ export default function AccountingReports() {
 
           {!loading && reportTab === 'vat' && vatReport && (
             <div className="space-y-4">
-              <div className="card p-4 flex gap-6">
+              <div className="card p-4 flex flex-wrap gap-6">
                 <div><p className="text-sm text-gray-500">{t('accounting.totalVat')}</p><p className="text-xl font-bold">{fmt(vatReport.totals.tax)}</p></div>
                 <div><p className="text-sm text-gray-500">{t('accounting.invoiced')}</p><p className="text-xl font-bold">{fmt(vatReport.totals.gross)}</p></div>
+                {vatReport.totals.invoice_tax != null && (
+                  <div><p className="text-sm text-gray-500">{t('accounting.invoiceVat')}</p><p className="text-xl font-bold">{fmt(vatReport.totals.invoice_tax)}</p></div>
+                )}
+                {vatReport.totals.credit_note_tax != null && (
+                  <div><p className="text-sm text-gray-500">{t('accounting.creditNoteVat')}</p><p className="text-xl font-bold">{fmt(-Math.abs(vatReport.totals.credit_note_tax))}</p></div>
+                )}
               </div>
+              {(vatReport.documents || []).length > 0 && (
+                <ReportTable
+                  headers={[t('accounting.date'), t('accounting.source'), t('accounting.totalVat'), t('billing.total')]}
+                  rows={vatReport.documents.map((d) => [d.date, d.type === 'credit_note' ? t('accounting.creditNote') : t('billing.invoice'), fmt(d.tax), fmt(d.gross)])}
+                  empty={t('accounting.noData')}
+                />
+              )}
               <ReportTable
                 headers={[t('accounting.date'), t('accounting.totalVat'), t('billing.total'), t('accounting.invoiceCount')]}
                 rows={(vatReport.days || []).map((d) => [d.day, fmt(d.tax), fmt(d.gross), d.invoices])}
@@ -867,24 +871,9 @@ export default function AccountingReports() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DiscountField
-              subtotal={splitLineSubtotals(selectedInvoice?.items || []).serviceSubtotal}
-              type={paymentDiscountType}
-              value={paymentDiscountValue}
-              onTypeChange={setPaymentDiscountType}
-              onValueChange={setPaymentDiscountValue}
-              labelKey="billing.servicesDiscount"
-            />
-            <DiscountField
-              subtotal={splitLineSubtotals(selectedInvoice?.items || []).fieldVisitSubtotal}
-              type={paymentFieldVisitDiscountType}
-              value={paymentFieldVisitDiscountValue}
-              onTypeChange={setPaymentFieldVisitDiscountType}
-              onValueChange={setPaymentFieldVisitDiscountValue}
-              labelKey="billing.fieldVisitDiscount"
-            />
-          </div>
+          <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 p-2 rounded">
+            {t('billing.creditNoteAfterIssue')}
+          </p>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -953,8 +942,62 @@ export default function AccountingReports() {
       <Modal isOpen={refundModal} onClose={() => setRefundModal(false)} title={`${t('billing.refund')} — ${selectedInvoice?.invoice_number}`}>
         <form onSubmit={handleRefund} className="space-y-4">
           <div>
+            <label className="block text-sm font-medium mb-1">{t('billing.refundPayment')}</label>
+            <select
+              value={refundForm.payment_id}
+              onChange={(e) => {
+                const paymentId = e.target.value;
+                const payment = (selectedInvoice?.payments || []).find((p) => p.id === paymentId);
+                const remaining = refundableOf(payment);
+                const current = Number(refundForm.amount);
+                const nextAmount = !refundForm.amount || current > remaining ? String(remaining || '') : refundForm.amount;
+                setRefundForm({ ...refundForm, payment_id: paymentId, amount: nextAmount });
+              }}
+              className="input-field"
+              required
+            >
+              <option value="">{t('billing.selectPaymentMethod')}</option>
+              {(selectedInvoice?.payments || []).map((p) => {
+                const remaining = refundableOf(p);
+                const fullyRefunded = remaining <= 0;
+                return (
+                  <option key={p.id} value={p.id} disabled={fullyRefunded}>
+                    {paymentMethodLabel(p.method)} — {t('billing.originalPaymentAmount')} {fmt(p.amount)} — {t('billing.refundedAmount')} {fmt(p.refunded_amount)} — {fullyRefunded ? t('billing.paymentFullyRefunded') : `${t('billing.refundableRemaining')} ${fmt(remaining)}`}
+                  </option>
+                );
+              })}
+            </select>
+            {(() => {
+              const payment = (selectedInvoice?.payments || []).find((p) => p.id === refundForm.payment_id);
+              if (!payment) return <p className="text-xs text-gray-500 mt-1">{t('billing.refundOnePaymentOnly')}</p>;
+              return (
+                <div className="mt-2 text-xs text-gray-600 space-y-0.5">
+                  <p>{t('billing.originalPaymentAmount')}: {fmt(payment.amount)}</p>
+                  <p>{t('billing.refundedAmount')}: {fmt(payment.refunded_amount)}</p>
+                  <p>{t('billing.refundableRemaining')}: {fmt(refundableOf(payment))}</p>
+                  <p className="text-gray-500">{t('billing.refundOnePaymentOnly')}</p>
+                </div>
+              );
+            })()}
+          </div>
+          <div>
             <label className="block text-sm font-medium mb-1">{t('billing.amount')}</label>
-            <input type="number" step="0.01" value={refundForm.amount} onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })} className="input-field" required />
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={refundableOf((selectedInvoice?.payments || []).find((p) => p.id === refundForm.payment_id))}
+              value={refundForm.amount}
+              onChange={(e) => {
+                const payment = (selectedInvoice?.payments || []).find((p) => p.id === refundForm.payment_id);
+                const remaining = refundableOf(payment);
+                let value = e.target.value;
+                if (value !== '' && Number(value) > remaining) value = String(remaining);
+                setRefundForm({ ...refundForm, amount: value });
+              }}
+              className="input-field"
+              required
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('accounting.refundReason')}</label>
@@ -962,7 +1005,13 @@ export default function AccountingReports() {
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setRefundModal(false)} className="btn-secondary">{t('common.cancel')}</button>
-            <button type="submit" className="btn-primary">{t('billing.refund')}</button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!refundForm.payment_id || refundableOf((selectedInvoice?.payments || []).find((p) => p.id === refundForm.payment_id)) <= 0}
+            >
+              {t('billing.refund')}
+            </button>
           </div>
         </form>
       </Modal>

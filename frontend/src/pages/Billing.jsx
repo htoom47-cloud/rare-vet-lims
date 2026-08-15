@@ -10,7 +10,7 @@ import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
-import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, initDiscountFromInvoice, initFieldVisitDiscountFromInvoice, calcInvoiceTotals, splitLineSubtotals } from '../utils/discount';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { billingAPI, testsAPI } from '../services/api';
@@ -72,10 +72,6 @@ export default function Billing() {
     reference_number: '', notes: '',
   });
   const [paymentLines, setPaymentLines] = useState([{ method: '', amount: '' }]);
-  const [paymentDiscountType, setPaymentDiscountType] = useState(DISCOUNT_TYPES.NONE);
-  const [paymentDiscountValue, setPaymentDiscountValue] = useState('');
-  const [paymentFieldVisitDiscountType, setPaymentFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
-  const [paymentFieldVisitDiscountValue, setPaymentFieldVisitDiscountValue] = useState('');
   const [newItem, setNewItem] = useState({ test_id: '', description: '', quantity: 1, unit_price: 0 });
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [packageQuantity, setPackageQuantity] = useState(1);
@@ -245,14 +241,6 @@ export default function Billing() {
       return;
     }
     try {
-      const discountFields = buildSplitDiscountPayload(
-        selectedInvoice.items || [],
-        paymentDiscountType,
-        paymentDiscountValue,
-        paymentFieldVisitDiscountType,
-        paymentFieldVisitDiscountValue,
-        { catalogPrices: false },
-      );
       const invoiceId = selectedInvoice.id;
       for (let i = 0; i < lines.length; i += 1) {
         await billingAPI.recordPayment({
@@ -261,17 +249,12 @@ export default function Billing() {
           method: lines[i].method,
           reference_number: paymentForm.reference_number,
           notes: paymentForm.notes,
-          ...discountFields,
         });
       }
       toast.success('تم تسجيل الدفع');
       setPaymentModal(false);
       setPaymentForm({ reference_number: '', notes: '' });
       setPaymentLines([{ method: '', amount: '' }]);
-      setPaymentDiscountType(DISCOUNT_TYPES.NONE);
-      setPaymentDiscountValue('');
-      setPaymentFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
-      setPaymentFieldVisitDiscountValue('');
       load();
       if (detailInvoice?.id === invoiceId) openInvoiceDetail({ id: invoiceId });
       await printThermalReceipt(invoiceId, {
@@ -293,72 +276,34 @@ export default function Billing() {
       }
     }
     setSelectedInvoice(inv);
-    const { type, value } = initDiscountFromInvoice(inv);
-    const fv = initFieldVisitDiscountFromInvoice(inv);
-    setPaymentDiscountType(type);
-    setPaymentDiscountValue(value);
-    setPaymentFieldVisitDiscountType(fv.type);
-    setPaymentFieldVisitDiscountValue(fv.value);
     const paid = parseFloat(inv.total_paid || 0);
-    const preview = calcInvoiceTotals(inv.subtotal, type, value, inv.tax_rate || 15, paid, {
-      items: inv.items || [],
-      fvDiscountType: fv.type,
-      fvDiscountValue: fv.value,
-      catalogPrices: false,
-    });
+    const credited = parseFloat(inv.credit_notes_total || 0);
+    const total = parseFloat(inv.total) || 0;
+    const balanceDue = inv.balance_due != null
+      ? Math.max(0, parseFloat(inv.balance_due))
+      : Math.max(0, total - paid - credited);
     setPaymentForm({ reference_number: '', notes: '' });
-    setPaymentLines([{ method: '', amount: String(preview.balanceDue.toFixed(2)) }]);
+    setPaymentLines([{ method: '', amount: String(balanceDue.toFixed(2)) }]);
     setPaymentModal(true);
   };
 
   const paymentPreview = useMemo(() => {
     if (!selectedInvoice) return null;
     const paid = parseFloat(selectedInvoice.total_paid || 0);
-    const preview = calcInvoiceTotals(
-      selectedInvoice.subtotal,
-      paymentDiscountType,
-      paymentDiscountValue,
-      selectedInvoice.tax_rate || 15,
-      paid,
-      {
-        items: selectedInvoice.items || [],
-        fvDiscountType: paymentFieldVisitDiscountType,
-        fvDiscountValue: paymentFieldVisitDiscountValue,
-        catalogPrices: false,
-      },
-    );
-    const { type: invDiscType, value: invDiscValue } = initDiscountFromInvoice(selectedInvoice);
-    const invFv = initFieldVisitDiscountFromInvoice(selectedInvoice);
-    const discountsMatch = (
-      paymentDiscountType === invDiscType
-      && String(paymentDiscountValue || '') === String(invDiscValue || '')
-      && paymentFieldVisitDiscountType === invFv.type
-      && String(paymentFieldVisitDiscountValue || '') === String(invFv.value || '')
-    );
-    const storedTotal = parseFloat(selectedInvoice.total) || 0;
-    const isWholeRiyal = (n) => Math.abs(n - Math.round(n)) < 0.001;
-    const healHalala = discountsMatch
-      && isWholeRiyal(preview.total)
-      && !isWholeRiyal(storedTotal)
-      && Math.abs(preview.total - storedTotal) <= 0.02;
-    if (discountsMatch && !healHalala && selectedInvoice.total != null) {
-      const total = storedTotal;
-      return {
-        ...preview,
-        total,
-        taxAmount: parseFloat(selectedInvoice.tax_amount) || preview.taxAmount,
-        subtotal: parseFloat(selectedInvoice.subtotal) || preview.subtotal,
-        balanceDue: Math.max(0, total - paid),
-      };
-    }
-    return preview;
-  }, [
-    selectedInvoice,
-    paymentDiscountType,
-    paymentDiscountValue,
-    paymentFieldVisitDiscountType,
-    paymentFieldVisitDiscountValue,
-  ]);
+    const credited = parseFloat(selectedInvoice.credit_notes_total || 0);
+    const total = parseFloat(selectedInvoice.total) || 0;
+    const balanceDue = selectedInvoice.balance_due != null
+      ? Math.max(0, parseFloat(selectedInvoice.balance_due))
+      : Math.max(0, total - paid - credited);
+    return {
+      subtotal: parseFloat(selectedInvoice.subtotal) || 0,
+      discountAmount: parseFloat(selectedInvoice.discount_amount) || 0,
+      fieldVisitDiscountAmount: parseFloat(selectedInvoice.field_visit_discount_amount) || 0,
+      taxAmount: parseFloat(selectedInvoice.tax_amount) || 0,
+      total,
+      balanceDue,
+    };
+  }, [selectedInvoice]);
 
   useEffect(() => {
     if (!paymentModal || !paymentPreview) return;
@@ -366,7 +311,7 @@ export default function Billing() {
       if (prev.length !== 1) return prev;
       return [{ ...prev[0], amount: String(paymentPreview.balanceDue.toFixed(2)) }];
     });
-  }, [paymentModal, paymentPreview?.balanceDue, paymentDiscountType, paymentDiscountValue, paymentFieldVisitDiscountType, paymentFieldVisitDiscountValue]);
+  }, [paymentModal, paymentPreview?.balanceDue]);
 
   const openInvoicePdf = async (invoiceId, regenerate = false) => {
     setPdfLoading(true);
@@ -776,24 +721,9 @@ export default function Billing() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DiscountField
-              subtotal={splitLineSubtotals(selectedInvoice?.items || []).serviceSubtotal}
-              type={paymentDiscountType}
-              value={paymentDiscountValue}
-              onTypeChange={setPaymentDiscountType}
-              onValueChange={setPaymentDiscountValue}
-              labelKey="billing.servicesDiscount"
-            />
-            <DiscountField
-              subtotal={splitLineSubtotals(selectedInvoice?.items || []).fieldVisitSubtotal}
-              type={paymentFieldVisitDiscountType}
-              value={paymentFieldVisitDiscountValue}
-              onTypeChange={setPaymentFieldVisitDiscountType}
-              onValueChange={setPaymentFieldVisitDiscountValue}
-              labelKey="billing.fieldVisitDiscount"
-            />
-          </div>
+          <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 p-2 rounded">
+            {t('billing.creditNoteAfterIssue')}
+          </p>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">

@@ -59,7 +59,7 @@ check('recordPayment locks invoice row FOR UPDATE', () => {
     billingSrc.indexOf('const listPackages')
   );
   assert.ok(/FOR UPDATE/.test(fn), 'missing FOR UPDATE in recordPayment');
-  assert.ok(/BEGIN/.test(fn) && /COMMIT/.test(fn));
+  assert.ok(/withBillingClient/.test(fn) || (/BEGIN/.test(fn) && /COMMIT/.test(fn)));
 });
 
 check('processRefund uses transaction + FOR UPDATE', () => {
@@ -67,11 +67,12 @@ check('processRefund uses transaction + FOR UPDATE', () => {
     billingSrc.indexOf('const processRefund'),
     billingSrc.indexOf('const exportInvoicesCsv')
   );
-  assert.ok(/getClient/.test(fn));
+  assert.ok(/withBillingClient/.test(fn) || /getClient/.test(fn));
   assert.ok(/FOR UPDATE/.test(fn));
-  assert.ok(/BEGIN/.test(fn) && /COMMIT/.test(fn));
+  assert.ok(/withBillingClient/.test(fn) || (/BEGIN/.test(fn) && /COMMIT/.test(fn)));
   assert.ok(/computeRefundableAmount/.test(fn));
   assert.ok(/FROM refunds WHERE invoice_id/.test(fn));
+  assert.ok(/FROM refunds WHERE payment_id/.test(fn));
 });
 
 check('processRefund caps by payments − prior refunds (not total_paid alone)', () => {
