@@ -12,6 +12,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { labDay } from '../utils/accountingTime';
+import CreditNotePanel from '../components/billing/CreditNotePanel';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const today = () => labDay();
@@ -844,6 +845,15 @@ export default function AccountingReports() {
                 ))}
               </div>
             )}
+            <CreditNotePanel
+              invoice={detailInvoice}
+              canCreate={canRefund}
+              onIssued={async () => {
+                await openDetail({ id: detailInvoice.id });
+                loadInvoices();
+                loadDashboard();
+              }}
+            />
           </div>
         )}
       </Modal>
