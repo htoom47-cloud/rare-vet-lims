@@ -4,26 +4,28 @@ const { uuidv4 } = require('../utils/uuid');
 const { logBillingAudit } = require('../utils/billing-audit');
 const { getDailyFullSummary } = require('./accounting.service');
 const { generateClosingPDF } = require('../utils/closing-pdf');
+const { labDay } = require('../utils/accounting-time');
 const env = require('../config/env');
 const path = require('path');
 
-const isDayClosed = async (date) => {
-  const day = date || new Date().toISOString().slice(0, 10);
-  const result = await query(
+const isDayClosed = async (date, client) => {
+  const day = date || labDay();
+  const q = client ? client.query.bind(client) : query;
+  const result = await q(
     `SELECT id, status FROM daily_closings WHERE closing_date = $1::date AND status = 'closed'`,
     [day]
   );
   return !!result.rows[0];
 };
 
-const assertDayOpen = async (date) => {
-  if (await isDayClosed(date)) {
+const assertDayOpen = async (date, client) => {
+  if (await isDayClosed(date, client)) {
     throw new AppError('This day is closed. Contact a manager to reopen.', 403, 'DAY_CLOSED');
   }
 };
 
 const getClosing = async (date) => {
-  const day = date || new Date().toISOString().slice(0, 10);
+  const day = date || labDay();
   const result = await query(
     `SELECT dc.*, u.full_name AS closed_by_name, ru.full_name AS reopened_by_name
      FROM daily_closings dc
@@ -50,7 +52,7 @@ const listClosings = async (limit = 30) => {
 };
 
 const closeDay = async (date, userId, req) => {
-  const day = date || new Date().toISOString().slice(0, 10);
+  const day = date || labDay();
   if (await isDayClosed(day)) {
     throw new AppError('Day already closed', 409, 'ALREADY_CLOSED');
   }
@@ -83,7 +85,7 @@ const closeDay = async (date, userId, req) => {
 };
 
 const reopenDay = async (date, userId, req) => {
-  const day = date || new Date().toISOString().slice(0, 10);
+  const day = date || labDay();
   const existing = await query(
     `SELECT * FROM daily_closings WHERE closing_date = $1::date AND status = 'closed' ORDER BY created_at DESC LIMIT 1`,
     [day]

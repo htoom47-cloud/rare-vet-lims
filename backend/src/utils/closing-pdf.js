@@ -33,6 +33,7 @@ const generateClosingPDF = async (summary, closingNumber, outputDir) => {
       ['Credit / On Account', 'آجل', summary.by_method?.credit || 0],
       ['VAT 15%', 'ضريبة القيمة المضافة', summary.tax_total],
       ['Discounts', 'الخصومات', summary.discount_total],
+      ['Refunds', 'الاستردادات', summary.refunds_total || 0],
       ['Net Collections', 'صافي التحصيل', summary.net_collections],
       ['Invoice Count', 'عدد الفواتير', summary.invoice_count],
       ['Unpaid Invoices', 'غير مدفوعة', summary.unpaid_count],

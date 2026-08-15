@@ -10,10 +10,13 @@ const logBillingAudit = async ({
   oldValues = null,
   newValues = null,
   req = null,
+  client = null,
+  required = false,
 }) => {
   if (!userId) return;
+  const exec = client ? client.query.bind(client) : query;
   try {
-    await query(
+    await exec(
       `INSERT INTO audit_logs (id, user_id, action, module, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
        VALUES ($1, $2, $3, 'billing', $4, $5, $6, $7, $8, $9)`,
       [
@@ -29,6 +32,7 @@ const logBillingAudit = async ({
       ]
     );
   } catch (err) {
+    if (required) throw err;
     logger.warn('Billing audit log failed', { error: err.message, action });
   }
 };
