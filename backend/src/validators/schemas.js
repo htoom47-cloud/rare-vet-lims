@@ -202,6 +202,51 @@ const supplierSchema = Joi.object({
   balance: Joi.forbidden(),
 });
 
+const supplierQuickSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(255).required(),
+  name_ar: Joi.string().trim().min(2).max(255).allow('', null),
+  tax_number: Joi.string().trim().max(30).allow('', null),
+  phone: Joi.string().trim().max(30).allow('', null),
+  confirm: Joi.boolean().valid(true).required(),
+});
+
+const purchaseItemSchema = Joi.object({
+  description: Joi.string().trim().min(1).max(500).required(),
+  quantity: Joi.number().positive().required(),
+  unit_price_sar: Joi.number().min(0),
+  unit_price_halalas: Joi.number().integer().min(0),
+  discount_sar: Joi.number().min(0).allow(null),
+  discount_halalas: Joi.number().integer().min(0).allow(null),
+  tax_category: Joi.string().valid('standard', 'zero_rated', 'exempt', 'out_of_scope'),
+  tax_rate: Joi.number().valid(0, 15),
+  tax_rate_bps: Joi.number().integer().valid(0, 1500),
+}).or('unit_price_sar', 'unit_price_halalas');
+
+const purchaseInvoiceSchema = Joi.object({
+  supplier_id: Joi.string().uuid().allow(null),
+  uses_cash_unregistered: Joi.boolean().default(false),
+  supplier_invoice_number: Joi.string().trim().min(1).max(80).required(),
+  invoice_date: Joi.date().required(),
+  payment_method: Joi.string().valid('cash', 'bank_transfer', 'credit', 'other').default('cash'),
+  notes: Joi.string().trim().max(2000).allow('', null),
+  vat_rate_bps: Joi.any().strip(),
+  discount_sar: Joi.number().min(0).allow(null),
+  discount_halalas: Joi.number().integer().min(0).allow(null),
+  subtotal_halalas: Joi.number().integer().min(0).allow(null),
+  vat_halalas: Joi.number().integer().min(0).allow(null),
+  total_halalas: Joi.number().integer().min(0).allow(null),
+  items: Joi.array().min(1).items(purchaseItemSchema).required(),
+}).custom((value, helpers) => {
+  if (!value.uses_cash_unregistered && !value.supplier_id) {
+    return helpers.error('any.custom', { message: 'supplier_id is required unless using cash unregistered' });
+  }
+  return value;
+});
+
+const purchaseCancelSchema = Joi.object({
+  reason: Joi.string().trim().min(3).max(500).allow('', null),
+});
+
 const inventorySchema = Joi.object({
   sku: Joi.string().required(),
   name: Joi.string().required(),
@@ -248,4 +293,7 @@ module.exports = {
   refundSchema,
   inventorySchema,
   supplierSchema,
+  supplierQuickSchema,
+  purchaseInvoiceSchema,
+  purchaseCancelSchema,
 };

@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const helpers = require('../utils/helpers');
 const suppliersAudit = require('../utils/suppliers-audit');
+const { getSuppliersCapabilities } = require('../utils/suppliers-schema');
 const { AppError } = require('../middleware/errorHandler');
 
 const TABLE_MISSING = '42P01';
@@ -62,6 +63,14 @@ const emptyToNull = (value) => {
   return trimmed === '' ? null : trimmed;
 };
 
+const throwPurchasesMigrationRequired = () => {
+  throw new AppError(
+    'Quick suppliers require the purchase invoices migration',
+    503,
+    'PURCHASES_MIGRATION_REQUIRED'
+  );
+};
+
 const toPublic = (row) => {
   if (!row) return null;
   return {
@@ -75,6 +84,8 @@ const toPublic = (row) => {
     address: row.address,
     notes: row.notes,
     is_active: row.is_active,
+    is_temporary: Boolean(row.is_temporary),
+    is_system: Boolean(row.is_system),
     deleted_at: row.deleted_at || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -108,29 +119,49 @@ const lockSupplier = async (client, id) => {
   return rows[0] || null;
 };
 
-const insertSupplierWithRetry = async (client, data, createdBy) => {
+const insertSupplierWithRetry = async (client, data, createdBy, { includePurchaseColumns } = {}) => {
   for (let attempt = 1; attempt <= MAX_NUMBER_RETRIES; attempt += 1) {
     const supplierNumber = helpers.generateCode('SUP');
     await client.query('SAVEPOINT supplier_insert');
     try {
-      const { rows } = await client.query(
-        `INSERT INTO suppliers (
-           supplier_number, name, name_ar, tax_number, phone, email, address, notes, is_active, created_by
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING *`,
-        [
-          supplierNumber,
-          data.name,
-          data.name_ar,
-          emptyToNull(data.tax_number),
-          emptyToNull(data.phone),
-          emptyToNull(data.email),
-          emptyToNull(data.address),
-          emptyToNull(data.notes),
-          data.is_active !== false,
-          createdBy || null,
-        ]
-      );
+      const { rows } = includePurchaseColumns
+        ? await client.query(
+          `INSERT INTO suppliers (
+             supplier_number, name, name_ar, tax_number, phone, email, address, notes, is_active, created_by, is_temporary
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           RETURNING *`,
+          [
+            supplierNumber,
+            data.name,
+            data.name_ar,
+            emptyToNull(data.tax_number),
+            emptyToNull(data.phone),
+            emptyToNull(data.email),
+            emptyToNull(data.address),
+            emptyToNull(data.notes),
+            data.is_active !== false,
+            createdBy || null,
+            Boolean(data.is_temporary),
+          ]
+        )
+        : await client.query(
+          `INSERT INTO suppliers (
+             supplier_number, name, name_ar, tax_number, phone, email, address, notes, is_active, created_by
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           RETURNING *`,
+          [
+            supplierNumber,
+            data.name,
+            data.name_ar,
+            emptyToNull(data.tax_number),
+            emptyToNull(data.phone),
+            emptyToNull(data.email),
+            emptyToNull(data.address),
+            emptyToNull(data.notes),
+            data.is_active !== false,
+            createdBy || null,
+          ]
+        );
       await client.query('RELEASE SAVEPOINT supplier_insert');
       return rows[0];
     } catch (err) {
@@ -212,9 +243,15 @@ const getById = async (id, viewOrOptions = {}, maybeOptions = {}) => {
 const create = async (data, actor, reqOrOptions, maybeOptions) => {
   const options = pickOptions(reqOrOptions, maybeOptions);
   const req = requestOf(reqOrOptions, options);
+  const caps = await getSuppliersCapabilities(options.client);
+  if (data?.is_temporary && !caps.hasPurchaseColumns) {
+    throwPurchasesMigrationRequired();
+  }
   try {
     return await withSupplierClient(options.client, async (client) => {
-      const row = await insertSupplierWithRetry(client, data, actorIdOf(actor));
+      const row = await insertSupplierWithRetry(client, data, actorIdOf(actor), {
+        includePurchaseColumns: caps.hasPurchaseColumns,
+      });
       const publicRow = toPublic(row);
       await suppliersAudit.logSupplierAudit(client, {
         userId: actorIdOf(actor),
@@ -328,4 +365,83 @@ const softDelete = async (id, actor, reqOrOptions, maybeOptions) => {
   }
 };
 
-module.exports = { list, getById, create, update, softDelete, toPublic };
+const searchQuick = async ({ tax_number, q } = {}, options = {}) => {
+  const caps = await getSuppliersCapabilities(options.client);
+  if (!caps.purchasesReady) throwPurchasesMigrationRequired();
+  try {
+    const tax = emptyToNull(tax_number);
+    if (tax) {
+      const exact = await runQuery(
+        options.client,
+        `SELECT * FROM suppliers
+         WHERE deleted_at IS NULL
+           AND lower(btrim(tax_number)) = lower(btrim($1))
+         LIMIT 5`,
+        [tax]
+      );
+      if (exact.rows.length) return { data: exact.rows.map(toPublic), match: 'tax_number' };
+    }
+    const term = emptyToNull(q) || tax;
+    if (!term) return { data: [], match: null };
+    const { rows } = await runQuery(
+      options.client,
+      `SELECT * FROM suppliers
+       WHERE deleted_at IS NULL
+         AND (
+           name ILIKE $1 OR name_ar ILIKE $1 OR supplier_number ILIKE $1
+           OR COALESCE(tax_number, '') ILIKE $1
+         )
+       ORDER BY is_system DESC, name
+       LIMIT 20`,
+      [`%${term}%`]
+    );
+    return { data: rows.map(toPublic), match: 'name' };
+  } catch (err) {
+    throwIfTableMissing(err);
+    throw err;
+  }
+};
+
+const createQuick = async (data, actor, reqOrOptions, maybeOptions) => {
+  if (!data?.confirm) {
+    throw new AppError('Quick supplier creation requires explicit confirmation', 400, 'CONFIRM_REQUIRED');
+  }
+  const options = pickOptions(reqOrOptions, maybeOptions);
+  const caps = await getSuppliersCapabilities(options.client);
+  if (!caps.purchasesReady) throwPurchasesMigrationRequired();
+  const name = emptyToNull(data.name);
+  if (!name || name.length < 2) {
+    throw new AppError('Supplier name is required', 400, 'NAME_REQUIRED');
+  }
+  return create({
+    name,
+    name_ar: emptyToNull(data.name_ar) || name,
+    tax_number: data.tax_number,
+    phone: data.phone,
+    is_active: true,
+    is_temporary: true,
+  }, actor, reqOrOptions, maybeOptions);
+};
+
+const getCashUnregistered = async (options = {}) => {
+  const caps = await getSuppliersCapabilities(options.client);
+  if (!caps.purchasesReady) throwPurchasesMigrationRequired();
+  try {
+    const { rows } = await runQuery(
+      options.client,
+      'SELECT * FROM suppliers WHERE supplier_number = $1 AND deleted_at IS NULL',
+      ['SUP-CASH-UNREG']
+    );
+    if (!rows[0]) {
+      throw new AppError('Cash unregistered supplier is not configured', 503, 'PURCHASES_MIGRATION_REQUIRED');
+    }
+    return toPublic(rows[0]);
+  } catch (err) {
+    throwIfTableMissing(err);
+    throw err;
+  }
+};
+
+module.exports = {
+  list, getById, create, update, softDelete, toPublic, searchQuick, createQuick, getCashUnregistered,
+};

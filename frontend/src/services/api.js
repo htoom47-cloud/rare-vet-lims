@@ -471,9 +471,32 @@ export const billingAPI = {
 export const suppliersAPI = {
   list: (params) => api.get('/suppliers', { params }),
   get: (id) => api.get(`/suppliers/${id}`),
+  search: (params) => api.get('/suppliers/search', { params }),
+  cashUnregistered: () => api.get('/suppliers/cash-unregistered'),
+  createQuick: (data) => api.post('/suppliers/quick', data),
   create: (data) => api.post('/suppliers', data),
   update: (id, data) => api.put(`/suppliers/${id}`, data),
   disable: (id) => api.delete(`/suppliers/${id}`),
+};
+
+export const purchasesAPI = {
+  list: (params) => api.get('/purchases', { params }),
+  get: (id) => api.get(`/purchases/${id}`),
+  create: (data) => api.post('/purchases', data),
+  update: (id, data) => api.put(`/purchases/${id}`, data),
+  remove: (id) => api.delete(`/purchases/${id}`),
+  approve: (id) => api.post(`/purchases/${id}/approve`),
+  cancel: (id, data) => api.post(`/purchases/${id}/cancel`, data),
+  attach: (id, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post(`/purchases/${id}/attachments`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  attachment: (id, attachmentId) => api.get(`/purchases/${id}/attachments/${attachmentId}`, {
+    responseType: 'blob',
+  }),
 };
 
 export const inventoryAPI = {
