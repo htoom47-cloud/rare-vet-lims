@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin, Package } from 'lucide-react';
+import CreditNotePanel from '../components/billing/CreditNotePanel';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -51,6 +52,7 @@ export default function Billing() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canPay = hasPermission('billing.payment');
+  const canRefund = hasPermission('billing.refund');
   const [invoices, setInvoices] = useState([]);
   const [packages, setPackages] = useState([]);
   const [tests, setTests] = useState([]);
@@ -547,6 +549,15 @@ export default function Billing() {
                 </div>
               </div>
             )}
+
+            <CreditNotePanel
+              invoice={detailInvoice}
+              canCreate={canRefund}
+              onIssued={async () => {
+                await openInvoiceDetail({ id: detailInvoice.id });
+                load();
+              }}
+            />
 
             {canPay && detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
               <div className="flex justify-end">
