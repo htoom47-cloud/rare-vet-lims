@@ -487,6 +487,11 @@ export const purchasesAPI = {
   remove: (id) => api.delete(`/purchases/${id}`),
   approve: (id) => api.post(`/purchases/${id}/approve`),
   cancel: (id, data) => api.post(`/purchases/${id}/cancel`, data),
+  post: (id, data) => api.post(`/purchases/${id}/post`, data || {}),
+  postingPreview: (id) => api.get(`/purchases/${id}/posting-preview`),
+  linkLines: (id, data) => api.put(`/purchases/${id}/lines`, data),
+  expenseAccounts: () => api.get('/purchases/posting/expense-accounts'),
+  postingInventory: (params) => api.get('/purchases/posting/inventory-items', { params }),
   attach: (id, file) => {
     const form = new FormData();
     form.append('file', file);

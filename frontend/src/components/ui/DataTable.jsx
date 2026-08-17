@@ -44,7 +44,7 @@ export default function DataTable({ columns, data, loading, onRowClick }) {
         <tbody className="divide-y divide-border/60 bg-card">
           {data.map((row, idx) => (
             <tr
-              key={row.id || idx}
+              key={row.row_key || row.id || idx}
               onClick={() => onRowClick?.(row)}
               className={onRowClick ? 'cursor-pointer hover:bg-accent/50 transition-colors duration-150' : ''}
             >

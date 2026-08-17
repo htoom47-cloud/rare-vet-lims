@@ -2,7 +2,7 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { creditNotesTableExists, ISSUED_CREDITS_JOIN } = require('../utils/credit-notes-schema');
-const { toHalalas, fromHalalas } = require('../utils/money');
+const { toHalalas, fromHalalas, asIntegerHalalas, expectedCashHalalas } = require('../utils/money');
 const { labDay, labDateSql, defaultLabRange } = require('../utils/accounting-time');
 
 const OPEN_INVOICE_STATUSES = ['issued', 'partial', 'paid'];
@@ -231,13 +231,36 @@ const getRevenueSummary = async (from, to) => {
   };
 };
 
-const getDailyFullSummary = async (date) => {
+const TABLE_MISSING = '42P01';
+const COLUMN_MISSING = '42703';
+
+const sumCashPurchaseOutflowsHalalas = async (day, client = null) => {
+  const q = client ? client.query.bind(client) : query;
+  try {
+    const { rows } = await q(
+      `SELECT COALESCE(SUM(total_halalas), 0)::bigint AS h
+       FROM purchase_invoices
+       WHERE deleted_at IS NULL
+         AND status = 'posted'
+         AND payment_method = 'cash'
+         AND posting_date = $1::date`,
+      [day]
+    );
+    return asIntegerHalalas(rows[0].h || 0);
+  } catch (err) {
+    if (err.code === TABLE_MISSING || err.code === COLUMN_MISSING) return 0;
+    throw err;
+  }
+};
+
+const getDailyFullSummary = async (date, client = null) => {
   const day = date || labDay();
-  const withCredits = await creditNotesTableExists();
+  const q = client ? client.query.bind(client) : query;
+  const withCredits = await creditNotesTableExists(client);
 
   const due = remainingSql(withCredits);
   const [invoices, payments, byMethod, credits, refunds] = await Promise.all([
-    query(
+    q(
       `SELECT
         COUNT(*) AS invoice_count,
         COALESCE(SUM(i.total), 0) AS invoiced_total,
@@ -255,24 +278,24 @@ const getDailyFullSummary = async (date) => {
        WHERE ${labDateSql('i.created_at')} = $1::date`,
       [day]
     ),
-    query(
+    q(
       `SELECT COALESCE(SUM(amount), 0) AS collections_total FROM payments WHERE ${labDateSql('created_at')} = $1::date`,
       [day]
     ),
-    query(
+    q(
       `SELECT method, COALESCE(SUM(amount), 0) AS total
        FROM payments WHERE ${labDateSql('created_at')} = $1::date GROUP BY method`,
       [day]
     ),
     withCredits
-      ? query(
+      ? q(
         `SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(tax_amount), 0) AS tax, COUNT(*) AS n
          FROM credit_notes
          WHERE status = 'issued' AND ${labDateSql('created_at')} = $1::date`,
         [day]
       )
       : Promise.resolve({ rows: [{ total: 0, tax: 0, n: 0 }] }),
-    query(
+    q(
       `SELECT COALESCE(SUM(amount), 0) AS refunds_total, COUNT(*) AS refund_count
        FROM refunds WHERE ${labDateSql('created_at')} = $1::date`,
       [day]
@@ -285,7 +308,10 @@ const getDailyFullSummary = async (date) => {
 
   const collectionsH = toHalalas(payments.rows[0].collections_total);
   const refundsH = toHalalas(refunds.rows[0].refunds_total);
+  const cashPurchaseOutflowsH = await sumCashPurchaseOutflowsHalalas(day, client);
   const net_collections = fromHalalas(collectionsH - refundsH);
+  const cash_purchase_outflows = fromHalalas(cashPurchaseOutflowsH);
+  const expected_cash = fromHalalas(expectedCashHalalas(collectionsH, refundsH, cashPurchaseOutflowsH));
   const creditTotal = parseFloat(credits.rows[0].total);
   const creditTax = parseFloat(credits.rows[0].tax);
 
@@ -301,6 +327,8 @@ const getDailyFullSummary = async (date) => {
     net_collections,
     collections_total: fromHalalas(collectionsH),
     refunds_total: fromHalalas(refundsH),
+    cash_purchase_outflows,
+    expected_cash,
     refund_count: parseInt(refunds.rows[0].refund_count, 10),
     invoice_count: parseInt(inv.invoice_count, 10),
     credit_note_count: parseInt(credits.rows[0].n, 10),
@@ -559,6 +587,8 @@ module.exports = {
   getArAging,
   getRevenueSummary,
   getDailyFullSummary,
+  sumCashPurchaseOutflowsHalalas,
+  expectedCashHalalas,
   getDashboardSummary,
   getUnpaidInvoicesReport,
   getVatReport,

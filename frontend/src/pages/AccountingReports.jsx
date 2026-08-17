@@ -631,6 +631,8 @@ export default function AccountingReports() {
                   [t('billing.discount'), closingData.summary.discount_total],
                   [t('accounting.refundsTotal'), closingData.summary.refunds_total],
                   [t('accounting.netCollection'), closingData.summary.net_collections],
+                  [t('accounting.cashPurchaseOutflows'), closingData.summary.cash_purchase_outflows ?? 0],
+                  [t('accounting.expectedCash'), closingData.summary.expected_cash ?? closingData.summary.net_collections],
                   [t('accounting.invoiceCount'), closingData.summary.invoice_count],
                   [t('accounting.unpaidCount'), closingData.summary.unpaid_count],
                   [t('accounting.cancelledCount'), closingData.summary.cancelled_count],
