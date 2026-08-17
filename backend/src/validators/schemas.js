@@ -247,6 +247,19 @@ const purchaseCancelSchema = Joi.object({
   reason: Joi.string().trim().min(3).max(500).allow('', null),
 });
 
+const purchaseExtractionCorrectSchema = Joi.object({
+  payload: Joi.object().unknown(true).default({}),
+  supplier_id: Joi.string().uuid().allow(null),
+  uses_cash_unregistered: Joi.boolean(),
+});
+
+const purchaseExtractionConfirmSchema = Joi.object({
+  payload: Joi.object().unknown(true).default({}),
+  supplier_id: Joi.string().uuid().allow(null),
+  uses_cash_unregistered: Joi.boolean().default(false),
+  purchase_invoice_id: Joi.string().uuid().allow(null),
+});
+
 const inventorySchema = Joi.object({
   sku: Joi.string().required(),
   name: Joi.string().required(),
@@ -296,4 +309,6 @@ module.exports = {
   supplierQuickSchema,
   purchaseInvoiceSchema,
   purchaseCancelSchema,
+  purchaseExtractionCorrectSchema,
+  purchaseExtractionConfirmSchema,
 };

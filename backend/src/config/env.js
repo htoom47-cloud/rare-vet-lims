@@ -176,6 +176,19 @@ const env = {
   database: {
     sslRejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
   },
+  invoiceExtraction: {
+    provider: process.env.INVOICE_EXTRACTION_PROVIDER || 'off',
+    apiKey: process.env.INVOICE_EXTRACTION_OPENAI_API_KEY || '',
+    baseUrl: process.env.INVOICE_EXTRACTION_OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    model: process.env.INVOICE_EXTRACTION_MODEL || 'gpt-5.6-terra',
+    timeoutMs: parseInt(process.env.INVOICE_EXTRACTION_TIMEOUT_MS || '45000', 10),
+    maxRetries: parseInt(process.env.INVOICE_EXTRACTION_MAX_RETRIES || '1', 10),
+    maxPages: parseInt(process.env.INVOICE_EXTRACTION_MAX_PAGES || '8', 10),
+    leaseMs: parseInt(process.env.INVOICE_EXTRACTION_LEASE_MS || '120000', 10),
+    retentionDays: parseInt(process.env.INVOICE_EXTRACTION_RETENTION_DAYS || '30', 10),
+    retryBaseMs: parseInt(process.env.INVOICE_EXTRACTION_RETRY_BASE_MS || '500', 10),
+    retryCapMs: parseInt(process.env.INVOICE_EXTRACTION_RETRY_CAP_MS || '8000', 10),
+  },
   notifications: {
     provider: process.env.NOTIFICATION_PROVIDER || 'msegat',
     defaultChannel: process.env.NOTIFICATION_DEFAULT_CHANNEL || 'sms',
