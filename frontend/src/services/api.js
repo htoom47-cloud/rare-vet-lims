@@ -497,6 +497,16 @@ export const purchasesAPI = {
   attachment: (id, attachmentId) => api.get(`/purchases/${id}/attachments/${attachmentId}`, {
     responseType: 'blob',
   }),
+  createExtraction: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post('/purchases/extractions', form);
+  },
+  extraction: (id) => api.get(`/purchases/extractions/${id}`),
+  processExtraction: (id, body) => api.post(`/purchases/extractions/${id}/process`, body || {}),
+  correctExtraction: (id, data) => api.patch(`/purchases/extractions/${id}`, data),
+  confirmExtraction: (id, data) => api.post(`/purchases/extractions/${id}/confirm`, data),
+  extractionFile: (id) => api.get(`/purchases/extractions/${id}/file`, { responseType: 'blob' }),
 };
 
 export const inventoryAPI = {

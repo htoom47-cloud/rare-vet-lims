@@ -3,7 +3,8 @@ const multer = require('multer');
 const service = require('../services/purchases.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { purchaseInvoiceSchema, purchaseCancelSchema } = require('../validators/schemas');
+const { purchaseInvoiceSchema, purchaseCancelSchema, purchaseExtractionCorrectSchema, purchaseExtractionConfirmSchema } = require('../validators/schemas');
+const extraction = require('../services/purchase-extraction.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { diskStorage, readAndCleanupUpload, cleanupUploadFile } = require('../utils/upload-disk');
 const { MAX_BYTES } = require('../utils/purchases-files');
@@ -25,6 +26,74 @@ const upload = multer({
     }
     cb(new Error('Only JPEG, PNG, WEBP, or PDF files are allowed'));
   },
+});
+
+router.get('/extractions', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
+  try {
+    const data = await extraction.list(req.query, req.user);
+    res.json({ success: true, ...data });
+  } catch (err) { next(err); }
+});
+
+router.post('/extractions', authorize(PERMISSIONS.PURCHASES_CREATE), upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      const err = new Error('File is required');
+      err.statusCode = 400;
+      err.code = 'FILE_REQUIRED';
+      throw err;
+    }
+    const buffer = await readAndCleanupUpload(req.file);
+    const data = await extraction.createFromUpload({
+      buffer,
+      originalname: req.file.originalname,
+    }, req.user, req);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    cleanupUploadFile(req.file);
+    next(err);
+  }
+});
+
+router.get('/extractions/:extractionId/file', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
+  try {
+    const file = await extraction.openFile(req.params.extractionId, req.user);
+    res.setHeader('Content-Type', file.mime_type);
+    res.setHeader('Content-Disposition', `inline; filename="${String(file.original_name).replace(/"/g, '')}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    file.stream.on('error', next);
+    file.stream.pipe(res);
+  } catch (err) { next(err); }
+});
+
+router.get('/extractions/:extractionId', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
+  try {
+    const data = await extraction.getById(req.params.extractionId, req.user);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/extractions/:extractionId/process', authorize(PERMISSIONS.PURCHASES_CREATE), async (req, res, next) => {
+  try {
+    const data = await extraction.processExtraction(req.params.extractionId, req.user, req, {
+      retry: Boolean(req.body?.retry),
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.patch('/extractions/:extractionId', authorize(PERMISSIONS.PURCHASES_CREATE), validate(purchaseExtractionCorrectSchema), async (req, res, next) => {
+  try {
+    const data = await extraction.correct(req.params.extractionId, req.body, req.user, req);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/extractions/:extractionId/confirm', authorize(PERMISSIONS.PURCHASES_CREATE), validate(purchaseExtractionConfirmSchema), async (req, res, next) => {
+  try {
+    const data = await extraction.confirm(req.params.extractionId, req.body, req.user, req);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
 });
 
 router.get('/', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {

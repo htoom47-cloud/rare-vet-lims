@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Ban, Search, Check } from 'lucide-react';
+import { Plus, Pencil, Ban, Search, Check, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/ui/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { purchasesAPI, suppliersAPI } from '../services/api';
+import PurchaseExtractionModal from './PurchaseExtractionModal';
 
 const PAGE_SIZE = 20;
 const TAX_CATEGORIES = ['standard', 'zero_rated', 'exempt', 'out_of_scope'];
@@ -106,6 +107,7 @@ export default function Purchases() {
   const [quick, setQuick] = useState({ name: '', tax_number: '', phone: '' });
   const [approveRow, setApproveRow] = useState(null);
   const [approving, setApproving] = useState(false);
+  const [extractOpen, setExtractOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [file, setFile] = useState(null);
 
@@ -298,9 +300,14 @@ export default function Purchases() {
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <h1 className="text-2xl font-bold">{t('purchases.title')}</h1>
         {canCreate && !unavailable && (
-          <button type="button" onClick={openCreate} className="btn-primary flex items-center gap-2">
-            <Plus size={18} /> {t('purchases.add')}
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setExtractOpen(true)} className="btn-secondary flex items-center gap-2">
+              <ScanLine size={18} /> {t('purchases.extract')}
+            </button>
+            <button type="button" onClick={openCreate} className="btn-primary flex items-center gap-2">
+              <Plus size={18} /> {t('purchases.add')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -465,6 +472,11 @@ export default function Purchases() {
           }}>{approving ? t('common.loading') : t('purchases.approve')}</button>
         </div>
       </Modal>
+      <PurchaseExtractionModal
+        open={extractOpen}
+        onClose={() => setExtractOpen(false)}
+        onCreated={() => { setExtractOpen(false); load(); }}
+      />
     </div>
   );
 }
