@@ -191,14 +191,16 @@ check('purchaser can create but cannot approve or cancel', () => {
   assert.ok(codes.includes(PERMISSIONS.SUPPLIERS_VIEW));
   assert.ok(!codes.includes(PERMISSIONS.PURCHASES_APPROVE));
   assert.ok(!codes.includes(PERMISSIONS.PURCHASES_CANCEL));
+  assert.ok(!codes.includes(PERMISSIONS.PURCHASES_POST));
 });
 
-check('accountant and manager can review, approve, and cancel', () => {
+check('accountant and manager can review, approve, cancel, and post', () => {
   for (const role of ['accountant', 'manager', 'admin']) {
     const codes = ROLE_PERMISSIONS[role];
     assert.ok(codes.includes(PERMISSIONS.PURCHASES_VIEW));
     assert.ok(codes.includes(PERMISSIONS.PURCHASES_APPROVE));
     assert.ok(codes.includes(PERMISSIONS.PURCHASES_CANCEL));
+    assert.ok(codes.includes(PERMISSIONS.PURCHASES_POST));
   }
 });
 
@@ -207,6 +209,7 @@ check('reception and lab roles do not receive purchase permissions', () => {
     const codes = ROLE_PERMISSIONS[role] || [];
     assert.ok(!codes.includes(PERMISSIONS.PURCHASES_VIEW));
     assert.ok(!codes.includes(PERMISSIONS.PURCHASES_APPROVE));
+    assert.ok(!codes.includes(PERMISSIONS.PURCHASES_POST));
   }
 });
 

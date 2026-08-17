@@ -247,6 +247,21 @@ const purchaseCancelSchema = Joi.object({
   reason: Joi.string().trim().min(3).max(500).allow('', null),
 });
 
+const purchaseLineLinkSchema = Joi.object({
+  lines: Joi.array().min(1).items(Joi.object({
+    id: Joi.string().uuid().required(),
+    destination: Joi.string().valid('inventory', 'expense').allow(null),
+    inventory_item_id: Joi.string().uuid().allow(null),
+    expense_account_id: Joi.string().uuid().allow(null),
+    lot_number: Joi.string().trim().max(100).allow('', null),
+    expiry_date: Joi.date().allow(null, ''),
+  })).required(),
+});
+
+const purchasePostSchema = Joi.object({
+  posting_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).allow('', null),
+});
+
 const purchaseExtractionCorrectSchema = Joi.object({
   payload: Joi.object().unknown(true).default({}),
   supplier_id: Joi.string().uuid().allow(null),
@@ -273,6 +288,16 @@ const inventorySchema = Joi.object({
   location: Joi.string().allow('', null),
   supplier: Joi.string().allow('', null),
   cost_per_unit: Joi.number().min(0).allow(null),
+});
+
+const inventoryAdjustSchema = Joi.object({
+  type: Joi.string().valid('in', 'out').required(),
+  quantity: Joi.alternatives().try(Joi.number().positive(), Joi.string().pattern(/^\d+(\.\d{1,3})?$/)).required(),
+  notes: Joi.string().allow('', null),
+  source: Joi.string().valid('lot', 'legacy', 'fefo').allow(null),
+  lot_id: Joi.string().uuid().allow(null),
+  lot_number: Joi.string().allow('', null),
+  expiry_date: Joi.date().allow(null, ''),
 });
 
 const portalOtpRequestSchema = Joi.object({
@@ -305,10 +330,13 @@ module.exports = {
   creditNoteSchema,
   refundSchema,
   inventorySchema,
+  inventoryAdjustSchema,
   supplierSchema,
   supplierQuickSchema,
   purchaseInvoiceSchema,
   purchaseCancelSchema,
+  purchaseLineLinkSchema,
+  purchasePostSchema,
   purchaseExtractionCorrectSchema,
   purchaseExtractionConfirmSchema,
 };

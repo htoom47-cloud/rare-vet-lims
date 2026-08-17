@@ -35,6 +35,8 @@ const generateClosingPDF = async (summary, closingNumber, outputDir) => {
       ['Discounts', 'الخصومات', summary.discount_total],
       ['Refunds', 'الاستردادات', summary.refunds_total || 0],
       ['Net Collections', 'صافي التحصيل', summary.net_collections],
+      ['Cash purchase outflows', 'مشتريات نقدية خارجة', summary.cash_purchase_outflows ?? 0],
+      ['Expected cash', 'النقد المتوقع', summary.expected_cash ?? summary.net_collections],
       ['Invoice Count', 'عدد الفواتير', summary.invoice_count],
       ['Unpaid Invoices', 'غير مدفوعة', summary.unpaid_count],
       ['Cancelled', 'ملغاة', summary.cancelled_count],

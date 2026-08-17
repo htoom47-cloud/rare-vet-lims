@@ -89,6 +89,7 @@ export default function Purchases() {
   const canCreate = hasPermission('purchases.create');
   const canApprove = hasPermission('purchases.approve');
   const canCancel = hasPermission('purchases.cancel');
+  const canPost = hasPermission('purchases.post');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
@@ -110,6 +111,14 @@ export default function Purchases() {
   const [extractOpen, setExtractOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [file, setFile] = useState(null);
+  const [expenseAccounts, setExpenseAccounts] = useState([]);
+  const [inventoryHits, setInventoryHits] = useState([]);
+  const [inventoryQuery, setInventoryQuery] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [postConfirmOpen, setPostConfirmOpen] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10));
 
   const totals = useMemo(() => computeFormTotals(form), [form]);
 
@@ -187,6 +196,83 @@ export default function Purchases() {
     setFormOpen(true);
   };
 
+  const openDetail = async (row) => {
+    const { data } = await purchasesAPI.get(row.id);
+    const invoice = data.data;
+    setDetail(invoice);
+    setPreview(null);
+    setPostConfirmOpen(false);
+    setPostingDate(new Date().toISOString().slice(0, 10));
+    try {
+      const [accounts, previewRes] = await Promise.all([
+        purchasesAPI.expenseAccounts().catch(() => ({ data: { data: [] } })),
+        purchasesAPI.postingPreview(invoice.id).catch(() => null),
+      ]);
+      setExpenseAccounts(accounts.data?.data || []);
+      if (previewRes?.data?.data?.preview) setPreview(previewRes.data.data.preview);
+    } catch {
+      setExpenseAccounts([]);
+    }
+  };
+
+  const searchInventory = async (term) => {
+    setInventoryQuery(term);
+    if (!term.trim()) {
+      setInventoryHits([]);
+      return;
+    }
+    const { data } = await purchasesAPI.postingInventory({ q: term.trim() });
+    setInventoryHits(data.data || []);
+  };
+
+  const updateDetailLine = (lineId, patch) => {
+    setDetail((current) => ({
+      ...current,
+      items: (current.items || []).map((line) => (line.id === lineId ? { ...line, ...patch } : line)),
+    }));
+  };
+
+  const saveLinks = async () => {
+    if (!detail || linking) return;
+    setLinking(true);
+    try {
+      const { data } = await purchasesAPI.linkLines(detail.id, {
+        lines: (detail.items || []).map((line) => ({
+          id: line.id,
+          destination: line.destination || null,
+          inventory_item_id: line.destination === 'inventory' ? line.inventory_item_id : null,
+          expense_account_id: line.destination === 'expense' ? line.expense_account_id : null,
+          lot_number: line.lot_number || null,
+          expiry_date: line.expiry_date || null,
+        })),
+      });
+      setDetail(data.data);
+      toast.success(t('purchases.linksSaved'));
+      const previewRes = await purchasesAPI.postingPreview(detail.id);
+      setPreview(previewRes.data.data.preview);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const confirmPost = async () => {
+    if (!detail || posting) return;
+    setPosting(true);
+    try {
+      const { data } = await purchasesAPI.post(detail.id, { posting_date: postingDate });
+      setDetail(data.data);
+      setPostConfirmOpen(false);
+      toast.success(t('purchases.postedOk'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally {
+      setPosting(false);
+    }
+  };
+
   const payload = () => ({
     supplier_id: form.uses_cash_unregistered ? null : form.supplier_id,
     uses_cash_unregistered: form.uses_cash_unregistered,
@@ -247,7 +333,10 @@ export default function Purchases() {
     {
       key: 'status',
       label: t('common.status'),
-      render: (r) => <StatusBadge status={r.status === 'approved' ? 'issued' : r.status === 'cancelled' ? 'cancelled' : 'pending'} label={t(`purchases.${r.status}`)} />,
+      render: (r) => {
+        const tone = r.status === 'posted' ? 'completed' : r.status === 'approved' ? 'issued' : r.status === 'cancelled' ? 'cancelled' : 'pending';
+        return <StatusBadge status={tone} label={t(`purchases.${r.status}`)} />;
+      },
     },
     {
       key: 'actions',
@@ -275,7 +364,7 @@ export default function Purchases() {
               <Check size={14} /> {t('purchases.approve')}
             </button>
           )}
-          {canCancel && r.status !== 'cancelled' && (
+          {canCancel && r.status !== 'cancelled' && r.status !== 'posted' && !r.posted && (
             <button type="button" onClick={async (e) => {
               e.stopPropagation();
               const reason = window.prompt(t('purchases.cancelReason')) || '';
@@ -324,10 +413,11 @@ export default function Purchases() {
               <option value="">{t('common.filter')}</option>
               <option value="draft">{t('purchases.draft')}</option>
               <option value="approved">{t('purchases.approved')}</option>
+              <option value="posted">{t('purchases.posted')}</option>
               <option value="cancelled">{t('purchases.cancelled')}</option>
             </select>
           </div>
-          <DataTable columns={columns} data={items} loading={loading} />
+          <DataTable columns={columns} data={items} loading={loading} onRowClick={(row) => openDetail(row)} />
           {pagination.total > 0 && (
             <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
               <span>
@@ -390,6 +480,9 @@ export default function Purchases() {
                 <option value="credit">{t('purchases.credit')}</option>
                 <option value="other">{t('purchases.other')}</option>
               </select>
+              {(form.payment_method === 'credit' || form.payment_method === 'other') && (
+                <p className="text-xs text-amber-800 md:col-span-2">{t('purchases.creditApHint')}</p>
+              )}
               <input value={form.discount_sar} onChange={(e) => setForm({ ...form, discount_sar: e.target.value })} className="input-field" placeholder={t('purchases.discount')} />
             </div>
             <div>
@@ -470,6 +563,112 @@ export default function Purchases() {
               setApproving(false);
             }
           }}>{approving ? t('common.loading') : t('purchases.approve')}</button>
+        </div>
+      </Modal>
+      <Modal isOpen={!!detail && !formOpen} onClose={() => setDetail(null)} title={t('purchases.details')} size="lg">
+        {detail && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              <div>{t('purchases.approvalStatus')}: {t(`purchases.${detail.status}`)}</div>
+              <div>{t('purchases.postingStatus')}: {detail.posted ? t('purchases.posted') : t('purchases.notPosted')}</div>
+              <div>{t('purchases.supplier')}: {detail.supplier_name_ar || detail.supplier_name}</div>
+              <div>{t('purchases.total')}: {detail.total_sar}</div>
+              <div>{t('purchases.paymentMethod')}: {t(`purchases.${detail.payment_method}`)}</div>
+              {detail.posting_date && <div>{t('purchases.postingDate')}: {String(detail.posting_date).slice(0, 10)}</div>}
+            </div>
+            {detail.posted && <p className="text-sm text-amber-800 bg-amber-50 p-3 rounded">{t('purchases.postedLocked')}</p>}
+            <div>
+              <div className="font-medium mb-2">{t('purchases.items')}</div>
+              {(detail.items || []).map((line) => (
+                <div key={line.id} className="border border-border/60 rounded-lg p-3 mb-2 space-y-2">
+                  <div className="text-sm font-medium">{line.description} · {line.quantity} · {line.line_net_sar}</div>
+                  {!detail.posted && (canCreate || canPost) ? (
+                    <>
+                      <select
+                        className="input-field"
+                        value={line.destination || ''}
+                        onChange={(e) => updateDetailLine(line.id, {
+                          destination: e.target.value || null,
+                          inventory_item_id: e.target.value === 'inventory' ? line.inventory_item_id : null,
+                          expense_account_id: e.target.value === 'expense' ? line.expense_account_id : null,
+                        })}
+                      >
+                        <option value="">{t('purchases.destination')}</option>
+                        <option value="inventory">{t('purchases.destInventory')}</option>
+                        <option value="expense">{t('purchases.destExpense')}</option>
+                      </select>
+                      {line.destination === 'inventory' && (
+                        <>
+                          <input className="input-field" placeholder={t('purchases.searchItem')} value={inventoryQuery} onChange={(e) => searchInventory(e.target.value)} />
+                          {line.inventory_name && <div className="text-xs text-gray-600">{line.inventory_sku} {line.inventory_name}</div>}
+                          {inventoryHits.map((hit) => (
+                            <button type="button" key={hit.id} className="block text-start text-sm py-1" onClick={() => updateDetailLine(line.id, { inventory_item_id: hit.id, inventory_name: hit.name, inventory_sku: hit.sku })}>
+                              {hit.sku} · {hit.name_ar || hit.name}
+                            </button>
+                          ))}
+                          <div className="grid grid-cols-2 gap-2">
+                            <input className="input-field" placeholder={t('purchases.lotNumber')} value={line.lot_number || ''} onChange={(e) => updateDetailLine(line.id, { lot_number: e.target.value })} />
+                            <input type="date" className="input-field" value={line.expiry_date ? String(line.expiry_date).slice(0, 10) : ''} onChange={(e) => updateDetailLine(line.id, { expiry_date: e.target.value || null })} />
+                          </div>
+                        </>
+                      )}
+                      {line.destination === 'expense' && (
+                        <select className="input-field" value={line.expense_account_id || ''} onChange={(e) => updateDetailLine(line.id, { expense_account_id: e.target.value || null })}>
+                          <option value="">{t('purchases.linkAccount')}</option>
+                          {expenseAccounts.map((acc) => (
+                            <option key={acc.id} value={acc.id}>{acc.code} · {acc.name_ar || acc.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-600">
+                      {line.destination === 'inventory' && `${t('purchases.destInventory')}: ${line.inventory_sku || ''} ${line.inventory_name || ''}`}
+                      {line.destination === 'expense' && `${t('purchases.destExpense')}: ${line.expense_account_code || ''} ${line.expense_account_name || ''}`}
+                      {!line.destination && t('purchases.destination')}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {!detail.posted && (canCreate || canPost) && (
+                <button type="button" className="btn-secondary" disabled={linking} onClick={saveLinks}>{linking ? t('common.loading') : t('purchases.saveLinks')}</button>
+              )}
+            </div>
+            {preview && (
+              <div className="text-sm space-y-1 bg-gray-50 dark:bg-gray-900/40 p-3 rounded">
+                <div className="font-medium">{t('purchases.postingPreview')}</div>
+                <div>{t('purchases.stockEffect')}: {fromHalalas(preview.inventory_halalas)}</div>
+                {(preview.inventory_lines || []).map((line) => (
+                  <div key={line.id} className="ps-2">{line.description} · {line.quantity} · {fromHalalas(line.line_net_halalas)}</div>
+                ))}
+                <div>{t('purchases.destExpense')}: {fromHalalas(preview.expense_halalas)}</div>
+                <div>{t('purchases.inputVat')}: {fromHalalas(preview.input_vat_halalas)}</div>
+                <p className="text-xs text-gray-600">{t('purchases.vatRecoverableHint')}</p>
+                <div>{t('purchases.creditAccount')}: {preview.credit_account_code} ({t(`purchases.${preview.payment_method}`)})</div>
+                {preview.aggregate_ap_only && (
+                  <p className="text-xs text-amber-800">{t('purchases.creditApHint')}</p>
+                )}
+                <div>{t('purchases.debitTotal')}: {fromHalalas(preview.debit_halalas)}</div>
+                <div>{t('purchases.creditTotal')}: {fromHalalas(preview.credit_halalas)}</div>
+              </div>
+            )}
+            {canPost && detail.status === 'approved' && !detail.posted && (
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label className="block text-sm mb-1">{t('purchases.postingDate')}</label>
+                  <input type="date" className="input-field" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} />
+                </div>
+                <button type="button" className="btn-primary" onClick={() => setPostConfirmOpen(true)}>{t('purchases.post')}</button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+      <Modal isOpen={postConfirmOpen} onClose={() => setPostConfirmOpen(false)} title={t('purchases.postConfirmTitle')}>
+        <p className="mb-4">{t('purchases.postConfirm')}</p>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary" disabled={posting} onClick={() => setPostConfirmOpen(false)}>{t('common.cancel')}</button>
+          <button type="button" className="btn-primary" disabled={posting} onClick={confirmPost}>{posting ? t('common.loading') : t('purchases.post')}</button>
         </div>
       </Modal>
       <PurchaseExtractionModal

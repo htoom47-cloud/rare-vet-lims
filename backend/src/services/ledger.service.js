@@ -12,8 +12,12 @@ const DEFAULT_ACCOUNTS = [
   { code: '1010', name: 'Cash', name_ar: 'النقد', type: 'asset' },
   { code: '1020', name: 'Bank', name_ar: 'البنك', type: 'asset' },
   { code: '1100', name: 'Accounts Receivable', name_ar: 'الذمم المدينة', type: 'asset' },
+  { code: '1170', name: 'Recoverable Input VAT', name_ar: 'ضريبة المدخلات القابلة للاسترداد', type: 'asset' },
+  { code: '1200', name: 'Inventory', name_ar: 'المخزون', type: 'asset' },
+  { code: '2000', name: 'Accounts Payable', name_ar: 'الذمم الدائنة', type: 'liability' },
   { code: '2100', name: 'VAT Payable', name_ar: 'ضريبة القيمة المضافة', type: 'liability' },
   { code: '4100', name: 'Lab Revenue', name_ar: 'إيرادات المختبر', type: 'revenue' },
+  { code: '5100', name: 'Direct purchase expense', name_ar: 'مصروف مشتريات مباشر', type: 'expense' },
 ];
 
 let accountsReady = false;
@@ -53,8 +57,19 @@ const assertNoDuplicateJournal = async (client, sourceType, sourceId) => {
   }
 };
 
+const linesUseIntegerHalalas = (lines) => lines.every((line) => (
+  Number.isInteger(line.debit_halalas) && Number.isInteger(line.credit_halalas)
+));
+
 const createEntry = async (description, sourceType, sourceId, userId, lines, client, options = {}) => {
-  if (!journalIsBalanced(lines)) {
+  const integerMode = linesUseIntegerHalalas(lines);
+  if (integerMode) {
+    const debit = lines.reduce((sum, line) => sum + line.debit_halalas, 0);
+    const credit = lines.reduce((sum, line) => sum + line.credit_halalas, 0);
+    if (debit !== credit || debit <= 0) {
+      throw new AppError('Unbalanced journal entry', 500, 'UNBALANCED_JOURNAL');
+    }
+  } else if (!journalIsBalanced(lines)) {
     throw new AppError('Unbalanced journal entry', 500, 'UNBALANCED_JOURNAL');
   }
   if (lines.some((line) => !line.accountId)) {
@@ -72,12 +87,21 @@ const createEntry = async (description, sourceType, sourceId, userId, lines, cli
   );
   const entryId = entry.rows[0].id;
   for (const line of lines) {
-    await exec(
-      client,
-      `INSERT INTO journal_lines (entry_id, account_id, debit, credit)
-       VALUES ($1, $2, $3, $4)`,
-      [entryId, line.accountId, line.debit || 0, line.credit || 0]
-    );
+    if (integerMode) {
+      await exec(
+        client,
+        `INSERT INTO journal_lines (entry_id, account_id, debit, credit)
+         VALUES ($1, $2, ($3::numeric / 100), ($4::numeric / 100))`,
+        [entryId, line.accountId, line.debit_halalas, line.credit_halalas]
+      );
+    } else {
+      await exec(
+        client,
+        `INSERT INTO journal_lines (entry_id, account_id, debit, credit)
+         VALUES ($1, $2, $3, $4)`,
+        [entryId, line.accountId, line.debit || 0, line.credit || 0]
+      );
+    }
   }
   return entryId;
 };
@@ -185,6 +209,7 @@ const listJournalEntries = async (limit = 50) => {
 
 module.exports = {
   ensureAccountsSeeded,
+  getAccountId,
   postInvoice,
   postPayment,
   postRefund,

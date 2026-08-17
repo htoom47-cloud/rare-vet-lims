@@ -92,8 +92,49 @@ check('attachment upload is image/PDF only and downloads through the API', () =>
 check('API client exposes purchases and supplier search/quick', () => {
   assert.ok(/export const purchasesAPI/.test(api));
   assert.ok(/\/purchases\/\$\{id\}\/approve/.test(api));
+  assert.ok(/\/purchases\/\$\{id\}\/post/.test(api));
+  assert.ok(/\/purchases\/\$\{id\}\/posting-preview/.test(api));
   assert.ok(/\/suppliers\/search/.test(api));
   assert.ok(/\/suppliers\/quick/.test(api));
+});
+
+check('detail posting UI links lines, previews, and blocks double post', () => {
+  assert.ok(/purchasesAPI\.post/.test(page));
+  assert.ok(/purchasesAPI\.linkLines/.test(page));
+  assert.ok(/purchasesAPI\.postingPreview/.test(page));
+  assert.ok(/postConfirm/.test(page));
+  assert.ok(/if \(!detail \|\| posting\) return/.test(page));
+  assert.ok(/purchases\.posted/.test(page));
+  assert.ok(/destInventory/.test(page));
+  assert.ok(/vatRecoverableHint/.test(page));
+  assert.ok(/creditApHint/.test(page));
+  assert.ok(/Post to stock and ledger/.test(i18n));
+  assert.ok(/ترحيل للمخزون والمحاسبة/.test(i18n));
+  assert.ok(/Recoverable Input VAT/.test(i18n) || /vatRecoverableHint/.test(i18n));
+  assert.ok(/aggregate accounts payable/.test(i18n));
+  assert.ok(/ذمم دائنة إجمالية/.test(i18n));
+});
+
+check('inventory expiry UI labels leftover stock separately from lots', () => {
+  const inventoryPage = read('pages/Inventory.jsx');
+  assert.ok(/inventoryAPI\.update/.test(inventoryPage));
+  assert.ok(/show_legacy_fields/.test(inventoryPage));
+  assert.ok(/alertSourceLot/.test(inventoryPage));
+  assert.ok(/alertSourceLegacy/.test(inventoryPage));
+  assert.ok(/params\.expiring = 'true'/.test(inventoryPage));
+  assert.ok(/PAGE_SIZE/.test(inventoryPage));
+  assert.ok(/setPagination/.test(inventoryPage));
+  assert.ok(/expiring_total/.test(inventoryPage));
+  assert.ok(/legacyFieldsLabel/.test(inventoryPage));
+  assert.ok(!/limit:\s*100/.test(inventoryPage));
+  assert.ok(!/[\u0600-\u06FF]/.test(inventoryPage));
+  assert.ok(/Unallocated legacy stock details \(not a current lot\)/.test(i18n));
+  assert.ok(/بيانات الرصيد القديم غير المفصل \(ليست دفعة حديثة\)/.test(i18n));
+  assert.ok(/صنف جديد/.test(i18n));
+  assert.ok(/New item/.test(i18n));
+  assert.ok(/تم تحديث المخزون/.test(i18n));
+  assert.ok(/Stock updated/.test(i18n));
+  assert.ok(/تم حفظ بيانات الرصيد القديم/.test(i18n));
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

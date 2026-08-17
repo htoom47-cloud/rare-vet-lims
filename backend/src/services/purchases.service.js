@@ -80,6 +80,15 @@ const toPublicItem = (row) => ({
   discount_sar: fromHalalas(row.discount_halalas),
   line_net_sar: fromHalalas(row.line_net_halalas),
   vat_sar: fromHalalas(row.vat_halalas),
+  destination: row.destination || null,
+  inventory_item_id: row.inventory_item_id || null,
+  inventory_sku: row.inventory_sku || null,
+  inventory_name: row.inventory_name || null,
+  expense_account_id: row.expense_account_id || null,
+  expense_account_code: row.expense_account_code || null,
+  expense_account_name: row.expense_account_name || null,
+  lot_number: row.lot_number || null,
+  expiry_date: row.expiry_date || null,
 });
 
 const toPublicAttachment = (row, invoiceId) => ({
@@ -121,6 +130,9 @@ const toPublic = (row, extras = {}) => {
     cancel_reason: row.cancel_reason,
     stock_applied_at: row.stock_applied_at,
     ledger_posted_at: row.ledger_posted_at,
+    posting_date: row.posting_date || null,
+    posted_by: row.posted_by || null,
+    posted: row.status === 'posted' || Boolean(row.stock_applied_at && row.ledger_posted_at),
     ...extras,
   };
 };
@@ -148,12 +160,32 @@ const lockInvoice = async (client, id) => {
 };
 
 const loadItems = async (client, id) => {
-  const { rows } = await runQuery(
-    client,
-    'SELECT * FROM purchase_invoice_items WHERE purchase_invoice_id = $1 ORDER BY line_no',
-    [id]
-  );
-  return rows.map(toPublicItem);
+  try {
+    const { rows } = await runQuery(
+      client,
+      `SELECT i.*,
+              inv.sku AS inventory_sku,
+              inv.name AS inventory_name,
+              inv.name_ar AS inventory_name_ar,
+              acc.code AS expense_account_code,
+              acc.name AS expense_account_name
+       FROM purchase_invoice_items i
+       LEFT JOIN inventory_items inv ON inv.id = i.inventory_item_id
+       LEFT JOIN ledger_accounts acc ON acc.id = i.expense_account_id
+       WHERE i.purchase_invoice_id = $1
+       ORDER BY i.line_no`,
+      [id]
+    );
+    return rows.map(toPublicItem);
+  } catch (err) {
+    if (err.code !== '42703') throw err;
+    const { rows } = await runQuery(
+      client,
+      'SELECT * FROM purchase_invoice_items WHERE purchase_invoice_id = $1 ORDER BY line_no',
+      [id]
+    );
+    return rows.map(toPublicItem);
+  }
 };
 
 const loadAttachments = async (client, id) => {
@@ -671,6 +703,13 @@ const cancel = async (id, reason, actor, reqOrOptions, maybeOptions) => {
         throw new AppError('Purchase invoice not found', 404, 'NOT_FOUND');
       }
       if (existing.status === 'cancelled') return toPublic(existing);
+      if (existing.status === 'posted' || existing.stock_applied_at || existing.ledger_posted_at) {
+        throw new AppError(
+          'Posted purchases cannot be cancelled. A reversal is required.',
+          409,
+          'POSTED_PURCHASE_REQUIRES_REVERSAL'
+        );
+      }
       if (existing.status === 'approved' && !String(reason || '').trim()) {
         throw new AppError('A cancellation reason is required for approved invoices', 400, 'CANCEL_REASON_REQUIRED');
       }
@@ -784,5 +823,8 @@ module.exports = {
   addAttachment,
   openAttachment,
   toPublic,
+  toPublicItem,
+  withPurchaseClient,
+  lockInvoice,
   CASH_SUPPLIER_NUMBER,
 };

@@ -3,8 +3,9 @@ const multer = require('multer');
 const service = require('../services/purchases.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { purchaseInvoiceSchema, purchaseCancelSchema, purchaseExtractionCorrectSchema, purchaseExtractionConfirmSchema } = require('../validators/schemas');
+const { purchaseInvoiceSchema, purchaseCancelSchema, purchaseLineLinkSchema, purchasePostSchema, purchaseExtractionCorrectSchema, purchaseExtractionConfirmSchema } = require('../validators/schemas');
 const extraction = require('../services/purchase-extraction.service');
+const posting = require('../services/purchase-posting.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { diskStorage, readAndCleanupUpload, cleanupUploadFile } = require('../utils/upload-disk');
 const { MAX_BYTES } = require('../utils/purchases-files');
@@ -96,6 +97,20 @@ router.post('/extractions/:extractionId/confirm', authorize(PERMISSIONS.PURCHASE
   } catch (err) { next(err); }
 });
 
+router.get('/posting/expense-accounts', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
+  try {
+    const data = await posting.listExpenseAccounts(req.user);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/posting/inventory-items', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
+  try {
+    const data = await posting.listLinkableInventory(req.user, req.query);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
   try {
     const data = await service.list(req.query, req.user);
@@ -127,6 +142,27 @@ router.put('/:id', authorize(PERMISSIONS.PURCHASES_CREATE), validate(purchaseInv
 router.delete('/:id', authorize(PERMISSIONS.PURCHASES_CREATE), async (req, res, next) => {
   try {
     const data = await service.softDelete(req.params.id, req.user, req);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/posting-preview', authorize(PERMISSIONS.PURCHASES_VIEW), async (req, res, next) => {
+  try {
+    const data = await posting.preview(req.params.id, req.user);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/:id/lines', authorize(PERMISSIONS.PURCHASES_CREATE), validate(purchaseLineLinkSchema), async (req, res, next) => {
+  try {
+    const data = await posting.setLineDestinations(req.params.id, req.body.lines, req.user, req);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/post', authorize(PERMISSIONS.PURCHASES_POST), validate(purchasePostSchema), async (req, res, next) => {
+  try {
+    const data = await posting.post(req.params.id, req.user, req, { body: req.body });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
