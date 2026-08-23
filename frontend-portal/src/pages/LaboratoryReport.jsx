@@ -105,6 +105,36 @@ function PatientField({ label, value }) {
   );
 }
 
+function recommendationItems(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-•*\u2022]+\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function ReportRecommendations({ title, text, dir }) {
+  const items = recommendationItems(text);
+  if (!items.length) return null;
+  return (
+    <section className="lab-rpt-recs" dir={dir}>
+      <div className="lab-rpt-recs-head">{title}</div>
+      <div className="lab-rpt-recs-body">
+        {items.length === 1 ? (
+          <p className="lab-rpt-recs-text">{items[0]}</p>
+        ) : (
+          <ul className="lab-rpt-recs-list">
+            {items.map((item) => (
+              <li key={item} className={/^العلاج\s*:/i.test(item) ? 'is-treatment' : undefined}>
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function LaboratoryReport({ initialReport = null, backPath = '/reports' }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -259,16 +289,6 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
         </div>
       </motion.div>
 
-      {recommendationsText && (
-        <section
-          className="portal-report-recommendations"
-          dir={isAr ? 'rtl' : 'ltr'}
-        >
-          <h2>{t('labReport.treatmentRecommendations')}</h2>
-          <p>{recommendationsText}</p>
-        </section>
-      )}
-
       {reportHtml ? (
         <div className="max-w-[210mm] mx-auto">
           <ReportHtmlFrame
@@ -328,16 +348,19 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
           <PatientField label={t('labReport.receivedDate')} value={fmtDate(report.sample.receivedDate, locale, true)} />
         </div>
 
-        {(interpretationText || recommendationsText) && (
-          <div className="lab-rpt-notes">
-            {interpretationText && (
-              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.interpretation')}:</b> {interpretationText}</p>
-            )}
-            {recommendationsText && (
-              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.treatmentRecommendations')}:</b> {recommendationsText}</p>
-            )}
-          </div>
+        {interpretationText && (
+          <section className="lab-rpt-recs lab-rpt-recs--interp" dir={isAr ? 'rtl' : 'ltr'}>
+            <div className="lab-rpt-recs-head">{t('labReport.interpretation')}</div>
+            <div className="lab-rpt-recs-body">
+              <p className="lab-rpt-recs-text">{interpretationText}</p>
+            </div>
+          </section>
         )}
+        <ReportRecommendations
+          title={t('labReport.treatmentRecommendations')}
+          text={recommendationsText}
+          dir={isAr ? 'rtl' : 'ltr'}
+        />
 
         <div className="lab-rpt-table-wrap">
           <table className="lab-rpt-table lab-results-table">
