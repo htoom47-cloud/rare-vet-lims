@@ -59,6 +59,18 @@ export const portalAnimalsAPI = {
 export const portalReportsAPI = {
   list: (params) => portalApi.get('/reports', { params }),
   getPreview: (id) => portalApi.get(`/reports/${id}/preview`, { params: { _: Date.now() } }),
+  getReportHtml: async (id) => {
+    const token = localStorage.getItem('portalAccessToken');
+    const response = await fetch(`${API_URL}/portal/reports/${id}/html`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const err = new Error('HTML preview failed');
+      err.response = { status: response.status };
+      throw err;
+    }
+    return response.text();
+  },
   openPdf: async (pdfUrl) => {
     const filename = pdfUrl?.split('/').pop();
     if (!filename) throw new Error('Missing report file');

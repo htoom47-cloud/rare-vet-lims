@@ -1010,6 +1010,38 @@
   color: #b91c1c;
 }
 
+.portal-report-recommendations {
+  max-width: 210mm;
+  margin: 0 auto 16px;
+  padding: 14px 16px;
+  background: #faf8f5;
+  border: 1px solid #e8e0d8;
+  border-inline-start: 4px solid #5B3A29;
+  border-radius: 10px;
+}
+
+.portal-report-recommendations h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #5B3A29;
+}
+
+.portal-report-recommendations p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  color: #2d2118;
+}
+
+@media screen {
+  .lab-report-page:has(.portal-report-recommendations) .lab-rpt-notes {
+    display: none;
+  }
+}
+
 .lab-rpt-notes {
   margin: 3px 8px;
   padding: 3px 6px;

@@ -15,6 +15,7 @@ import AppLogo from '../components/ui/AppLogo';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
+import ReportHtmlFrame from '../components/reports/ReportHtmlFrame';
 import { portalReportsAPI } from '../services/portalApi';
 import { printLabReport } from '../utils/labReportPrint';
 
@@ -109,7 +110,9 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const reportRef = useRef(null);
+  const htmlFrameRef = useRef(null);
   const [report, setReport] = useState(initialReport);
+  const [reportHtml, setReportHtml] = useState(null);
   const [loading, setLoading] = useState(!initialReport);
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -118,12 +121,16 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
   const locale = isAr ? 'ar' : 'en';
 
   const load = useCallback(async () => {
-    if (initialReport) { setReport(initialReport); setLoading(false); return; }
-    if (!id) return;
+    const reportId = initialReport?.id || id;
+    if (!reportId) return;
     setLoading(true);
     try {
-      const { data } = await portalReportsAPI.getPreview(id);
-      setReport(data.data);
+      const [previewRes, html] = await Promise.all([
+        portalReportsAPI.getPreview(reportId),
+        portalReportsAPI.getReportHtml(reportId).catch(() => null),
+      ]);
+      setReport(previewRes.data.data);
+      setReportHtml(html);
     } catch {
       toast.error(t('labReport.loadFailed'));
       navigate(backPath);
@@ -187,6 +194,7 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
 
   const handlePrint = async () => {
     toast.dismiss();
+    if (reportHtml && htmlFrameRef.current?.print()) return;
     if (!reportRef.current) return;
     try {
       await printLabReport(reportRef.current, { isAr });
@@ -224,6 +232,13 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
 
   if (!report) return null;
 
+  const recommendationsText = String(
+    report.recommendations || report.treatmentRecommendations || ''
+  ).trim();
+  const interpretationText = String(
+    report.interpretation || report.aiInterpretation || ''
+  ).trim();
+
   const labName = isAr ? report.lab.nameAr : report.lab.name;
   const statusLabel = report.status === 'final' ? t('labReport.final') : t('labReport.preliminary');
 
@@ -244,6 +259,25 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
         </div>
       </motion.div>
 
+      {recommendationsText && (
+        <section
+          className="portal-report-recommendations"
+          dir={isAr ? 'rtl' : 'ltr'}
+        >
+          <h2>{t('labReport.treatmentRecommendations')}</h2>
+          <p>{recommendationsText}</p>
+        </section>
+      )}
+
+      {reportHtml ? (
+        <div className="max-w-[210mm] mx-auto">
+          <ReportHtmlFrame
+            ref={htmlFrameRef}
+            html={reportHtml}
+            title={report.reportNumber || t('labReport.title')}
+          />
+        </div>
+      ) : (
       <div
         ref={reportRef}
         className="lab-report-document lab-report-a4 mx-auto bg-white text-[#2d2118] shadow-lg print:shadow-none"
@@ -293,6 +327,17 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
           <PatientField label={t('labReport.collectionDate')} value={fmtDate(report.sample.collectionDate, locale, true)} />
           <PatientField label={t('labReport.receivedDate')} value={fmtDate(report.sample.receivedDate, locale, true)} />
         </div>
+
+        {(interpretationText || recommendationsText) && (
+          <div className="lab-rpt-notes">
+            {interpretationText && (
+              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.interpretation')}:</b> {interpretationText}</p>
+            )}
+            {recommendationsText && (
+              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.treatmentRecommendations')}:</b> {recommendationsText}</p>
+            )}
+          </div>
+        )}
 
         <div className="lab-rpt-table-wrap">
           <table className="lab-rpt-table lab-results-table">
@@ -366,17 +411,6 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
           </section>
         )}
 
-        {(report.interpretation || report.recommendations) && (
-          <div className="lab-rpt-notes">
-            {report.interpretation && (
-              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.interpretation')}:</b> {report.interpretation}</p>
-            )}
-            {report.recommendations && (
-              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.recommendations')}:</b> {report.recommendations}</p>
-            )}
-          </div>
-        )}
-
         <div className="lab-rpt-flag-legend">
           <span><span className="lab-flag lab-flag-high">↑</span> {t('labReport.high')}</span>
           <span><span className="lab-flag lab-flag-low">↓</span> {t('labReport.low')}</span>
@@ -411,6 +445,7 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
           </div>
         </footer>
       </div>
+      )}
     </div>
   );
 }
