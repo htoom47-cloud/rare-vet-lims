@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --font-arabic: "Cairo", Tahoma, sans-serif;
+  --font-display: "Oswald", Impact, sans-serif;
+  --font-body: "Manrope", "Segoe UI", sans-serif;
+
+  --color-ink: #0a0a0a;
+  --color-navy: #14213d;
+  --color-steel: #1e3a5f;
+  --color-medical: #1a4b8c;
+  --color-crimson: #c41e3a;
+  --color-sand: #c9a46a;
+  --color-mist: #e6edf5;
+  --color-paper: #f5f7fa;
+  --color-track: #2a2118;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(26, 75, 140, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 0% 20%, rgba(201, 164, 106, 0.14), transparent 55%),
+    linear-gradient(180deg, #f5f7fa 0%, #eef2f7 40%, #f8f6f2 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+[dir="rtl"] body,
+[dir="rtl"] {
+  font-family: var(--font-arabic), var(--font-body);
+}
+
+[dir="ltr"] .font-display,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-medical) 35%, white);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+.hero-atmosphere {
+  background:
+    linear-gradient(180deg, rgba(10, 10, 10, 0.55) 0%, rgba(20, 33, 61, 0.72) 45%, rgba(10, 10, 10, 0.88) 100%),
+    radial-gradient(ellipse at 30% 70%, rgba(201, 164, 106, 0.35), transparent 50%),
+    radial-gradient(ellipse at 70% 40%, rgba(26, 75, 140, 0.25), transparent 45%),
+    linear-gradient(135deg, #3d2e1f 0%, #1a2438 40%, #0f1724 100%);
+}
+
+.dune-pattern {
+  background-image:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 18px,
+      rgba(255, 255, 255, 0.03) 18px 19px
+    );
+}
+
+.spec-table tr:nth-child(even) {
+  background: rgba(26, 75, 140, 0.05);
+}
+
+.product-podium {
+  background:
+    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.95) 0%, rgba(230, 237, 245, 0.4) 55%, transparent 75%);
+}
+
+@keyframes drift {
+  from {
+    transform: translateX(-2%);
+  }
+  to {
+    transform: translateX(2%);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-drift {
+  animation: drift 12s ease-in-out infinite alternate;
+}
+
+.animate-rise {
+  animation: rise-in 0.7s ease-out both;
+}
