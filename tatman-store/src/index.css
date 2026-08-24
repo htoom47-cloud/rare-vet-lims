@@ -62,11 +62,12 @@ img {
 }
 
 .hero-atmosphere {
-  background:
-    linear-gradient(180deg, rgba(10, 10, 10, 0.55) 0%, rgba(20, 33, 61, 0.72) 45%, rgba(10, 10, 10, 0.88) 100%),
-    radial-gradient(ellipse at 30% 70%, rgba(201, 164, 106, 0.35), transparent 50%),
-    radial-gradient(ellipse at 70% 40%, rgba(26, 75, 140, 0.25), transparent 45%),
-    linear-gradient(135deg, #3d2e1f 0%, #1a2438 40%, #0f1724 100%);
+  background-color: #0f1724;
+  background-image:
+    linear-gradient(180deg, rgba(10, 10, 10, 0.35) 0%, rgba(20, 33, 61, 0.55) 42%, rgba(8, 12, 20, 0.92) 100%),
+    radial-gradient(ellipse at 28% 78%, rgba(201, 164, 106, 0.45), transparent 52%),
+    radial-gradient(ellipse at 72% 35%, rgba(26, 75, 140, 0.4), transparent 48%),
+    linear-gradient(145deg, #4a3524 0%, #1a2438 38%, #0b1220 100%);
 }
 
 .dune-pattern {

@@ -1,7 +1,9 @@
-export function Logo({ className = "", compact = false }) {
+export function Logo({ className = "", compact = false, light = false }) {
+  const tone = light ? "text-white" : "text-ink";
+
   if (compact) {
     return (
-      <div className={`flex items-center gap-3 ${className}`}>
+      <div className={`flex items-center gap-3 ${tone} ${className}`}>
         <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
           <path
             d="M10 36c3-12 10-22 18-26 2 5 5 9 10 10-3 8-8 15-13 20-5-2-10-3-15-4zm24-28c5 1 10 4 12 9-7 2-12 7-15 14-2-7-5-14-7-19 3-2 6-3 10-4z"
@@ -17,7 +19,7 @@ export function Logo({ className = "", compact = false }) {
   }
 
   return (
-    <div className={`flex flex-col items-center text-center ${className}`}>
+    <div className={`flex flex-col items-center text-center ${tone} ${className}`}>
       <div className="font-arabic text-3xl font-extrabold tracking-tight sm:text-4xl">تطمن</div>
       <svg viewBox="0 0 120 70" className="my-1 h-14 w-24" aria-hidden>
         <path
@@ -28,18 +30,17 @@ export function Logo({ className = "", compact = false }) {
           x="60"
           y="62"
           textAnchor="middle"
-          className="font-display"
           fill="currentColor"
-          style={{ fontSize: 22, fontWeight: 700, letterSpacing: 3 }}
+          style={{ fontSize: 22, fontWeight: 700, letterSpacing: 3, fontFamily: "Oswald, sans-serif" }}
         >
           VET
         </text>
       </svg>
       <div className="font-display text-lg tracking-[0.28em]">TATMAN</div>
-      <div className="mt-0.5 text-[10px] font-semibold tracking-[0.28em] opacity-70">
+      <div className="mt-0.5 text-[10px] font-semibold tracking-[0.28em] opacity-80">
         VETERINARY SERVICES
       </div>
-      <div className="font-arabic text-xs font-semibold opacity-70">للخدمات البيطرية</div>
+      <div className="font-arabic text-xs font-semibold opacity-80">للخدمات البيطرية</div>
     </div>
   );
 }

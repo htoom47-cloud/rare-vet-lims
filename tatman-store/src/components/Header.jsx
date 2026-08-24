@@ -35,20 +35,19 @@ export function Header() {
           <button
             type="button"
             onClick={toggle}
-            className="rounded-full border border-navy/15 bg-white px-3 py-1.5 text-xs font-bold tracking-wide text-navy"
+            aria-label={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}
+            className="rounded-full border border-navy/15 bg-white px-3 py-1.5 text-xs font-bold tracking-wide text-navy hover:border-medical"
           >
             {lang === "ar" ? "EN" : "عربي"}
           </button>
           <Link
             to="/cart"
-            className="relative inline-flex items-center gap-2 rounded-full bg-navy px-3 py-2 text-sm font-semibold text-white"
+            className="relative inline-flex items-center gap-2 rounded-full bg-navy px-3.5 py-2 text-sm font-semibold text-white"
           >
             <span>{t("السلة", "Cart")}</span>
-            {cart.count > 0 && (
-              <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-crimson px-1 text-[11px]">
-                {cart.count}
-              </span>
-            )}
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-crimson px-1.5 text-[11px] font-bold">
+              {cart.count}
+            </span>
           </Link>
         </div>
       </div>

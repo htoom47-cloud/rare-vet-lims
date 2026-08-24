@@ -12,38 +12,50 @@ export function Home() {
 
   return (
     <div>
-      <section className="hero-atmosphere dune-pattern relative min-h-[88vh] overflow-hidden text-white">
+      <section
+        className="hero-atmosphere dune-pattern relative min-h-[88vh] overflow-hidden text-white"
+        style={{ color: "#fff" }}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[#0f1724]" aria-hidden />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(15,23,36,0.2) 0%, rgba(20,33,61,0.45) 50%, rgba(8,12,20,0.85) 100%), radial-gradient(ellipse at 30% 75%, rgba(201,164,106,0.4), transparent 55%)",
+          }}
+          aria-hidden
+        />
         <div className="pointer-events-none absolute inset-0">
-          <div className="animate-drift absolute -start-10 bottom-16 h-40 w-[120%] opacity-30">
+          <div className="animate-drift absolute -start-10 bottom-16 h-40 w-[120%] opacity-40">
             <svg viewBox="0 0 1200 200" className="h-full w-full" preserveAspectRatio="none">
               <path
                 d="M0 140 C120 80 220 160 340 110 C460 60 560 150 700 100 C840 50 960 140 1200 90 L1200 200 L0 200 Z"
-                fill="rgba(201,164,106,0.35)"
+                fill="rgba(201,164,106,0.45)"
               />
             </svg>
           </div>
-          <div className="absolute bottom-0 start-0 end-0 flex justify-between px-6 opacity-40 sm:px-16">
+          <div className="absolute bottom-0 start-0 end-0 flex justify-between px-6 text-white/45 sm:px-16">
             <HorseSilhouette className="h-28 w-36 sm:h-40 sm:w-52" />
             <CamelSilhouette className="hidden h-36 w-48 sm:block" />
             <HorseSilhouette className="h-24 w-32 scale-x-[-1] sm:h-36 sm:w-44" />
           </div>
         </div>
 
-        <div className="relative mx-auto flex min-h-[88vh] max-w-7xl flex-col items-center justify-center px-4 pb-28 pt-16 text-center sm:px-6">
+        <div className="relative z-10 mx-auto flex min-h-[88vh] max-w-7xl flex-col items-center justify-center px-4 pb-28 pt-16 text-center sm:px-6">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
             className="text-white"
           >
-            <Logo className="text-white [&_*]:fill-white [&_*]:text-white" />
+            <Logo className="text-white" light />
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.75, delay: 0.15 }}
-            className="mt-10 max-w-3xl font-arabic text-4xl font-extrabold leading-tight sm:text-5xl md:text-6xl"
+            className="mt-10 max-w-3xl font-arabic text-4xl font-extrabold leading-tight text-white sm:text-5xl md:text-6xl"
           >
             {t("منتجات بيطرية مميزة… تطمن", "Specialty veterinary products. Rest assured.")}
           </motion.h1>
@@ -52,7 +64,7 @@ export function Home() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.28 }}
-            className="mt-5 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
+            className="mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg"
           >
             {t(
               "تركيبات احترافية لخيول السباق والإبل والمواشي — بنفس هوية إعلانات تطمن.",
@@ -74,7 +86,7 @@ export function Home() {
             </Link>
             <Link
               to="/contact"
-              className="rounded-full border border-white/35 bg-white/10 px-7 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+              className="rounded-full border border-white/40 bg-white/15 px-7 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/25"
             >
               {t("اطلب عبر واتساب", "Order on WhatsApp")}
             </Link>
