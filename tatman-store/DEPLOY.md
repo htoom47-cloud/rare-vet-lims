@@ -1,11 +1,25 @@
 # نشر وإدارة متجر تطمن
 
-المتجر أصبح **Web Service** (ليس Static Site) لأن لوحة التحكم تحتاج حفظ المنتجات والطلبات.
+المتجر **Web Service** على Render (ليس Static Site) لأن لوحة التحكم تحتاج حفظ المنتجات والطلبات.
+
+## الروابط الحية
+
+- المتجر: https://tatmanvet.com
+- الإدارة: https://tatmanvet.com/admin
+- نسخة Render: https://tatman-vet-web.onrender.com
+- لوحة Render: https://dashboard.render.com/web/srv-da6n12vavr4c739dh1ag
+
+الخدمة: `tatman-vet-web` (`srv-da6n12vavr4c739dh1ag`)  
+الفرع: `cursor/tatman-vet-store-8ce2` حتى الدمج في `main`  
+Root Directory: `tatman-store`
+
+**لا تعدّل** خدمة LIMS: `rare-vet-lims`.
 
 ## لوحة التحكم
+
 - الرابط: `https://tatmanvet.com/admin`
-- كلمة المرور الافتراضية محلياً: `Tatman#2026`
-- على Render ضع Environment Variable: `ADMIN_PASSWORD`
+- محلياً كلمة المرور الافتراضية: `Tatman#2026`
+- على Render غيّر Environment Variable: `ADMIN_PASSWORD` إلى كلمة سر قوية
 
 من اللوحة:
 - المنتجات وأسعار قطر / السعودية
@@ -14,31 +28,40 @@
 - أرقام واتساب، IBAN، وتفعيل طرق الدفع لكل دولة
 
 ## طرق الدفع الحالية
+
 لكل دولة يمكن تفعيل:
 - واتساب
 - تحويل بنكي (IBAN من الإعدادات)
 - الدفع عند الاستلام
 - بطاقة / مدى (يمكن تفعيلها من الإعدادات؛ حتى ربط بوابة دفع مثل Tap/Moyasar يبقى الطلب مسجّلاً للتأكيد)
 
-## تحويل الخدمة في Render (مهم)
+## إعداد Render الحالي
 
-الخدمة الحالية Static Site لا تشغّل لوحة التحكم. اعمل التالي:
+| البند | القيمة |
+|---|---|
+| النوع | Web Service (Node) |
+| Build | `npm ci --include=dev && npm run build` |
+| Start | `npm start` |
+| Health | `/api/health` |
+| Disk | 1GB على `/var/data` |
+| `NODE_VERSION` | `22` |
+| `NODE_ENV` | `production` |
+| `DATA_DIR` | `/var/data` |
+| `ADMIN_PASSWORD` | غيّرها من لوحة Render |
+| `SESSION_SECRET` | نص عشوائي موجود على الخدمة |
 
-1. **New + → Web Service**
-2. نفس المستودع `rare-vet-lims`
-3. Branch: `cursor/tatman-vet-store-8ce2` ثم `main` بعد الدمج
-4. Root Directory: `tatman-store`
-5. Runtime: Node
-6. Build: `npm ci && npm run build`
-7. Start: `npm start`
-8. Environment:
-   - `NODE_VERSION=22`
-   - `NODE_ENV=production`
-   - `DATA_DIR=/var/data`
-   - `ADMIN_PASSWORD=` كلمة سر قوية
-   - `SESSION_SECRET=` نص عشوائي
-9. Disk: أضف قرص 1GB على `/var/data` حتى لا تُمسح الطلبات بعد إعادة النشر
-10. انقل الدومين `tatmanvet.com` من الـ Static Site القديم إلى هذا الـ Web Service
+`NODE_ENV=production` يجعل `npm ci` يتخطى `devDependencies` (ومنها Vite). لذلك أمر البناء يجب أن يبقى `npm ci --include=dev && npm run build`.
+
+الخدمة القديمة Static Site `tatman-vet-store` تُركت كنسخة احتياطية بدون الدومين. الدومين مربوط بـ `tatman-vet-web`.
+
+## DNS (Namecheap)
+
+- **A** `@` → `216.24.57.1` (Render)
+- **CNAME** `www` → `tatman-vet-web.onrender.com.` (يفضّل تحديثه من القيمة القديمة `tatman-vet-store.onrender.com.`)
+
+`www` يعيد التوجيه حالياً إلى https://tatmanvet.com حتى قبل تحديث الـ CNAME، لأن الدومين مربوط بالخدمة الجديدة على Render.
+
+بعد الدمج في `main` غيّر Branch في Render إلى `main`.
 
 ## تشغيل محلي
 
