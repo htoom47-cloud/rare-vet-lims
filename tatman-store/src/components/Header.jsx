@@ -4,8 +4,8 @@ import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
 
 const linkClass = ({ isActive }) =>
-  `text-sm font-semibold tracking-wide transition ${
-    isActive ? "text-crimson" : "text-ink/75 hover:text-navy"
+  `text-sm font-bold tracking-wide transition ${
+    isActive ? "text-crimson" : "text-ink/75 hover:text-medical"
   }`;
 
 export function Header() {
@@ -13,9 +13,9 @@ export function Header() {
   const cart = useCart();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-navy/10 bg-paper/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <Link to="/" className="text-ink">
+    <header className="sticky top-0 z-40 border-b border-track/10 bg-paper/90 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2.5 sm:px-6 sm:py-3">
+        <Link to="/" className="shrink-0" aria-label="Tatman home">
           <Logo compact />
         </Link>
 
@@ -36,22 +36,23 @@ export function Header() {
             type="button"
             onClick={toggle}
             aria-label={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}
-            className="rounded-full border border-navy/15 bg-white px-3 py-1.5 text-xs font-bold tracking-wide text-navy hover:border-medical"
+            className="min-h-10 rounded-full border border-medical/25 bg-white px-3.5 py-2 text-xs font-extrabold tracking-wide text-navy"
           >
             {lang === "ar" ? "EN" : "عربي"}
           </button>
           <Link
             to="/cart"
-            className="relative inline-flex items-center gap-2 rounded-full bg-navy px-3.5 py-2 text-sm font-semibold text-white"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-navy px-3.5 py-2 text-sm font-bold text-white"
           >
-            <span>{t("السلة", "Cart")}</span>
+            <span className="hidden xs:inline sm:inline">{t("السلة", "Cart")}</span>
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-crimson px-1.5 text-[11px] font-bold">
               {cart.count}
             </span>
           </Link>
         </div>
       </div>
-      <nav className="flex justify-center gap-5 border-t border-navy/5 py-2 md:hidden">
+
+      <nav className="safe-bottom flex justify-around gap-1 border-t border-track/5 px-2 py-2 md:hidden">
         <NavLink to="/" end className={linkClass}>
           {t("الرئيسية", "Home")}
         </NavLink>

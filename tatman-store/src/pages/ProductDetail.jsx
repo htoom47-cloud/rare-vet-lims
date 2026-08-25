@@ -60,14 +60,15 @@ export function ProductDetail() {
             ))}
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center"
+            >
             <div className="font-display text-3xl text-crimson">
               {formatPrice(product.priceQar, lang)}
             </div>
             <button
               type="button"
               onClick={() => cart.add(product)}
-              className="rounded-full bg-crimson px-6 py-3 text-sm font-bold text-white shadow-lg shadow-crimson/25"
+              className="min-h-12 rounded-full bg-crimson px-6 py-3 text-sm font-bold text-white shadow-lg shadow-crimson/25"
             >
               {t("أضف إلى السلة", "Add to cart")}
             </button>

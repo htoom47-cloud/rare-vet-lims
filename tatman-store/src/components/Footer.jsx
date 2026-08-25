@@ -7,14 +7,16 @@ export function Footer() {
   const { t } = useLang();
 
   return (
-    <footer className="mt-20 border-t border-navy/10 bg-ink text-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr]">
+    <footer className="mt-16 border-t border-track/10 bg-ink text-white sm:mt-20">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 sm:py-14 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
-          <Logo className="items-start text-start text-white [&_*]:text-white" />
+          <div className="inline-block rounded-2xl bg-paper p-3">
+            <Logo compact className="h-16 sm:h-[4.5rem]" />
+          </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">
             {t(
-              "متجر تطمن للمنتجات البيطرية المميزة — جودة احترافية لخيول السباق والإبل والمواشي في قطر والخليج.",
-              "Tatman specialty veterinary store — professional-grade care for race horses, camels, and livestock across Qatar & the Gulf.",
+              "تطمن للخدمات البيطرية — منتجات مميزة للإبل والخيل والهجن. طلب من قطر والسعودية والخليج والعالم.",
+              "Tatman Veterinary Services — specialty products for camels, horses, and hajjan. Orders from Qatar, Saudi Arabia, the Gulf, and worldwide.",
             )}
           </p>
         </div>
@@ -35,11 +37,14 @@ export function Footer() {
             href={`https://wa.me/${WHATSAPP}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-bold text-ink"
+            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25D366] px-4 py-2.5 text-sm font-bold text-ink"
           >
             WhatsApp +974 5121 1169
           </a>
           <p className="mt-3 font-arabic text-2xl font-extrabold text-white/90">الصيدلية</p>
+          <p className="mt-2 text-xs text-white/50">
+            {t("متاح للطلب من أي دولة", "Available for orders from any country")}
+          </p>
         </div>
       </div>
       <div className="border-t border-white/10 py-4 text-center text-xs text-white/45">

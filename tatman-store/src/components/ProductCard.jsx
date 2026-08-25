@@ -16,7 +16,7 @@ export function ProductCard({ product, index = 0 }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.45, delay: index * 0.05 }}
-      className="group relative overflow-hidden rounded-[1.5rem] bg-white/80 shadow-[0_12px_40px_rgba(20,33,61,0.08)] ring-1 ring-navy/5 backdrop-blur-sm"
+      className="group relative overflow-hidden rounded-[1.35rem] bg-white/90 shadow-[0_12px_40px_rgba(58,44,31,0.08)] ring-1 ring-track/10 backdrop-blur-sm sm:rounded-[1.5rem]"
     >
       <div
         className="absolute inset-x-0 top-0 h-1.5"
@@ -51,7 +51,7 @@ export function ProductCard({ product, index = 0 }) {
         <button
           type="button"
           onClick={() => cart.add(product)}
-          className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-medical"
+          className="min-h-10 rounded-full bg-navy px-4 py-2.5 text-sm font-bold text-white transition hover:bg-medical"
         >
           {t("أضف للسلة", "Add to cart")}
         </button>

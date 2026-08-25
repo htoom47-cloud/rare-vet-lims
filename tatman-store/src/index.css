@@ -5,15 +5,19 @@
   --font-display: "Oswald", Impact, sans-serif;
   --font-body: "Manrope", "Segoe UI", sans-serif;
 
-  --color-ink: #0a0a0a;
-  --color-navy: #14213d;
-  --color-steel: #1e3a5f;
-  --color-medical: #1a4b8c;
-  --color-crimson: #c41e3a;
-  --color-sand: #c9a46a;
-  --color-mist: #e6edf5;
-  --color-paper: #f5f7fa;
-  --color-track: #2a2118;
+  /* Medical + wilderness palette */
+  --color-ink: #12100e;
+  --color-navy: #1a3d3a;
+  --color-steel: #245652;
+  --color-medical: #2f6f68;
+  --color-teal: #3d8b82;
+  --color-crimson: #9b3b2f;
+  --color-sand: #c4a574;
+  --color-dune: #e8dcc8;
+  --color-mist: #e7efed;
+  --color-paper: #f4efe6;
+  --color-track: #3a2c1f;
+  --color-sage: #6f8f6a;
 }
 
 * {
@@ -22,6 +26,7 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -30,9 +35,9 @@ body {
   font-family: var(--font-body);
   color: var(--color-ink);
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(26, 75, 140, 0.12), transparent 60%),
-    radial-gradient(900px 500px at 0% 20%, rgba(201, 164, 106, 0.14), transparent 55%),
-    linear-gradient(180deg, #f5f7fa 0%, #eef2f7 40%, #f8f6f2 100%);
+    radial-gradient(1000px 520px at 90% -5%, rgba(61, 139, 130, 0.14), transparent 58%),
+    radial-gradient(800px 480px at 0% 15%, rgba(196, 165, 116, 0.18), transparent 55%),
+    linear-gradient(180deg, #f4efe6 0%, #eef3f1 45%, #f7f2ea 100%);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -61,40 +66,43 @@ img {
   display: block;
 }
 
-.hero-atmosphere {
-  background-color: #0f1724;
-  background-image:
-    linear-gradient(180deg, rgba(10, 10, 10, 0.35) 0%, rgba(20, 33, 61, 0.55) 42%, rgba(8, 12, 20, 0.92) 100%),
-    radial-gradient(ellipse at 28% 78%, rgba(201, 164, 106, 0.45), transparent 52%),
-    radial-gradient(ellipse at 72% 35%, rgba(26, 75, 140, 0.4), transparent 48%),
-    linear-gradient(145deg, #4a3524 0%, #1a2438 38%, #0b1220 100%);
+button,
+a,
+input {
+  touch-action: manipulation;
 }
 
-.dune-pattern {
-  background-image:
-    repeating-linear-gradient(
-      115deg,
-      transparent 0 18px,
-      rgba(255, 255, 255, 0.03) 18px 19px
-    );
+.hero-shell {
+  position: relative;
+  min-height: 100svh;
+  color: #fff;
+  overflow: hidden;
+}
+
+.hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 45%;
+}
+
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(18, 16, 14, 0.55) 0%, rgba(26, 61, 58, 0.45) 42%, rgba(18, 16, 14, 0.82) 100%),
+    linear-gradient(90deg, rgba(58, 44, 31, 0.35), transparent 40%, rgba(47, 111, 104, 0.25));
 }
 
 .spec-table tr:nth-child(even) {
-  background: rgba(26, 75, 140, 0.05);
+  background: rgba(47, 111, 104, 0.06);
 }
 
 .product-podium {
   background:
-    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.95) 0%, rgba(230, 237, 245, 0.4) 55%, transparent 75%);
-}
-
-@keyframes drift {
-  from {
-    transform: translateX(-2%);
-  }
-  to {
-    transform: translateX(2%);
-  }
+    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.96) 0%, rgba(231, 239, 237, 0.45) 55%, transparent 75%);
 }
 
 @keyframes rise-in {
@@ -108,10 +116,12 @@ img {
   }
 }
 
-.animate-drift {
-  animation: drift 12s ease-in-out infinite alternate;
-}
-
 .animate-rise {
   animation: rise-in 0.7s ease-out both;
+}
+
+@media (max-width: 640px) {
+  .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
 }
