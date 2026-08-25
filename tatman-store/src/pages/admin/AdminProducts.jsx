@@ -5,10 +5,12 @@ import { productImage } from "../../data/stock";
 
 export function AdminProducts() {
   const [products, setProducts] = useState([]);
+  const [extras, setExtras] = useState([]);
 
   async function load() {
-    const d = await api.products();
-    setProducts(d.products || []);
+    const p = await api.products();
+    setProducts(p.products || []);
+    setExtras((p.countries || []).filter((c) => c.code !== "qa" && c.code !== "sa"));
   }
 
   useEffect(() => {
@@ -31,6 +33,9 @@ export function AdminProducts() {
               <th className="p-3">الاسم</th>
               <th className="p-3">قطر</th>
               <th className="p-3">السعودية</th>
+              {extras.map((c) => (
+                <th key={c.code} className="p-3">{c.nameAr}</th>
+              ))}
               <th className="p-3">الحالة</th>
               <th className="p-3"></th>
             </tr>
@@ -57,6 +62,12 @@ export function AdminProducts() {
                   {p.availableSa === false ? "—" : `${p.priceSar} ر.س`}
                   <div className="text-xs text-black/50">{stockLabel(p.stockSa)}</div>
                 </td>
+                {extras.map((c) => (
+                  <td key={c.code} className="p-3">
+                    {p.available?.[c.code] === false ? "—" : `${p.prices?.[c.code] || p.priceQar || 0} ${c.currencyAr}`}
+                    <div className="text-xs text-black/50">{stockLabel(p.stock?.[c.code])}</div>
+                  </td>
+                ))}
                 <td className="p-3">{p.active === false ? "مخفي" : "ظاهر"}</td>
                 <td className="p-3">
                   <Link className="font-bold text-medical" to={`/admin/products/${p.id}`}>

@@ -3,12 +3,24 @@ import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import { getDb, saveDb, uploadsDir } from "./db.js";
-import { stockOf } from "../src/data/stock.js";
+import { decrementStock, stockOf } from "../src/data/stock.js";
 import { couponFail, discountAmount, findCoupon, normalizeCode, shapeCoupon } from "../src/data/coupons.js";
 import { customersFromOrders } from "../src/data/customers.js";
 import { isOrderStatus } from "../src/data/orders.js";
-import { activeCouriers, findCourier, mergeCouriers } from "../src/data/couriers.js";
+import { activeCouriers, findCourier } from "../src/data/couriers.js";
 import { buildRevenue } from "../src/data/revenue.js";
+import {
+  isCountryCode,
+  mergeAllSettings,
+  normalizeCountryCode,
+  productAvailable,
+  productPrice,
+  publicCountryList,
+  resolveCountry,
+  shapeExtraAvailable,
+  shapeExtraPrices,
+  shapeExtraStock,
+} from "../src/data/countries.js";
 import { normalizePermissions, normalizeUsername, publicAdminUser } from "../src/data/permissions.js";
 import {
   checkPassword,
@@ -112,6 +124,9 @@ function shapeProduct(body, existing = {}) {
     images,
     stockQa: optionalStock(body.stockQa !== undefined ? body.stockQa : existing.stockQa),
     stockSa: optionalStock(body.stockSa !== undefined ? body.stockSa : existing.stockSa),
+    prices: shapeExtraPrices(body.prices, existing.prices),
+    available: shapeExtraAvailable(body.available, existing.available),
+    stock: shapeExtraStock(body.stock, existing.stock, optionalStock),
   };
 }
 
@@ -124,15 +139,16 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/api/catalog", (req, res) => {
-  const country = req.query.country === "sa" ? "sa" : "qa";
   const db = getDb();
+  const country = resolveCountry(req.query.country, db.settings);
   const products = db.products.filter((p) => {
     if (p.active === false) return false;
-    return country === "sa" ? p.availableSa !== false : p.availableQa !== false;
+    return productAvailable(p, country);
   });
   res.json({
     country,
     settings: db.settings[country],
+    countries: publicCountryList(db.settings),
     products: products.map(publicProduct),
     categories: [
       { id: "anti-inflammatory", ar: "مضاد التهاب", en: "Anti-inflammatory" },
@@ -146,7 +162,6 @@ app.get("/api/catalog", (req, res) => {
 });
 
 app.post("/api/orders", (req, res) => {
-  const country = req.body?.country === "sa" ? "sa" : "qa";
   const itemsIn = Array.isArray(req.body?.items) ? req.body.items : [];
   if (!itemsIn.length) {
     res.status(400).json({ error: "empty_cart" });
@@ -170,7 +185,12 @@ app.post("/api/orders", (req, res) => {
   let settings = null;
 
   saveDb((d) => {
+    const country = resolveCountry(req.body?.country, d.settings);
     settings = d.settings[country];
+    if (!settings) {
+      fail = "invalid_country";
+      return d;
+    }
     const allowed = settings.payments || {};
     const methodOk =
       (method === "whatsapp" && allowed.whatsapp) ||
@@ -188,15 +208,14 @@ app.post("/api/orders", (req, res) => {
     for (const row of itemsIn) {
       const product = d.products.find((p) => p.id === row.id && p.active !== false);
       if (!product) continue;
-      if (country === "sa" && product.availableSa === false) continue;
-      if (country === "qa" && product.availableQa === false) continue;
+      if (!productAvailable(product, country)) continue;
       const qty = Math.max(1, Math.min(99, Number(row.qty) || 1));
       const available = stockOf(product, country);
       if (available !== null && available < qty) {
         fail = "insufficient_stock";
         return d;
       }
-      const unit = country === "sa" ? product.priceSar : product.priceQar;
+      const unit = productPrice(product, country);
       lines.push({
         id: product.id,
         slug: product.slug,
@@ -242,16 +261,7 @@ app.post("/api/orders", (req, res) => {
     }
 
     for (const line of lines) {
-      d.products = d.products.map((p) => {
-        if (p.id !== line.id) return p;
-        if (country === "sa" && p.stockSa !== null && p.stockSa !== undefined) {
-          return { ...p, stockSa: Math.max(0, Number(p.stockSa) - line.qty) };
-        }
-        if (country === "qa" && p.stockQa !== null && p.stockQa !== undefined) {
-          return { ...p, stockQa: Math.max(0, Number(p.stockQa) - line.qty) };
-        }
-        return p;
-      });
+      d.products = d.products.map((p) => (p.id === line.id ? decrementStock(p, country, line.qty) : p));
     }
 
     if (coupon) {
@@ -379,7 +389,7 @@ app.get("/api/admin/overview", requireAdmin, (_req, res) => {
 });
 
 app.post("/api/coupons/preview", (req, res) => {
-  const country = req.body?.country === "sa" ? "sa" : "qa";
+  const country = resolveCountry(req.body?.country, getDb().settings);
   const subtotal = Math.max(0, Number(req.body?.subtotal) || 0);
   const coupon = findCoupon(getDb().coupons, req.body?.code);
   const fail = couponFail(coupon, { country, subtotal });
@@ -399,7 +409,8 @@ app.post("/api/coupons/preview", (req, res) => {
 });
 
 app.get("/api/admin/coupons", requirePermission("coupons"), (_req, res) => {
-  res.json({ coupons: getDb().coupons || [] });
+  const db = getDb();
+  res.json({ coupons: db.coupons || [], countries: publicCountryList(db.settings) });
 });
 
 app.post("/api/admin/coupons", requirePermission("coupons"), (req, res) => {
@@ -456,7 +467,8 @@ app.delete("/api/admin/coupons/:id", requirePermission("coupons"), (req, res) =>
 });
 
 app.get("/api/admin/products", requirePermission("products"), (_req, res) => {
-  res.json({ products: getDb().products });
+  const db = getDb();
+  res.json({ products: db.products, countries: publicCountryList(db.settings) });
 });
 
 app.post("/api/admin/products", requirePermission("products"), (req, res) => {
@@ -518,11 +530,13 @@ app.delete("/api/admin/products/:id", requirePermission("products"), (req, res) 
 });
 
 app.get("/api/admin/orders", requirePermission("orders"), (_req, res) => {
-  res.json({ orders: getDb().orders });
+  const db = getDb();
+  res.json({ orders: db.orders, countries: publicCountryList(db.settings) });
 });
 
 app.get("/api/admin/customers", requirePermission("customers"), (_req, res) => {
-  res.json({ customers: customersFromOrders(getDb().orders || []) });
+  const db = getDb();
+  res.json({ customers: customersFromOrders(db.orders || []), countries: publicCountryList(db.settings) });
 });
 
 app.put("/api/admin/orders/:id", requirePermission("orders"), (req, res) => {
@@ -556,7 +570,8 @@ app.put("/api/admin/orders/:id", requirePermission("orders"), (req, res) => {
 
 app.get("/api/admin/revenue", requirePermission("revenue"), (req, res) => {
   const period = req.query.period === "today" || req.query.period === "month" ? req.query.period : "all";
-  res.json(buildRevenue(getDb().orders || [], period));
+  const db = getDb();
+  res.json(buildRevenue(db.orders || [], period, new Date(), db.settings));
 });
 
 function shapeAdminUser(body, existing = {}) {
@@ -659,21 +674,18 @@ app.get("/api/admin/settings", requirePermission("settings"), (_req, res) => {
 });
 
 app.put("/api/admin/settings", requirePermission("settings"), (req, res) => {
+  const incoming = req.body && typeof req.body === "object" ? req.body : {};
   const next = saveDb((d) => {
-    d.settings = {
-      qa: {
-        ...d.settings.qa,
-        ...(req.body?.qa || {}),
-        payments: { ...d.settings.qa.payments, ...(req.body?.qa?.payments || {}) },
-        couriers: mergeCouriers("qa", req.body?.qa?.couriers ?? d.settings.qa.couriers),
-      },
-      sa: {
-        ...d.settings.sa,
-        ...(req.body?.sa || {}),
-        payments: { ...d.settings.sa.payments, ...(req.body?.sa?.payments || {}) },
-        couriers: mergeCouriers("sa", req.body?.sa?.couriers ?? d.settings.sa.couriers),
-      },
+    const nextRaw = {
+      qa: incoming.qa || d.settings.qa,
+      sa: incoming.sa || d.settings.sa,
     };
+    for (const [key, conf] of Object.entries(incoming)) {
+      const code = normalizeCountryCode(key);
+      if (!isCountryCode(code) || code === "qa" || code === "sa") continue;
+      nextRaw[code] = conf;
+    }
+    d.settings = mergeAllSettings(nextRaw);
     return d;
   });
   res.json({ settings: next.settings });

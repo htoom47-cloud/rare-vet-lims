@@ -12,7 +12,7 @@ const linkClass = ({ isActive }) =>
 export function Header() {
   const { t, toggle, lang } = useLang();
   const cart = useCart();
-  const { country, setCountry } = useCountry();
+  const { country, countries, setCountry } = useCountry();
 
   return (
     <header className="sticky top-0 z-40 border-b border-track/10 bg-paper/92 backdrop-blur-md">
@@ -35,13 +35,16 @@ export function Header() {
 
         <div className="flex items-center gap-2">
           <select
-            value={country}
+            value={countries.some((c) => c.code === country) ? country : countries[0]?.code || "qa"}
             onChange={(e) => setCountry(e.target.value)}
             className="min-h-10 rounded-full border border-medical/25 bg-white px-2 py-2 text-xs font-extrabold text-navy"
             aria-label={t("الدولة", "Country")}
           >
-            <option value="qa">{t("قطر", "Qatar")}</option>
-            <option value="sa">{t("السعودية", "KSA")}</option>
+            {countries.map((c) => (
+              <option key={c.code} value={c.code}>
+                {t(c.nameAr, c.nameEn)}
+              </option>
+            ))}
           </select>
           <button
             type="button"

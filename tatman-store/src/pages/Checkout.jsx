@@ -23,7 +23,7 @@ function couponMessage(code, t) {
 export function Checkout() {
   const { t, lang } = useLang();
   const cart = useCart();
-  const { country, formatPrice } = useCountry();
+  const { country, formatPrice, countryName } = useCountry();
   const { settings } = useCatalog();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", phone: "", city: "", address: "", notes: "" });
@@ -184,7 +184,7 @@ export function Checkout() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <h1 className="font-arabic text-3xl font-extrabold">{t("إتمام الطلب", "Checkout")}</h1>
       <p className="mt-2 text-sm text-ink/60">
-        {t("المتجر:", "Store:")} {country === "sa" ? t("السعودية", "Saudi Arabia") : t("قطر", "Qatar")}
+        {t("المتجر:", "Store:")} {countryName(lang)}
       </p>
 
       <form onSubmit={submit} className="mt-8 space-y-4">

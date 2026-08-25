@@ -1,31 +1,48 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  FALLBACK_COUNTRIES,
+  normalizeCountryCode,
+  productPrice,
+} from "../data/countries";
 
 const CountryContext = createContext(null);
 
 export function CountryProvider({ children }) {
-  const [country, setCountry] = useState(() => localStorage.getItem("tatman-country") || "qa");
+  const [country, setCountryState] = useState(() => normalizeCountryCode(localStorage.getItem("tatman-country")) || "qa");
+  const [countries, setCountriesState] = useState(FALLBACK_COUNTRIES);
+
+  const setCountries = useCallback((next) => {
+    if (!Array.isArray(next) || !next.length) return;
+    setCountriesState(next);
+  }, []);
+
+  const setCountry = useCallback((next) => {
+    const code = normalizeCountryCode(next) || "qa";
+    localStorage.setItem("tatman-country", code);
+    setCountryState(code);
+  }, []);
 
   const value = useMemo(() => {
-    const isSa = country === "sa";
+    const meta = countries.find((c) => c.code === country) || FALLBACK_COUNTRIES.find((c) => c.code === country) || FALLBACK_COUNTRIES[0];
     return {
       country,
-      isSa,
-      setCountry(next) {
-        const code = next === "sa" ? "sa" : "qa";
-        localStorage.setItem("tatman-country", code);
-        setCountry(code);
-      },
+      countries,
+      isSa: country === "sa",
+      setCountries,
+      setCountry,
       priceOf(product) {
-        if (!product) return 0;
-        return isSa ? Number(product.priceSar || product.priceQar || 0) : Number(product.priceQar || 0);
+        return productPrice(product, country);
       },
       formatPrice(amount, lang) {
         const n = Number(amount) || 0;
-        if (isSa) return lang === "ar" ? `${n} ر.س` : `SAR ${n}`;
-        return lang === "ar" ? `${n} ر.ق` : `QAR ${n}`;
+        if (lang === "ar") return `${n} ${meta.currencyAr}`;
+        return `${meta.currency} ${n}`;
+      },
+      countryName(lang) {
+        return lang === "en" ? meta.nameEn : meta.nameAr;
       },
     };
-  }, [country]);
+  }, [country, countries, setCountries, setCountry]);
 
   return <CountryContext.Provider value={value}>{children}</CountryContext.Provider>;
 }

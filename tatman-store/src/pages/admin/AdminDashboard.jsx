@@ -41,20 +41,17 @@ export function AdminDashboard() {
       </div>
       {revenue ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl bg-navy p-5 text-white">
-            <p className="text-sm text-white/70">إيراد قطر المحصّل</p>
-            <p className="mt-2 text-3xl font-extrabold text-sand">
-              {revenue.qa?.net || 0} {revenue.qa?.currencyAr}
-            </p>
-            <p className="mt-1 text-xs text-white/60">{revenue.qa?.countedCount || 0} طلب محتسب</p>
-          </div>
-          <div className="rounded-2xl bg-navy p-5 text-white">
-            <p className="text-sm text-white/70">إيراد السعودية المحصّل</p>
-            <p className="mt-2 text-3xl font-extrabold text-sand">
-              {revenue.sa?.net || 0} {revenue.sa?.currencyAr}
-            </p>
-            <p className="mt-1 text-xs text-white/60">{revenue.sa?.countedCount || 0} طلب محتسب</p>
-          </div>
+          {Object.entries(revenue)
+            .filter(([key]) => key !== "period")
+            .map(([code, block]) => (
+              <div key={code} className="rounded-2xl bg-navy p-5 text-white">
+                <p className="text-sm text-white/70">إيراد {block.nameAr || code} المحصّل</p>
+                <p className="mt-2 text-3xl font-extrabold text-sand">
+                  {block.net || 0} {block.currencyAr}
+                </p>
+                <p className="mt-1 text-xs text-white/60">{block.countedCount || 0} طلب محتسب</p>
+              </div>
+            ))}
         </div>
       ) : null}
       <div className="mt-8 flex flex-wrap gap-3">

@@ -109,7 +109,7 @@ export function AdminRevenue() {
     <div>
       <h1 className="text-3xl font-extrabold">الإيرادات</h1>
       <p className="mt-2 text-sm text-black/55">
-        الإيراد المحصّل من الطلبات المؤكدة والمدفوعة والمشحونة فقط. عملتا قطر والسعودية مفصولتان. الملغى لا يُحتسب.
+        الإيراد المحصّل من الطلبات المؤكدة والمدفوعة والمشحونة فقط. عملات الدول مفصولة ولا تُخلط. الملغى لا يُحتسب.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         {[
@@ -129,9 +129,12 @@ export function AdminRevenue() {
       </div>
       {error && <p className="mt-3 text-sm font-bold text-crimson">{error}</p>}
       {data ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <CountryRevenue title={`قطر · ${periodLabel(period)}`} block={data.qa} />
-          <CountryRevenue title={`السعودية · ${periodLabel(period)}`} block={data.sa} />
+        <div className={`mt-6 grid gap-6 ${Object.keys(data).filter((k) => k !== "period").length > 2 ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2"}`}>
+          {Object.entries(data)
+            .filter(([key]) => key !== "period")
+            .map(([code, block]) => (
+              <CountryRevenue key={code} title={`${block.nameAr || code} · ${periodLabel(period)}`} block={block} />
+            ))}
         </div>
       ) : (
         !error && <p className="mt-6">...</p>

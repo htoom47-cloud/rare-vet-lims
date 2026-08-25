@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
+import { countryLabel } from "../../data/countries";
 
 const empty = {
   code: "",
@@ -15,6 +16,10 @@ const empty = {
 
 export function AdminCoupons() {
   const [coupons, setCoupons] = useState([]);
+  const [countries, setCountries] = useState([
+    { code: "qa", nameAr: "قطر" },
+    { code: "sa", nameAr: "السعودية" },
+  ]);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -24,6 +29,7 @@ export function AdminCoupons() {
   async function load() {
     const d = await api.coupons();
     setCoupons(d.coupons || []);
+    if (d.countries?.length) setCountries(d.countries);
   }
 
   useEffect(() => {
@@ -119,9 +125,7 @@ export function AdminCoupons() {
               </div>
               <p className="mt-2 text-xs text-black/55">
                 {c.active === false ? "متوقف" : "مفعّل"} ·{" "}
-                {(c.countries || []).includes("qa") ? "قطر" : ""}
-                {(c.countries || []).includes("qa") && (c.countries || []).includes("sa") ? " / " : ""}
-                {(c.countries || []).includes("sa") ? "السعودية" : ""}
+                {(c.countries || []).map((code) => countryLabel(code)).join(" / ")}
                 {c.maxUses != null ? ` · الاستخدام: ${c.usedCount || 0}/${c.maxUses}` : ` · استخدم ${c.usedCount || 0} مرة`}
               </p>
               <div className="mt-3 flex gap-3 text-sm">
@@ -167,15 +171,13 @@ export function AdminCoupons() {
           <span className="text-sm font-bold text-navy">تاريخ الانتهاء (اختياري)</span>
           <input className="input" type="date" value={form.expiresAt} onChange={(e) => patch("expiresAt", e.target.value)} />
         </label>
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={form.countries.includes("qa")} onChange={() => toggleCountry("qa")} />
-            قطر
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={form.countries.includes("sa")} onChange={() => toggleCountry("sa")} />
-            السعودية
-          </label>
+        <div className="flex flex-wrap gap-4 text-sm">
+          {countries.map((c) => (
+            <label key={c.code} className="flex items-center gap-2">
+              <input type="checkbox" checked={form.countries.includes(c.code)} onChange={() => toggleCountry(c.code)} />
+              {c.nameAr}
+            </label>
+          ))}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.active} onChange={(e) => patch("active", e.target.checked)} />

@@ -1,4 +1,5 @@
 import { ORDER_STATUSES } from "./orders.js";
+import { countryCodes, countryLabel, isCountryCode, normalizeCountryCode } from "./countries.js";
 
 export const COUNTED_STATUSES = ["confirmed", "paid", "shipped"];
 export const PENDING_STATUSES = ["new", "pending_payment"];
@@ -31,8 +32,14 @@ function orderGross(o) {
   return num(o.total) + num(o.discount);
 }
 
-function countryBlock(orders, country) {
-  const rows = orders.filter((o) => (o.country === "sa" ? "sa" : "qa") === country);
+function orderCountry(code) {
+  const n = normalizeCountryCode(code);
+  if (isCountryCode(n)) return n;
+  return "qa";
+}
+
+function countryBlock(orders, country, conf) {
+  const rows = orders.filter((o) => orderCountry(o.country) === country);
   const counted = rows.filter((o) => COUNTED_STATUSES.includes(o.status || "new"));
   const pending = rows.filter((o) => PENDING_STATUSES.includes(o.status || "new"));
   const cancelled = rows.filter((o) => (o.status || "new") === "cancelled");
@@ -58,8 +65,9 @@ function countryBlock(orders, country) {
   }
   return {
     country,
-    currency: country === "sa" ? "SAR" : "QAR",
-    currencyAr: country === "sa" ? "ر.س" : "ر.ق",
+    nameAr: conf?.nameAr || countryLabel(country),
+    currency: conf?.currency || (country === "sa" ? "SAR" : country === "qa" ? "QAR" : "USD"),
+    currencyAr: conf?.currencyAr || (country === "sa" ? "ر.س" : country === "qa" ? "ر.ق" : "$"),
     orderCount: rows.length,
     countedCount: counted.length,
     pendingCount: pending.length,
@@ -77,13 +85,18 @@ function countryBlock(orders, country) {
   };
 }
 
-export function buildRevenue(orders, period = "all", now = new Date()) {
+export function buildRevenue(orders, period = "all", now = new Date(), settings = null) {
   const scoped = (orders || []).filter((o) => inPeriod(o.createdAt, period, now));
-  return {
-    period,
-    qa: countryBlock(scoped, "qa"),
-    sa: countryBlock(scoped, "sa"),
-  };
+  const codes = countryCodes(settings);
+  for (const o of scoped) {
+    const code = orderCountry(o.country);
+    if (!codes.includes(code)) codes.push(code);
+  }
+  const out = { period };
+  for (const code of codes) {
+    out[code] = countryBlock(scoped, code, settings?.[code]);
+  }
+  return out;
 }
 
 export function periodLabel(period) {

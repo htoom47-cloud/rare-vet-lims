@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { products as fallbackProducts } from "../data/products";
+import { productAvailable } from "../data/countries";
 import { useCountry } from "./CountryContext";
 
 const CatalogContext = createContext(null);
 
 export function CatalogProvider({ children }) {
-  const { country } = useCountry();
+  const { country, setCountry, setCountries } = useCountry();
   const [products, setProducts] = useState(fallbackProducts);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,12 +21,12 @@ export function CatalogProvider({ children }) {
         if (cancelled) return;
         setProducts(data.products || []);
         setSettings(data.settings);
+        if (Array.isArray(data.countries) && data.countries.length) setCountries(data.countries);
+        if (data.country && data.country !== country) setCountry(data.country);
       })
       .catch(() => {
         if (cancelled) return;
-        setProducts(
-          fallbackProducts.filter((p) => (country === "sa" ? p.availableSa !== false : p.availableQa !== false)),
-        );
+        setProducts(fallbackProducts.filter((p) => productAvailable(p, country)));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -33,7 +34,7 @@ export function CatalogProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [country]);
+  }, [country, setCountry, setCountries]);
 
   const value = useMemo(
     () => ({

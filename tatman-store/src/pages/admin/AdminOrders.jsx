@@ -6,6 +6,10 @@ import { trackingLink } from "../../data/couriers";
 
 export function AdminOrders() {
   const [orders, setOrders] = useState([]);
+  const [countries, setCountries] = useState([
+    { code: "qa", nameAr: "قطر" },
+    { code: "sa", nameAr: "السعودية" },
+  ]);
   const [country, setCountry] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [busyId, setBusyId] = useState("");
@@ -14,6 +18,7 @@ export function AdminOrders() {
   async function load() {
     const d = await api.orders();
     setOrders(d.orders || []);
+    if (d.countries?.length) setCountries(d.countries);
   }
 
   useEffect(() => {
@@ -51,8 +56,7 @@ export function AdminOrders() {
           <div className="flex flex-wrap gap-2">
             {[
               ["all", "كل الدول"],
-              ["qa", "قطر"],
-              ["sa", "السعودية"],
+              ...countries.map((c) => [c.code, c.nameAr]),
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -120,7 +124,7 @@ export function AdminOrders() {
                 <td className="p-3" dir="ltr">
                   {o.customer?.phone || "—"}
                 </td>
-                <td className="p-3">{countryLabel(o.country)}</td>
+                <td className="p-3">{countries.find((x) => x.code === o.country)?.nameAr || countryLabel(o.country)}</td>
                 <td className="p-3 text-black/70">
                   {(o.items || []).map((i) => (
                     <div key={i.id}>

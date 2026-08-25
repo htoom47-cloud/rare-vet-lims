@@ -19,7 +19,9 @@ export function shapeCoupon(body, existing = {}) {
   if (type === "percent") value = Math.min(100, Math.max(0, Math.floor(value)));
   else value = Math.max(0, Math.floor(value));
   const fromBody = Array.isArray(body.countries) ? body.countries : null;
-  const countries = (fromBody || existing.countries || ["qa", "sa"]).filter((c) => c === "qa" || c === "sa");
+  const countries = (fromBody || existing.countries || ["qa", "sa"])
+    .map((c) => String(c || "").trim().toLowerCase())
+    .filter((c) => /^[a-z]{2,3}$/.test(c));
   return {
     id: existing.id || body.id,
     code: normalizeCode(body.code ?? existing.code),

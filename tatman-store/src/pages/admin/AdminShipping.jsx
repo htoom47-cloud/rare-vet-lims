@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { shapeCourier } from "../../data/couriers";
+import { countryCodes } from "../../data/countries";
 
-function emptyCustom() {
-  return { qa: { nameAr: "", fee: "" }, sa: { nameAr: "", fee: "" } };
+function emptyCustom(settings) {
+  const out = {};
+  for (const code of countryCodes(settings)) out[code] = { nameAr: "", fee: "" };
+  return out;
 }
 
 export function AdminShipping() {
@@ -11,11 +14,18 @@ export function AdminShipping() {
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [custom, setCustom] = useState(emptyCustom);
+  const [custom, setCustom] = useState({});
 
   async function load() {
     const d = await api.settings();
     setSettings(d.settings);
+    setCustom((prev) => {
+      const next = emptyCustom(d.settings);
+      for (const code of Object.keys(next)) {
+        if (prev[code]) next[code] = prev[code];
+      }
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -51,7 +61,7 @@ export function AdminShipping() {
   }
 
   async function addCompany(code) {
-    const nameAr = custom[code].nameAr.trim();
+    const nameAr = (custom[code] || {}).nameAr?.trim();
     if (!nameAr) {
       setError("أدخل اسم شركة التوصيل.");
       return;
@@ -66,7 +76,7 @@ export function AdminShipping() {
       nameAr,
       nameEn: nameAr,
       active: true,
-      fee: custom[code].fee,
+      fee: (custom[code] || {}).fee,
     });
     const next = {
       ...settings,
@@ -95,15 +105,17 @@ export function AdminShipping() {
 
   if (!settings) return <p>...</p>;
 
+  const codes = countryCodes(settings);
+
   return (
     <form onSubmit={save} className="space-y-8">
       <div>
         <h1 className="text-3xl font-extrabold">شركات التوصيل</h1>
         <p className="mt-2 text-sm text-black/55">أضف أو احذف الشركات لكل دولة. الإضافة والحذف يُحفظان مباشرة.</p>
       </div>
-      {["qa", "sa"].map((code) => (
+      {codes.map((code) => (
         <section key={code} className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-extrabold">{code === "qa" ? "قطر" : "السعودية"}</h2>
+          <h2 className="text-xl font-extrabold">{settings[code]?.nameAr || code}</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[44rem] text-sm">
               <thead className="bg-mist text-right">
@@ -174,9 +186,9 @@ export function AdminShipping() {
                 <span className="text-xs font-bold text-black/50">اسم الشركة</span>
                 <input
                   className="input"
-                  value={custom[code].nameAr}
+                  value={(custom[code] || {}).nameAr || ""}
                   placeholder="مثال: أرامكس"
-                  onChange={(e) => setCustom((c) => ({ ...c, [code]: { ...c[code], nameAr: e.target.value } }))}
+                  onChange={(e) => setCustom((c) => ({ ...c, [code]: { ...(c[code] || { nameAr: "", fee: "" }), nameAr: e.target.value } }))}
                 />
               </label>
               <label className="block w-28 space-y-1">
@@ -185,9 +197,9 @@ export function AdminShipping() {
                   className="input"
                   type="number"
                   min="0"
-                  value={custom[code].fee}
+                  value={(custom[code] || {}).fee || ""}
                   placeholder="0"
-                  onChange={(e) => setCustom((c) => ({ ...c, [code]: { ...c[code], fee: e.target.value } }))}
+                  onChange={(e) => setCustom((c) => ({ ...c, [code]: { ...(c[code] || { nameAr: "", fee: "" }), fee: e.target.value } }))}
                 />
               </label>
               <button

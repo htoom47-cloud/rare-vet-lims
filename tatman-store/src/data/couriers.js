@@ -39,8 +39,12 @@ export function shapeCourier(body, existing = {}) {
 }
 
 export function defaultCouriers(country) {
-  const code = country === "sa" ? "sa" : "qa";
-  return COURIER_PRESETS.filter((p) => p.countries.includes(code)).map((p) =>
+  const code = String(country || "qa");
+  const matched = COURIER_PRESETS.filter((p) => p.countries.includes(code));
+  const presets = matched.length
+    ? matched
+    : COURIER_PRESETS.filter((p) => ["pickup", "aramex", "dhl", "fedex"].includes(p.id));
+  return presets.map((p) =>
     shapeCourier({
       id: p.id,
       nameAr: p.ar,

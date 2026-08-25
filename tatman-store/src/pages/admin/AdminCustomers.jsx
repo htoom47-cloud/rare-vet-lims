@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { countriesLabel } from "../../data/customers";
 
 export function AdminCustomers() {
   const [customers, setCustomers] = useState([]);
+  const [countries, setCountries] = useState([
+    { code: "qa", nameAr: "قطر" },
+    { code: "sa", nameAr: "السعودية" },
+  ]);
   const [country, setCountry] = useState("all");
 
   async function load() {
     const d = await api.customers();
     setCustomers(d.customers || []);
+    if (d.countries?.length) setCountries(d.countries);
   }
 
   useEffect(() => {
@@ -24,8 +28,7 @@ export function AdminCustomers() {
       <div className="mt-4 flex gap-2">
         {[
           ["all", "الكل"],
-          ["qa", "قطر"],
-          ["sa", "السعودية"],
+          ...countries.map((c) => [c.code, c.nameAr]),
         ].map(([id, label]) => (
           <button
             key={id}
@@ -54,7 +57,7 @@ export function AdminCustomers() {
                 <td className="p-3" dir="ltr">
                   {c.phone || "—"}
                 </td>
-                <td className="p-3">{countriesLabel(c.countries)}</td>
+                <td className="p-3">{(c.countries || []).map((code) => countries.find((x) => x.code === code)?.nameAr || code).join(" / ")}</td>
                 <td className="p-3">{c.orderCount || 0}</td>
               </tr>
             ))}

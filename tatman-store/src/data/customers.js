@@ -1,5 +1,12 @@
+import { countryLabel, isCountryCode, normalizeCountryCode } from "./countries.js";
+
 export function normalizePhone(raw) {
   return String(raw || "").replace(/\D/g, "");
+}
+
+function orderCountry(code) {
+  const n = normalizeCountryCode(code);
+  return isCountryCode(n) ? n : "qa";
 }
 
 export function customersFromOrders(orders) {
@@ -7,7 +14,7 @@ export function customersFromOrders(orders) {
   for (const o of orders || []) {
     const digits = normalizePhone(o.customer?.phone);
     if (!digits) continue;
-    const country = o.country === "sa" ? "sa" : "qa";
+    const country = orderCountry(o.country);
     const name = String(o.customer?.name || "").trim();
     const phone = String(o.customer?.phone || "").trim();
     const created = String(o.createdAt || "");
@@ -34,9 +41,6 @@ export function customersFromOrders(orders) {
   return [...map.values()].sort((a, b) => String(b.lastOrderAt).localeCompare(String(a.lastOrderAt)));
 }
 
-export function countriesLabel(countries) {
-  const labels = [];
-  if ((countries || []).includes("qa")) labels.push("قطر");
-  if ((countries || []).includes("sa")) labels.push("السعودية");
-  return labels.join(" / ");
+export function countriesLabel(countries, settings) {
+  return (countries || []).map((code) => countryLabel(code, settings)).join(" / ");
 }

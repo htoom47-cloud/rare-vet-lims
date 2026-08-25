@@ -16,6 +16,4 @@ export function statusLabel(value) {
   return row ? row[1] : "جديد";
 }
 
-export function countryLabel(code) {
-  return code === "sa" ? "السعودية" : "قطر";
-}
+export { countryLabel } from "./countries.js";

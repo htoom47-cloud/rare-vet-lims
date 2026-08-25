@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import { categories } from "../../data/products";
@@ -27,6 +27,9 @@ const empty = {
   benefitsEn: "",
   image: "",
   images: [],
+  prices: {},
+  available: {},
+  stock: {},
 };
 
 export function AdminProductEdit() {
@@ -37,7 +40,17 @@ export function AdminProductEdit() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const [extraCountries, setExtraCountries] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api
+      .products()
+      .then((d) => {
+        setExtraCountries((d.countries || []).filter((c) => c.code !== "qa" && c.code !== "sa"));
+      })
+      .catch(() => setExtraCountries([]));
+  }, []);
 
   useEffect(() => {
     if (isNew) return;
@@ -54,6 +67,9 @@ export function AdminProductEdit() {
         stockSa: p.stockSa ?? "",
         images: productImages(p),
         image: productImages(p)[0] || "",
+        prices: p.prices || {},
+        available: p.available || {},
+        stock: Object.fromEntries(Object.entries(p.stock || {}).map(([k, v]) => [k, v ?? ""])),
       });
     });
   }, [id, isNew]);
@@ -109,6 +125,15 @@ export function AdminProductEdit() {
         priceSar: Number(form.priceSar) || 0,
         stockQa: form.stockQa === "" ? null : Number(form.stockQa),
         stockSa: form.stockSa === "" ? null : Number(form.stockSa),
+        prices: Object.fromEntries(
+          extraCountries.map(({ code }) => [code, Number(form.prices?.[code]) || 0]),
+        ),
+        available: Object.fromEntries(
+          extraCountries.map(({ code }) => [code, form.available?.[code] !== false]),
+        ),
+        stock: Object.fromEntries(
+          extraCountries.map(({ code }) => [code, form.stock?.[code] === "" || form.stock?.[code] == null ? null : Number(form.stock[code])]),
+        ),
         images,
         image: images[0] || "",
         animals: String(form.animals)
@@ -134,6 +159,9 @@ export function AdminProductEdit() {
           stockSa: p.stockSa ?? "",
           images: productImages(p),
           image: productImages(p)[0] || "",
+          prices: p.prices || {},
+          available: p.available || {},
+          stock: Object.fromEntries(Object.entries(p.stock || {}).map(([k, v]) => [k, v ?? ""])),
         });
       }
       setSaved("تم الحفظ في المتجر.");
@@ -238,6 +266,30 @@ export function AdminProductEdit() {
           <Field label="العدد المتاح في السعودية" hint="اتركه فارغاً إذا لا تريد تتبع المخزون. 0 = غير متوفر">
             <input className="input" type="number" min="0" step="1" value={form.stockSa} onChange={(e) => patch("stockSa", e.target.value)} />
           </Field>
+          {extraCountries.map(({ code, nameAr, currencyAr }) => (
+            <Fragment key={code}>
+              <Field label={`سعر ${nameAr} (${currencyAr || code})`}>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.prices?.[code] ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, prices: { ...f.prices, [code]: e.target.value } }))}
+                />
+              </Field>
+              <Field label={`العدد المتاح في ${nameAr}`} hint="اتركه فارغاً إذا لا تريد تتبع المخزون. 0 = غير متوفر">
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.stock?.[code] ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, stock: { ...f.stock, [code]: e.target.value } }))}
+                />
+              </Field>
+            </Fragment>
+          ))}
         </div>
       </section>
 
@@ -265,6 +317,16 @@ export function AdminProductEdit() {
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.availableSa} onChange={(e) => patch("availableSa", e.target.checked)} /> متاح في السعودية
         </label>
+        {extraCountries.map(({ code, nameAr }) => (
+          <label key={code} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.available?.[code] !== false}
+              onChange={(e) => setForm((f) => ({ ...f, available: { ...f.available, [code]: e.target.checked } }))}
+            />{" "}
+            متاح في {nameAr}
+          </label>
+        ))}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.active} onChange={(e) => patch("active", e.target.checked)} /> ظاهر في المتجر
         </label>
