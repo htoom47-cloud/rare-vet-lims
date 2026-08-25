@@ -15,11 +15,12 @@ export function AdminDashboard() {
     ["طلبات قطر", data.qaOrders],
     ["طلبات السعودية", data.saOrders],
     ["أكواد الخصم", data.couponCount ?? 0],
+    ["العملاء", data.customerCount ?? 0],
   ];
   return (
     <div>
       <h1 className="text-3xl font-extrabold">لوحة التحكم</h1>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {cards.map(([label, value]) => (
           <div key={label} className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-sm text-black/50">{label}</p>
@@ -27,12 +28,15 @@ export function AdminDashboard() {
           </div>
         ))}
       </div>
-      <div className="mt-8 flex gap-3">
+      <div className="mt-8 flex flex-wrap gap-3">
         <Link to="/admin/products" className="rounded-full bg-navy px-5 py-2.5 text-sm font-bold text-white">
           إدارة المنتجات
         </Link>
         <Link to="/admin/orders" className="rounded-full bg-crimson px-5 py-2.5 text-sm font-bold text-white">
           الطلبات
+        </Link>
+        <Link to="/admin/customers" className="rounded-full bg-steel px-5 py-2.5 text-sm font-bold text-white">
+          العملاء
         </Link>
         <Link to="/admin/coupons" className="rounded-full bg-medical px-5 py-2.5 text-sm font-bold text-white">
           أكواد الخصم

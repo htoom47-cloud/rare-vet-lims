@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { paymentLabel } from "../../data/payments";
-
-const statuses = [
-  ["new", "جديد"],
-  ["pending_payment", "بانتظار الدفع"],
-  ["confirmed", "مؤكد"],
-  ["paid", "مدفوع"],
-  ["shipped", "تم الشحن"],
-  ["cancelled", "ملغى"],
-];
+import { countryLabel, ORDER_STATUSES } from "../../data/orders";
 
 export function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [country, setCountry] = useState("all");
+  const [busyId, setBusyId] = useState("");
+  const [error, setError] = useState("");
 
   async function load() {
     const d = await api.orders();
@@ -26,9 +20,25 @@ export function AdminOrders() {
 
   const shown = orders.filter((o) => country === "all" || o.country === country);
 
+  async function setStatus(id, status) {
+    setError("");
+    setBusyId(id);
+    try {
+      const data = await api.updateOrder(id, { status });
+      if (!data.order?.id) throw new Error("save_failed");
+      await load();
+    } catch {
+      setError("تعذر تحديث حالة الطلب. حاول مرة أخرى.");
+      await load().catch(() => {});
+    } finally {
+      setBusyId("");
+    }
+  }
+
   return (
     <div>
       <h1 className="text-3xl font-extrabold">الطلبات</h1>
+      <p className="mt-2 text-sm text-black/55">لكل طلب خانة حالة تُحفظ في النظام بعد التغيير.</p>
       <div className="mt-4 flex gap-2">
         {[
           ["all", "الكل"],
@@ -45,50 +55,70 @@ export function AdminOrders() {
           </button>
         ))}
       </div>
-      <div className="mt-6 space-y-4">
-        {shown.map((o) => (
-          <article key={o.id} className="rounded-2xl bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <strong>{o.id}</strong>
-              <span>{o.country === "sa" ? "السعودية" : "قطر"}</span>
-              <span>
-                {o.total} {o.currency}
-              </span>
-            </div>
-            <p className="mt-2 text-sm">
-              {o.customer?.name} · {o.customer?.phone} · {paymentLabel(o.paymentMethod)}
-            </p>
-            {o.couponCode ? (
-              <p className="mt-1 text-sm font-bold text-navy">
-                كود {o.couponCode}
-                {o.discount ? ` · خصم ${o.discount} ${o.currency || ""}` : ""}
-                {o.subtotal ? ` · قبل الخصم ${o.subtotal}` : ""}
-              </p>
-            ) : null}
-            <ul className="mt-2 text-sm text-black/70">
-              {o.items.map((i) => (
-                <li key={i.id}>
-                  {i.nameAr} × {i.qty}
-                </li>
-              ))}
-            </ul>
-            <select
-              className="input mt-3"
-              value={o.status}
-              onChange={async (e) => {
-                await api.updateOrder(o.id, { status: e.target.value });
-                load();
-              }}
-            >
-              {statuses.map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </article>
-        ))}
-        {!shown.length && <p className="text-black/50">لا توجد طلبات.</p>}
+      {error && <p className="mt-3 text-sm font-bold text-crimson">{error}</p>}
+      <div className="mt-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
+        <table className="w-full min-w-[52rem] text-sm">
+          <thead className="bg-mist text-right">
+            <tr>
+              <th className="p-3">رقم الطلب</th>
+              <th className="p-3">الاسم</th>
+              <th className="p-3">الرقم</th>
+              <th className="p-3">الدولة</th>
+              <th className="p-3">المنتجات</th>
+              <th className="p-3">الإجمالي</th>
+              <th className="p-3">حالة الطلب</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((o) => (
+              <tr key={o.id} className="border-t border-black/5 align-top">
+                <td className="p-3">
+                  <strong>{o.id}</strong>
+                  <div className="mt-1 text-xs text-black/50">{paymentLabel(o.paymentMethod)}</div>
+                  {o.couponCode ? (
+                    <div className="mt-1 text-xs font-bold text-navy">
+                      كود {o.couponCode}
+                      {o.discount ? ` (−${o.discount})` : ""}
+                    </div>
+                  ) : null}
+                </td>
+                <td className="p-3 font-bold">{o.customer?.name || "—"}</td>
+                <td className="p-3" dir="ltr">
+                  {o.customer?.phone || "—"}
+                </td>
+                <td className="p-3">{countryLabel(o.country)}</td>
+                <td className="p-3 text-black/70">
+                  {(o.items || []).map((i) => (
+                    <div key={i.id}>
+                      {i.nameAr} × {i.qty}
+                    </div>
+                  ))}
+                </td>
+                <td className="p-3 whitespace-nowrap">
+                  {o.total} {o.currency}
+                </td>
+                <td className="p-3">
+                  <label className="block space-y-1">
+                    <span className="sr-only">حالة الطلب</span>
+                    <select
+                      className="input min-w-[10rem]"
+                      value={o.status || "new"}
+                      disabled={busyId === o.id}
+                      onChange={(e) => setStatus(o.id, e.target.value)}
+                    >
+                      {ORDER_STATUSES.map(([id, label]) => (
+                        <option key={id} value={id}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!shown.length && <p className="p-4 text-black/50">لا توجد طلبات.</p>}
       </div>
     </div>
   );

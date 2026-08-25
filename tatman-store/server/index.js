@@ -5,6 +5,8 @@ import express from "express";
 import { getDb, saveDb, uploadsDir } from "./db.js";
 import { stockOf } from "../src/data/stock.js";
 import { couponFail, discountAmount, findCoupon, normalizeCode, shapeCoupon } from "../src/data/coupons.js";
+import { customersFromOrders } from "../src/data/customers.js";
+import { isOrderStatus } from "../src/data/orders.js";
 import {
   checkPassword,
   clearSessionCookie,
@@ -326,6 +328,7 @@ app.get("/api/admin/overview", requireAdmin, (_req, res) => {
     qaOrders: db.orders.filter((o) => o.country === "qa").length,
     saOrders: db.orders.filter((o) => o.country === "sa").length,
     couponCount: (db.coupons || []).length,
+    customerCount: customersFromOrders(db.orders || []).length,
   });
 });
 
@@ -472,14 +475,22 @@ app.get("/api/admin/orders", requireAdmin, (_req, res) => {
   res.json({ orders: getDb().orders });
 });
 
+app.get("/api/admin/customers", requireAdmin, (_req, res) => {
+  res.json({ customers: customersFromOrders(getDb().orders || []) });
+});
+
 app.put("/api/admin/orders/:id", requireAdmin, (req, res) => {
+  if (req.body?.status !== undefined && !isOrderStatus(req.body.status)) {
+    res.status(400).json({ error: "invalid_status" });
+    return;
+  }
   let updated = null;
   saveDb((d) => {
     d.orders = d.orders.map((o) => {
       if (o.id !== req.params.id) return o;
       updated = {
         ...o,
-        status: req.body?.status || o.status,
+        status: req.body?.status || o.status || "new",
         notes: req.body?.notes ?? o.notes,
       };
       return updated;
