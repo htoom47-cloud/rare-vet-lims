@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { shapeCourier } from "../../data/couriers";
 import { countryCodes } from "../../data/countries";
@@ -15,6 +16,7 @@ export function AdminShipping() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState({});
+  const navigate = useNavigate();
 
   async function load() {
     const d = await api.settings();
@@ -32,17 +34,6 @@ export function AdminShipping() {
     load().catch(() => setSettings(null));
   }, []);
 
-  function patchCourier(code, id, key, value) {
-    setSettings((s) => ({
-      ...s,
-      [code]: {
-        ...s[code],
-        couriers: (s[code].couriers || []).map((c) => (c.id === id ? { ...c, [key]: value } : c)),
-      },
-    }));
-    setSaved("");
-  }
-
   async function persist(next, message) {
     setError("");
     setSaved("");
@@ -52,9 +43,11 @@ export function AdminShipping() {
       if (!d.settings) throw new Error("save_failed");
       setSettings(d.settings);
       setSaved(message);
+      return d.settings;
     } catch {
       setError("تعذر الحفظ. حاول مرة أخرى.");
       await load().catch(() => {});
+      return null;
     } finally {
       setBusy(false);
     }
@@ -83,7 +76,8 @@ export function AdminShipping() {
       [code]: { ...settings[code], couriers: [...(settings[code].couriers || []), row] },
     };
     setCustom((c) => ({ ...c, [code]: { nameAr: "", fee: "" } }));
-    await persist(next, "تمت إضافة شركة التوصيل.");
+    const savedSettings = await persist(next, "تمت إضافة شركة التوصيل.");
+    if (savedSettings) navigate(`/admin/shipping/${code}/${row.id}`);
   }
 
   async function removeCompany(code, id) {
@@ -98,87 +92,50 @@ export function AdminShipping() {
     await persist(next, "تم حذف شركة التوصيل.");
   }
 
-  async function save(e) {
-    e.preventDefault();
-    await persist(settings, "تم حفظ شركات التوصيل.");
-  }
-
   if (!settings) return <p>...</p>;
 
   const codes = countryCodes(settings);
 
   return (
-    <form onSubmit={save} className="space-y-8">
+    <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-extrabold">شركات التوصيل</h1>
-        <p className="mt-2 text-sm text-black/55">أضف أو احذف الشركات لكل دولة. الإضافة والحذف يُحفظان مباشرة.</p>
+        <p className="mt-2 text-sm text-black/55">افتح صفحة كل شركة لضبط التسعيرة والحالة ومدة الشحن. الإضافة والحذف يُحفظان مباشرة.</p>
       </div>
       {codes.map((code) => (
         <section key={code} className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-xl font-extrabold">{settings[code]?.nameAr || code}</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-sm">
-              <thead className="bg-mist text-right">
-                <tr>
-                  <th className="p-2">تفعيل</th>
-                  <th className="p-2">الشركة</th>
-                  <th className="p-2">الرسوم</th>
-                  <th className="p-2">مدة تقريبية</th>
-                  <th className="p-2">رابط التتبع</th>
-                  <th className="p-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(settings[code].couriers || []).map((c) => (
-                  <tr key={c.id} className="border-t border-black/5">
-                    <td className="p-2">
-                      <input type="checkbox" checked={c.active === true} onChange={(e) => patchCourier(code, c.id, "active", e.target.checked)} />
-                    </td>
-                    <td className="p-2">
-                      <input className="input" value={c.nameAr} onChange={(e) => patchCourier(code, c.id, "nameAr", e.target.value)} />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        value={c.fee || 0}
-                        onChange={(e) => patchCourier(code, c.id, "fee", e.target.value)}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        className="input"
-                        value={c.etaAr || ""}
-                        placeholder="1–2 يوم"
-                        onChange={(e) => patchCourier(code, c.id, "etaAr", e.target.value)}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        className="input"
-                        dir="ltr"
-                        value={c.trackUrl || ""}
-                        placeholder="https://...{code}"
-                        onChange={(e) => patchCourier(code, c.id, "trackUrl", e.target.value)}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <button
-                        type="button"
-                        className="text-sm font-bold text-crimson"
-                        disabled={busy}
-                        onClick={() => removeCompany(code, c.id)}
-                      >
-                        حذف
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!(settings[code].couriers || []).length && <p className="p-3 text-sm text-black/50">لا توجد شركات. أضف شركة أدناه.</p>}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {(settings[code].couriers || []).map((c) => (
+              <article key={c.id} className="flex items-center justify-between gap-3 rounded-2xl bg-mist/60 p-4 ring-1 ring-navy/5">
+                <div className="flex min-w-0 items-center gap-3">
+                  {c.logo ? (
+                    <img src={c.logo} alt="" className="h-11 w-11 rounded-xl bg-white object-contain ring-1 ring-navy/10" />
+                  ) : (
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-sm font-extrabold text-navy ring-1 ring-navy/10">
+                      {(c.nameAr || "?").slice(0, 1)}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate font-extrabold text-navy">{c.nameAr}</p>
+                    <p className="text-xs text-black/50">
+                      {c.active ? "مفعّلة" : "متوقفة"}
+                      {c.fee ? ` · ${c.fee} ${settings[code]?.currencyAr || ""}` : " · بدون رسوم"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
+                  <Link className="font-bold text-medical" to={`/admin/shipping/${code}/${c.id}`}>
+                    إعدادات
+                  </Link>
+                  <button type="button" className="font-bold text-crimson" disabled={busy} onClick={() => removeCompany(code, c.id)}>
+                    حذف
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
+          {!(settings[code].couriers || []).length && <p className="mt-3 text-sm text-black/50">لا توجد شركات. أضف شركة أدناه.</p>}
           <div className="mt-4 rounded-xl bg-mist p-4">
             <p className="text-sm font-bold text-navy">إضافة شركة توصيل</p>
             <div className="mt-2 flex flex-wrap items-end gap-2">
@@ -215,10 +172,7 @@ export function AdminShipping() {
         </section>
       ))}
       {error && <p className="text-sm font-bold text-crimson">{error}</p>}
-      <button disabled={busy} className="rounded-full bg-navy px-6 py-3 text-sm font-bold text-white disabled:opacity-60">
-        {busy ? "جاري الحفظ..." : "حفظ التعديلات"}
-      </button>
-      {saved && <span className="ms-3 text-sm font-bold text-medical">{saved}</span>}
-    </form>
+      {saved && <p className="text-sm font-bold text-medical">{saved}</p>}
+    </div>
   );
 }

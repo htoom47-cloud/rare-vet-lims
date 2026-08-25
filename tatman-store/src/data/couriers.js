@@ -19,22 +19,49 @@ export function normalizeCourierId(raw) {
     .slice(0, 40);
 }
 
+function money(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(99999, Math.round(n * 100) / 100);
+}
+
+function kg(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(9999, Math.round(n * 100) / 100);
+}
+
 export function shapeCourier(body, existing = {}) {
   const preset = COURIER_PRESETS.find((p) => p.id === (body.id || existing.id));
-  let fee = Number(body.fee ?? existing.fee) || 0;
-  if (!Number.isFinite(fee) || fee < 0) fee = 0;
-  fee = Math.min(99999, Math.floor(fee));
   const id = normalizeCourierId(body.id ?? existing.id) || `c-${Date.now().toString(36)}`;
+  const pricingType = (body.pricingType ?? existing.pricingType) === "weight" ? "weight" : "flat";
+  const shippingTypeRaw = body.shippingType ?? existing.shippingType;
+  const shippingType =
+    shippingTypeRaw === "pickup" || (!shippingTypeRaw && (preset?.id === "pickup" || id === "pickup"))
+      ? "pickup"
+      : "shipping";
+  const codEnabled = (body.codEnabled !== undefined ? body.codEnabled : existing.codEnabled) !== false;
   return {
     id,
     nameAr: String(body.nameAr ?? existing.nameAr ?? preset?.ar ?? "").trim().slice(0, 80),
     nameEn: String(body.nameEn ?? existing.nameEn ?? preset?.en ?? "").trim().slice(0, 80),
     active: (body.active !== undefined ? body.active : existing.active) === true,
-    fee,
+    shippingType,
+    pricingType,
+    merchantFee: money(body.merchantFee ?? existing.merchantFee, 0),
+    fee: money(body.fee ?? existing.fee, 0),
+    weightKg: kg(body.weightKg ?? existing.weightKg, 0),
+    extraCost: money(body.extraCost ?? existing.extraCost, 0),
+    extraPerKg: kg(body.extraPerKg ?? existing.extraPerKg, 1),
     etaAr: String(body.etaAr ?? existing.etaAr ?? "").trim().slice(0, 80),
     etaEn: String(body.etaEn ?? existing.etaEn ?? "").trim().slice(0, 80),
     phone: String(body.phone ?? existing.phone ?? "").trim().slice(0, 40),
     trackUrl: String(body.trackUrl ?? existing.trackUrl ?? preset?.trackUrl ?? "").trim().slice(0, 240),
+    logo: String(body.logo ?? existing.logo ?? "").trim().slice(0, 240),
+    note: String(body.note ?? existing.note ?? "").trim().slice(0, 400),
+    descriptionAr: String(body.descriptionAr ?? existing.descriptionAr ?? "").trim().slice(0, 200),
+    descriptionEn: String(body.descriptionEn ?? existing.descriptionEn ?? "").trim().slice(0, 200),
+    codEnabled,
   };
 }
 
@@ -52,6 +79,7 @@ export function defaultCouriers(country) {
       trackUrl: p.trackUrl,
       active: false,
       fee: 0,
+      shippingType: p.id === "pickup" ? "pickup" : "shipping",
     }),
   );
 }
@@ -77,4 +105,9 @@ export function trackingLink(courier, trackingNumber) {
   if (!url || !code) return "";
   if (!url.includes("{code}")) return url;
   return url.replaceAll("{code}", encodeURIComponent(code));
+}
+
+export function courierSupportsCod(courier) {
+  if (!courier) return true;
+  return courier.codEnabled !== false;
 }

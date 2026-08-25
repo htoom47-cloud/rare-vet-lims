@@ -24,6 +24,7 @@ import { AdminCustomers } from "./pages/admin/AdminCustomers";
 import { AdminRevenue } from "./pages/admin/AdminRevenue";
 import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminShipping } from "./pages/admin/AdminShipping";
+import { AdminCourierEdit } from "./pages/admin/AdminCourierEdit";
 import { AdminGuard } from "./pages/admin/AdminGuard";
 
 function StoreLayout({ children }) {
@@ -55,6 +56,7 @@ export default function App() {
                   <Route path="coupons" element={<AdminGuard perm="coupons"><AdminCoupons /></AdminGuard>} />
                   <Route path="revenue" element={<AdminGuard perm="revenue"><AdminRevenue /></AdminGuard>} />
                   <Route path="shipping" element={<AdminGuard perm="settings"><AdminShipping /></AdminGuard>} />
+                  <Route path="shipping/:country/:courierId" element={<AdminGuard perm="settings"><AdminCourierEdit /></AdminGuard>} />
                   <Route path="users" element={<AdminGuard perm="users"><AdminUsers /></AdminGuard>} />
                   <Route path="settings" element={<AdminGuard perm="settings"><AdminSettings /></AdminGuard>} />
                 </Route>

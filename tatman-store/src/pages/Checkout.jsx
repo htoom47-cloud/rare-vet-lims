@@ -7,7 +7,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { api } from "../api";
 import { checkoutMethods } from "../data/payments";
 import { ApplePayMark } from "../components/ApplePayMark";
-import { activeCouriers, findCourier } from "../data/couriers";
+import { activeCouriers, courierSupportsCod, findCourier } from "../data/couriers";
 
 function couponMessage(code, t) {
   if (code === "coupon_country") return t("هذا الكود غير متاح لهذه الدولة.", "This code is not available for this country.");
@@ -38,11 +38,11 @@ export function Checkout() {
   const [shippingId, setShippingId] = useState("");
 
   const payments = settings?.payments || { whatsapp: true, bank: true, cod: true, applePay: true };
-  const methods = checkoutMethods(payments);
-  const selectedMethod = methods.some((m) => m.id === method) ? method : methods[0]?.id || "whatsapp";
-  const couponOk = applied && applied.country === country && applied.subtotal === cart.total ? applied : null;
   const couriers = activeCouriers(settings?.couriers);
   const selectedCourier = findCourier(couriers, shippingId);
+  const methods = checkoutMethods(payments).filter((m) => m.id !== "cod" || courierSupportsCod(selectedCourier));
+  const selectedMethod = methods.some((m) => m.id === method) ? method : methods[0]?.id || "whatsapp";
+  const couponOk = applied && applied.country === country && applied.subtotal === cart.total ? applied : null;
   const shippingFee = selectedCourier ? Number(selectedCourier.fee) || 0 : 0;
   const payable = (couponOk ? couponOk.total : cart.total) + shippingFee;
 
@@ -210,6 +210,13 @@ export function Checkout() {
                     <span>
                       {t(c.nameAr, c.nameEn || c.nameAr)}
                       {c.etaAr ? <span className="block text-xs text-ink/50">{t(c.etaAr, c.etaEn || c.etaAr)}</span> : null}
+                      {c.descriptionAr ? <span className="block text-xs text-ink/50">{t(c.descriptionAr, c.descriptionEn || c.descriptionAr)}</span> : null}
+                      {c.pricingType === "weight" && c.weightKg ? (
+                        <span className="block text-xs text-ink/50">
+                          {t(`لأول ${c.weightKg} كجم`, `First ${c.weightKg} kg`)}
+                          {c.extraCost ? t(` · كل ${c.extraPerKg || 1} كجم +${c.extraCost}`, ` · each ${c.extraPerKg || 1} kg +${c.extraCost}`) : ""}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                   <span className="text-sm font-bold text-navy">
