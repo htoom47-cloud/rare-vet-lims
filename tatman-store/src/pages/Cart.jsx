@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { formatPrice } from "../data/products";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
+import { useCountry } from "../context/CountryContext";
 
 export function Cart() {
   const { t, lang } = useLang();
   const cart = useCart();
+  const { priceOf, formatPrice } = useCountry();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
@@ -34,7 +35,7 @@ export function Cart() {
                 <p className="font-arabic text-lg font-extrabold">{product.nameAr}</p>
                 <p className="font-display text-xs tracking-wider text-navy">{product.nameEn}</p>
                 <p className="mt-1 text-sm text-crimson">
-                  {formatPrice(product.priceQar, lang)}
+                  {formatPrice(priceOf(product), lang)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -71,13 +72,12 @@ export function Cart() {
                 {formatPrice(cart.total, lang)}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => cart.whatsappCheckout(lang)}
-              className="mt-5 w-full rounded-full bg-[#25D366] py-3 text-sm font-bold text-ink"
+            <Link
+              to="/checkout"
+              className="mt-5 block w-full rounded-full bg-crimson py-3 text-center text-sm font-bold text-white"
             >
-              {t("إتمام الطلب عبر واتساب", "Checkout via WhatsApp")}
-            </button>
+              {t("إتمام الطلب والدفع", "Checkout & pay")}
+            </Link>
           </div>
         </div>
       )}

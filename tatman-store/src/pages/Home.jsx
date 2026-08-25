@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { products } from "../data/products";
+import { useCatalog } from "../context/CatalogContext";
 import { useLang } from "../context/LangContext";
 import { BenefitBar } from "../components/BenefitBar";
 import { ProductCard } from "../components/ProductCard";
@@ -8,6 +8,7 @@ import { Logo } from "../components/Logo";
 
 export function Home() {
   const { t } = useLang();
+  const { products } = useCatalog();
   const featured = products.slice(0, 6);
 
   return (

@@ -1,15 +1,18 @@
 import { Link, useParams } from "react-router-dom";
-import { formatPrice, getProduct } from "../data/products";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
+import { useCountry } from "../context/CountryContext";
+import { useCatalog } from "../context/CatalogContext";
 import { AnimalIcon } from "../components/Icons";
 import { ProductVisual } from "../components/ProductVisual";
 
 export function ProductDetail() {
   const { slug } = useParams();
+  const { getProduct } = useCatalog();
   const product = getProduct(slug);
   const { t, lang } = useLang();
   const cart = useCart();
+  const { priceOf, formatPrice } = useCountry();
 
   if (!product) {
     return (
@@ -63,7 +66,7 @@ export function ProductDetail() {
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center"
             >
             <div className="font-display text-3xl text-crimson">
-              {formatPrice(product.priceQar, lang)}
+              {formatPrice(priceOf(product), lang)}
             </div>
             <button
               type="button"

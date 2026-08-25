@@ -1,52 +1,54 @@
-# نشر متجر تطمن على Render → tatmanvet.com
+# نشر وإدارة متجر تطمن
 
-هذا متجر **Static Site** منفصل عن LIMS. لا تعدّل خدمة `rare-vet-lims`.
+المتجر أصبح **Web Service** (ليس Static Site) لأن لوحة التحكم تحتاج حفظ المنتجات والطلبات.
 
-## 1) إنشاء الموقع في Render
+## لوحة التحكم
+- الرابط: `https://tatmanvet.com/admin`
+- كلمة المرور الافتراضية محلياً: `Tatman#2026`
+- على Render ضع Environment Variable: `ADMIN_PASSWORD`
 
-1. افتح [dashboard.render.com](https://dashboard.render.com)
-2. **New +** → **Static Site**
-3. وصّل GitHub واختر المستودع: `htoom47-cloud/rare-vet-lims`
-4. املأ الحقول كالتالي:
+من اللوحة:
+- المنتجات وأسعار قطر / السعودية
+- إظهار المنتج في قطر أو السعودية أو الاثنين
+- الطلبات وحالتها
+- أرقام واتساب، IBAN، وتفعيل طرق الدفع لكل دولة
 
-| الحقل | القيمة |
-|--------|--------|
-| Name | `tatman-vet-store` |
-| Branch | `cursor/tatman-vet-store-8ce2` (حتى يتم دمج الـ PR) ثم حوّله إلى `main` |
-| Root Directory | `tatman-store` |
-| Build Command | `npm ci && npm run build` |
-| Publish Directory | `dist` |
+## طرق الدفع الحالية
+لكل دولة يمكن تفعيل:
+- واتساب
+- تحويل بنكي (IBAN من الإعدادات)
+- الدفع عند الاستلام
+- بطاقة / مدى (يمكن تفعيلها من الإعدادات؛ حتى ربط بوابة دفع مثل Tap/Moyasar يبقى الطلب مسجّلاً للتأكيد)
 
-5. Environment:
-   - `NODE_VERSION` = `22`
-6. **Create Static Site** وانتظر حتى يصبح **Live**
-7. افتح الرابط `https://tatman-vet-store.onrender.com` للتأكد
+## تحويل الخدمة في Render (مهم)
 
-## 2) توجيه الصفحات الداخلية (مهم)
+الخدمة الحالية Static Site لا تشغّل لوحة التحكم. اعمل التالي:
 
-في الخدمة: **Redirects/Rewrites** → أضف:
+1. **New + → Web Service**
+2. نفس المستودع `rare-vet-lims`
+3. Branch: `cursor/tatman-vet-store-8ce2` ثم `main` بعد الدمج
+4. Root Directory: `tatman-store`
+5. Runtime: Node
+6. Build: `npm ci && npm run build`
+7. Start: `npm start`
+8. Environment:
+   - `NODE_VERSION=22`
+   - `NODE_ENV=production`
+   - `DATA_DIR=/var/data`
+   - `ADMIN_PASSWORD=` كلمة سر قوية
+   - `SESSION_SECRET=` نص عشوائي
+9. Disk: أضف قرص 1GB على `/var/data` حتى لا تُمسح الطلبات بعد إعادة النشر
+10. انقل الدومين `tatmanvet.com` من الـ Static Site القديم إلى هذا الـ Web Service
 
-- Action: **Rewrite**
-- Source: `/*`
-- Destination: `/index.html`
+## تشغيل محلي
 
-بدون هذا، صفحات `/shop` و `/product/...` لن تعمل عند التحديث.
+```bash
+cd tatman-store
+npm install
+npm run dev:api
+# في طرفية ثانية:
+npm run dev
+```
 
-## 3) ربط الدومين tatmanvet.com
-
-1. داخل الخدمة: **Settings → Custom Domains → Add**
-2. أضف: `tatmanvet.com` (Render يضيف `www` عادة تلقائياً)
-3. في لوحة الدومين ضع DNS كما يظهر Render. الشائع:
-
-| Type | Name | Value |
-|------|------|--------|
-| A | `@` | `216.24.57.1` |
-| CNAME | `www` | `tatman-vet-store.onrender.com` |
-
-4. احذف أي سجل **AAAA** (IPv6) إن وُجد — Render لا يدعمه
-5. ارجع إلى Render واضغط **Verify**
-6. انتظر شهادة HTTPS ثم افتح https://tatmanvet.com
-
-## 4) بعد دمج PR #8
-
-حوّل Branch في Render إلى `main` حتى كل تحديث على المتجر ينشر تلقائياً.
+المتجر: http://localhost:5177  
+الإدارة: http://localhost:5177/admin

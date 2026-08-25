@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
 import { Logo } from "./Logo";
 import { useLang } from "../context/LangContext";
-import { WHATSAPP } from "../data/products";
+import { useCatalog } from "../context/CatalogContext";
 
 export function Footer() {
   const { t } = useLang();
+  const { settings } = useCatalog();
+  const wa = (settings?.whatsapp || "97451211169").replace(/\D/g, "");
 
   return (
     <footer className="mt-16 border-t border-track/10 bg-ink text-white sm:mt-20">
@@ -34,12 +36,12 @@ export function Footer() {
             {t("تواصل", "CONTACT")}
           </h4>
           <a
-            href={`https://wa.me/${WHATSAPP}`}
+            href={`https://wa.me/${wa}`}
             target="_blank"
             rel="noreferrer"
             className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25D366] px-4 py-2.5 text-sm font-bold text-ink"
           >
-            WhatsApp +974 5121 1169
+            WhatsApp +{wa}
           </a>
           <p className="mt-3 font-arabic text-2xl font-extrabold text-white/90">الصيدلية</p>
           <p className="mt-2 text-xs text-white/50">

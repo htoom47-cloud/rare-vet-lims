@@ -1,9 +1,11 @@
-import { WHATSAPP } from "../data/products";
 import { useLang } from "../context/LangContext";
+import { useCatalog } from "../context/CatalogContext";
 import { Logo } from "../components/Logo";
 
 export function Contact() {
   const { t, lang } = useLang();
+  const { settings } = useCatalog();
+  const wa = (settings?.whatsapp || "97451211169").replace(/\D/g, "");
   const preset =
     lang === "ar"
       ? "مرحباً تطمن، أريد الاستفسار عن المنتجات البيطرية. أنا أتواصل من:"
@@ -26,14 +28,14 @@ export function Contact() {
 
       <div className="mt-8 grid gap-5 md:grid-cols-2 md:gap-6">
         <a
-          href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(preset)}`}
+          href={`https://wa.me/${wa}?text=${encodeURIComponent(preset)}`}
           target="_blank"
           rel="noreferrer"
           className="rounded-[1.5rem] bg-[#25D366] p-7 text-ink shadow-lg transition hover:brightness-105 sm:rounded-[1.75rem] sm:p-8"
         >
           <p className="text-sm font-bold tracking-wide opacity-70">WhatsApp</p>
           <p className="mt-2 font-display text-2xl tracking-wide sm:text-3xl" dir="ltr">
-            +974 5121 1169
+            +{wa}
           </p>
           <p className="mt-4 text-sm font-semibold">
             {t("اضغط لفتح المحادثة", "Tap to open chat")}

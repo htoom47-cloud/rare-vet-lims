@@ -2,6 +2,7 @@ import { NavLink, Link } from "react-router-dom";
 import { Logo } from "./Logo";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
+import { useCountry } from "../context/CountryContext";
 
 const linkClass = ({ isActive }) =>
   `text-sm font-bold tracking-wide transition ${
@@ -11,6 +12,7 @@ const linkClass = ({ isActive }) =>
 export function Header() {
   const { t, toggle, lang } = useLang();
   const cart = useCart();
+  const { country, setCountry } = useCountry();
 
   return (
     <header className="sticky top-0 z-40 border-b border-track/10 bg-paper/90 backdrop-blur-md">
@@ -32,6 +34,15 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <select
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            className="min-h-10 rounded-full border border-medical/25 bg-white px-2 py-2 text-xs font-extrabold text-navy"
+            aria-label={t("الدولة", "Country")}
+          >
+            <option value="qa">{t("قطر", "Qatar")}</option>
+            <option value="sa">{t("السعودية", "KSA")}</option>
+          </select>
           <button
             type="button"
             onClick={toggle}

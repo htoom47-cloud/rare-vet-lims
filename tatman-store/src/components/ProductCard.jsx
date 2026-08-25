@@ -1,14 +1,15 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { formatPrice } from "../data/products";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
+import { useCountry } from "../context/CountryContext";
 import { AnimalIcon } from "./Icons";
 import { ProductVisual } from "./ProductVisual";
 
 export function ProductCard({ product, index = 0 }) {
   const { t, lang } = useLang();
   const cart = useCart();
+  const { priceOf, formatPrice } = useCountry();
 
   return (
     <motion.article
@@ -47,7 +48,7 @@ export function ProductCard({ product, index = 0 }) {
         </div>
       </Link>
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-navy/5 px-5 py-4">
-        <div className="font-display text-lg text-crimson">{formatPrice(product.priceQar, lang)}</div>
+        <div className="font-display text-lg text-crimson">{formatPrice(priceOf(product), lang)}</div>
         <button
           type="button"
           onClick={() => cart.add(product)}

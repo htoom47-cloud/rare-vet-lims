@@ -1,14 +1,15 @@
 import { createContext, useContext, useMemo, useState } from "react";
-import { WHATSAPP } from "../data/products";
+import { useCountry } from "./CountryContext";
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
+  const { priceOf } = useCountry();
 
   const api = useMemo(() => {
     const count = items.reduce((sum, i) => sum + i.qty, 0);
-    const total = items.reduce((sum, i) => sum + i.qty * i.product.priceQar, 0);
+    const total = items.reduce((sum, i) => sum + i.qty * priceOf(i.product), 0);
 
     return {
       items,
@@ -38,25 +39,8 @@ export function CartProvider({ children }) {
       clear() {
         setItems([]);
       },
-      whatsappCheckout(lang) {
-        if (!items.length) return;
-        const lines = items.map((i) => {
-          const name = lang === "ar" ? i.product.nameAr : i.product.nameEn;
-          return `• ${name} × ${i.qty}`;
-        });
-        const header =
-          lang === "ar"
-            ? "مرحباً تطمن، أريد طلب المنتجات التالية:"
-            : "Hello Tatman, I would like to order:";
-        const footer =
-          lang === "ar"
-            ? `\nالإجمالي التقريبي: ${total} ر.ق`
-            : `\nApprox. total: QAR ${total}`;
-        const text = encodeURIComponent([header, ...lines, footer].join("\n"));
-        window.open(`https://wa.me/${WHATSAPP}?text=${text}`, "_blank");
-      },
     };
-  }, [items]);
+  }, [items, priceOf]);
 
   return <CartContext.Provider value={api}>{children}</CartContext.Provider>;
 }

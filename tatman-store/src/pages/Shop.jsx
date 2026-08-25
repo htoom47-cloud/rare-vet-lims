@@ -1,18 +1,20 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { categories, products } from "../data/products";
+import { categories } from "../data/products";
 import { useLang } from "../context/LangContext";
+import { useCatalog } from "../context/CatalogContext";
 import { ProductCard } from "../components/ProductCard";
 
 export function Shop() {
   const { t } = useLang();
+  const { products } = useCatalog();
   const [params, setParams] = useSearchParams();
   const cat = params.get("cat") || "all";
 
   const filtered = useMemo(() => {
     if (cat === "all") return products;
     return products.filter((p) => p.category === cat);
-  }, [cat]);
+  }, [cat, products]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">

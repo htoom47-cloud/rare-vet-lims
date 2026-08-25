@@ -1,32 +1,33 @@
-# Tatman Vet Store — Render Static Site (separate from LIMS)
+# Tatman Vet Store — Render Web Service (admin + dual-country store)
 
-Create this as a **new Static Site** in the existing Render account.
-Do not apply this file as a Blueprint on the LIMS service.
+The store is no longer a Static Site. Create / convert to a **Web Service**.
 
 services:
   - type: web
     name: tatman-vet-store
-    runtime: static
+    runtime: node
     plan: starter
     region: frankfurt
     rootDir: tatman-store
     buildCommand: npm ci && npm run build
-    staticPublishPath: dist
+    startCommand: npm start
+    healthCheckPath: /api/health
     autoDeployTrigger: commit
     buildFilter:
       paths:
         - tatman-store/**
+    disk:
+      name: tatman-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    headers:
-      - path: /brand/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
