@@ -10,7 +10,7 @@ export function Footer() {
     <footer className="mt-16 border-t border-track/10 bg-ink text-white sm:mt-20">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 sm:py-14 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
-          <div className="inline-block rounded-2xl bg-paper p-3">
+          <div className="inline-block overflow-hidden rounded-xl">
             <Logo compact className="h-16 sm:h-[4.5rem]" />
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">

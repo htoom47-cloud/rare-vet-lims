@@ -1,5 +1,5 @@
-/** Official Tatman camel logo — used as image asset only, never redrawn. */
-const LOGO_SRC = "/brand/logo.png?v=knockout";
+/** Official Tatman logo — displayed exactly as the brand PNG, no redraw. */
+const LOGO_SRC = "/brand/logo.png?v=as-is-final";
 
 export function Logo({ className = "", compact = false }) {
   if (compact) {
@@ -7,9 +7,9 @@ export function Logo({ className = "", compact = false }) {
       <img
         src={LOGO_SRC}
         alt="تطمن | Tatman Veterinary Services"
-        className={`h-12 w-auto object-contain sm:h-14 ${className}`}
-        width={112}
-        height={168}
+        className={`h-12 w-auto object-contain object-center sm:h-14 ${className}`}
+        width={96}
+        height={132}
         decoding="async"
       />
     );
@@ -19,9 +19,9 @@ export function Logo({ className = "", compact = false }) {
     <img
       src={LOGO_SRC}
       alt="تطمن | Tatman Veterinary Services"
-      className={`mx-auto h-auto w-[min(72vw,280px)] object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.35)] sm:w-[300px] ${className}`}
-      width={300}
-      height={450}
+      className={`mx-auto h-auto w-[min(78vw,320px)] object-contain object-center sm:w-[340px] ${className}`}
+      width={340}
+      height={467}
       decoding="async"
     />
   );

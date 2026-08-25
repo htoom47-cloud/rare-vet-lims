@@ -29,8 +29,9 @@ export function Home() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
-            className="rounded-3xl bg-paper/92 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ring-1 ring-white/40 backdrop-blur-sm sm:p-5"
+            className="overflow-hidden rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)]"
           >
+            {/* Logo PNG shown exactly as provided — no recolor, no redraw */}
             <Logo />
           </motion.div>
 

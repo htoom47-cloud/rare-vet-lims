@@ -41,8 +41,8 @@ export function Contact() {
         </a>
 
         <div className="rounded-[1.5rem] bg-navy p-7 text-white sm:rounded-[1.75rem] sm:p-8">
-          <div className="inline-block rounded-xl bg-paper p-2">
-            <Logo compact className="h-14" />
+          <div className="inline-block overflow-hidden rounded-lg">
+            <Logo compact className="h-16" />
           </div>
           <p className="mt-5 text-sm leading-relaxed text-white/75">
             {t(
