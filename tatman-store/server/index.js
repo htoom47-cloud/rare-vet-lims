@@ -167,7 +167,8 @@ app.post("/api/orders", (req, res) => {
       (method === "bank" && allowed.bank) ||
       (method === "cod" && allowed.cod) ||
       (method === "card" && allowed.card) ||
-      (method === "mada" && allowed.mada);
+      (method === "mada" && allowed.mada) ||
+      (method === "applePay" && allowed.applePay);
     if (!methodOk) {
       fail = "payment_disabled";
       return d;
@@ -245,10 +246,19 @@ app.post("/api/orders", (req, res) => {
     return;
   }
 
+  const methodAr =
+    {
+      whatsapp: "واتساب",
+      bank: "تحويل بنكي",
+      cod: "الدفع عند الاستلام",
+      card: "بطاقة",
+      mada: "مدى",
+      applePay: "أبل باي",
+    }[method] || method;
   const wa = settings.whatsapp.replace(/\D/g, "");
   const itemLines = order.items.map((l) => `• ${l.nameAr} × ${l.qty}`).join("\n");
   const waText = encodeURIComponent(
-    `طلب تطمن ${order.id}\nالدولة: ${settings.nameAr}\n${itemLines}\nالإجمالي: ${order.total} ${settings.currencyAr}\nالدفع: ${method}\nالاسم: ${customer.name}\nالجوال: ${customer.phone}`,
+    `طلب تطمن ${order.id}\nالدولة: ${settings.nameAr}\n${itemLines}\nالإجمالي: ${order.total} ${settings.currencyAr}\nالدفع: ${methodAr}\nالاسم: ${customer.name}\nالجوال: ${customer.phone}`,
   );
 
   res.json({
@@ -384,8 +394,16 @@ app.get("/api/admin/settings", requireAdmin, (_req, res) => {
 app.put("/api/admin/settings", requireAdmin, (req, res) => {
   const next = saveDb((d) => {
     d.settings = {
-      qa: { ...d.settings.qa, ...(req.body?.qa || {}) },
-      sa: { ...d.settings.sa, ...(req.body?.sa || {}) },
+      qa: {
+        ...d.settings.qa,
+        ...(req.body?.qa || {}),
+        payments: { ...d.settings.qa.payments, ...(req.body?.qa?.payments || {}) },
+      },
+      sa: {
+        ...d.settings.sa,
+        ...(req.body?.sa || {}),
+        payments: { ...d.settings.sa.payments, ...(req.body?.sa?.payments || {}) },
+      },
     };
     return d;
   });

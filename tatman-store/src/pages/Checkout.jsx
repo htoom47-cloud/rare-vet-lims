@@ -5,13 +5,8 @@ import { useCart } from "../context/CartContext";
 import { useCountry } from "../context/CountryContext";
 import { useCatalog } from "../context/CatalogContext";
 import { api } from "../api";
-
-const METHODS = [
-  { id: "whatsapp", ar: "واتساب", en: "WhatsApp", keys: ["whatsapp"] },
-  { id: "bank", ar: "تحويل بنكي", en: "Bank transfer", keys: ["bank"] },
-  { id: "cod", ar: "الدفع عند الاستلام", en: "Cash on delivery", keys: ["cod"] },
-  { id: "card", ar: "بطاقة ائتمان / مدى", en: "Card / Mada", keys: ["card", "mada"] },
-];
+import { checkoutMethods } from "../data/payments";
+import { ApplePayMark } from "../components/ApplePayMark";
 
 export function Checkout() {
   const { t, lang } = useLang();
@@ -25,8 +20,9 @@ export function Checkout() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(null);
 
-  const payments = settings?.payments || { whatsapp: true, bank: true, cod: true };
-  const methods = METHODS.filter((m) => m.keys.some((k) => payments[k]));
+  const payments = settings?.payments || { whatsapp: true, bank: true, cod: true, applePay: true };
+  const methods = checkoutMethods(payments);
+  const selectedMethod = methods.some((m) => m.id === method) ? method : methods[0]?.id || "whatsapp";
 
   async function submit(e) {
     e.preventDefault();
@@ -35,7 +31,7 @@ export function Checkout() {
     try {
       const result = await api.createOrder({
         country,
-        paymentMethod: method,
+        paymentMethod: selectedMethod,
         notes: form.notes,
         customer: form,
         items: cart.items.map((i) => ({ id: i.product.id, qty: i.qty })),
@@ -68,12 +64,23 @@ export function Checkout() {
   }
 
   if (done) {
+    const apple = done.order?.paymentMethod === "applePay";
     return (
       <div className="mx-auto max-w-xl px-4 py-12">
-        <h1 className="font-arabic text-3xl font-extrabold">{t("تم تسجيل الطلب", "Order placed")}</h1>
+        <h1 className="font-arabic text-3xl font-extrabold">
+          {apple ? t("تم تسجيل الطلب — أبل باي", "Order placed — Apple Pay") : t("تم تسجيل الطلب", "Order placed")}
+        </h1>
         <p className="mt-2 text-ink/70">
           {t("رقم الطلب", "Order no.")}: <strong>{done.order.id}</strong>
         </p>
+        {apple && (
+          <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-ink/75 ring-1 ring-navy/10">
+            {t(
+              "طلبك بانتظار إتمام الدفع عبر Apple Pay. تابع عبر واتساب لتأكيد العملية، أو ادفع من iPhone / Safari.",
+              "Your order is awaiting Apple Pay. Continue on WhatsApp to confirm, or pay from iPhone / Safari.",
+            )}
+          </p>
+        )}
         {done.bank?.iban && (
           <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-navy/10">
             <p className="font-bold">{t("بيانات التحويل", "Bank details")}</p>
@@ -116,12 +123,25 @@ export function Checkout() {
 
         <div className="space-y-2">
           <p className="text-sm font-bold">{t("طريقة الدفع", "Payment method")}</p>
-          {methods.map((m) => (
-            <label key={m.id} className="flex items-center gap-3 rounded-xl bg-white p-3 ring-1 ring-navy/10">
-              <input type="radio" name="pay" checked={method === m.id} onChange={() => setMethod(m.id)} />
-              <span>{t(m.ar, m.en)}</span>
-            </label>
-          ))}
+          {methods.map((m) => {
+            const selected = selectedMethod === m.id;
+            const apple = m.id === "applePay";
+            return (
+              <label
+                key={m.id}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl p-3 ring-1 transition ${
+                  apple && selected
+                    ? "bg-black text-white ring-black"
+                    : selected
+                      ? "bg-mist ring-navy/20"
+                      : "bg-white ring-navy/10"
+                }`}
+              >
+                <input type="radio" name="pay" checked={selected} onChange={() => setMethod(m.id)} />
+                {apple ? <ApplePayMark light={selected} /> : <span>{t(m.ar, m.en)}</span>}
+              </label>
+            );
+          })}
         </div>
 
         <textarea className="input min-h-20" placeholder={t("ملاحظات", "Notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -132,8 +152,13 @@ export function Checkout() {
         </div>
 
         {error && <p className="text-sm text-crimson">{error}</p>}
-        <button disabled={busy} className="min-h-12 w-full rounded-full bg-crimson text-sm font-extrabold text-white">
-          {busy ? "..." : t("تأكيد الطلب", "Confirm order")}
+        <button
+          disabled={busy}
+          className={`min-h-12 w-full rounded-full text-sm font-extrabold ${
+            selectedMethod === "applePay" ? "bg-black text-white" : "bg-crimson text-white"
+          }`}
+        >
+          {busy ? "..." : selectedMethod === "applePay" ? t("الدفع عبر أبل باي", "Pay with Apple Pay") : t("تأكيد الطلب", "Confirm order")}
         </button>
       </form>
     </div>

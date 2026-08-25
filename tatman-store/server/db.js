@@ -25,7 +25,7 @@ function defaultSettings() {
       bankName: "",
       iban: "",
       accountName: "Tatman Veterinary Services",
-      payments: { whatsapp: true, bank: true, cod: true, card: false },
+      payments: { whatsapp: true, bank: true, cod: true, card: false, applePay: true },
     },
     sa: {
       code: "sa",
@@ -37,7 +37,7 @@ function defaultSettings() {
       bankName: "",
       iban: "",
       accountName: "Tatman Veterinary Services",
-      payments: { whatsapp: true, bank: true, cod: true, mada: false },
+      payments: { whatsapp: true, bank: true, cod: true, mada: false, applePay: true },
     },
   };
 }
@@ -74,13 +74,24 @@ function ensure() {
   }
 }
 
+function mergeCountrySettings(code, saved) {
+  const base = defaultSettings()[code];
+  const row = saved?.[code] || {};
+  return {
+    ...base,
+    ...row,
+    payments: { ...base.payments, ...(row.payments || {}) },
+  };
+}
+
 function read() {
   ensure();
   const raw = JSON.parse(fs.readFileSync(dbPath, "utf8"));
   raw.products = (raw.products || []).map(normalizeProduct);
-  raw.settings = { ...defaultSettings(), ...(raw.settings || {}) };
-  raw.settings.qa = { ...defaultSettings().qa, ...(raw.settings.qa || {}) };
-  raw.settings.sa = { ...defaultSettings().sa, ...(raw.settings.sa || {}) };
+  raw.settings = {
+    qa: mergeCountrySettings("qa", raw.settings),
+    sa: mergeCountrySettings("sa", raw.settings),
+  };
   raw.orders = raw.orders || [];
   return raw;
 }

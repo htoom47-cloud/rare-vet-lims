@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
+import { paymentLabel } from "../../data/payments";
 
 const statuses = [
   ["new", "جديد"],
@@ -55,7 +56,7 @@ export function AdminOrders() {
               </span>
             </div>
             <p className="mt-2 text-sm">
-              {o.customer?.name} · {o.customer?.phone} · {o.paymentMethod}
+              {o.customer?.name} · {o.customer?.phone} · {paymentLabel(o.paymentMethod)}
             </p>
             <ul className="mt-2 text-sm text-black/70">
               {o.items.map((i) => (
