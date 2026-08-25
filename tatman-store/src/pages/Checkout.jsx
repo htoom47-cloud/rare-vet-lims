@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
 import { useCountry } from "../context/CountryContext";
@@ -7,6 +7,17 @@ import { useCatalog } from "../context/CatalogContext";
 import { api } from "../api";
 import { checkoutMethods } from "../data/payments";
 import { ApplePayMark } from "../components/ApplePayMark";
+
+function couponMessage(code, t) {
+  if (code === "coupon_country") return t("هذا الكود غير متاح لهذه الدولة.", "This code is not available for this country.");
+  if (code === "coupon_expired") return t("انتهت صلاحية كود الخصم.", "This discount code has expired.");
+  if (code === "coupon_used_up") return t("استُنفد هذا الكود.", "This code has been fully used.");
+  if (code === "coupon_min") return t("الطلب أقل من الحد الأدنى لهذا الكود.", "The order is below this code’s minimum.");
+  if (code === "coupon_invalid" || code === "coupon_inactive") {
+    return t("كود الخصم غير صالح.", "Invalid discount code.");
+  }
+  return t("تعذر تطبيق كود الخصم.", "Could not apply the discount code.");
+}
 
 export function Checkout() {
   const { t, lang } = useLang();
@@ -19,10 +30,38 @@ export function Checkout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(null);
+  const [couponInput, setCouponInput] = useState("");
+  const [applied, setApplied] = useState(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
 
   const payments = settings?.payments || { whatsapp: true, bank: true, cod: true, applePay: true };
   const methods = checkoutMethods(payments);
   const selectedMethod = methods.some((m) => m.id === method) ? method : methods[0]?.id || "whatsapp";
+  const payable = applied ? applied.total : cart.total;
+
+  useEffect(() => {
+    setApplied(null);
+    setCouponError("");
+  }, [country, cart.total]);
+
+  async function applyCoupon() {
+    setCouponError("");
+    setCouponBusy(true);
+    try {
+      const data = await api.previewCoupon({
+        code: couponInput,
+        country,
+        subtotal: cart.total,
+      });
+      setApplied(data);
+    } catch (err) {
+      setApplied(null);
+      setCouponError(couponMessage(err?.message, t));
+    } finally {
+      setCouponBusy(false);
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -33,6 +72,7 @@ export function Checkout() {
         country,
         paymentMethod: selectedMethod,
         notes: form.notes,
+        couponCode: applied?.code || "",
         customer: form,
         items: cart.items.map((i) => ({ id: i.product.id, qty: i.qty })),
       });
@@ -44,6 +84,9 @@ export function Checkout() {
     } catch (err) {
       if (err?.status === 409) {
         setError(t("الكمية المطلوبة غير متاحة حالياً.", "Requested quantity is not available."));
+      } else if (String(err?.message || "").startsWith("coupon_")) {
+        setApplied(null);
+        setError(couponMessage(err.message, t));
       } else {
         setError(t("تعذر إرسال الطلب. تأكد من البيانات وحاول مرة أخرى.", "Could not place order. Check details and try again."));
       }
@@ -73,6 +116,13 @@ export function Checkout() {
         <p className="mt-2 text-ink/70">
           {t("رقم الطلب", "Order no.")}: <strong>{done.order.id}</strong>
         </p>
+        {done.order?.discount ? (
+          <p className="mt-2 text-sm text-ink/70">
+            {t("الخصم", "Discount")} ({done.order.couponCode}): −{formatPrice(done.order.discount, lang)}
+            {" · "}
+            {t("الإجمالي", "Total")}: {formatPrice(done.order.total, lang)}
+          </p>
+        ) : null}
         {apple && (
           <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-ink/75 ring-1 ring-navy/10">
             {t(
@@ -146,9 +196,61 @@ export function Checkout() {
 
         <textarea className="input min-h-20" placeholder={t("ملاحظات", "Notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
 
-        <div className="flex items-center justify-between rounded-2xl bg-navy p-4 text-white">
-          <span>{t("الإجمالي", "Total")}</span>
-          <span className="font-display text-xl text-sand">{formatPrice(cart.total, lang)}</span>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-navy/10">
+          <p className="text-sm font-bold">{t("كود الخصم", "Discount code")}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input
+              className="input flex-1"
+              dir="ltr"
+              value={couponInput}
+              onChange={(e) => {
+                setCouponInput(e.target.value);
+                setCouponError("");
+                if (applied) setApplied(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (couponInput.trim() && !couponBusy) applyCoupon();
+                }
+              }}
+              placeholder={t("أدخل الكود", "Enter code")}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              disabled={couponBusy || !couponInput.trim()}
+              onClick={applyCoupon}
+              className="rounded-full bg-navy px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {couponBusy ? "..." : t("تطبيق", "Apply")}
+            </button>
+          </div>
+          {applied ? (
+            <p className="mt-2 text-sm font-bold text-medical">
+              {t("تم تطبيق", "Applied")} {applied.code} (−{formatPrice(applied.discount, lang)})
+            </p>
+          ) : null}
+          {couponError ? <p className="mt-2 text-sm text-crimson">{couponError}</p> : null}
+        </div>
+
+        <div className="space-y-2 rounded-2xl bg-navy p-4 text-white">
+          <div className="flex items-center justify-between text-sm text-white/80">
+            <span>{t("المجموع", "Subtotal")}</span>
+            <span>{formatPrice(cart.total, lang)}</span>
+          </div>
+          {applied?.discount ? (
+            <div className="flex items-center justify-between text-sm text-sand">
+              <span>
+                {t("الخصم", "Discount")} ({applied.code})
+              </span>
+              <span>−{formatPrice(applied.discount, lang)}</span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between">
+            <span>{t("الإجمالي", "Total")}</span>
+            <span className="font-display text-xl text-sand">{formatPrice(payable, lang)}</span>
+          </div>
         </div>
 
         {error && <p className="text-sm text-crimson">{error}</p>}

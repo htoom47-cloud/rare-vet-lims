@@ -21,6 +21,7 @@ export function AdminLayout() {
           <Link to="/admin">الرئيسية</Link>
           <Link to="/admin/products">المنتجات</Link>
           <Link to="/admin/orders">الطلبات</Link>
+          <Link to="/admin/coupons">أكواد الخصم</Link>
           <Link to="/admin/settings">الإعدادات</Link>
           <Link to="/">عرض المتجر</Link>
         </nav>

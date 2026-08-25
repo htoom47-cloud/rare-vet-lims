@@ -4,6 +4,7 @@ import path from "node:path";
 import express from "express";
 import { getDb, saveDb, uploadsDir } from "./db.js";
 import { stockOf } from "../src/data/stock.js";
+import { couponFail, discountAmount, findCoupon, normalizeCode, shapeCoupon } from "../src/data/coupons.js";
 import {
   checkPassword,
   clearSessionCookie,
@@ -203,6 +204,17 @@ app.post("/api/orders", (req, res) => {
       return d;
     }
 
+    const subtotal = lines.reduce((s, l) => s + l.lineTotal, 0);
+    const requestedCode = normalizeCode(req.body?.couponCode);
+    let coupon = null;
+    let discount = 0;
+    if (requestedCode) {
+      coupon = findCoupon(d.coupons, requestedCode);
+      fail = couponFail(coupon, { country, subtotal });
+      if (fail) return d;
+      discount = discountAmount(coupon, subtotal);
+    }
+
     for (const line of lines) {
       d.products = d.products.map((p) => {
         if (p.id !== line.id) return p;
@@ -216,13 +228,22 @@ app.post("/api/orders", (req, res) => {
       });
     }
 
-    const total = lines.reduce((s, l) => s + l.lineTotal, 0);
+    if (coupon) {
+      d.coupons = (d.coupons || []).map((c) =>
+        c.id === coupon.id ? { ...c, usedCount: Math.max(0, Number(c.usedCount) || 0) + 1 } : c,
+      );
+    }
+
+    const total = Math.max(0, subtotal - discount);
     order = {
       id: `TV-${Date.now().toString(36).toUpperCase()}`,
       createdAt: new Date().toISOString(),
       country,
       currency: settings.currency,
       items: lines,
+      subtotal,
+      discount,
+      couponCode: coupon ? coupon.code : "",
       total,
       customer,
       paymentMethod: method,
@@ -241,6 +262,10 @@ app.post("/api/orders", (req, res) => {
     res.status(409).json({ error: fail });
     return;
   }
+  if (fail && String(fail).startsWith("coupon_")) {
+    res.status(400).json({ error: fail });
+    return;
+  }
   if (fail || !order) {
     res.status(400).json({ error: fail || "invalid_items" });
     return;
@@ -257,8 +282,11 @@ app.post("/api/orders", (req, res) => {
     }[method] || method;
   const wa = settings.whatsapp.replace(/\D/g, "");
   const itemLines = order.items.map((l) => `• ${l.nameAr} × ${l.qty}`).join("\n");
+  const discountLine = order.discount
+    ? `\nالخصم (${order.couponCode}): -${order.discount} ${settings.currencyAr}`
+    : "";
   const waText = encodeURIComponent(
-    `طلب تطمن ${order.id}\nالدولة: ${settings.nameAr}\n${itemLines}\nالإجمالي: ${order.total} ${settings.currencyAr}\nالدفع: ${methodAr}\nالاسم: ${customer.name}\nالجوال: ${customer.phone}`,
+    `طلب تطمن ${order.id}\nالدولة: ${settings.nameAr}\n${itemLines}${discountLine}\nالإجمالي: ${order.total} ${settings.currencyAr}\nالدفع: ${methodAr}\nالاسم: ${customer.name}\nالجوال: ${customer.phone}`,
   );
 
   res.json({
@@ -297,7 +325,85 @@ app.get("/api/admin/overview", requireAdmin, (_req, res) => {
     newOrders: db.orders.filter((o) => o.status === "new" || o.status === "pending_payment").length,
     qaOrders: db.orders.filter((o) => o.country === "qa").length,
     saOrders: db.orders.filter((o) => o.country === "sa").length,
+    couponCount: (db.coupons || []).length,
   });
+});
+
+app.post("/api/coupons/preview", (req, res) => {
+  const country = req.body?.country === "sa" ? "sa" : "qa";
+  const subtotal = Math.max(0, Number(req.body?.subtotal) || 0);
+  const coupon = findCoupon(getDb().coupons, req.body?.code);
+  const fail = couponFail(coupon, { country, subtotal });
+  if (fail) {
+    res.status(400).json({ error: fail });
+    return;
+  }
+  const discount = discountAmount(coupon, subtotal);
+  res.json({
+    code: coupon.code,
+    type: coupon.type,
+    value: coupon.value,
+    discount,
+    total: Math.max(0, subtotal - discount),
+    minSubtotal: coupon.minSubtotal || 0,
+  });
+});
+
+app.get("/api/admin/coupons", requireAdmin, (_req, res) => {
+  res.json({ coupons: getDb().coupons || [] });
+});
+
+app.post("/api/admin/coupons", requireAdmin, (req, res) => {
+  const coupon = shapeCoupon(req.body || {}, { id: crypto.randomUUID(), usedCount: 0 });
+  if (!coupon.code) {
+    res.status(400).json({ error: "code_required" });
+    return;
+  }
+  const db = getDb();
+  if (findCoupon(db.coupons, coupon.code)) {
+    res.status(409).json({ error: "code_exists" });
+    return;
+  }
+  saveDb((d) => {
+    d.coupons = d.coupons || [];
+    d.coupons.unshift(coupon);
+    return d;
+  });
+  res.json({ coupon });
+});
+
+app.put("/api/admin/coupons/:id", requireAdmin, (req, res) => {
+  const id = req.params.id;
+  let updated = null;
+  let clash = false;
+  saveDb((d) => {
+    const current = (d.coupons || []).find((c) => c.id === id);
+    if (!current) return d;
+    const next = { ...shapeCoupon(req.body || {}, current), id, usedCount: current.usedCount };
+    if (!next.code) return d;
+    clash = (d.coupons || []).some((c) => c.id !== id && normalizeCode(c.code) === next.code);
+    if (clash) return d;
+    updated = next;
+    d.coupons = d.coupons.map((c) => (c.id === id ? next : c));
+    return d;
+  });
+  if (clash) {
+    res.status(409).json({ error: "code_exists" });
+    return;
+  }
+  if (!updated) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  res.json({ coupon: updated });
+});
+
+app.delete("/api/admin/coupons/:id", requireAdmin, (req, res) => {
+  saveDb((d) => {
+    d.coupons = (d.coupons || []).filter((c) => c.id !== req.params.id);
+    return d;
+  });
+  res.json({ ok: true });
 });
 
 app.get("/api/admin/products", requireAdmin, (_req, res) => {

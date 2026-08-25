@@ -62,6 +62,7 @@ function emptyDb() {
   return {
     products: seedProducts.map(normalizeProduct),
     orders: [],
+    coupons: [],
     settings: defaultSettings(),
   };
 }
@@ -93,6 +94,7 @@ function read() {
     sa: mergeCountrySettings("sa", raw.settings),
   };
   raw.orders = raw.orders || [];
+  raw.coupons = Array.isArray(raw.coupons) ? raw.coupons : [];
   return raw;
 }
 

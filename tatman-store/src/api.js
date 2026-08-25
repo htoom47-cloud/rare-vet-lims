@@ -46,4 +46,11 @@ export const api = {
   updateOrder: (id, body) => request(`/api/admin/orders/${id}`, { method: "PUT", body }),
   settings: () => request("/api/admin/settings"),
   saveSettings: (body) => request("/api/admin/settings", { method: "PUT", body }),
+  previewCoupon: (body) => request("/api/coupons/preview", { method: "POST", body }),
+  coupons: () => request("/api/admin/coupons"),
+  saveCoupon: (id, body) =>
+    id
+      ? request(`/api/admin/coupons/${id}`, { method: "PUT", body })
+      : request("/api/admin/coupons", { method: "POST", body }),
+  deleteCoupon: (id) => request(`/api/admin/coupons/${id}`, { method: "DELETE" }),
 };

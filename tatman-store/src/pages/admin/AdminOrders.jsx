@@ -58,6 +58,13 @@ export function AdminOrders() {
             <p className="mt-2 text-sm">
               {o.customer?.name} · {o.customer?.phone} · {paymentLabel(o.paymentMethod)}
             </p>
+            {o.couponCode ? (
+              <p className="mt-1 text-sm font-bold text-navy">
+                كود {o.couponCode}
+                {o.discount ? ` · خصم ${o.discount} ${o.currency || ""}` : ""}
+                {o.subtotal ? ` · قبل الخصم ${o.subtotal}` : ""}
+              </p>
+            ) : null}
             <ul className="mt-2 text-sm text-black/70">
               {o.items.map((i) => (
                 <li key={i.id}>
