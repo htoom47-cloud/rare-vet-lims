@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { paymentLabel } from "../../data/payments";
 import { countryLabel, ORDER_STATUSES } from "../../data/orders";
-import { trackingLink } from "../../data/couriers";
+import { trackingLink, shippingErrorAr } from "../../data/couriers";
 
 export function AdminOrders() {
   const [orders, setOrders] = useState([]);
@@ -40,6 +40,22 @@ export function AdminOrders() {
       await load();
     } catch {
       setError("تعذر تحديث حالة الطلب. حاول مرة أخرى.");
+      await load().catch(() => {});
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function createShipment(id) {
+    if (!window.confirm("سيتم إنشاء شحنة حقيقية لدى شركة التوصيل دون تغيير حالة الطلب. المتابعة؟")) return;
+    setError("");
+    setBusyId(id);
+    try {
+      const data = await api.createShipment(id);
+      if (!data.trackingNumber && !data.order?.trackingNumber) throw new Error("create_failed");
+      await load();
+    } catch (err) {
+      setError(shippingErrorAr(err.message, err.detail));
       await load().catch(() => {});
     } finally {
       setBusyId("");
@@ -142,6 +158,7 @@ export function AdminOrders() {
                         </div>
                       ) : null}
                       <input
+                        key={`${o.id}-${o.trackingNumber || ""}`}
                         className="input mt-2"
                         placeholder="رقم التتبع"
                         defaultValue={o.trackingNumber || ""}
@@ -152,6 +169,16 @@ export function AdminOrders() {
                           load();
                         }}
                       />
+                      {o.canCreateShipment ? (
+                        <button
+                          type="button"
+                          disabled={busyId === o.id}
+                          onClick={() => createShipment(o.id)}
+                          className="mt-2 block rounded-full bg-navy px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                        >
+                          {busyId === o.id ? "جاري الإنشاء..." : "إنشاء شحنة"}
+                        </button>
+                      ) : null}
                       {trackingLink(o.shipping, o.trackingNumber) ? (
                         <a
                           className="mt-1 inline-block text-xs font-bold text-medical"
@@ -160,6 +187,16 @@ export function AdminOrders() {
                           rel="noreferrer"
                         >
                           تتبع الشحنة
+                        </a>
+                      ) : null}
+                      {o.shippingLabelUrl ? (
+                        <a
+                          className="mt-1 block text-xs font-bold text-navy"
+                          href={o.shippingLabelUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          بوليصة الشحن
                         </a>
                       ) : null}
                     </>

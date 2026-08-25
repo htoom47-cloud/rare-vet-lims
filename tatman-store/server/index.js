@@ -7,8 +7,9 @@ import { decrementStock, stockOf } from "../src/data/stock.js";
 import { couponFail, discountAmount, findCoupon, normalizeCode, shapeCoupon } from "../src/data/coupons.js";
 import { customersFromOrders } from "../src/data/customers.js";
 import { isOrderStatus } from "../src/data/orders.js";
-import { activeCouriers, findCourier } from "../src/data/couriers.js";
+import { activeCouriers, findCourier, publicAdminCourier, publicStoreCourier, saudiApiReady } from "../src/data/couriers.js";
 import { buildRevenue } from "../src/data/revenue.js";
+import { createSaudiShipment, testSaudiCourier } from "./shipping.js";
 import {
   isCountryCode,
   mergeAllSettings,
@@ -134,6 +135,33 @@ function publicProduct(p) {
   return p;
 }
 
+function publicCountrySettings(s) {
+  if (!s) return s;
+  return {
+    ...s,
+    couriers: (s.couriers || []).map(publicStoreCourier),
+  };
+}
+
+function publicAdminSettings(settings) {
+  const out = {};
+  for (const [code, conf] of Object.entries(settings || {})) {
+    out[code] = {
+      ...conf,
+      couriers: (conf.couriers || []).map(publicAdminCourier),
+    };
+  }
+  return out;
+}
+
+function publicOrder(order, settings) {
+  const courier = findCourier(settings?.[order.country]?.couriers, order.shipping?.id);
+  return {
+    ...order,
+    canCreateShipment: order.country === "sa" && saudiApiReady("sa", courier) && !order.trackingNumber,
+  };
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
@@ -147,7 +175,7 @@ app.get("/api/catalog", (req, res) => {
   });
   res.json({
     country,
-    settings: db.settings[country],
+    settings: publicCountrySettings(db.settings[country]),
     countries: publicCountryList(db.settings),
     products: products.map(publicProduct),
     categories: [
@@ -531,7 +559,10 @@ app.delete("/api/admin/products/:id", requirePermission("products"), (req, res) 
 
 app.get("/api/admin/orders", requirePermission("orders"), (_req, res) => {
   const db = getDb();
-  res.json({ orders: db.orders, countries: publicCountryList(db.settings) });
+  res.json({
+    orders: (db.orders || []).map((o) => publicOrder(o, db.settings)),
+    countries: publicCountryList(db.settings),
+  });
 });
 
 app.get("/api/admin/customers", requirePermission("customers"), (_req, res) => {
@@ -565,7 +596,69 @@ app.put("/api/admin/orders/:id", requirePermission("orders"), (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
-  res.json({ order: updated });
+  res.json({ order: publicOrder(updated, getDb().settings) });
+});
+
+app.post("/api/admin/orders/:id/shipment", requirePermission("orders"), async (req, res) => {
+  const db = getDb();
+  const order = (db.orders || []).find((o) => o.id === req.params.id);
+  if (!order) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  if (order.country !== "sa") {
+    res.status(400).json({ error: "saudi_only" });
+    return;
+  }
+  if (order.trackingNumber) {
+    res.status(409).json({ error: "already_shipped" });
+    return;
+  }
+  const courier = findCourier(db.settings.sa?.couriers, order.shipping?.id);
+  if (!courier) {
+    res.status(400).json({ error: "no_courier" });
+    return;
+  }
+  try {
+    const result = await createSaudiShipment(order, courier);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error || "create_failed" });
+      return;
+    }
+    let updated = null;
+    let conflict = false;
+    saveDb((d) => {
+      const current = (d.orders || []).find((o) => o.id === order.id);
+      if (!current) return d;
+      if (current.trackingNumber) {
+        conflict = true;
+        updated = current;
+        return d;
+      }
+      updated = {
+        ...current,
+        trackingNumber: result.trackingNumber,
+        shippingLabelUrl: result.labelUrl || current.shippingLabelUrl || "",
+      };
+      d.orders = d.orders.map((o) => (o.id === order.id ? updated : o));
+      return d;
+    });
+    if (conflict) {
+      res.status(409).json({ error: "already_shipped" });
+      return;
+    }
+    if (!updated) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    res.json({
+      order: publicOrder(updated, getDb().settings),
+      trackingNumber: result.trackingNumber,
+      shippingLabelUrl: updated.shippingLabelUrl || "",
+    });
+  } catch {
+    res.status(502).json({ error: "carrier_unreachable" });
+  }
 });
 
 app.get("/api/admin/revenue", requirePermission("revenue"), (req, res) => {
@@ -670,7 +763,7 @@ app.delete("/api/admin/users/:id", requirePermission("users"), (req, res) => {
 });
 
 app.get("/api/admin/settings", requirePermission("settings"), (_req, res) => {
-  res.json({ settings: getDb().settings });
+  res.json({ settings: publicAdminSettings(getDb().settings) });
 });
 
 app.put("/api/admin/settings", requirePermission("settings"), (req, res) => {
@@ -685,10 +778,36 @@ app.put("/api/admin/settings", requirePermission("settings"), (req, res) => {
       if (!isCountryCode(code) || code === "qa" || code === "sa") continue;
       nextRaw[code] = conf;
     }
-    d.settings = mergeAllSettings(nextRaw);
+    d.settings = mergeAllSettings(nextRaw, d.settings);
     return d;
   });
-  res.json({ settings: next.settings });
+  res.json({ settings: publicAdminSettings(next.settings) });
+});
+
+app.post("/api/admin/shipping/test", requirePermission("settings"), async (req, res) => {
+  if (String(req.body?.country || "").trim().toLowerCase() !== "sa") {
+    res.status(400).json({ error: "saudi_only" });
+    return;
+  }
+  const courier = findCourier(getDb().settings.sa?.couriers, req.body?.courierId);
+  if (!courier) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  if (!saudiApiReady("sa", { ...courier, apiEnabled: true })) {
+    res.status(400).json({ error: "api_not_ready" });
+    return;
+  }
+  try {
+    const result = await testSaudiCourier(courier);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error || "test_failed" });
+      return;
+    }
+    res.json({ ok: true, message: result.message });
+  } catch {
+    res.status(502).json({ error: "carrier_unreachable" });
+  }
 });
 
 const dist = path.join(process.cwd(), "dist");

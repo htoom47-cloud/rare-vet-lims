@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
-import { findCourier, shapeCourier } from "../../data/couriers";
+import { findCourier, isSaudiApiCourier, shapeCourier, shippingErrorAr } from "../../data/couriers";
 
 const TABS = [
   ["display", "بيانات العرض"],
   ["pricing", "تسعيرة الشحن"],
+  ["connect", "ربط الحساب"],
   ["extra", "معلومات إضافية"],
 ];
 
@@ -35,12 +36,22 @@ export function AdminCourierEdit() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const [testMsg, setTestMsg] = useState("");
 
   async function load() {
     const d = await api.settings();
     setSettings(d.settings);
     const row = findCourier(d.settings?.[country]?.couriers, courierId);
-    setForm(row ? shapeCourier(row) : null);
+    setForm(
+      row
+        ? {
+            ...shapeCourier(row),
+            apiPassKeySet: row.apiPassKeySet,
+            apiPasswordSet: row.apiPasswordSet,
+            apiPinSet: row.apiPinSet,
+          }
+        : null,
+    );
   }
 
   useEffect(() => {
@@ -58,6 +69,7 @@ export function AdminCourierEdit() {
   async function persist(nextCourier, message) {
     setError("");
     setSaved("");
+    setTestMsg("");
     setBusy(true);
     try {
       const next = {
@@ -72,11 +84,32 @@ export function AdminCourierEdit() {
       setSettings(d.settings);
       const row = findCourier(d.settings?.[country]?.couriers, courierId);
       if (!row) throw new Error("save_failed");
-      setForm(shapeCourier(row));
+      setForm({
+        ...shapeCourier(row),
+        apiPassKeySet: row.apiPassKeySet,
+        apiPasswordSet: row.apiPasswordSet,
+        apiPinSet: row.apiPinSet,
+      });
       setSaved(message);
+      return true;
     } catch {
       setError("تعذر الحفظ. حاول مرة أخرى.");
       await load().catch(() => {});
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testConnection() {
+    const ok = await persist(shapeCourier(form), "تم حفظ بيانات الربط.");
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await api.testShipping(country, courierId);
+      setTestMsg(r.message || "تم الاتصال بنجاح.");
+    } catch (err) {
+      setError(shippingErrorAr(err.message, err.detail));
     } finally {
       setBusy(false);
     }
@@ -112,6 +145,9 @@ export function AdminCourierEdit() {
 
   const currencyAr = settings[country]?.currencyAr || "";
   const countryName = settings[country]?.nameAr || country;
+  const canConnect = isSaudiApiCourier(country, form);
+  const tabs = TABS.filter(([id]) => id !== "connect" || canConnect);
+  const activeTab = tab === "connect" && !canConnect ? "display" : tab;
 
   return (
     <form onSubmit={save} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-navy/10">
@@ -138,14 +174,14 @@ export function AdminCourierEdit() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 bg-mist p-1 mx-4 mt-4 rounded-xl">
-        {TABS.map(([id, label]) => (
+      <div className={`grid gap-1 bg-mist p-1 mx-4 mt-4 rounded-xl ${tabs.length > 3 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+        {tabs.map(([id, label]) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
             className={`rounded-lg px-2 py-2 text-xs font-extrabold sm:text-sm ${
-              tab === id ? "bg-white text-navy shadow-sm" : "text-navy/60"
+              activeTab === id ? "bg-white text-navy shadow-sm" : "text-navy/60"
             }`}
           >
             {label}
@@ -154,7 +190,7 @@ export function AdminCourierEdit() {
       </div>
 
       <div className="space-y-4 p-4 sm:p-5">
-        {tab === "pricing" && (
+        {activeTab === "pricing" && (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="نوع الشحن">
@@ -249,7 +285,7 @@ export function AdminCourierEdit() {
           </>
         )}
 
-        {tab === "display" && (
+        {activeTab === "display" && (
           <div className="space-y-5">
             <Field label="نبذة">
               <textarea
@@ -332,7 +368,97 @@ export function AdminCourierEdit() {
           </div>
         )}
 
-        {tab === "extra" && (
+        {activeTab === "connect" && canConnect && (
+          <div className="space-y-5">
+            <div className="rounded-xl bg-[#e8f2fb] p-4 text-sm text-navy">
+              <p className="font-extrabold">ربط أرامكس وسمسا — السعودية فقط</p>
+              <p className="mt-1 text-black/70">
+                لا يُنشأ شحن تلقائياً عند الطلب. بعد حفظ البيانات، أنشئ الشحنة يدوياً من صفحة الطلبات. حالة الطلب لا تتغير تلقائياً.
+              </p>
+            </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input className="mt-0.5" type="checkbox" checked={form.apiEnabled === true} onChange={(e) => patch("apiEnabled", e.target.checked)} />
+              <span>
+                تفعيل الربط
+                <span className="block text-xs text-black/50">معطّل افتراضياً. فعّله فقط بعد إدخال بيانات الحساب الصحيحة.</span>
+              </span>
+            </label>
+
+            {form.id === "smsa" ? (
+              <Field label="مفتاح سمسا (PassKey)" hint="يُحفظ في الخادم ولا يظهر بعد الحفظ.">
+                <input
+                  className="input"
+                  type="password"
+                  dir="ltr"
+                  autoComplete="new-password"
+                  value={form.apiPassKey || ""}
+                  placeholder={form.apiPassKeySet ? "محفوظ — اتركه فارغاً للإبقاء" : ""}
+                  onChange={(e) => patch("apiPassKey", e.target.value)}
+                />
+              </Field>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="اسم المستخدم">
+                  <input className="input" dir="ltr" autoComplete="off" value={form.apiUsername || ""} onChange={(e) => patch("apiUsername", e.target.value)} />
+                </Field>
+                <Field label="كلمة المرور" hint="يُحفظ في الخادم ولا يظهر بعد الحفظ.">
+                  <input
+                    className="input"
+                    type="password"
+                    dir="ltr"
+                    autoComplete="new-password"
+                    value={form.apiPassword || ""}
+                    placeholder={form.apiPasswordSet ? "محفوظ — اتركه فارغاً للإبقاء" : ""}
+                    onChange={(e) => patch("apiPassword", e.target.value)}
+                  />
+                </Field>
+                <Field label="رقم الحساب">
+                  <input className="input" dir="ltr" value={form.apiAccountNumber || ""} onChange={(e) => patch("apiAccountNumber", e.target.value)} />
+                </Field>
+                <Field label="رمز الحساب (PIN)" hint="يُحفظ في الخادم ولا يظهر بعد الحفظ.">
+                  <input
+                    className="input"
+                    type="password"
+                    dir="ltr"
+                    autoComplete="new-password"
+                    value={form.apiAccountPin || ""}
+                    placeholder={form.apiPinSet ? "محفوظ — اتركه فارغاً للإبقاء" : ""}
+                    onChange={(e) => patch("apiAccountPin", e.target.value)}
+                  />
+                </Field>
+                <Field label="الكيان (Entity)" hint="للشحن الداخلي السعودي عادة RUH.">
+                  <input className="input" dir="ltr" value={form.apiAccountEntity || "RUH"} onChange={(e) => patch("apiAccountEntity", e.target.value)} />
+                </Field>
+                <Field label="نوع المنتج" hint="OND للشحن الداخلي العادي.">
+                  <input className="input" dir="ltr" value={form.apiProductType || "OND"} onChange={(e) => patch("apiProductType", e.target.value)} />
+                </Field>
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="مدينة الاستلام">
+                <input className="input" value={form.pickupCity || ""} placeholder="Riyadh" onChange={(e) => patch("pickupCity", e.target.value)} />
+              </Field>
+              <Field label="عنوان الاستلام">
+                <input className="input" value={form.pickupAddress || ""} onChange={(e) => patch("pickupAddress", e.target.value)} />
+              </Field>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={testConnection}
+                className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-navy ring-1 ring-navy/10 disabled:opacity-60"
+              >
+                {busy ? "جاري الاختبار..." : "حفظ ثم اختبار الاتصال"}
+              </button>
+              {testMsg ? <p className="mt-2 text-sm font-bold text-medical">{testMsg}</p> : null}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "extra" && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="اسم الشركة بالعربية" required>
               <input className="input" value={form.nameAr} onChange={(e) => patch("nameAr", e.target.value)} />

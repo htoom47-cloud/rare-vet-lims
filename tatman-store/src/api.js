@@ -9,6 +9,7 @@ async function request(path, options = {}) {
   if (!res.ok) {
     const err = new Error(data.error || "request_failed");
     err.status = res.status;
+    err.detail = data.detail || "";
     throw err;
   }
   return data;
@@ -51,6 +52,9 @@ export const api = {
   customers: () => request("/api/admin/customers"),
   settings: () => request("/api/admin/settings"),
   saveSettings: (body) => request("/api/admin/settings", { method: "PUT", body }),
+  testShipping: (country, courierId) =>
+    request("/api/admin/shipping/test", { method: "POST", body: { country, courierId } }),
+  createShipment: (id) => request(`/api/admin/orders/${id}/shipment`, { method: "POST", body: {} }),
   previewCoupon: (body) => request("/api/coupons/preview", { method: "POST", body }),
   coupons: () => request("/api/admin/coupons"),
   saveCoupon: (id, body) =>

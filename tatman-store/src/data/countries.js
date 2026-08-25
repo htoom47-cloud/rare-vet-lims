@@ -69,7 +69,7 @@ export function defaultCountryRow(code, extra = {}) {
   };
 }
 
-export function mergeCountrySettings(code, savedRow) {
+export function mergeCountrySettings(code, savedRow, previousRow) {
   const base = defaultCountryRow(code);
   const row = savedRow && typeof savedRow === "object" ? savedRow : {};
   return {
@@ -85,20 +85,20 @@ export function mergeCountrySettings(code, savedRow) {
     iban: String(row.iban ?? base.iban).slice(0, 40),
     accountName: String(row.accountName ?? base.accountName).slice(0, 80),
     payments: { ...base.payments, ...(row.payments || {}) },
-    couriers: mergeCouriers(code, row.couriers),
+    couriers: mergeCouriers(code, row.couriers, previousRow?.couriers),
   };
 }
 
-export function mergeAllSettings(raw) {
+export function mergeAllSettings(raw, previous) {
   const src = raw && typeof raw === "object" ? raw : {};
   const out = {
-    qa: mergeCountrySettings("qa", src.qa),
-    sa: mergeCountrySettings("sa", src.sa),
+    qa: mergeCountrySettings("qa", src.qa, previous?.qa),
+    sa: mergeCountrySettings("sa", src.sa, previous?.sa),
   };
   for (const [key, conf] of Object.entries(src)) {
     const code = normalizeCountryCode(key);
     if (!isCountryCode(code) || isCoreCountry(code)) continue;
-    out[code] = mergeCountrySettings(code, conf);
+    out[code] = mergeCountrySettings(code, conf, previous?.[code]);
   }
   return out;
 }
