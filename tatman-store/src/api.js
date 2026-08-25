@@ -17,7 +17,11 @@ async function request(path, options = {}) {
 export const api = {
   catalog: (country) => request(`/api/catalog?country=${country}`),
   createOrder: (payload) => request("/api/orders", { method: "POST", body: payload }),
-  login: (password) => request("/api/admin/login", { method: "POST", body: { password } }),
+  login: (username, password) =>
+    request("/api/admin/login", {
+      method: "POST",
+      body: typeof username === "string" && password !== undefined ? { username, password } : { password: username },
+    }),
   logout: () => request("/api/admin/logout", { method: "POST", body: {} }),
   session: () => request("/api/admin/session"),
   overview: () => request("/api/admin/overview"),
@@ -54,4 +58,9 @@ export const api = {
       ? request(`/api/admin/coupons/${id}`, { method: "PUT", body })
       : request("/api/admin/coupons", { method: "POST", body }),
   deleteCoupon: (id) => request(`/api/admin/coupons/${id}`, { method: "DELETE" }),
+  revenue: (period = "all") => request(`/api/admin/revenue?period=${period}`),
+  users: () => request("/api/admin/users"),
+  saveUser: (id, body) =>
+    id ? request(`/api/admin/users/${id}`, { method: "PUT", body }) : request("/api/admin/users", { method: "POST", body }),
+  deleteUser: (id) => request(`/api/admin/users/${id}`, { method: "DELETE" }),
 };

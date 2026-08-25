@@ -63,6 +63,7 @@ function emptyDb() {
     products: seedProducts.map(normalizeProduct),
     orders: [],
     coupons: [],
+    adminUsers: [],
     settings: defaultSettings(),
   };
 }
@@ -95,6 +96,7 @@ function read() {
   };
   raw.orders = raw.orders || [];
   raw.coupons = Array.isArray(raw.coupons) ? raw.coupons : [];
+  raw.adminUsers = Array.isArray(raw.adminUsers) ? raw.adminUsers : [];
   return raw;
 }
 

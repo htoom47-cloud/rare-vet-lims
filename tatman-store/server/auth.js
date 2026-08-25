@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { getDb } from "./db.js";
+import { ALL_PERMISSIONS, publicAdminUser } from "../src/data/permissions.js";
 
 const COOKIE = "tatman_admin";
 const TTL_MS = 1000 * 60 * 60 * 12;
@@ -44,19 +46,57 @@ export function checkPassword(input) {
   return crypto.timingSafeEqual(a, b);
 }
 
-export function createSessionCookie() {
-  const token = sign({ role: "admin", exp: Date.now() + TTL_MS });
+export function hashPassword(plain) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(plain), salt, 64).toString("hex");
+  return { passwordSalt: salt, passwordHash: hash };
+}
+
+export function verifyStoredPassword(plain, user) {
+  if (!user?.passwordHash || !user?.passwordSalt) return false;
+  let derived;
+  try {
+    derived = crypto.scryptSync(String(plain), user.passwordSalt, 64).toString("hex");
+  } catch {
+    return false;
+  }
+  const a = Buffer.from(derived);
+  const b = Buffer.from(String(user.passwordHash));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function cookieHeader(token, maxAge) {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(TTL_MS / 1000)}${secure}`;
+  return `${COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+}
+
+export function createSessionCookie(session = { isOwner: true }) {
+  const payload = session.isOwner ? { isOwner: true, exp: Date.now() + TTL_MS } : { uid: session.uid, exp: Date.now() + TTL_MS };
+  return cookieHeader(sign(payload), Math.floor(TTL_MS / 1000));
 }
 
 export function clearSessionCookie() {
-  return `${COOKIE}=; HttpOnly; Path=/; Max-Age=0`;
+  return cookieHeader("", 0);
+}
+
+export function systemOwner() {
+  return publicAdminUser(null, { isOwner: true });
+}
+
+export function getSessionUser(req) {
+  const token = parseCookies(req)[COOKIE];
+  const payload = verify(token);
+  if (!payload) return null;
+  if (payload.isOwner || payload.role === "admin") return systemOwner();
+  if (!payload.uid) return null;
+  const user = (getDb().adminUsers || []).find((u) => u.id === payload.uid);
+  if (!user || user.active === false) return null;
+  return publicAdminUser(user);
 }
 
 export function isAdmin(req) {
-  const token = parseCookies(req)[COOKIE];
-  return Boolean(verify(token));
+  return Boolean(getSessionUser(req));
 }
 
 export function requireAdmin(req, res, next) {
@@ -66,3 +106,20 @@ export function requireAdmin(req, res, next) {
   }
   next();
 }
+
+export function requirePermission(perm) {
+  return (req, res, next) => {
+    const user = getSessionUser(req);
+    if (!user) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    if (user.isOwner || user.permissions?.[perm] === true) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "forbidden" });
+  };
+}
+
+export { ALL_PERMISSIONS };

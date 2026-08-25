@@ -21,6 +21,9 @@ import { AdminOrders } from "./pages/admin/AdminOrders";
 import { AdminSettings } from "./pages/admin/AdminSettings";
 import { AdminCoupons } from "./pages/admin/AdminCoupons";
 import { AdminCustomers } from "./pages/admin/AdminCustomers";
+import { AdminRevenue } from "./pages/admin/AdminRevenue";
+import { AdminUsers } from "./pages/admin/AdminUsers";
+import { AdminGuard } from "./pages/admin/AdminGuard";
 
 function StoreLayout({ children }) {
   return (
@@ -44,12 +47,14 @@ export default function App() {
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />
-                  <Route path="products" element={<AdminProducts />} />
-                  <Route path="products/:id" element={<AdminProductEdit />} />
-                  <Route path="orders" element={<AdminOrders />} />
-                  <Route path="customers" element={<AdminCustomers />} />
-                  <Route path="coupons" element={<AdminCoupons />} />
-                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="products" element={<AdminGuard perm="products"><AdminProducts /></AdminGuard>} />
+                  <Route path="products/:id" element={<AdminGuard perm="products"><AdminProductEdit /></AdminGuard>} />
+                  <Route path="orders" element={<AdminGuard perm="orders"><AdminOrders /></AdminGuard>} />
+                  <Route path="customers" element={<AdminGuard perm="customers"><AdminCustomers /></AdminGuard>} />
+                  <Route path="coupons" element={<AdminGuard perm="coupons"><AdminCoupons /></AdminGuard>} />
+                  <Route path="revenue" element={<AdminGuard perm="revenue"><AdminRevenue /></AdminGuard>} />
+                  <Route path="users" element={<AdminGuard perm="users"><AdminUsers /></AdminGuard>} />
+                  <Route path="settings" element={<AdminGuard perm="settings"><AdminSettings /></AdminGuard>} />
                 </Route>
                 <Route
                   path="*"

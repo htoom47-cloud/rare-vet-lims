@@ -6,6 +6,7 @@ import { countryLabel, ORDER_STATUSES } from "../../data/orders";
 export function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [country, setCountry] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
 
@@ -18,7 +19,11 @@ export function AdminOrders() {
     load().catch(() => setOrders([]));
   }, []);
 
-  const shown = orders.filter((o) => country === "all" || o.country === country);
+  const shown = orders.filter((o) => {
+    const countryOk = country === "all" || o.country === country;
+    const statusOk = statusFilter === "all" || (o.status || "new") === statusFilter;
+    return countryOk && statusOk;
+  });
 
   async function setStatus(id, status) {
     setError("");
@@ -39,21 +44,48 @@ export function AdminOrders() {
     <div>
       <h1 className="text-3xl font-extrabold">الطلبات</h1>
       <p className="mt-2 text-sm text-black/55">لكل طلب خانة حالة تُحفظ في النظام بعد التغيير.</p>
-      <div className="mt-4 flex gap-2">
-        {[
-          ["all", "الكل"],
-          ["qa", "قطر"],
-          ["sa", "السعودية"],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setCountry(id)}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${country === id ? "bg-navy text-white" : "bg-white"}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mt-4 space-y-3">
+        <div>
+          <p className="mb-2 text-xs font-bold text-black/50">الدولة</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["all", "كل الدول"],
+              ["qa", "قطر"],
+              ["sa", "السعودية"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCountry(id)}
+                className={`rounded-full px-4 py-2 text-sm font-bold ${country === id ? "bg-navy text-white" : "bg-white"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-bold text-black/50">حالة الطلب</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-full px-4 py-2 text-sm font-bold ${statusFilter === "all" ? "bg-navy text-white" : "bg-white"}`}
+            >
+              كل الحالات
+            </button>
+            {ORDER_STATUSES.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setStatusFilter(id)}
+                className={`rounded-full px-4 py-2 text-sm font-bold ${statusFilter === id ? "bg-navy text-white" : "bg-white"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       {error && <p className="mt-3 text-sm font-bold text-crimson">{error}</p>}
       <div className="mt-6 overflow-x-auto rounded-2xl bg-white shadow-sm">

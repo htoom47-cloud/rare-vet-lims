@@ -7,12 +7,18 @@ import { stockOf } from "../src/data/stock.js";
 import { couponFail, discountAmount, findCoupon, normalizeCode, shapeCoupon } from "../src/data/coupons.js";
 import { customersFromOrders } from "../src/data/customers.js";
 import { isOrderStatus } from "../src/data/orders.js";
+import { buildRevenue } from "../src/data/revenue.js";
+import { normalizePermissions, normalizeUsername, publicAdminUser } from "../src/data/permissions.js";
 import {
   checkPassword,
   clearSessionCookie,
   createSessionCookie,
-  isAdmin,
+  getSessionUser,
+  hashPassword,
   requireAdmin,
+  requirePermission,
+  systemOwner,
+  verifyStoredPassword,
 } from "./auth.js";
 
 const app = express();
@@ -302,12 +308,22 @@ app.post("/api/orders", (req, res) => {
 });
 
 app.post("/api/admin/login", (req, res) => {
-  if (!checkPassword(req.body?.password)) {
-    res.status(401).json({ error: "invalid_password" });
+  const username = normalizeUsername(req.body?.username);
+  const pass = String(req.body?.password || "");
+  if (username) {
+    const user = (getDb().adminUsers || []).find((u) => u.username === username);
+    if (user && user.active !== false && verifyStoredPassword(pass, user)) {
+      res.setHeader("Set-Cookie", createSessionCookie({ uid: user.id }));
+      res.json({ ok: true, user: publicAdminUser(user) });
+      return;
+    }
+  }
+  if ((!username || username === "admin") && checkPassword(pass)) {
+    res.setHeader("Set-Cookie", createSessionCookie({ isOwner: true }));
+    res.json({ ok: true, user: systemOwner() });
     return;
   }
-  res.setHeader("Set-Cookie", createSessionCookie());
-  res.json({ ok: true });
+  res.status(401).json({ error: "invalid_password" });
 });
 
 app.post("/api/admin/logout", (_req, res) => {
@@ -316,7 +332,8 @@ app.post("/api/admin/logout", (_req, res) => {
 });
 
 app.get("/api/admin/session", (req, res) => {
-  res.json({ ok: isAdmin(req) });
+  const user = getSessionUser(req);
+  res.json({ ok: Boolean(user), user });
 });
 
 app.get("/api/admin/overview", requireAdmin, (_req, res) => {
@@ -352,11 +369,11 @@ app.post("/api/coupons/preview", (req, res) => {
   });
 });
 
-app.get("/api/admin/coupons", requireAdmin, (_req, res) => {
+app.get("/api/admin/coupons", requirePermission("coupons"), (_req, res) => {
   res.json({ coupons: getDb().coupons || [] });
 });
 
-app.post("/api/admin/coupons", requireAdmin, (req, res) => {
+app.post("/api/admin/coupons", requirePermission("coupons"), (req, res) => {
   const coupon = shapeCoupon(req.body || {}, { id: crypto.randomUUID(), usedCount: 0 });
   if (!coupon.code) {
     res.status(400).json({ error: "code_required" });
@@ -375,7 +392,7 @@ app.post("/api/admin/coupons", requireAdmin, (req, res) => {
   res.json({ coupon });
 });
 
-app.put("/api/admin/coupons/:id", requireAdmin, (req, res) => {
+app.put("/api/admin/coupons/:id", requirePermission("coupons"), (req, res) => {
   const id = req.params.id;
   let updated = null;
   let clash = false;
@@ -401,7 +418,7 @@ app.put("/api/admin/coupons/:id", requireAdmin, (req, res) => {
   res.json({ coupon: updated });
 });
 
-app.delete("/api/admin/coupons/:id", requireAdmin, (req, res) => {
+app.delete("/api/admin/coupons/:id", requirePermission("coupons"), (req, res) => {
   saveDb((d) => {
     d.coupons = (d.coupons || []).filter((c) => c.id !== req.params.id);
     return d;
@@ -409,11 +426,11 @@ app.delete("/api/admin/coupons/:id", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/admin/products", requireAdmin, (_req, res) => {
+app.get("/api/admin/products", requirePermission("products"), (_req, res) => {
   res.json({ products: getDb().products });
 });
 
-app.post("/api/admin/products", requireAdmin, (req, res) => {
+app.post("/api/admin/products", requirePermission("products"), (req, res) => {
   const id = String(req.body?.id || crypto.randomUUID());
   const product = { ...shapeProduct(req.body || {}, { id }), id };
   if (!product.slug) product.slug = id;
@@ -424,7 +441,7 @@ app.post("/api/admin/products", requireAdmin, (req, res) => {
   res.json({ product });
 });
 
-app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
+app.put("/api/admin/products/:id", requirePermission("products"), (req, res) => {
   const id = req.params.id;
   let updated = null;
   saveDb((d) => {
@@ -444,7 +461,7 @@ app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
 
 app.post(
   "/api/admin/upload",
-  requireAdmin,
+  requirePermission("products"),
   express.raw({
     type: ["image/jpeg", "image/png", "image/webp", "image/gif", "application/octet-stream"],
     limit: "6mb",
@@ -463,7 +480,7 @@ app.post(
   },
 );
 
-app.delete("/api/admin/products/:id", requireAdmin, (req, res) => {
+app.delete("/api/admin/products/:id", requirePermission("products"), (req, res) => {
   saveDb((d) => {
     d.products = d.products.filter((p) => p.id !== req.params.id);
     return d;
@@ -471,15 +488,15 @@ app.delete("/api/admin/products/:id", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/admin/orders", requireAdmin, (_req, res) => {
+app.get("/api/admin/orders", requirePermission("orders"), (_req, res) => {
   res.json({ orders: getDb().orders });
 });
 
-app.get("/api/admin/customers", requireAdmin, (_req, res) => {
+app.get("/api/admin/customers", requirePermission("customers"), (_req, res) => {
   res.json({ customers: customersFromOrders(getDb().orders || []) });
 });
 
-app.put("/api/admin/orders/:id", requireAdmin, (req, res) => {
+app.put("/api/admin/orders/:id", requirePermission("orders"), (req, res) => {
   if (req.body?.status !== undefined && !isOrderStatus(req.body.status)) {
     res.status(400).json({ error: "invalid_status" });
     return;
@@ -504,11 +521,111 @@ app.put("/api/admin/orders/:id", requireAdmin, (req, res) => {
   res.json({ order: updated });
 });
 
-app.get("/api/admin/settings", requireAdmin, (_req, res) => {
+app.get("/api/admin/revenue", requirePermission("revenue"), (req, res) => {
+  const period = req.query.period === "today" || req.query.period === "month" ? req.query.period : "all";
+  res.json(buildRevenue(getDb().orders || [], period));
+});
+
+function shapeAdminUser(body, existing = {}) {
+  const username = normalizeUsername(body.username ?? existing.username);
+  if (!username || username.length < 3) return { error: "username_required" };
+  if (username === "admin") return { error: "username_reserved" };
+  const name = String(body.name ?? existing.name ?? username).trim().slice(0, 80);
+  const next = {
+    id: existing.id || crypto.randomUUID(),
+    username,
+    name: name || username,
+    active: (body.active !== undefined ? body.active : existing.active) !== false,
+    permissions: normalizePermissions(body.permissions !== undefined ? body.permissions : existing.permissions),
+    passwordHash: existing.passwordHash || "",
+    passwordSalt: existing.passwordSalt || "",
+    createdAt: existing.createdAt || new Date().toISOString(),
+  };
+  const pass = body.password !== undefined ? String(body.password) : "";
+  if (pass) {
+    if (pass.length < 8) return { error: "password_short" };
+    Object.assign(next, hashPassword(pass));
+  }
+  if (!existing.id && !pass) return { error: "password_required" };
+  if (!next.passwordHash) return { error: "password_required" };
+  return { user: next };
+}
+
+app.get("/api/admin/users", requirePermission("users"), (_req, res) => {
+  res.json({ users: (getDb().adminUsers || []).map((u) => publicAdminUser(u)) });
+});
+
+app.post("/api/admin/users", requirePermission("users"), (req, res) => {
+  const shaped = shapeAdminUser(req.body || {});
+  if (shaped.error) {
+    res.status(400).json({ error: shaped.error });
+    return;
+  }
+  const db = getDb();
+  if ((db.adminUsers || []).some((u) => u.username === shaped.user.username)) {
+    res.status(409).json({ error: "username_exists" });
+    return;
+  }
+  saveDb((d) => {
+    d.adminUsers = d.adminUsers || [];
+    d.adminUsers.unshift(shaped.user);
+    return d;
+  });
+  res.json({ user: publicAdminUser(shaped.user) });
+});
+
+app.put("/api/admin/users/:id", requirePermission("users"), (req, res) => {
+  const id = req.params.id;
+  let updated = null;
+  let clash = false;
+  let shapedError = "";
+  saveDb((d) => {
+    const current = (d.adminUsers || []).find((u) => u.id === id);
+    if (!current) return d;
+    const shaped = shapeAdminUser(req.body || {}, current);
+    if (shaped.error) {
+      shapedError = shaped.error;
+      return d;
+    }
+    clash = (d.adminUsers || []).some((u) => u.id !== id && u.username === shaped.user.username);
+    if (clash) return d;
+    updated = { ...shaped.user, id };
+    d.adminUsers = d.adminUsers.map((u) => (u.id === id ? updated : u));
+    return d;
+  });
+  if (shapedError) {
+    res.status(400).json({ error: shapedError });
+    return;
+  }
+  if (clash) {
+    res.status(409).json({ error: "username_exists" });
+    return;
+  }
+  if (!updated) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  res.json({ user: publicAdminUser(updated) });
+});
+
+app.delete("/api/admin/users/:id", requirePermission("users"), (req, res) => {
+  const me = getSessionUser(req);
+  if (me?.id === req.params.id) {
+    res.status(400).json({ error: "cannot_delete_self" });
+    return;
+  }
+  saveDb((d) => {
+    d.adminUsers = (d.adminUsers || []).filter((u) => u.id !== req.params.id);
+    return d;
+  });
+  res.json({ ok: true });
+});
+
+app.get("/api/admin/settings", requirePermission("settings"), (_req, res) => {
   res.json({ settings: getDb().settings });
 });
 
-app.put("/api/admin/settings", requireAdmin, (req, res) => {
+app.put("/api/admin/settings", requirePermission("settings"), (req, res) => {
   const next = saveDb((d) => {
     d.settings = {
       qa: {
