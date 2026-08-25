@@ -443,18 +443,7 @@ export function AdminCourierEdit() {
                 <input className="input" value={form.pickupAddress || ""} onChange={(e) => patch("pickupAddress", e.target.value)} />
               </Field>
             </div>
-
-            <div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={testConnection}
-                className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-navy ring-1 ring-navy/10 disabled:opacity-60"
-              >
-                {busy ? "جاري الاختبار..." : "حفظ ثم اختبار الاتصال"}
-              </button>
-              {testMsg ? <p className="mt-2 text-sm font-bold text-medical">{testMsg}</p> : null}
-            </div>
+            {testMsg ? <p className="text-sm font-bold text-medical">{testMsg}</p> : null}
           </div>
         )}
 
@@ -488,10 +477,20 @@ export function AdminCourierEdit() {
         <button type="button" className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-navy ring-1 ring-navy/10" onClick={() => navigate("/admin/shipping")}>
           خروج
         </button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" disabled={busy} className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-navy ring-1 ring-navy/10 disabled:opacity-60" onClick={reset}>
             إعادة تعيين
           </button>
+          {activeTab === "connect" && canConnect ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={testConnection}
+              className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-navy ring-1 ring-navy/10 disabled:opacity-60"
+            >
+              {busy ? "جاري الاختبار..." : "حفظ ثم اختبار الاتصال"}
+            </button>
+          ) : null}
           <button disabled={busy} className="rounded-full bg-navy px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">
             {busy ? "جاري الحفظ..." : "حفظ"}
           </button>
