@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://tatmanvet.com/sitemap.xml
