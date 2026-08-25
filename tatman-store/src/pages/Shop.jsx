@@ -72,37 +72,6 @@ export function Shop() {
   );
 }
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        <FilterChip
-          active={cat === "all"}
-          onClick={() => setParams({})}
-          label={t("الكل", "All")}
-        />
-        {categories.map((c) => (
-          <FilterChip
-            key={c.id}
-            active={cat === c.id}
-            onClick={() => setParams({ cat: c.id })}
-            label={t(c.ar, c.en)}
-          />
-        ))}
-      </div>
-
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((p, i) => (
-          <ProductCard key={p.id} product={p} index={i} />
-        ))}
-      </div>
-
-      {!filtered.length && (
-        <p className="mt-16 text-center text-ink/55">
-          {t("لا توجد منتجات في هذا التصنيف حالياً.", "No products in this category yet.")}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function FilterChip({ active, onClick, label }) {
   return (
     <button
