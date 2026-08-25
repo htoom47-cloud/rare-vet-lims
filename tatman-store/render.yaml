@@ -1,0 +1,28 @@
+# Static site for Tatman Vet Store — deploy separately from LIMS.
+# In Render: New > Static Site > connect this repo
+# Root Directory: tatman-store
+# Build: npm ci && npm run build
+# Publish: dist
+# Custom Domain: tatmanvet.com
+
+services:
+  - type: web
+    name: tatman-vet-store
+    runtime: static
+    rootDir: tatman-store
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /brand/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    domains:
+      - tatmanvet.com
+      - www.tatmanvet.com

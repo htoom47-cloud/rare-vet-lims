@@ -1,16 +1,10 @@
 # تطمن | Tatman Vet Store
 
-Professional bilingual (Arabic / English) e-commerce storefront for **Tatman Veterinary Services** specialty products.
+متجر إلكتروني ثنائي اللغة (عربي / إنجليزي) لمنتجات **تطمن للخدمات البيطرية**.
 
-## Stack
+**الدومين:** [tatmanvet.com](https://tatmanvet.com)
 
-- React + Vite
-- Tailwind CSS v4
-- React Router
-- Framer Motion
-- WhatsApp checkout (`+974 51211169`)
-
-## Run locally
+## تشغيل محلي
 
 ```bash
 cd tatman-store
@@ -18,17 +12,16 @@ npm install
 npm run dev
 ```
 
-Open the URL shown in the terminal (default `http://localhost:5177`).
+## النشر
 
-## Build
+راجع [DEPLOY.md](./DEPLOY.md) لربط `tatmanvet.com` عبر Vercel أو Render أو GitHub Pages.
 
 ```bash
 npm run build
-npm run preview
 ```
 
-## Notes
+## ملاحظات
 
-- This app lives in `tatman-store/` and does **not** modify the Rare Vet Care LIMS application.
-- Product packaging visuals are brand-matched placeholders until real product photos are uploaded to `public/products/`.
-- Prices are placeholder QAR values — update in `src/data/products.js`.
+- الشعار الرسمي من `public/brand/Tatman_VET_high_quality.pdf` (بدون تعديل)
+- الطلب عبر واتساب: `+974 51211169`
+- هذا المجلد مستقل عن نظام Rare Vet Care LIMS
