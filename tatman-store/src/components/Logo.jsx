@@ -1,5 +1,5 @@
 /** Official Tatman logo — displayed exactly as the brand PNG, no redraw. */
-const LOGO_SRC = "/brand/logo.png?v=as-is-final";
+const LOGO_SRC = "/brand/logo.png?v=pdf-original";
 
 export function Logo({ className = "", compact = false }) {
   if (compact) {
