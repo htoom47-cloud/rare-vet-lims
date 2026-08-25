@@ -45,8 +45,12 @@ export function Checkout() {
       if (method === "whatsapp" && result.whatsappUrl) {
         window.open(result.whatsappUrl, "_blank");
       }
-    } catch {
-      setError(t("تعذر إرسال الطلب. تأكد من البيانات وحاول مرة أخرى.", "Could not place order. Check details and try again."));
+    } catch (err) {
+      if (err?.status === 409) {
+        setError(t("الكمية المطلوبة غير متاحة حالياً.", "Requested quantity is not available."));
+      } else {
+        setError(t("تعذر إرسال الطلب. تأكد من البيانات وحاول مرة أخرى.", "Could not place order. Check details and try again."));
+      }
     } finally {
       setBusy(false);
     }

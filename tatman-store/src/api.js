@@ -27,6 +27,21 @@ export const api = {
       ? request(`/api/admin/products/${id}`, { method: "PUT", body })
       : request("/api/admin/products", { method: "POST", body }),
   deleteProduct: (id) => request(`/api/admin/products/${id}`, { method: "DELETE" }),
+  uploadImage: async (file) => {
+    const res = await fetch("/api/admin/upload", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || "upload_failed");
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  },
   orders: () => request("/api/admin/orders"),
   updateOrder: (id, body) => request(`/api/admin/orders/${id}`, { method: "PUT", body }),
   settings: () => request("/api/admin/settings"),

@@ -1,10 +1,12 @@
 import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
 import { useCountry } from "../context/CountryContext";
 import { useCatalog } from "../context/CatalogContext";
 import { AnimalIcon } from "../components/Icons";
 import { ProductVisual } from "../components/ProductVisual";
+import { productImages, stockOf } from "../data/stock";
 
 export function ProductDetail() {
   const { slug } = useParams();
@@ -12,7 +14,7 @@ export function ProductDetail() {
   const product = getProduct(slug);
   const { t, lang } = useLang();
   const cart = useCart();
-  const { priceOf, formatPrice } = useCountry();
+  const { priceOf, formatPrice, country } = useCountry();
 
   if (!product) {
     return (
@@ -27,8 +29,11 @@ export function ProductDetail() {
     );
   }
 
-  const benefits = lang === "ar" ? product.benefitsAr : product.benefitsEn;
-  const dosage = lang === "ar" ? product.dosageAr : product.dosageEn;
+  const benefits = (lang === "ar" ? product.benefitsAr : product.benefitsEn) || [];
+  const dosage = (lang === "ar" ? product.dosageAr : product.dosageEn) || [];
+  const photos = productImages(product);
+  const stock = stockOf(product, country);
+  const soldOut = stock === 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -38,7 +43,7 @@ export function ProductDetail() {
 
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
         <div className="rounded-[2rem] bg-white/80 p-6 shadow-lg ring-1 ring-navy/5">
-          <ProductVisual product={product} className="min-h-72" />
+        <ProductGallery product={product} photos={photos} />
         </div>
 
         <div>
@@ -52,7 +57,7 @@ export function ProductDetail() {
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            {product.animals.map((a) => (
+            {(product.animals || []).map((a) => (
               <span
                 key={a}
                 className="inline-flex items-center gap-2 rounded-full bg-mist px-3 py-1.5 text-xs font-semibold capitalize text-navy"
@@ -70,12 +75,16 @@ export function ProductDetail() {
             </div>
             <button
               type="button"
+              disabled={soldOut}
               onClick={() => cart.add(product)}
-              className="min-h-12 rounded-full bg-crimson px-6 py-3 text-sm font-bold text-white shadow-lg shadow-crimson/25"
+              className="min-h-12 rounded-full bg-crimson px-6 py-3 text-sm font-bold text-white shadow-lg shadow-crimson/25 disabled:cursor-not-allowed disabled:bg-ink/30 disabled:shadow-none"
             >
-              {t("أضف إلى السلة", "Add to cart")}
+              {soldOut ? t("غير متوفر", "Out of stock") : t("أضف إلى السلة", "Add to cart")}
             </button>
           </div>
+          {stock !== null && !soldOut && (
+            <p className="mt-2 text-sm text-ink/55">{t(`العدد المتاح: ${stock}`, `Available: ${stock}`)}</p>
+          )}
         </div>
       </div>
 
@@ -126,7 +135,7 @@ export function ProductDetail() {
         </div>
         <table className="spec-table w-full text-sm">
           <tbody>
-            {product.composition.map((row) => (
+            {(product.composition || []).map((row) => (
               <tr key={row.name} className="border-b border-navy/5">
                 <td className="px-6 py-3 font-semibold text-navy">{row.name}</td>
                 <td className="px-6 py-3 text-end text-ink/70">{row.amount}</td>
@@ -135,6 +144,37 @@ export function ProductDetail() {
           </tbody>
         </table>
       </section>
+    </div>
+  );
+}
+
+function ProductGallery({ product, photos }) {
+  const [current, setCurrent] = useState(photos[0] || "");
+  const shown = photos.includes(current) ? current : photos[0] || "";
+
+  if (!photos.length) {
+    return <ProductVisual product={product} className="min-h-72" />;
+  }
+
+  return (
+    <div>
+      <div className="product-podium flex min-h-72 items-center justify-center p-4">
+        <img src={shown} alt={product.nameAr} className="max-h-80 w-full object-contain" />
+      </div>
+      {photos.length > 1 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {photos.map((url) => (
+            <button
+              key={url}
+              type="button"
+              onClick={() => setCurrent(url)}
+              className={`h-16 w-16 overflow-hidden rounded-xl ring-2 ${shown === url ? "ring-navy" : "ring-navy/10"}`}
+            >
+              <img src={url} alt="" className="h-full w-full object-contain bg-white" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

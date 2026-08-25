@@ -1,6 +1,17 @@
-/** Stylized packaging mock matching flyer aesthetics when real photos are not yet uploaded. */
+import { productImage } from "../data/stock";
+
+/** Real product photo when uploaded; otherwise a stylized pack fallback. */
 export function ProductVisual({ product, className = "" }) {
+  const photo = productImage(product);
   const { packStyle, accent, secondary, nameEn, volume } = product;
+
+  if (photo) {
+    return (
+      <div className={`product-podium relative flex items-center justify-center p-4 ${className}`}>
+        <img src={photo} alt={nameEn || product.nameAr || ""} className="max-h-56 w-full object-contain sm:max-h-64" />
+      </div>
+    );
+  }
 
   if (packStyle === "bottle") {
     return (

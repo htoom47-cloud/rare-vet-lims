@@ -2,8 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { products as seedProducts } from "../src/data/products.js";
 
-const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+export const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const dbPath = path.join(dataDir, "store.json");
+export const uploadsDir = path.join(dataDir, "uploads");
+
+function optionalStock(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.floor(n));
+}
 
 function defaultSettings() {
   return {
@@ -35,12 +43,18 @@ function defaultSettings() {
 }
 
 function normalizeProduct(p) {
+  const images = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+  if (p.image && !images.includes(p.image)) images.unshift(p.image);
   return {
     ...p,
     priceSar: Number(p.priceSar ?? Math.round(Number(p.priceQar) * 1.03)),
     availableQa: p.availableQa !== false,
     availableSa: p.availableSa !== false,
     active: p.active !== false,
+    image: images[0] || "",
+    images,
+    stockQa: optionalStock(p.stockQa),
+    stockSa: optionalStock(p.stockSa),
   };
 }
 
@@ -54,6 +68,7 @@ function emptyDb() {
 
 function ensure() {
   fs.mkdirSync(dataDir, { recursive: true });
+  fs.mkdirSync(uploadsDir, { recursive: true });
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, JSON.stringify(emptyDb(), null, 2));
   }

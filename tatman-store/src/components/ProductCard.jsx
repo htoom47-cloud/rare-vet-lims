@@ -5,11 +5,14 @@ import { useCart } from "../context/CartContext";
 import { useCountry } from "../context/CountryContext";
 import { AnimalIcon } from "./Icons";
 import { ProductVisual } from "./ProductVisual";
+import { stockOf } from "../data/stock";
 
 export function ProductCard({ product, index = 0 }) {
   const { t, lang } = useLang();
   const cart = useCart();
-  const { priceOf, formatPrice } = useCountry();
+  const { priceOf, formatPrice, country } = useCountry();
+  const stock = stockOf(product, country);
+  const soldOut = stock === 0;
 
   return (
     <motion.article
@@ -35,7 +38,7 @@ export function ProductCard({ product, index = 0 }) {
             {t(product.taglineAr, product.taglineEn)}
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
-            {product.animals.slice(0, 4).map((a) => (
+            {(product.animals || []).slice(0, 4).map((a) => (
               <span
                 key={a}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-mist text-navy"
@@ -48,13 +51,21 @@ export function ProductCard({ product, index = 0 }) {
         </div>
       </Link>
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-navy/5 px-5 py-4">
-        <div className="font-display text-lg text-crimson">{formatPrice(priceOf(product), lang)}</div>
+        <div>
+          <div className="font-display text-lg text-crimson">{formatPrice(priceOf(product), lang)}</div>
+          {stock !== null && (
+            <div className={`text-xs font-semibold ${soldOut ? "text-crimson" : "text-ink/55"}`}>
+              {soldOut ? t("غير متوفر", "Out of stock") : t(`المتوفر: ${stock}`, `${stock} available`)}
+            </div>
+          )}
+        </div>
         <button
           type="button"
+          disabled={soldOut}
           onClick={() => cart.add(product)}
-          className="min-h-10 rounded-full bg-navy px-4 py-2.5 text-sm font-bold text-white transition hover:bg-medical"
+          className="min-h-10 rounded-full bg-navy px-4 py-2.5 text-sm font-bold text-white transition hover:bg-medical disabled:cursor-not-allowed disabled:bg-ink/25"
         >
-          {t("أضف للسلة", "Add to cart")}
+          {soldOut ? t("غير متوفر", "Unavailable") : t("أضف للسلة", "Add to cart")}
         </button>
       </div>
     </motion.article>

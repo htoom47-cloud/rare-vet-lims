@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
+import { productImage } from "../../data/stock";
 
 export function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -26,6 +27,7 @@ export function AdminProducts() {
         <table className="w-full text-sm">
           <thead className="bg-mist text-right">
             <tr>
+              <th className="p-3">الصورة</th>
               <th className="p-3">الاسم</th>
               <th className="p-3">قطر</th>
               <th className="p-3">السعودية</th>
@@ -37,11 +39,24 @@ export function AdminProducts() {
             {products.map((p) => (
               <tr key={p.id} className="border-t border-black/5">
                 <td className="p-3">
+                  {productImage(p) ? (
+                    <img src={productImage(p)} alt="" className="h-12 w-12 rounded-lg object-contain bg-mist ring-1 ring-navy/10" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-mist text-[10px] text-black/40">بدون</div>
+                  )}
+                </td>
+                <td className="p-3">
                   <div className="font-bold">{p.nameAr}</div>
                   <div className="text-xs text-black/50">{p.nameEn}</div>
                 </td>
-                <td className="p-3">{p.availableQa === false ? "—" : `${p.priceQar} ر.ق`}</td>
-                <td className="p-3">{p.availableSa === false ? "—" : `${p.priceSar} ر.س`}</td>
+                <td className="p-3">
+                  {p.availableQa === false ? "—" : `${p.priceQar} ر.ق`}
+                  <div className="text-xs text-black/50">{stockLabel(p.stockQa)}</div>
+                </td>
+                <td className="p-3">
+                  {p.availableSa === false ? "—" : `${p.priceSar} ر.س`}
+                  <div className="text-xs text-black/50">{stockLabel(p.stockSa)}</div>
+                </td>
                 <td className="p-3">{p.active === false ? "مخفي" : "ظاهر"}</td>
                 <td className="p-3">
                   <Link className="font-bold text-medical" to={`/admin/products/${p.id}`}>
@@ -55,4 +70,12 @@ export function AdminProducts() {
       </div>
     </div>
   );
+}
+
+function stockLabel(value) {
+  if (value === null || value === undefined || value === "") return "مخزون غير محدد";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "مخزون غير محدد";
+  if (n <= 0) return "غير متوفر";
+  return `المتوفر: ${n}`;
 }
