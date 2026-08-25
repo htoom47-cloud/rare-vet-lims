@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
 import { useCountry } from "../context/CountryContext";
@@ -38,12 +38,8 @@ export function Checkout() {
   const payments = settings?.payments || { whatsapp: true, bank: true, cod: true, applePay: true };
   const methods = checkoutMethods(payments);
   const selectedMethod = methods.some((m) => m.id === method) ? method : methods[0]?.id || "whatsapp";
-  const payable = applied ? applied.total : cart.total;
-
-  useEffect(() => {
-    setApplied(null);
-    setCouponError("");
-  }, [country, cart.total]);
+  const couponOk = applied && applied.country === country && applied.subtotal === cart.total ? applied : null;
+  const payable = couponOk ? couponOk.total : cart.total;
 
   async function applyCoupon() {
     setCouponError("");
@@ -54,7 +50,7 @@ export function Checkout() {
         country,
         subtotal: cart.total,
       });
-      setApplied(data);
+      setApplied({ ...data, country, subtotal: cart.total });
     } catch (err) {
       setApplied(null);
       setCouponError(couponMessage(err?.message, t));
@@ -72,7 +68,7 @@ export function Checkout() {
         country,
         paymentMethod: selectedMethod,
         notes: form.notes,
-        couponCode: applied?.code || "",
+        couponCode: couponOk?.code || "",
         customer: form,
         items: cart.items.map((i) => ({ id: i.product.id, qty: i.qty })),
       });
@@ -226,9 +222,9 @@ export function Checkout() {
               {couponBusy ? "..." : t("تطبيق", "Apply")}
             </button>
           </div>
-          {applied ? (
+          {couponOk ? (
             <p className="mt-2 text-sm font-bold text-medical">
-              {t("تم تطبيق", "Applied")} {applied.code} (−{formatPrice(applied.discount, lang)})
+              {t("تم تطبيق", "Applied")} {couponOk.code} (−{formatPrice(couponOk.discount, lang)})
             </p>
           ) : null}
           {couponError ? <p className="mt-2 text-sm text-crimson">{couponError}</p> : null}
@@ -239,12 +235,12 @@ export function Checkout() {
             <span>{t("المجموع", "Subtotal")}</span>
             <span>{formatPrice(cart.total, lang)}</span>
           </div>
-          {applied?.discount ? (
+          {couponOk?.discount ? (
             <div className="flex items-center justify-between text-sm text-sand">
               <span>
-                {t("الخصم", "Discount")} ({applied.code})
+                {t("الخصم", "Discount")} ({couponOk.code})
               </span>
-              <span>−{formatPrice(applied.discount, lang)}</span>
+              <span>−{formatPrice(couponOk.discount, lang)}</span>
             </div>
           ) : null}
           <div className="flex items-center justify-between">
