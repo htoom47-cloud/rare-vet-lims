@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api";
+import { PasswordField } from "./PasswordField";
 
 export function AdminLogin() {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -31,8 +32,7 @@ export function AdminLogin() {
           onChange={(e) => setForm({ ...form, username: e.target.value })}
           autoComplete="username"
         />
-        <input
-          type="password"
+        <PasswordField
           className="input mt-3"
           placeholder="كلمة المرور"
           value={form.password}

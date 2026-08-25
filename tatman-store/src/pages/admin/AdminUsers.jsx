@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { PERMISSIONS, emptyPermissions } from "../../data/permissions";
+import { PasswordField } from "./PasswordField";
 
 function blankForm() {
   return {
@@ -145,14 +146,14 @@ export function AdminUsers() {
         </label>
         <label className="block space-y-1.5">
           <span className="text-sm font-bold text-navy">{editId ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}</span>
-          <input
+          <PasswordField
             className="input"
-            type="password"
             dir="ltr"
             value={form.password}
             onChange={(e) => patch("password", e.target.value)}
             required={!editId}
             minLength={editId && !form.password ? undefined : 8}
+            autoComplete="new-password"
           />
         </label>
         <label className="flex items-center gap-2 text-sm">
