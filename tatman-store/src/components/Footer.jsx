@@ -9,7 +9,7 @@ export function Footer() {
   const wa = (settings?.whatsapp || "97451211169").replace(/\D/g, "");
 
   return (
-    <footer className="mt-16 border-t border-track/10 bg-ink text-white sm:mt-20">
+    <footer className="relative z-10 mt-16 border-t border-track/10 bg-ink text-white sm:mt-20">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 sm:py-14 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <div className="inline-block overflow-hidden rounded-xl">

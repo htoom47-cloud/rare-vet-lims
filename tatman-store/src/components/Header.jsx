@@ -15,7 +15,7 @@ export function Header() {
   const { country, setCountry } = useCountry();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-track/10 bg-paper/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-track/10 bg-paper/92 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2.5 sm:px-6 sm:py-3">
         <Link to="/" className="shrink-0" aria-label="Tatman home">
           <Logo compact />
