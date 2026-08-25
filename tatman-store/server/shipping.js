@@ -41,9 +41,12 @@ function smsaEnvelope(method, fields) {
 }
 
 function smsaResult(xml, method) {
+  const src = String(xml || "");
+  const status = src.match(/<RequestStatus[^>]*>([\s\S]*?)<\/RequestStatus>/i);
+  if (status) return status[1].replace(/<!\[CDATA\[|\]\]>/g, "").trim();
   const tag = `${method}Result`;
-  const match = String(xml || "").match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
-  return (match ? match[1] : String(xml || "")).replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+  const match = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
+  return (match ? match[1] : src).replace(/<!\[CDATA\[|\]\]>/g, "").trim();
 }
 
 async function smsaCall(method, fields) {
@@ -56,8 +59,14 @@ async function smsaCall(method, fields) {
     body: smsaEnvelope(method, fields),
   });
   const result = smsaResult(text, method);
-  const lower = result.toLowerCase();
-  if (status >= 400 || lower.includes("invalid") || lower.includes("error") || lower.includes("fail")) {
+  const lower = `${text}\n${result}`.toLowerCase();
+  if (
+    status >= 400 ||
+    text.includes("soap:Fault") ||
+    lower.includes("invalid") ||
+    lower.includes("error") ||
+    lower.includes("fail")
+  ) {
     return { ok: false, error: result.slice(0, 240) || `smsa_${status}` };
   }
   return { ok: true, result };
@@ -100,7 +109,17 @@ async function aramexJson(url, payload) {
 export async function testSaudiCourier(courier) {
   if (!isSaudiApiCourier("sa", courier)) return { ok: false, error: "not_saudi_courier" };
   if (courier.id === "smsa") {
-    const out = await smsaCall("getRTLCities", { passKey: courier.apiPassKey });
+    const city = courier.pickupCity || "Riyadh";
+    const out = await smsaCall("getShipCharges", {
+      passKey: courier.apiPassKey,
+      shipCity: city,
+      shipCntry: "SA",
+      destCity: city,
+      destCntry: "SA",
+      shipType: "DLV",
+      codAmt: "0",
+      weight: "1",
+    });
     if (!out.ok) return out;
     return { ok: true, message: "تم الاتصال بسمسا." };
   }
