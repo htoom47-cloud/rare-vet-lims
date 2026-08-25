@@ -4,8 +4,8 @@ import { api } from "../../api";
 import { findCourier, shapeCourier } from "../../data/couriers";
 
 const TABS = [
-  ["pricing", "تسعيرة الشحن"],
   ["display", "بيانات العرض"],
+  ["pricing", "تسعيرة الشحن"],
   ["extra", "معلومات إضافية"],
 ];
 
@@ -31,7 +31,7 @@ export function AdminCourierEdit() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [form, setForm] = useState(null);
-  const [tab, setTab] = useState("pricing");
+  const [tab, setTab] = useState("display");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
@@ -116,7 +116,7 @@ export function AdminCourierEdit() {
   return (
     <form onSubmit={save} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-navy/10">
       <div className="flex items-center justify-between bg-medical/15 px-4 py-3">
-        <h1 className="text-lg font-extrabold text-navy">{form.nameAr || "شركة التوصيل"}</h1>
+        <h1 className="text-lg font-extrabold text-navy">{form.displayName || form.nameAr || "شركة التوصيل"}</h1>
         <Link to="/admin/shipping" className="rounded-lg p-1 text-navy" aria-label="إغلاق">
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -250,6 +250,89 @@ export function AdminCourierEdit() {
         )}
 
         {tab === "display" && (
+          <div className="space-y-5">
+            <Field label="نبذة">
+              <textarea
+                className="input min-h-24"
+                value={form.overview || ""}
+                placeholder="نبذة قصيرة عن شركة التوصيل تظهر في لوحة التحكم."
+                onChange={(e) => patch("overview", e.target.value)}
+              />
+            </Field>
+
+            <Field label="اسم العرض" hint="هذا الاسم يظهر للعميل في صفحة الدفع.">
+              <div className="flex items-center gap-2 rounded-[0.9rem] border border-navy/10 bg-white px-3">
+                <Icon path="M4 7h16M4 12h10M4 17h13" />
+                <input
+                  className="input border-0 px-0"
+                  value={form.displayName || ""}
+                  placeholder="شركة شحن سريع"
+                  onChange={(e) => patch("displayName", e.target.value)}
+                />
+              </div>
+            </Field>
+
+            <div>
+              <p className="text-sm font-extrabold text-navy">بيانات العرض في البوليصة</p>
+              <p className="mt-1 text-xs text-black/50">تُحفظ على بوليصة الشحن واسم المرسل عند الطباعة أو التتبع.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Field label="اسم المتجر" required>
+                  <div className="flex items-center gap-2 rounded-[0.9rem] border border-navy/10 bg-white px-3">
+                    <Icon path="M4 10l8-6 8 6v9H4v-9z" />
+                    <input className="input border-0 px-0" value={form.storeName || ""} placeholder="تطمن" onChange={(e) => patch("storeName", e.target.value)} />
+                  </div>
+                </Field>
+                <Field label="اسم المرسل" required>
+                  <div className="flex items-center gap-2 rounded-[0.9rem] border border-navy/10 bg-white px-3">
+                    <Icon path="M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0" />
+                    <input className="input border-0 px-0" value={form.senderName || ""} placeholder="تطمن" onChange={(e) => patch("senderName", e.target.value)} />
+                  </div>
+                </Field>
+                <Field label="رقم الجوال" required>
+                  <div className="flex items-center gap-2 rounded-[0.9rem] border border-navy/10 bg-white px-3">
+                    <Icon path="M7 3h6l2 4-3 2a12 12 0 006 6l2-3 4 2v6a2 2 0 01-2 2A16 16 0 013 5a2 2 0 012-2h2z" />
+                    <input className="input border-0 px-0" dir="ltr" value={form.senderPhone || ""} placeholder="97451211169" onChange={(e) => patch("senderPhone", e.target.value)} />
+                  </div>
+                </Field>
+                <Field label="نوع الشحن">
+                  <div className="flex items-center gap-2 rounded-[0.9rem] border border-navy/10 bg-white px-3">
+                    <Icon path="M4 10l8-6 8 6v9H4v-9z" />
+                    <select className="input border-0 px-0" value={form.active ? "on" : "off"} onChange={(e) => patch("active", e.target.value === "on")}>
+                      <option value="on">مفعّل</option>
+                      <option value="off">غير مفعّل</option>
+                    </select>
+                  </div>
+                </Field>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-extrabold text-navy">خيارات إضافية</p>
+              <label className="flex items-start gap-2 text-sm">
+                <input className="mt-0.5" type="checkbox" checked={form.printItemsOnWaybill === true} onChange={(e) => patch("printItemsOnWaybill", e.target.checked)} />
+                إظهار عناصر الطلب عند طباعة البوليصة
+              </label>
+              <label className="mt-2 flex items-start gap-2 text-sm">
+                <input className="mt-0.5" type="checkbox" checked={form.syncStatusFromShipping === true} onChange={(e) => patch("syncStatusFromShipping", e.target.checked)} />
+                <span>
+                  السماح بتحديث حالة الطلب تبعاً لتحديثات الشحن
+                  <span className="block text-xs text-black/50">يُحفظ الإعداد فقط. لا يُغيَّر الطلب تلقائياً حتى يُربط التتبع.</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="رابط الشعار" hint="رابط صورة. اتركه فارغاً لإظهار الحرف الأول.">
+                <input className="input" dir="ltr" value={form.logo} placeholder="https://..." onChange={(e) => patch("logo", e.target.value)} />
+              </Field>
+              <Field label="رابط التتبع" hint="استخدم {code} لرقم التتبع.">
+                <input className="input" dir="ltr" value={form.trackUrl} placeholder="https://...{code}" onChange={(e) => patch("trackUrl", e.target.value)} />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        {tab === "extra" && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="اسم الشركة بالعربية" required>
               <input className="input" value={form.nameAr} onChange={(e) => patch("nameAr", e.target.value)} />
@@ -257,23 +340,6 @@ export function AdminCourierEdit() {
             <Field label="اسم الشركة بالإنجليزية">
               <input className="input" dir="ltr" value={form.nameEn} onChange={(e) => patch("nameEn", e.target.value)} />
             </Field>
-            <Field label="وصف يظهر للعميل">
-              <input className="input" value={form.descriptionAr} onChange={(e) => patch("descriptionAr", e.target.value)} />
-            </Field>
-            <Field label="الوصف بالإنجليزية">
-              <input className="input" dir="ltr" value={form.descriptionEn} onChange={(e) => patch("descriptionEn", e.target.value)} />
-            </Field>
-            <Field label="رابط الشعار" hint="رابط صورة أو ملف مرفوع. اتركه فارغاً لإظهار الحرف الأول.">
-              <input className="input" dir="ltr" value={form.logo} placeholder="https://..." onChange={(e) => patch("logo", e.target.value)} />
-            </Field>
-            <Field label="رابط التتبع" hint="استخدم {code} لرقم التتبع.">
-              <input className="input" dir="ltr" value={form.trackUrl} placeholder="https://...{code}" onChange={(e) => patch("trackUrl", e.target.value)} />
-            </Field>
-          </div>
-        )}
-
-        {tab === "extra" && (
-          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="هاتف الشركة">
               <input className="input" dir="ltr" value={form.phone} onChange={(e) => patch("phone", e.target.value)} />
             </Field>

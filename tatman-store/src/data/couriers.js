@@ -59,8 +59,15 @@ export function shapeCourier(body, existing = {}) {
     trackUrl: String(body.trackUrl ?? existing.trackUrl ?? preset?.trackUrl ?? "").trim().slice(0, 240),
     logo: String(body.logo ?? existing.logo ?? "").trim().slice(0, 240),
     note: String(body.note ?? existing.note ?? "").trim().slice(0, 400),
+    overview: String(body.overview ?? existing.overview ?? "").trim().slice(0, 600),
+    displayName: String(body.displayName ?? existing.displayName ?? "").trim().slice(0, 80),
     descriptionAr: String(body.descriptionAr ?? existing.descriptionAr ?? "").trim().slice(0, 200),
     descriptionEn: String(body.descriptionEn ?? existing.descriptionEn ?? "").trim().slice(0, 200),
+    storeName: String(body.storeName ?? existing.storeName ?? "").trim().slice(0, 80),
+    senderName: String(body.senderName ?? existing.senderName ?? "").trim().slice(0, 80),
+    senderPhone: String(body.senderPhone ?? existing.senderPhone ?? existing.phone ?? "").trim().slice(0, 40),
+    printItemsOnWaybill: (body.printItemsOnWaybill !== undefined ? body.printItemsOnWaybill : existing.printItemsOnWaybill) === true,
+    syncStatusFromShipping: (body.syncStatusFromShipping !== undefined ? body.syncStatusFromShipping : existing.syncStatusFromShipping) === true,
     codEnabled,
   };
 }
@@ -110,4 +117,10 @@ export function trackingLink(courier, trackingNumber) {
 export function courierSupportsCod(courier) {
   if (!courier) return true;
   return courier.codEnabled !== false;
+}
+
+export function courierLabel(courier, lang = "ar") {
+  if (!courier) return "";
+  if (lang === "en") return courier.nameEn || courier.displayName || courier.nameAr || "";
+  return courier.displayName || courier.nameAr || courier.nameEn || "";
 }

@@ -7,7 +7,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { api } from "../api";
 import { checkoutMethods } from "../data/payments";
 import { ApplePayMark } from "../components/ApplePayMark";
-import { activeCouriers, courierSupportsCod, findCourier } from "../data/couriers";
+import { activeCouriers, courierLabel, courierSupportsCod, findCourier } from "../data/couriers";
 
 function couponMessage(code, t) {
   if (code === "coupon_country") return t("هذا الكود غير متاح لهذه الدولة.", "This code is not available for this country.");
@@ -208,7 +208,7 @@ export function Checkout() {
                   <span className="flex items-center gap-3">
                     <input type="radio" name="ship" checked={selected} onChange={() => setShippingId(c.id)} />
                     <span>
-                      {t(c.nameAr, c.nameEn || c.nameAr)}
+                      {t(courierLabel(c, lang === "en" ? "en" : "ar"), c.nameEn || c.displayName || c.nameAr)}
                       {c.etaAr ? <span className="block text-xs text-ink/50">{t(c.etaAr, c.etaEn || c.etaAr)}</span> : null}
                       {c.descriptionAr ? <span className="block text-xs text-ink/50">{t(c.descriptionAr, c.descriptionEn || c.descriptionAr)}</span> : null}
                       {c.pricingType === "weight" && c.weightKg ? (

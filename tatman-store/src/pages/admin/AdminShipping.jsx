@@ -117,7 +117,7 @@ export function AdminShipping() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="truncate font-extrabold text-navy">{c.nameAr}</p>
+                    <p className="truncate font-extrabold text-navy">{c.displayName || c.nameAr}</p>
                     <p className="text-xs text-black/50">
                       {c.active ? "مفعّلة" : "متوقفة"}
                       {c.fee ? ` · ${c.fee} ${settings[code]?.currencyAr || ""}` : " · بدون رسوم"}
