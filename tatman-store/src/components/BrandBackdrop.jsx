@@ -1,5 +1,3 @@
-import { Logo } from "./Logo";
-
 const LOGO_SRC = "/brand/logo.png?v=pdf-original";
 
 /** Atmospheric brand layer from official logo + hero photos. Does not redraw the mark. */
