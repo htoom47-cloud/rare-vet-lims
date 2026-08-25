@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { paymentLabel } from "../../data/payments";
 import { countryLabel, ORDER_STATUSES } from "../../data/orders";
+import { trackingLink } from "../../data/couriers";
 
 export function AdminOrders() {
   const [orders, setOrders] = useState([]);
@@ -97,6 +98,7 @@ export function AdminOrders() {
               <th className="p-3">الرقم</th>
               <th className="p-3">الدولة</th>
               <th className="p-3">المنتجات</th>
+              <th className="p-3">التوصيل</th>
               <th className="p-3">الإجمالي</th>
               <th className="p-3">حالة الطلب</th>
             </tr>
@@ -125,6 +127,41 @@ export function AdminOrders() {
                       {i.nameAr} × {i.qty}
                     </div>
                   ))}
+                </td>
+                <td className="p-3">
+                  {o.shipping?.nameAr ? (
+                    <>
+                      <div className="font-bold">{o.shipping.nameAr}</div>
+                      {o.shippingFee ? (
+                        <div className="text-xs text-black/50">
+                          {o.shippingFee} {o.currency}
+                        </div>
+                      ) : null}
+                      <input
+                        className="input mt-2"
+                        placeholder="رقم التتبع"
+                        defaultValue={o.trackingNumber || ""}
+                        onBlur={async (e) => {
+                          const v = e.target.value.trim();
+                          if (v === (o.trackingNumber || "")) return;
+                          await api.updateOrder(o.id, { trackingNumber: v });
+                          load();
+                        }}
+                      />
+                      {trackingLink(o.shipping, o.trackingNumber) ? (
+                        <a
+                          className="mt-1 inline-block text-xs font-bold text-medical"
+                          href={trackingLink(o.shipping, o.trackingNumber)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          تتبع الشحنة
+                        </a>
+                      ) : null}
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </td>
                 <td className="p-3 whitespace-nowrap">
                   {o.total} {o.currency}

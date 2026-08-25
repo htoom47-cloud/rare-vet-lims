@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLang } from "../context/LangContext";
 import { useCart } from "../context/CartContext";
 import { useCountry } from "../context/CountryContext";
@@ -7,6 +7,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { api } from "../api";
 import { checkoutMethods } from "../data/payments";
 import { ApplePayMark } from "../components/ApplePayMark";
+import { activeCouriers, findCourier } from "../data/couriers";
 
 function couponMessage(code, t) {
   if (code === "coupon_country") return t("هذا الكود غير متاح لهذه الدولة.", "This code is not available for this country.");
@@ -34,12 +35,28 @@ export function Checkout() {
   const [applied, setApplied] = useState(null);
   const [couponError, setCouponError] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
+  const [shippingId, setShippingId] = useState("");
 
   const payments = settings?.payments || { whatsapp: true, bank: true, cod: true, applePay: true };
   const methods = checkoutMethods(payments);
   const selectedMethod = methods.some((m) => m.id === method) ? method : methods[0]?.id || "whatsapp";
   const couponOk = applied && applied.country === country && applied.subtotal === cart.total ? applied : null;
-  const payable = couponOk ? couponOk.total : cart.total;
+  const couriers = activeCouriers(settings?.couriers);
+  const selectedCourier = findCourier(couriers, shippingId);
+  const shippingFee = selectedCourier ? Number(selectedCourier.fee) || 0 : 0;
+  const payable = (couponOk ? couponOk.total : cart.total) + shippingFee;
+
+  useEffect(() => {
+    if (!couriers.length) {
+      setShippingId("");
+      return;
+    }
+    if (couriers.length === 1) {
+      setShippingId(couriers[0].id);
+      return;
+    }
+    if (!couriers.some((c) => c.id === shippingId)) setShippingId("");
+  }, [country, settings]);
 
   async function applyCoupon() {
     setCouponError("");
@@ -69,6 +86,7 @@ export function Checkout() {
         paymentMethod: selectedMethod,
         notes: form.notes,
         couponCode: couponOk?.code || "",
+        shippingId: selectedCourier?.id || "",
         customer: form,
         items: cart.items.map((i) => ({ id: i.product.id, qty: i.qty })),
       });
@@ -80,6 +98,8 @@ export function Checkout() {
     } catch (err) {
       if (err?.status === 409) {
         setError(t("الكمية المطلوبة غير متاحة حالياً.", "Requested quantity is not available."));
+      } else if (err?.message === "shipping_required") {
+        setError(t("اختر شركة التوصيل.", "Please choose a delivery company."));
       } else if (String(err?.message || "").startsWith("coupon_")) {
         setApplied(null);
         setError(couponMessage(err.message, t));
@@ -112,6 +132,12 @@ export function Checkout() {
         <p className="mt-2 text-ink/70">
           {t("رقم الطلب", "Order no.")}: <strong>{done.order.id}</strong>
         </p>
+        {done.order?.shipping ? (
+          <p className="mt-2 text-sm text-ink/70">
+            {t("التوصيل", "Delivery")}: {lang === "en" ? done.order.shipping.nameEn || done.order.shipping.nameAr : done.order.shipping.nameAr}
+            {done.order.shippingFee ? ` · ${formatPrice(done.order.shippingFee, lang)}` : ""}
+          </p>
+        ) : null}
         {done.order?.discount ? (
           <p className="mt-2 text-sm text-ink/70">
             {t("الخصم", "Discount")} ({done.order.couponCode}): −{formatPrice(done.order.discount, lang)}
@@ -166,6 +192,34 @@ export function Checkout() {
         <input required className="input" placeholder={t("رقم الجوال", "Mobile")} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         <input className="input" placeholder={t("المدينة", "City")} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
         <textarea className="input min-h-24" placeholder={t("العنوان", "Address")} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+
+        {couriers.length ? (
+          <div className="space-y-2">
+            <p className="text-sm font-bold">{t("شركة التوصيل", "Delivery company")}</p>
+            {couriers.map((c) => {
+              const selected = selectedCourier?.id === c.id;
+              return (
+                <label
+                  key={c.id}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ${
+                    selected ? "ring-navy/20 bg-mist" : "ring-navy/10"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <input type="radio" name="ship" checked={selected} onChange={() => setShippingId(c.id)} />
+                    <span>
+                      {t(c.nameAr, c.nameEn || c.nameAr)}
+                      {c.etaAr ? <span className="block text-xs text-ink/50">{t(c.etaAr, c.etaEn || c.etaAr)}</span> : null}
+                    </span>
+                  </span>
+                  <span className="text-sm font-bold text-navy">
+                    {c.fee ? formatPrice(c.fee, lang) : t("بدون رسوم", "No fee")}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <p className="text-sm font-bold">{t("طريقة الدفع", "Payment method")}</p>
@@ -241,6 +295,12 @@ export function Checkout() {
                 {t("الخصم", "Discount")} ({couponOk.code})
               </span>
               <span>−{formatPrice(couponOk.discount, lang)}</span>
+            </div>
+          ) : null}
+          {shippingFee ? (
+            <div className="flex items-center justify-between text-sm text-white/80">
+              <span>{t("التوصيل", "Delivery")}</span>
+              <span>{formatPrice(shippingFee, lang)}</span>
             </div>
           ) : null}
           <div className="flex items-center justify-between">

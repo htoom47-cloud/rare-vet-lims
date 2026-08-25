@@ -10,6 +10,7 @@ const NAV = [
   ["/admin/customers", "العملاء", "customers"],
   ["/admin/coupons", "أكواد الخصم", "coupons"],
   ["/admin/revenue", "الإيرادات", "revenue"],
+  ["/admin/shipping", "التوصيل", "settings"],
   ["/admin/users", "المستخدمون", "users"],
   ["/admin/settings", "الإعدادات", "settings"],
 ];

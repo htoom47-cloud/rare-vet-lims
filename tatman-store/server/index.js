@@ -7,6 +7,7 @@ import { stockOf } from "../src/data/stock.js";
 import { couponFail, discountAmount, findCoupon, normalizeCode, shapeCoupon } from "../src/data/coupons.js";
 import { customersFromOrders } from "../src/data/customers.js";
 import { isOrderStatus } from "../src/data/orders.js";
+import { activeCouriers, findCourier, mergeCouriers } from "../src/data/couriers.js";
 import { buildRevenue } from "../src/data/revenue.js";
 import { normalizePermissions, normalizeUsername, publicAdminUser } from "../src/data/permissions.js";
 import {
@@ -223,6 +224,23 @@ app.post("/api/orders", (req, res) => {
       discount = discountAmount(coupon, subtotal);
     }
 
+    const availableCouriers = activeCouriers(settings.couriers);
+    let shipping = null;
+    if (availableCouriers.length) {
+      const chosen = findCourier(availableCouriers, req.body?.shippingId);
+      if (!chosen) {
+        fail = "shipping_required";
+        return d;
+      }
+      shipping = {
+        id: chosen.id,
+        nameAr: chosen.nameAr,
+        nameEn: chosen.nameEn,
+        fee: Number(chosen.fee) || 0,
+        trackUrl: chosen.trackUrl || "",
+      };
+    }
+
     for (const line of lines) {
       d.products = d.products.map((p) => {
         if (p.id !== line.id) return p;
@@ -242,7 +260,8 @@ app.post("/api/orders", (req, res) => {
       );
     }
 
-    const total = Math.max(0, subtotal - discount);
+    const shippingFee = shipping ? Number(shipping.fee) || 0 : 0;
+    const total = Math.max(0, subtotal - discount) + shippingFee;
     order = {
       id: `TV-${Date.now().toString(36).toUpperCase()}`,
       createdAt: new Date().toISOString(),
@@ -252,6 +271,9 @@ app.post("/api/orders", (req, res) => {
       subtotal,
       discount,
       couponCode: coupon ? coupon.code : "",
+      shipping,
+      shippingFee,
+      trackingNumber: "",
       total,
       customer,
       paymentMethod: method,
@@ -274,6 +296,10 @@ app.post("/api/orders", (req, res) => {
     res.status(400).json({ error: fail });
     return;
   }
+  if (fail === "shipping_required") {
+    res.status(400).json({ error: fail });
+    return;
+  }
   if (fail || !order) {
     res.status(400).json({ error: fail || "invalid_items" });
     return;
@@ -293,8 +319,11 @@ app.post("/api/orders", (req, res) => {
   const discountLine = order.discount
     ? `\nالخصم (${order.couponCode}): -${order.discount} ${settings.currencyAr}`
     : "";
+  const shipLine = order.shipping
+    ? `\nالتوصيل: ${order.shipping.nameAr}${order.shippingFee ? `\nرسوم التوصيل: ${order.shippingFee} ${settings.currencyAr}` : ""}`
+    : "";
   const waText = encodeURIComponent(
-    `طلب تطمن ${order.id}\nالدولة: ${settings.nameAr}\n${itemLines}${discountLine}\nالإجمالي: ${order.total} ${settings.currencyAr}\nالدفع: ${methodAr}\nالاسم: ${customer.name}\nالجوال: ${customer.phone}`,
+    `طلب تطمن ${order.id}\nالدولة: ${settings.nameAr}\n${itemLines}${discountLine}${shipLine}\nالإجمالي: ${order.total} ${settings.currencyAr}\nالدفع: ${methodAr}\nالاسم: ${customer.name}\nالجوال: ${customer.phone}`,
   );
 
   res.json({
@@ -509,6 +538,10 @@ app.put("/api/admin/orders/:id", requirePermission("orders"), (req, res) => {
         ...o,
         status: req.body?.status || o.status || "new",
         notes: req.body?.notes ?? o.notes,
+        trackingNumber:
+          req.body?.trackingNumber !== undefined
+            ? String(req.body.trackingNumber || "").trim().slice(0, 80)
+            : o.trackingNumber || "",
       };
       return updated;
     });
@@ -632,11 +665,13 @@ app.put("/api/admin/settings", requirePermission("settings"), (req, res) => {
         ...d.settings.qa,
         ...(req.body?.qa || {}),
         payments: { ...d.settings.qa.payments, ...(req.body?.qa?.payments || {}) },
+        couriers: mergeCouriers("qa", req.body?.qa?.couriers ?? d.settings.qa.couriers),
       },
       sa: {
         ...d.settings.sa,
         ...(req.body?.sa || {}),
         payments: { ...d.settings.sa.payments, ...(req.body?.sa?.payments || {}) },
+        couriers: mergeCouriers("sa", req.body?.sa?.couriers ?? d.settings.sa.couriers),
       },
     };
     return d;

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { products as seedProducts } from "../src/data/products.js";
+import { mergeCouriers } from "../src/data/couriers.js";
 
 export const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const dbPath = path.join(dataDir, "store.json");
@@ -83,6 +84,7 @@ function mergeCountrySettings(code, saved) {
     ...base,
     ...row,
     payments: { ...base.payments, ...(row.payments || {}) },
+    couriers: mergeCouriers(code, row.couriers),
   };
 }
 
