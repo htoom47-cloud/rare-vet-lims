@@ -12,9 +12,9 @@ npm install
 npm run dev
 ```
 
-## النشر
+## النشر (Render)
 
-راجع [DEPLOY.md](./DEPLOY.md) لربط `tatmanvet.com` عبر Vercel أو Render أو GitHub Pages.
+راجع [DEPLOY.md](./DEPLOY.md) — حساب Render الحالي + دومين `tatmanvet.com`.
 
 ```bash
 npm run build

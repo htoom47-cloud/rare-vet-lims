@@ -1,62 +1,52 @@
-# نشر متجر تطمن على tatmanvet.com
+# نشر متجر تطمن على Render → tatmanvet.com
 
-المتجر جاهز كملفات ثابتة (`npm run build` → مجلد `dist`).
+هذا متجر **Static Site** منفصل عن LIMS. لا تعدّل خدمة `rare-vet-lims`.
 
-## الطريقة الأسرع: Vercel (موصى بها)
+## 1) إنشاء الموقع في Render
 
-1. ادخل [vercel.com](https://vercel.com) وسجّل بحساب GitHub `htoom47-cloud`
-2. **Add New Project** → اختر مستودع `rare-vet-lims`
-3. الإعدادات:
-   - **Root Directory:** `tatman-store`
-   - **Framework:** Vite
-   - **Build Command:** `npm run build`
-   - **Output:** `dist`
-4. Deploy
-5. **Settings → Domains** → أضف:
-   - `tatmanvet.com`
-   - `www.tatmanvet.com`
+1. افتح [dashboard.render.com](https://dashboard.render.com)
+2. **New +** → **Static Site**
+3. وصّل GitHub واختر المستودع: `htoom47-cloud/rare-vet-lims`
+4. املأ الحقول كالتالي:
 
-### DNS عند مزوّد الدومين (tatmanvet.com)
+| الحقل | القيمة |
+|--------|--------|
+| Name | `tatman-vet-store` |
+| Branch | `cursor/tatman-vet-store-8ce2` (حتى يتم دمج الـ PR) ثم حوّله إلى `main` |
+| Root Directory | `tatman-store` |
+| Build Command | `npm ci && npm run build` |
+| Publish Directory | `dist` |
 
-من لوحة Vercel انسخ القيم الدقيقة. عادة:
+5. Environment:
+   - `NODE_VERSION` = `22`
+6. **Create Static Site** وانتظر حتى يصبح **Live**
+7. افتح الرابط `https://tatman-vet-store.onrender.com` للتأكد
 
-| Type  | Name | Value                 |
-|-------|------|-----------------------|
-| A     | `@`  | `76.76.21.21`         |
-| CNAME | `www`| `cname.vercel-dns.com`|
+## 2) توجيه الصفحات الداخلية (مهم)
 
-انتظر انتشار DNS (غالباً دقائق إلى ساعات) ثم افتح https://tatmanvet.com
+في الخدمة: **Redirects/Rewrites** → أضف:
 
----
+- Action: **Rewrite**
+- Source: `/*`
+- Destination: `/index.html`
 
-## بديل: Render (نفس منصة المختبر)
+بدون هذا، صفحات `/shop` و `/product/...` لن تعمل عند التحديث.
 
-1. Render → **New Static Site**
-2. Repo: `rare-vet-lims`
-3. Root Directory: `tatman-store`
-4. Build: `npm ci && npm run build`
-5. Publish: `dist`
-6. Custom Domain: `tatmanvet.com` + `www.tatmanvet.com`
-7. اتبع سجلات DNS التي يعطيها Render
+## 3) ربط الدومين tatmanvet.com
 
-يوجد ملف جاهز: `tatman-store/render.yaml`
+1. داخل الخدمة: **Settings → Custom Domains → Add**
+2. أضف: `tatmanvet.com` (Render يضيف `www` عادة تلقائياً)
+3. في لوحة الدومين ضع DNS كما يظهر Render. الشائع:
 
----
+| Type | Name | Value |
+|------|------|--------|
+| A | `@` | `216.24.57.1` |
+| CNAME | `www` | `tatman-vet-store.onrender.com` |
 
-## بديل: GitHub Pages
+4. احذف أي سجل **AAAA** (IPv6) إن وُجد — Render لا يدعمه
+5. ارجع إلى Render واضغط **Verify**
+6. انتظر شهادة HTTPS ثم افتح https://tatmanvet.com
 
-1. في GitHub → Settings → Pages → Source: **GitHub Actions**
-2. Workflow جاهز: `.github/workflows/deploy-tatman.yml`
-3. أضف Custom Domain: `tatmanvet.com`
-4. فعّل Enforce HTTPS بعد انتشار DNS
+## 4) بعد دمج PR #8
 
----
-
-## بناء محلي للتحقق
-
-```bash
-cd tatman-store
-npm ci
-npm run build
-npm run preview
-```
+حوّل Branch في Render إلى `main` حتى كل تحديث على المتجر ينشر تلقائياً.
