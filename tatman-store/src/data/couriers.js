@@ -38,37 +38,23 @@ export function shapeCourier(body, existing = {}) {
   };
 }
 
-export function mergeCouriers(country, saved) {
+export function defaultCouriers(country) {
   const code = country === "sa" ? "sa" : "qa";
-  const savedList = Array.isArray(saved) ? saved : [];
-  const byId = new Map();
-  for (const row of savedList) {
-    const id = normalizeCourierId(row.id);
-    if (id) byId.set(id, row);
-  }
-  const out = [];
-  for (const preset of COURIER_PRESETS.filter((p) => p.countries.includes(code))) {
-    const savedRow = byId.get(preset.id) || {};
-    out.push(
-      shapeCourier({
-        id: preset.id,
-        nameAr: savedRow.nameAr || preset.ar,
-        nameEn: savedRow.nameEn || preset.en,
-        active: savedRow.active === true,
-        fee: savedRow.fee,
-        etaAr: savedRow.etaAr,
-        etaEn: savedRow.etaEn,
-        phone: savedRow.phone,
-        trackUrl: savedRow.trackUrl || preset.trackUrl,
-      }),
-    );
-    byId.delete(preset.id);
-  }
-  for (const extra of byId.values()) {
-    const row = shapeCourier(extra);
-    if (row.id && (row.nameAr || row.nameEn)) out.push(row);
-  }
-  return out;
+  return COURIER_PRESETS.filter((p) => p.countries.includes(code)).map((p) =>
+    shapeCourier({
+      id: p.id,
+      nameAr: p.ar,
+      nameEn: p.en,
+      trackUrl: p.trackUrl,
+      active: false,
+      fee: 0,
+    }),
+  );
+}
+
+export function mergeCouriers(country, saved) {
+  if (!Array.isArray(saved)) return defaultCouriers(country);
+  return saved.map((c) => shapeCourier(c)).filter((c) => c.id && (c.nameAr || c.nameEn));
 }
 
 export function activeCouriers(list) {
