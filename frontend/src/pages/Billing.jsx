@@ -15,6 +15,7 @@ import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSu
 import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { billingAPI, testsAPI } from '../services/api';
+import { invoiceDisplayStatus, invoiceNeedsPayment } from '../utils/invoiceDisplay';
 import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
@@ -52,6 +53,10 @@ export default function Billing() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canPay = hasPermission('billing.payment');
+  const statusLabel = (invOrStatus) => {
+    const status = typeof invOrStatus === 'string' ? invOrStatus : invoiceDisplayStatus(invOrStatus);
+    return t(`billing.invoiceStatus.${status}`, { defaultValue: status });
+  };
   const canRefund = hasPermission('billing.refund');
   const [invoices, setInvoices] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -352,7 +357,9 @@ export default function Billing() {
     { key: 'subtotal', label: t('billing.subtotal'), render: (r) => `SAR ${parseFloat(r.subtotal).toFixed(2)}` },
     { key: 'tax_amount', label: t('billing.tax'), render: (r) => `SAR ${parseFloat(r.tax_amount).toFixed(2)}` },
     { key: 'total', label: t('billing.total'), render: (r) => `SAR ${parseFloat(r.total).toFixed(2)}` },
-    { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'status', label: t('common.status'), render: (r) => (
+      <StatusBadge status={invoiceDisplayStatus(r)} label={statusLabel(r)} />
+    ) },
     { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
     { key: 'actions', label: t('common.actions'), render: (r) => (
       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -372,7 +379,7 @@ export default function Billing() {
         >
           <Printer size={14} /> {t('billing.printThermal')}
         </button>
-        {canPay && r.status !== 'paid' && r.status !== 'cancelled' ? (
+        {canPay && invoiceNeedsPayment(r) ? (
           <button type="button" onClick={() => openPayment(r)} className="text-primary-600 text-sm flex items-center gap-1">
             <CreditCard size={14} /> {t('billing.payment')}
           </button>
@@ -455,7 +462,7 @@ export default function Billing() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailInvoice.customer_name}</div>
-              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={detailInvoice.status} /></div>
+              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={invoiceDisplayStatus(detailInvoice)} label={statusLabel(detailInvoice)} /></div>
               <div><span className="text-gray-500">{t('common.date')}:</span> {new Date(detailInvoice.created_at).toLocaleString()}</div>
               <div><span className="text-gray-500">{t('billing.total')}:</span> <strong>SAR {parseFloat(detailInvoice.total).toFixed(2)}</strong></div>
               <div><span className="text-gray-500">{t('billing.paid')}:</span> SAR {parseFloat(detailInvoice.total_paid || 0).toFixed(2)}</div>
@@ -559,7 +566,7 @@ export default function Billing() {
               }}
             />
 
-            {canPay && detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
+            {canPay && invoiceNeedsPayment(detailInvoice) && (
               <div className="flex justify-end">
                 <button onClick={() => openPayment(detailInvoice)} className="btn-primary flex items-center gap-2">
                   <CreditCard size={16} /> {t('billing.payment')}

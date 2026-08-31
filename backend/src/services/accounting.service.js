@@ -49,6 +49,7 @@ const getCustomerStatement = async (customerId) => {
     query(
       `SELECT i.id, i.invoice_number, i.total, i.status, i.created_at,
               COALESCE(p.paid, 0) AS total_paid,
+              ${withCredits ? 'COALESCE(cn.credited, 0)' : '0'} AS credit_notes_total,
               ${remainingSql(withCredits)} AS balance_due
        FROM invoices i
        ${paymentsJoin('p')}

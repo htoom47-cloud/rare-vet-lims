@@ -878,7 +878,7 @@ const resources = {
           cash: 'Cash', card: 'Network', bank_transfer: 'Bank transfer', credit: 'On account',
         },
         invoiceStatus: {
-          issued: 'Issued', partial: 'Partially paid', paid: 'Paid', cancelled: 'Cancelled', refunded: 'Refunded',
+          issued: 'Issued', partial: 'Partially paid', paid: 'Paid', credited: 'Settled by credit note', cancelled: 'Cancelled', refunded: 'Refunded',
           partial_refunded: 'Partially refunded',
         },
         createCreditNote: 'Create credit note',
@@ -2248,7 +2248,7 @@ const resources = {
           cash: 'نقدي', card: 'شبكة', bank_transfer: 'تحويل بنكي', credit: 'آجل',
         },
         invoiceStatus: {
-          issued: 'غير مدفوعة', partial: 'مدفوعة جزئياً', paid: 'مدفوعة', cancelled: 'ملغاة', refunded: 'مستردة',
+          issued: 'غير مدفوعة', partial: 'مدفوعة جزئياً', paid: 'مدفوعة', credited: 'مسددة بإشعار', cancelled: 'ملغاة', refunded: 'مستردة',
           partial_refunded: 'مستردة جزئياً',
         },
         createCreditNote: 'إنشاء إشعار دائن',

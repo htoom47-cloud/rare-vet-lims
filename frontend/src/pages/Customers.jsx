@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/ui/StatusBadge';
 import { customersAPI, billingAPI, hatifAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { invoiceDisplayStatus } from '../utils/invoiceDisplay';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const emptyForm = () => ({
@@ -690,7 +691,7 @@ export default function Customers() {
                           <td className="p-2 text-green-700">{fmt(inv.total_paid)}</td>
                           <td className="p-2 text-amber-700">{fmt(inv.balance_due)}</td>
                           <td className="p-2">
-                            <StatusBadge status={inv.status} label={t(`billing.invoiceStatus.${inv.status}`, { defaultValue: inv.status })} />
+                            <StatusBadge status={invoiceDisplayStatus(inv)} label={t(`billing.invoiceStatus.${invoiceDisplayStatus(inv)}`, { defaultValue: invoiceDisplayStatus(inv) })} />
                           </td>
                           <td className="p-2">
                             <button type="button" onClick={() => billingAPI.openInvoicePdf(inv.id)} className="text-primary-600 text-xs hover:underline">PDF</button>
