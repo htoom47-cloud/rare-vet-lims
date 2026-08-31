@@ -12,6 +12,7 @@ const {
   DEFAULT_CBC_TEST_CODE,
 } = require('../utils/norma-cbc-map');
 const { mapMindrayDeviceCodeToLims } = require('../utils/mindray-chem-map');
+const { mapDiasysDeviceCodeToLims } = require('../utils/diasys-chem-map');
 
 const VALUE_TYPES = {
   COUNT: 'count',
@@ -141,6 +142,21 @@ const resolveDeviceParameterMapping = async (
         system_parameter_code: mindrayLims,
         system_parameter_id: null,
         value_type: inferValueType(mindrayLims, { unit, deviceParameterCode: raw }),
+        unit: unit || null,
+      };
+    }
+  }
+
+  if (!resolvedCode && deviceName && /diasys|respons/i.test(deviceName)) {
+    const diasysLims = mapDiasysDeviceCodeToLims(raw);
+    if (diasysLims) {
+      return {
+        source: 'static-diasys',
+        device_parameter_code: raw,
+        normalized_device_code: raw.toUpperCase(),
+        system_parameter_code: diasysLims,
+        system_parameter_id: null,
+        value_type: inferValueType(diasysLims, { unit, deviceParameterCode: raw }),
         unit: unit || null,
       };
     }
@@ -276,7 +292,8 @@ const validateMappedDeviceResult = (mappedResult = {}) => {
   const deviceRaw = String(mappedResult.device_parameter_code || '').toUpperCase();
 
   if (mappedResult.mapping?.source !== 'database'
-    && mappedResult.mapping?.source !== 'static-mindray') {
+    && mappedResult.mapping?.source !== 'static-mindray'
+    && mappedResult.mapping?.source !== 'static-diasys') {
     const expectedCode = resolveSystemParameterCodeSync({
       code: mappedResult.device_parameter_code,
       unit: mappedResult.unit,
