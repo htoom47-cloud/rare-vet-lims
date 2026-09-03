@@ -7,10 +7,13 @@ const VALUE_NA = { en: 'N/A', ar: '—' };
 
 /** Lab-facing report labels (internal codes stay unchanged, e.g. BUN). */
 const CANONICAL_REPORT_DISPLAY = {
-  BUN: { code: 'UR', nameEn: 'Urea', nameAr: 'اليوريا' },
-  UREA: { code: 'UR', nameEn: 'Urea', nameAr: 'اليوريا' },
-  UR: { code: 'UR', nameEn: 'Urea', nameAr: 'اليوريا' },
-  URE: { code: 'UR', nameEn: 'Urea', nameAr: 'اليوريا' },
+  // Keep internal result-key as BUN so report designs / PDF sections
+  // (which are keyed by CHEM parameter codes) can find the value.
+  // We still expose the human display names (Urea / اليوريا).
+  BUN: { code: 'BUN', nameEn: 'Urea', nameAr: 'اليوريا' },
+  UREA: { code: 'BUN', nameEn: 'Urea', nameAr: 'اليوريا' },
+  UR: { code: 'BUN', nameEn: 'Urea', nameAr: 'اليوريا' },
+  URE: { code: 'BUN', nameEn: 'Urea', nameAr: 'اليوريا' },
 };
 
 const referenceNa = (isArabic) => (isArabic ? REFERENCE_NA.ar : REFERENCE_NA.en);

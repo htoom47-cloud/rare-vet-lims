@@ -62,6 +62,9 @@ const DIASYS_CHEM_MAPPINGS = [
   ['LDH', 'LDH', 'numeric'],
   ['LDH21', 'LDH', 'numeric'],
   ['LDH-21', 'LDH', 'numeric'],
+  // DiaSys ASTM for LDH sometimes arrives as internal method code 074.
+  // Without this mapping LDH is skipped during import.
+  ['074', 'LDH', 'numeric'],
   ['CHE', 'CHE', 'numeric'],
   ['CHOLINESTERASE', 'CHE', 'numeric'],
   ['CO2', 'CO2', 'numeric'],

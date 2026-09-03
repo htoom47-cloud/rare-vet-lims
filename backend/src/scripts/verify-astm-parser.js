@@ -78,6 +78,7 @@ check('Diasys Respons codes: CREAJ / 054 / GLUC GOD', () => {
   assert.strictEqual(mapDiasysDeviceCodeToLims('GLUC GOD'), 'GLU');
   assert.strictEqual(mapDiasysDeviceCodeToLims('801'), null);
   assert.strictEqual(mapDiasysDeviceCodeToLims('LDH21'), 'LDH');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('074'), 'LDH');
   assert.strictEqual(mapDiasysDeviceCodeToLims('CHE'), 'CHE');
   assert.strictEqual(mapDiasysDeviceCodeToLims('CO2'), 'CO2');
   assert.strictEqual(mapDiasysDeviceCodeToLims('NEFA'), 'NEFA');
