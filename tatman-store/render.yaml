@@ -1,0 +1,33 @@
+# Tatman Vet Store — Render Web Service (admin + dual-country store)
+
+The store is no longer a Static Site. Create / convert to a **Web Service**.
+
+services:
+  - type: web
+    name: tatman-vet-store
+    runtime: node
+    plan: starter
+    region: frankfurt
+    rootDir: tatman-store
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - tatman-store/**
+    disk:
+      name: tatman-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
