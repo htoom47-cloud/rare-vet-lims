@@ -28,9 +28,27 @@ const inferCodeFromComments = (lines, startIndex) => {
   return '';
 };
 
+/** Digit count of a sample/order token (ignores BC-/SMP- prefixes). */
+const sampleIdDigitCount = (value) => String(value || '').replace(/\D/g, '').length;
+
+/**
+ * Specimen ID is on the O record. DiaSys also puts a short patient token on P
+ * (e.g. 553). Prefer the O barcode when it looks like a LIMS ID (8–14 digits).
+ */
+const pickAstmSampleId = (orderId, patientId) => {
+  const order = String(orderId || '').trim();
+  const patient = String(patientId || '').trim();
+  const orderDigits = sampleIdDigitCount(order);
+  const patientDigits = sampleIdDigitCount(patient);
+  if (orderDigits >= 8 && orderDigits <= 14) return order;
+  if (patientDigits >= 8 && patientDigits <= 14) return patient;
+  return order || patient || null;
+};
+
 function parseAstm(raw) {
   const lines = raw.replace(/\r\n/g, '\r').replace(/\n/g, '\r').split('\r').filter(Boolean);
-  let sampleId = null;
+  let orderId = null;
+  let patientId = null;
   const results = [];
 
   for (let i = 0; i < lines.length; i += 1) {
@@ -39,13 +57,11 @@ function parseAstm(raw) {
     const type = recordType(fields[0]);
 
     if (type === 'O') {
-      const orderId = firstComponent(fields[2]) || firstComponent(fields[3]);
-      sampleId = sampleId || orderId || null;
+      orderId = orderId || firstComponent(fields[2]) || firstComponent(fields[3]) || null;
     }
 
-    if (type === 'P' && !sampleId) {
-      const patientId = firstComponent(fields[3]) || firstComponent(fields[2]);
-      sampleId = patientId || null;
+    if (type === 'P') {
+      patientId = patientId || firstComponent(fields[3]) || firstComponent(fields[2]) || null;
     }
 
     if (type === 'R') {
@@ -73,7 +89,12 @@ function parseAstm(raw) {
     }
   }
 
-  return { protocol: 'ASTM', sampleId, results, records: lines.length };
+  return {
+    protocol: 'ASTM',
+    sampleId: pickAstmSampleId(orderId, patientId),
+    results,
+    records: lines.length,
+  };
 }
 
 module.exports = { parseAstm, firstComponent, recordType };

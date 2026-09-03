@@ -85,6 +85,18 @@ check('Diasys Respons codes: CREAJ / 054 / GLUC GOD', () => {
   assert.strictEqual(mapDiasysDeviceCodeToLims('GLUCGOD'), 'GLU');
 });
 
+check('Prefers O barcode 260903400105 over short P patient id 553', () => {
+  const raw = [
+    'H|\\^&|||DiaSys^R910^152027|||||||P|E1394-97|20260904041756',
+    'P|1||553|||||U',
+    'O|1|260903400105|260903400105|||20260904032348|||||||||S||||||||||F',
+    'R|1|^^^ALB|3.9|g/dL||||V||Guest|',
+  ].join('\r');
+  const parsed = parseAstm(raw);
+  assert.strictEqual(parsed.sampleId, '260903400105');
+  assert.strictEqual(parsed.results[0].code, 'ALB');
+});
+
 check('Empty R code uses following GLUC GOD comment as glucose', () => {
   const raw = [
     'R|11|^^^|105.3|||||V||Guest|',
