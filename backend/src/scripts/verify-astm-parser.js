@@ -75,6 +75,8 @@ check('Diasys static map: UREA/GPT/GOT → LIMS codes', () => {
 check('Diasys Respons codes: CREAJ / 054 / GLUC GOD', () => {
   assert.strictEqual(mapDiasysDeviceCodeToLims('CREAJ'), 'CREA');
   assert.strictEqual(mapDiasysDeviceCodeToLims('054'), 'BUN');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('BUN'), 'BUN');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('UREA'), 'BUN');
   assert.strictEqual(mapDiasysDeviceCodeToLims('GLUC GOD'), 'GLU');
   assert.strictEqual(mapDiasysDeviceCodeToLims('801'), null);
   assert.strictEqual(mapDiasysDeviceCodeToLims('LDH21'), 'LDH');

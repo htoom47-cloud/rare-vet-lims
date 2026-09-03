@@ -9,6 +9,7 @@ const mappingEngine = require('./device-mapping-engine.service');
 const { barcodeLookupSql, barcodeLookupOrderSql } = require('../utils/barcode-lookup');
 const { normalizeSampleScanId } = require('../utils/barcode-scan');
 const { mapNormaSpeciesToRefSpeciesExact, normalizeSpeciesKey } = require('../utils/norma-species-map');
+const { isUreaLimsCode, UREA_LIMS_CODES } = require('../utils/diasys-chem-map');
 const logger = require('../config/logger');
 
 /** Device chemistry (Mindray): show like 12.2 — one digit after decimal unless param overrides. */
@@ -202,6 +203,28 @@ const resolveParameter = async (testCode, deviceCode, device) => {
       deviceParameterCode: deviceCode,
     });
   if (!limsCode) return null;
+  if (isUreaLimsCode(limsCode)) {
+    const urea = await query(
+      `SELECT tp.id, tp.code, tp.name, tp.unit, tp.decimal_places
+       FROM test_parameters tp
+       JOIN tests t ON tp.test_id = t.id
+       WHERE t.code = $1
+         AND (
+           UPPER(tp.code) = ANY($2::text[])
+           OR UPPER(TRIM(tp.name)) IN ('UREA', 'BUN', 'UR')
+           OR TRIM(tp.name_ar) = 'اليوريا'
+         )
+       ORDER BY CASE UPPER(tp.code)
+         WHEN 'BUN' THEN 0
+         WHEN 'UREA' THEN 1
+         WHEN 'UR' THEN 2
+         ELSE 3
+       END
+       LIMIT 1`,
+      [testCode, UREA_LIMS_CODES]
+    );
+    if (urea.rows[0]) return urea.rows[0];
+  }
   const result = await query(
     `SELECT tp.id, tp.code, tp.name, tp.unit, tp.decimal_places
      FROM test_parameters tp

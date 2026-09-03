@@ -22,7 +22,7 @@ const inferCodeFromComments = (lines, startIndex) => {
     if (type !== 'C') continue;
     const text = String(lines[j] || '');
     if (/GLUC/i.test(text)) return 'GLU';
-    if (/UREA|URE\b/i.test(text)) return 'UREA';
+    if (/\bBUN\b/i.test(text) || /UREA|URE\b/i.test(text)) return 'BUN';
     if (/CREA/i.test(text)) return 'CREAJ';
   }
   return '';

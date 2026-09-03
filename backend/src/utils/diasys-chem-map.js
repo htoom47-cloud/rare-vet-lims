@@ -23,6 +23,8 @@ const DIASYS_CHEM_MAPPINGS = [
   ['URE', 'BUN', 'numeric'],
   ['UR', 'BUN', 'numeric'],
   ['BUN', 'BUN', 'numeric'],
+  ['UREA(BUN)', 'BUN', 'numeric'],
+  ['UREA (BUN)', 'BUN', 'numeric'],
   ['UREA-UV', 'BUN', 'numeric'],
   ['UREA-N', 'BUN', 'numeric'],
   ['UREAN', 'BUN', 'numeric'],
@@ -113,6 +115,13 @@ function mapDiasysDeviceCodeToLims(deviceCode) {
   return DIASYS_CHEM_LIMS_BY_DEVICE.get(String(deviceCode).trim().toUpperCase()) || null;
 }
 
+/** CHEM-BASIC urea row may be coded BUN or UREA; display name is Urea / اليوريا. */
+const UREA_LIMS_CODES = ['BUN', 'UREA', 'UR', 'URE'];
+
+function isUreaLimsCode(code) {
+  return UREA_LIMS_CODES.includes(String(code || '').trim().toUpperCase());
+}
+
 module.exports = {
   DIASYS_DEVICE_NAME,
   DIASYS_TEST_CODE,
@@ -120,5 +129,7 @@ module.exports = {
   DIASYS_DEFAULT_PORT,
   DIASYS_CHEM_MAPPINGS,
   DIASYS_CHEM_PARAM_DEFS,
+  UREA_LIMS_CODES,
   mapDiasysDeviceCodeToLims,
+  isUreaLimsCode,
 };
