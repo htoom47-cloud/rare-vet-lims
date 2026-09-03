@@ -77,6 +77,12 @@ check('Diasys Respons codes: CREAJ / 054 / GLUC GOD', () => {
   assert.strictEqual(mapDiasysDeviceCodeToLims('054'), 'BUN');
   assert.strictEqual(mapDiasysDeviceCodeToLims('GLUC GOD'), 'GLU');
   assert.strictEqual(mapDiasysDeviceCodeToLims('801'), null);
+  assert.strictEqual(mapDiasysDeviceCodeToLims('LDH21'), 'LDH');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('CHE'), 'CHE');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('CO2'), 'CO2');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('NEFA'), 'NEFA');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('UA'), 'UA');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('GLUCGOD'), 'GLU');
 });
 
 check('Empty R code uses following GLUC GOD comment as glucose', () => {
