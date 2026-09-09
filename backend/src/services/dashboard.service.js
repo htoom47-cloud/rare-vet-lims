@@ -154,7 +154,8 @@ const listFailedMessages = async (limit = 50) => {
 const getStats = async () => {
   await reconcileSampleStatuses();
 
-  const sampleDayCol = 'COALESCE(s.received_date, s.collection_date, s.created_at)';
+  /** Registration time (created_at), not lab receipt. */
+  const sampleDayCol = 's.created_at';
 
   const [
     dailySamples,
@@ -205,7 +206,7 @@ const getStats = async () => {
        FROM sample_tests st
        JOIN tests t ON st.test_id = t.id
        JOIN samples s ON s.id = st.sample_id
-       WHERE ${monthMatch('COALESCE(s.received_date, s.collection_date, s.created_at)')}
+       WHERE ${monthMatch(sampleDayCol)}
        GROUP BY t.id ORDER BY count DESC LIMIT 10`
     ),
     query(
