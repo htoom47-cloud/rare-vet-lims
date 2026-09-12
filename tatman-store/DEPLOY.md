@@ -2,18 +2,53 @@
 
 المتجر **Web Service** على Render (ليس Static Site) لأن لوحة التحكم تحتاج حفظ المنتجات والطلبات.
 
+## إعادة إنشاء الخدمة بعد حذفها من Render
+
+المتجر موجود على فرع `cursor/tatman-vet-store-8ce2` فقط (ليس على `main`). أنشئ الخدمة من هذا الفرع.
+
+في [Render Dashboard](https://dashboard.render.com) → **New +** → **Web Service**:
+
+1. وصّل المستودع `htoom47-cloud/rare-vet-lims` (نفس GitHub).
+2. املأ الإعدادات التالية ثم **Create Web Service**:
+
+| البند | القيمة |
+|---|---|
+| Name | `tatman-vet-web` |
+| Language | Node |
+| Branch | `cursor/tatman-vet-store-8ce2` |
+| Root Directory | `tatman-store` |
+| Build Command | `npm ci --include=dev && npm run build` |
+| Start Command | `npm start` |
+| Instance | Starter (أو Free للتجربة) |
+| Region | Frankfurt |
+
+3. Environment:
+
+| المتغير | القيمة |
+|---|---|
+| `NODE_VERSION` | `22` |
+| `NODE_ENV` | `production` |
+| `DATA_DIR` | `/var/data` |
+| `ADMIN_PASSWORD` | كلمة سر قوية للإدارة |
+| `SESSION_SECRET` | نص عشوائي طويل |
+
+4. Disk: أضف قرصاً 1GB ومساره `/var/data`.
+5. Health Check Path: `/api/health`
+6. بعد أول نشر ناجح: **Settings → Custom Domains** → أضف `tatmanvet.com` و `www.tatmanvet.com`.
+7. DNS في Namecheap كما هو أسفل الصفحة.
+
+**لا تعدّل** خدمة LIMS: `rare-vet-lims`.  
+القرص الجديد فارغ: المنتجات والطلبات القديمة تُفقد إذا لم يكن هناك نسخة احتياطية من `/var/data`.
+
 ## الروابط الحية
 
 - المتجر: https://tatmanvet.com
 - الإدارة: https://tatmanvet.com/admin
 - نسخة Render: https://tatman-vet-web.onrender.com
-- لوحة Render: https://dashboard.render.com/web/srv-da6n12vavr4c739dh1ag
 
-الخدمة: `tatman-vet-web` (`srv-da6n12vavr4c739dh1ag`)  
+الخدمة: `tatman-vet-web`  
 الفرع: `cursor/tatman-vet-store-8ce2` حتى الدمج في `main`  
 Root Directory: `tatman-store`
-
-**لا تعدّل** خدمة LIMS: `rare-vet-lims`.
 
 ## لوحة التحكم
 

@@ -1,15 +1,16 @@
 # Tatman Vet Store — Render Web Service (admin + dual-country store)
-
-The store is no longer a Static Site. Create / convert to a **Web Service**.
+# Recreate as a Web Service, not a Static Site.
+# Branch must stay cursor/tatman-vet-store-8ce2 until tatman-store is on main.
 
 services:
   - type: web
-    name: tatman-vet-store
+    name: tatman-vet-web
     runtime: node
     plan: starter
     region: frankfurt
     rootDir: tatman-store
-    buildCommand: npm ci && npm run build
+    branch: cursor/tatman-vet-store-8ce2
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeployTrigger: commit
