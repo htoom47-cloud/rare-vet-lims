@@ -66,6 +66,7 @@ export function defaultCountryRow(code, extra = {}) {
     iban: String(extra.iban || "").slice(0, 40),
     accountName: String(extra.accountName || "Tatman Veterinary Services").slice(0, 80),
     payments: { ...defaultPayments(code), ...(extra.payments || {}) },
+    enabled: extra.enabled !== false,
   };
 }
 
@@ -86,6 +87,7 @@ export function mergeCountrySettings(code, savedRow, previousRow) {
     accountName: String(row.accountName ?? base.accountName).slice(0, 80),
     payments: { ...base.payments, ...(row.payments || {}) },
     couriers: mergeCouriers(code, row.couriers, previousRow?.couriers),
+    enabled: (row.enabled !== undefined ? row.enabled : previousRow?.enabled) !== false,
   };
 }
 
@@ -118,8 +120,13 @@ export function extraCountryCodes(settings) {
   return countryCodes(settings).filter((code) => !isCoreCountry(code));
 }
 
-export function publicCountryList(settings) {
-  return countryCodes(settings).map((code) => {
+export function storefrontCountryCodes(settings) {
+  const codes = countryCodes(settings).filter((code) => settings?.[code]?.enabled !== false);
+  return codes.length ? codes : countryCodes(settings).slice(0, 1);
+}
+
+function countryListFrom(settings, codes) {
+  return codes.map((code) => {
     const row = settings?.[code] || {};
     const preset = COUNTRY_PRESETS[code] || {};
     return {
@@ -132,6 +139,14 @@ export function publicCountryList(settings) {
   });
 }
 
+export function publicCountryList(settings) {
+  return countryListFrom(settings, storefrontCountryCodes(settings));
+}
+
+export function adminCountryList(settings) {
+  return countryListFrom(settings, countryCodes(settings));
+}
+
 export function countryLabel(code, settings) {
   const n = normalizeCountryCode(code);
   if (settings?.[n]?.nameAr) return settings[n].nameAr;
@@ -140,9 +155,10 @@ export function countryLabel(code, settings) {
 }
 
 export function resolveCountry(raw, settings) {
+  const visible = storefrontCountryCodes(settings);
   const code = normalizeCountryCode(raw);
-  if (code && settings?.[code]) return code;
-  return "qa";
+  if (code && visible.includes(code)) return code;
+  return visible[0] || "qa";
 }
 
 export function productPrice(product, country) {

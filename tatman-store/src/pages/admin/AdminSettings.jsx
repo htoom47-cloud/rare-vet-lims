@@ -111,23 +111,39 @@ export function AdminSettings() {
     if (ok) setAddForm(emptyNew);
   }
 
+  const codes = settings ? countryCodes(settings) : [];
+  const visibleCodes = codes.filter((code) => settings?.[code]?.enabled !== false);
+
   async function removeCountry(code) {
-    if (isCoreCountry(code)) return;
-    if (!confirm(`حذف دولة ${settings[code]?.nameAr || code}؟ لن تُحذف الطلبات السابقة.`)) return;
+    const name = settings[code]?.nameAr || code;
+    if (isCoreCountry(code)) {
+      if (visibleCodes.length <= 1) {
+        setError("يجب أن تبقى دولة واحدة ظاهرة في المتجر.");
+        return;
+      }
+      if (!confirm(`إزالة ${name} من واجهة المتجر؟ الإعدادات والطلبات تبقى.`)) return;
+      await persist({ ...settings, [code]: { ...settings[code], enabled: false } }, "تمت إزالة الدولة من المتجر.");
+      return;
+    }
+    if (!confirm(`حذف دولة ${name}؟ لن تُحذف الطلبات السابقة.`)) return;
     const next = { ...settings };
     delete next[code];
     await persist(next, "تم حذف الدولة.");
   }
 
-  if (!settings) return <p>...</p>;
+  async function showCountry(code) {
+    await persist({ ...settings, [code]: { ...settings[code], enabled: true } }, "تم إظهار الدولة في المتجر.");
+  }
 
-  const codes = countryCodes(settings);
+  if (!settings) return <p>...</p>;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-extrabold">إعدادات الدول والدفع</h1>
-        <p className="mt-2 text-sm text-black/55">قطر والسعودية ثابتتان. يمكنك إضافة دولة أخرى مع عملتها.</p>
+        <p className="mt-2 text-sm text-black/55">
+          أضف دولة أو أزلها من المتجر. قطر والسعودية لا تُحذفان نهائياً؛ الإزالة تخفيهما من واجهة المتجر فقط.
+        </p>
         {error && <p className="mt-3 text-sm font-bold text-crimson">{error}</p>}
       </div>
 
@@ -164,12 +180,33 @@ export function AdminSettings() {
         {codes.map((code) => (
           <section key={code} className="rounded-2xl bg-white p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-extrabold">{settings[code]?.nameAr || code} · {settings[code]?.currency}</h2>
-              {!isCoreCountry(code) && (
-                <button type="button" disabled={busy} className="text-sm font-bold text-crimson" onClick={() => removeCountry(code)}>
-                  حذف الدولة
-                </button>
-              )}
+              <div>
+                <h2 className="text-xl font-extrabold">{settings[code]?.nameAr || code} · {settings[code]?.currency}</h2>
+                {settings[code]?.enabled === false ? (
+                  <p className="mt-1 text-xs font-bold text-black/45">مخفية عن واجهة المتجر</p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {settings[code]?.enabled === false ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="rounded-full bg-navy px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                    onClick={() => showCountry(code)}
+                  >
+                    إظهار في المتجر
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="rounded-full bg-crimson px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                    onClick={() => removeCountry(code)}
+                  >
+                    إزالة
+                  </button>
+                )}
+              </div>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="block space-y-1.5">

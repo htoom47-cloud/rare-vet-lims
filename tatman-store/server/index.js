@@ -16,6 +16,7 @@ import {
   normalizeCountryCode,
   productAvailable,
   productPrice,
+  adminCountryList,
   publicCountryList,
   resolveCountry,
   shapeExtraAvailable,
@@ -438,7 +439,7 @@ app.post("/api/coupons/preview", (req, res) => {
 
 app.get("/api/admin/coupons", requirePermission("coupons"), (_req, res) => {
   const db = getDb();
-  res.json({ coupons: db.coupons || [], countries: publicCountryList(db.settings) });
+  res.json({ coupons: db.coupons || [], countries: adminCountryList(db.settings) });
 });
 
 app.post("/api/admin/coupons", requirePermission("coupons"), (req, res) => {
@@ -496,7 +497,7 @@ app.delete("/api/admin/coupons/:id", requirePermission("coupons"), (req, res) =>
 
 app.get("/api/admin/products", requirePermission("products"), (_req, res) => {
   const db = getDb();
-  res.json({ products: db.products, countries: publicCountryList(db.settings) });
+  res.json({ products: db.products, countries: adminCountryList(db.settings) });
 });
 
 app.post("/api/admin/products", requirePermission("products"), (req, res) => {
@@ -561,13 +562,13 @@ app.get("/api/admin/orders", requirePermission("orders"), (_req, res) => {
   const db = getDb();
   res.json({
     orders: (db.orders || []).map((o) => publicOrder(o, db.settings)),
-    countries: publicCountryList(db.settings),
+    countries: adminCountryList(db.settings),
   });
 });
 
 app.get("/api/admin/customers", requirePermission("customers"), (_req, res) => {
   const db = getDb();
-  res.json({ customers: customersFromOrders(db.orders || []), countries: publicCountryList(db.settings) });
+  res.json({ customers: customersFromOrders(db.orders || []), countries: adminCountryList(db.settings) });
 });
 
 app.put("/api/admin/orders/:id", requirePermission("orders"), (req, res) => {
