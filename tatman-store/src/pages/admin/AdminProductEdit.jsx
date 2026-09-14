@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import { categories } from "../../data/products";
 import { productImages } from "../../data/stock";
+import { imageUploadErrorAr, prepareProductImage } from "../../lib/prepareImage";
 
 const empty = {
   nameAr: "",
@@ -90,16 +91,18 @@ export function AdminProductEdit() {
     try {
       const uploaded = [];
       for (const file of files) {
-        const data = await api.uploadImage(file);
+        const prepared = await prepareProductImage(file);
+        const data = await api.uploadImage(prepared);
         if (data.url) uploaded.push(data.url);
       }
+      if (!uploaded.length) throw new Error("invalid_image");
       setForm((f) => {
         const next = [...productImages(f), ...uploaded].slice(0, 8);
         return { ...f, images: next, image: next[0] || "" };
       });
       setSaved("");
-    } catch {
-      setError("تعذر رفع الصورة. استخدم JPG أو PNG أو WEBP بحجم حتى 6MB.");
+    } catch (err) {
+      setError(imageUploadErrorAr(err.message));
     } finally {
       setUploading(false);
     }
@@ -119,6 +122,7 @@ export function AdminProductEdit() {
     setSaved("");
     setBusy(true);
     try {
+      const photos = productImages(form);
       const body = {
         ...form,
         priceQar: Number(form.priceQar) || 0,
@@ -134,8 +138,8 @@ export function AdminProductEdit() {
         stock: Object.fromEntries(
           extraCountries.map(({ code }) => [code, form.stock?.[code] === "" || form.stock?.[code] == null ? null : Number(form.stock[code])]),
         ),
-        images,
-        image: images[0] || "",
+        images: photos,
+        image: photos[0] || "",
         animals: String(form.animals)
           .split(",")
           .map((s) => s.trim())
@@ -148,22 +152,23 @@ export function AdminProductEdit() {
       if (!savedId) throw new Error("save_failed");
       const d = await api.products();
       const p = (d.products || []).find((x) => x.id === savedId);
-      if (p) {
-        setForm({
-          ...empty,
-          ...p,
-          animals: (p.animals || []).join(","),
-          benefitsAr: (p.benefitsAr || []).join("\n"),
-          benefitsEn: (p.benefitsEn || []).join("\n"),
-          stockQa: p.stockQa ?? "",
-          stockSa: p.stockSa ?? "",
-          images: productImages(p),
-          image: productImages(p)[0] || "",
-          prices: p.prices || {},
-          available: p.available || {},
-          stock: Object.fromEntries(Object.entries(p.stock || {}).map(([k, v]) => [k, v ?? ""])),
-        });
-      }
+      if (!p) throw new Error("save_failed");
+      const stored = productImages(p);
+      if (photos.length && photos.some((url) => !stored.includes(url))) throw new Error("save_failed");
+      setForm({
+        ...empty,
+        ...p,
+        animals: (p.animals || []).join(","),
+        benefitsAr: (p.benefitsAr || []).join("\n"),
+        benefitsEn: (p.benefitsEn || []).join("\n"),
+        stockQa: p.stockQa ?? "",
+        stockSa: p.stockSa ?? "",
+        images: stored,
+        image: stored[0] || "",
+        prices: p.prices || {},
+        available: p.available || {},
+        stock: Object.fromEntries(Object.entries(p.stock || {}).map(([k, v]) => [k, v ?? ""])),
+      });
       setSaved("تم الحفظ في المتجر.");
       if (isNew) navigate(`/admin/products/${savedId}`, { replace: true });
     } catch {
@@ -203,7 +208,7 @@ export function AdminProductEdit() {
           {images.length < 8 && (
             <label className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-navy/25 bg-mist/60 text-sm font-bold text-navy">
               {uploading ? "جاري الرفع..." : "إضافة صورة"}
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={onPickImages} disabled={uploading} />
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic" multiple className="hidden" onChange={onPickImages} disabled={uploading} />
             </label>
           )}
         </div>

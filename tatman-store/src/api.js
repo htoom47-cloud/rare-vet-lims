@@ -36,15 +36,16 @@ export const api = {
     const res = await fetch("/api/admin/upload", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
+      headers: { "Content-Type": "application/octet-stream" },
       body: file,
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = new Error(data.error || "upload_failed");
+      const err = new Error(data.error || (res.status === 413 ? "too_large" : "upload_failed"));
       err.status = res.status;
       throw err;
     }
+    if (!data.url) throw new Error("upload_failed");
     return data;
   },
   orders: () => request("/api/admin/orders"),

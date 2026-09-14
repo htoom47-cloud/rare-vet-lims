@@ -39,9 +39,12 @@ import {
 const app = express();
 const port = Number(process.env.PORT || 8787);
 
-app.use(express.json({ limit: "2mb" }));
+app.use((req, res, next) => {
+  if (req.method === "POST" && req.path === "/api/admin/upload") return next();
+  return express.json({ limit: "2mb" })(req, res, next);
+});
 fs.mkdirSync(uploadsDir, { recursive: true });
-app.use("/uploads", express.static(uploadsDir));
+app.use("/uploads", express.static(uploadsDir, { maxAge: "30d", fallthrough: true }));
 
 const ALLOWED_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
@@ -56,13 +59,24 @@ function sniffImageExt(buf) {
   return "";
 }
 
+function looksLikeHeic(buf) {
+  if (!buf || buf.length < 12) return false;
+  const brand = buf.subarray(4, 12).toString("ascii");
+  return brand.includes("ftyp") || /heic|heif|mif1|msf1/i.test(buf.subarray(8, 16).toString("ascii"));
+}
+
 function isSafeImageUrl(url) {
   const s = String(url || "").trim();
   if (!s || s.length > 500) return false;
-  if (s.startsWith("/uploads/")) {
-    const name = path.basename(s);
-    const ext = path.extname(name).toLowerCase();
-    return ALLOWED_IMAGE.has(ext) && name === s.slice("/uploads/".length);
+  const pathOnly = s.split("?")[0];
+  const uploadName = pathOnly.startsWith("/uploads/")
+    ? path.basename(pathOnly)
+    : pathOnly.includes("/uploads/")
+      ? path.basename(pathOnly)
+      : "";
+  if (uploadName) {
+    const ext = path.extname(uploadName).toLowerCase();
+    return ALLOWED_IMAGE.has(ext) && !uploadName.includes("..") && /^[a-zA-Z0-9._-]+$/.test(uploadName);
   }
   try {
     const u = new URL(s);
@@ -532,15 +546,12 @@ app.put("/api/admin/products/:id", requirePermission("products"), (req, res) => 
 app.post(
   "/api/admin/upload",
   requirePermission("products"),
-  express.raw({
-    type: ["image/jpeg", "image/png", "image/webp", "image/gif", "application/octet-stream"],
-    limit: "6mb",
-  }),
+  express.raw({ type: () => true, limit: "12mb" }),
   (req, res) => {
     const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
     const ext = sniffImageExt(buf);
     if (!ext || buf.length < 32) {
-      res.status(400).json({ error: "invalid_image" });
+      res.status(400).json({ error: looksLikeHeic(buf) ? "heic_unsupported" : "invalid_image" });
       return;
     }
     const name = `${crypto.randomUUID()}${ext}`;
