@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Phone, X } from 'lucide-react';
 import { customersAPI } from '../../services/api';
 
-export default function CustomerSearch({ value, onChange, placeholder, required = false, autoFocus = false }) {
+export default function CustomerSearch({ value, onChange, placeholder, required = false, autoFocus = false, knownCustomer = null }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(() => (knownCustomer?.id === value ? knownCustomer : null));
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -17,9 +17,12 @@ export default function CustomerSearch({ value, onChange, placeholder, required 
       setSelected(null);
       return;
     }
-    if (selected?.id === value) return;
+    if (knownCustomer?.id === value) {
+      setSelected(knownCustomer);
+      return;
+    }
     customersAPI.get(value).then(({ data }) => setSelected(data.data)).catch(() => setSelected(null));
-  }, [value]);
+  }, [value, knownCustomer]);
 
   useEffect(() => {
     if (!query.trim()) {

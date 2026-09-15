@@ -4,7 +4,8 @@ import { Plus, Search, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
-import { animalsAPI, customersAPI } from '../services/api';
+import CustomerSearch from '../components/customers/CustomerSearch';
+import { animalsAPI } from '../services/api';
 import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,13 +32,13 @@ export default function Animals() {
   const { codes, label } = useAnimalSpecies();
   const isAr = i18n.language === 'ar';
   const [animals, setAnimals] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [knownOwner, setKnownOwner] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
@@ -53,22 +54,24 @@ export default function Animals() {
   };
 
   useEffect(() => {
-    customersAPI.list({ limit: 100 }).then(({ data }) => setCustomers(data.data || []));
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
   }, [search, page]);
 
   const openCreate = () => {
     setEditingId(null);
+    setKnownOwner(null);
     setForm(EMPTY_FORM);
     setModalOpen(true);
   };
 
   const openEdit = (animal) => {
     setEditingId(animal.id);
+    setKnownOwner(animal.owner_id ? {
+      id: animal.owner_id,
+      full_name: animal.owner_name || '',
+      mobile: animal.owner_mobile || '',
+    } : null);
     setForm({
       animal_type: animal.animal_type || 'camel',
       gender: animal.gender || 'unknown',
@@ -87,11 +90,16 @@ export default function Animals() {
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
+    setKnownOwner(null);
     setForm(EMPTY_FORM);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.owner_id) {
+      toast.error(t('animals.selectOwner'));
+      return;
+    }
     const payload = { ...form, weight: form.weight !== '' && form.weight != null ? parseFloat(form.weight) : null };
     try {
       if (editingId) {
@@ -195,10 +203,13 @@ export default function Animals() {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">{t('animals.owner')}</label>
-            <select value={form.owner_id} onChange={(e) => setField('owner_id', e.target.value)} className="input-field" required>
-              <option value="">{t('animals.selectOwner')}</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-            </select>
+            <CustomerSearch
+              key={editingId || 'new'}
+              value={form.owner_id}
+              onChange={(id) => setField('owner_id', id || '')}
+              knownCustomer={knownOwner}
+              required
+            />
           </div>
 
           <div>
