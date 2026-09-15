@@ -23,6 +23,8 @@ import {
   isFieldVisitItem,
 } from '../utils/fieldVisitService';
 
+const PAGE_SIZE = 20;
+
 function groupItemsByAnimal(items, t) {
   const groups = new Map();
   for (const item of items || []) {
@@ -62,6 +64,8 @@ export default function Billing() {
   const [packages, setPackages] = useState([]);
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [tab, setTab] = useState('invoices');
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
@@ -89,15 +93,23 @@ export default function Billing() {
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
-  const load = () => {
+  const loadInvoices = (p = page) => {
     setLoading(true);
-    billingAPI.invoices().then(({ data }) => setInvoices(data.data)).finally(() => setLoading(false));
-    billingAPI.packages().then(({ data }) => setPackages(data.data));
+    billingAPI.invoices({ page: p, limit: PAGE_SIZE })
+      .then(({ data }) => {
+        setInvoices(data.data || []);
+        setPagination(data.pagination || { total: 0, page: p, limit: PAGE_SIZE, totalPages: 0 });
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    load();
-    testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
+    loadInvoices(page);
+  }, [page]);
+
+  useEffect(() => {
+    billingAPI.packages().then(({ data }) => setPackages(data.data));
+    testsAPI.list({ limit: 500 }).then(({ data }) => setTests(data.data));
     billingAPI.extraServices()
       .then(({ data }) => {
         const svc = (data.data || []).find((s) => s.code === FIELD_VISIT_CODE);
@@ -218,7 +230,8 @@ export default function Billing() {
       setDiscountValue('');
       setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
       setFieldVisitDiscountValue('');
-      load();
+      setPage(1);
+      loadInvoices(1);
     } catch (err) {
       const details = err.response?.data?.error?.details;
       const detailMsg = Array.isArray(details) && details.length
@@ -262,7 +275,7 @@ export default function Billing() {
       setPaymentModal(false);
       setPaymentForm({ reference_number: '', notes: '' });
       setPaymentLines([{ method: '', amount: '' }]);
-      load();
+      loadInvoices(page);
       if (detailInvoice?.id === invoiceId) openInvoiceDetail({ id: invoiceId });
       await printThermalReceipt(invoiceId, {
         paymentMethod: lines.map((l) => l.method).join('+'),
@@ -434,7 +447,41 @@ export default function Billing() {
       </div>
 
       {tab === 'invoices' ? (
-        <DataTable columns={columns} data={invoices} loading={loading} onRowClick={openInvoiceDetail} />
+        <>
+          <DataTable columns={columns} data={invoices} loading={loading} onRowClick={openInvoiceDetail} />
+          {pagination.total > 0 && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
+              <span>
+                {i18n.language === 'ar'
+                  ? `عرض ${invoices.length} من ${pagination.total}`
+                  : `Showing ${invoices.length} of ${pagination.total}`}
+                {pagination.totalPages > 1 && (
+                  <> · {i18n.language === 'ar' ? `صفحة ${pagination.page} / ${pagination.totalPages}` : `Page ${pagination.page} / ${pagination.totalPages}`}</>
+                )}
+              </span>
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 px-3 disabled:opacity-40"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    {i18n.language === 'ar' ? 'السابق' : 'Previous'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 px-3 disabled:opacity-40"
+                    disabled={page >= pagination.totalPages || loading}
+                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  >
+                    {i18n.language === 'ar' ? 'التالي' : 'Next'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {packages.map((pkg) => (
@@ -562,7 +609,7 @@ export default function Billing() {
               canCreate={canRefund}
               onIssued={async () => {
                 await openInvoiceDetail({ id: detailInvoice.id });
-                load();
+                loadInvoices(page);
               }}
             />
 

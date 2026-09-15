@@ -58,9 +58,11 @@ const sampleDigitsOnly = (value) => String(value || '').replace(/\D/g, '');
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
+const MAX_PAGE_LIMIT = 500;
+
 const paginate = (page = 1, limit = 20) => {
   const p = Math.max(1, parseInt(page, 10) || 1);
-  const l = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const l = Math.min(MAX_PAGE_LIMIT, Math.max(1, parseInt(limit, 10) || 20));
   return { page: p, limit: l, offset: (p - 1) * l };
 };
 
@@ -110,6 +112,7 @@ module.exports = {
   ANIMAL_CODE_LOCK,
   sampleDigitsOnly,
   hashToken,
+  MAX_PAGE_LIMIT,
   paginate,
   buildPagination,
   evaluateFlag,
