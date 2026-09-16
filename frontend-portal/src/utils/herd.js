@@ -47,10 +47,37 @@ export const herdAgeBucket = (animal) => {
   return 'over5';
 };
 
+/** Keep in sync with backend/src/constants/breeder.js ADULT_MONTHS. */
+const ADULT_MONTHS = {
+  camel: 36,
+  horse: 36,
+  sheep: 12,
+  goat: 12,
+  cow: 24,
+  cattle: 24,
+  buffalo: 30,
+  default: 24,
+};
+
+export const isAdultFemale = (animal) => {
+  if (animal?.gender !== 'female') return false;
+  const months = animal?.age_computed?.total_months;
+  if (months == null || Number.isNaN(Number(months))) return false;
+  const need = ADULT_MONTHS[String(animal.animal_type || '').toLowerCase()] ?? ADULT_MONTHS.default;
+  return Number(months) >= need;
+};
+
+/** Adult female, or a female that has produced offspring. */
+export const isHerdMother = (animal) => {
+  if (animal?.gender !== 'female') return false;
+  if ((animal.offspring_count || 0) > 0 || animal.is_mother) return true;
+  return isAdultFemale(animal);
+};
+
 export const filterHerdAnimals = (animals, { role = 'all', age = 'all', vax = 'all' } = {}) => {
   const list = Array.isArray(animals) ? animals : [];
   return list.filter((a) => {
-    if (role === 'mothers' && !a.is_mother) return false;
+    if (role === 'mothers' && !isHerdMother(a)) return false;
     if (role === 'sires' && !a.is_sire) return false;
     if (role === 'offspring' && !a.is_offspring) return false;
     if (age !== 'all' && herdAgeBucket(a) !== age) return false;
