@@ -12,6 +12,7 @@ const {
   DEFAULT_CBC_TEST_CODE,
 } = require('../utils/norma-cbc-map');
 const { mapMindrayDeviceCodeToLims } = require('../utils/mindray-chem-map');
+const { mapDiasysDeviceCodeToLims, isUreaLimsCode, UREA_LIMS_CODES } = require('../utils/diasys-chem-map');
 
 const VALUE_TYPES = {
   COUNT: 'count',
@@ -146,6 +147,21 @@ const resolveDeviceParameterMapping = async (
     }
   }
 
+  if (!resolvedCode && deviceName && /diasys|respons/i.test(deviceName)) {
+    const diasysLims = mapDiasysDeviceCodeToLims(raw);
+    if (diasysLims) {
+      return {
+        source: 'static-diasys',
+        device_parameter_code: raw,
+        normalized_device_code: raw.toUpperCase(),
+        system_parameter_code: diasysLims,
+        system_parameter_id: null,
+        value_type: inferValueType(diasysLims, { unit, deviceParameterCode: raw }),
+        unit: unit || null,
+      };
+    }
+  }
+
   if (!resolvedCode) {
     return {
       source: 'unknown',
@@ -171,6 +187,28 @@ const resolveDeviceParameterMapping = async (
 
 const resolveSystemParameterId = async (testCode, systemParameterCode) => {
   if (!testCode || !systemParameterCode) return null;
+  if (isUreaLimsCode(systemParameterCode)) {
+    const urea = await query(
+      `SELECT tp.id, tp.code, tp.name, tp.unit
+       FROM test_parameters tp
+       JOIN tests t ON tp.test_id = t.id
+       WHERE t.code = $1
+         AND (
+           UPPER(tp.code) = ANY($2::text[])
+           OR UPPER(TRIM(tp.name)) IN ('UREA', 'BUN', 'UR')
+           OR TRIM(tp.name_ar) = 'اليوريا'
+         )
+       ORDER BY CASE UPPER(tp.code)
+         WHEN 'BUN' THEN 0
+         WHEN 'UREA' THEN 1
+         WHEN 'UR' THEN 2
+         ELSE 3
+       END
+       LIMIT 1`,
+      [testCode, UREA_LIMS_CODES]
+    );
+    if (urea.rows[0]) return urea.rows[0];
+  }
   const result = await query(
     `SELECT tp.id, tp.code, tp.name, tp.unit
      FROM test_parameters tp
@@ -276,7 +314,8 @@ const validateMappedDeviceResult = (mappedResult = {}) => {
   const deviceRaw = String(mappedResult.device_parameter_code || '').toUpperCase();
 
   if (mappedResult.mapping?.source !== 'database'
-    && mappedResult.mapping?.source !== 'static-mindray') {
+    && mappedResult.mapping?.source !== 'static-mindray'
+    && mappedResult.mapping?.source !== 'static-diasys') {
     const expectedCode = resolveSystemParameterCodeSync({
       code: mappedResult.device_parameter_code,
       unit: mappedResult.unit,

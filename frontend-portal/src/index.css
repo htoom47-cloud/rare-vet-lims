@@ -666,7 +666,8 @@
     page-break-inside: avoid;
   }
 
-  body.printing-lab-report .lab-rpt-notes {
+  body.printing-lab-report .lab-rpt-notes,
+  body.printing-lab-report .lab-rpt-recs {
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -1008,6 +1009,72 @@
 
 .lab-rpt-abnormal-item b {
   color: #b91c1c;
+}
+
+.lab-rpt-recs {
+  margin: 6px 8px 8px;
+  border: 1px solid #d4c4a8;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.lab-rpt-recs-head {
+  background: #5B3A29;
+  color: #F7F5F2;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
+  border-inline-start: 3px solid #C9A86A;
+}
+
+.lab-rpt-recs-body {
+  background: #faf8f5;
+  padding: 8px 12px 9px;
+}
+
+.lab-rpt-recs-text {
+  margin: 0;
+  font-size: 9pt;
+  font-weight: 600;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  color: #2d2118;
+}
+
+.lab-rpt-recs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.lab-rpt-recs-list li {
+  position: relative;
+  padding-inline-start: 14px;
+  font-size: 9pt;
+  font-weight: 600;
+  line-height: 1.55;
+  color: #2d2118;
+}
+
+.lab-rpt-recs-list li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #C9A86A;
+}
+
+.lab-rpt-recs-list li.is-treatment {
+  margin-top: 3px;
+  padding-top: 6px;
+  border-top: 1px dashed #d4c4a8;
+  color: #5B3A29;
 }
 
 .lab-rpt-notes {

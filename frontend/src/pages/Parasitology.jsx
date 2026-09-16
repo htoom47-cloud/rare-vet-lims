@@ -537,7 +537,7 @@ export default function Parasitology() {
 
   const loadParasTypes = useCallback(async () => {
     try {
-      const { data } = await testsAPI.list({ limit: 200 });
+      const { data } = await testsAPI.list({ limit: 500 });
       const microTests = sortMicroTests(
         (data.data || []).filter((tst) => tst.category_code === PARAS_CATEGORY_CODE)
       );

@@ -55,7 +55,7 @@ const parseUploadUrl = (url) => {
 const uploadUrl = (subdir, filename) => `/uploads/${subdir}/${filename}`;
 
 /** Paths that must not be served without staff JWT (reports, invoices, microscope, internal docs). */
-const PROTECTED_UPLOAD_PREFIXES = ['reports/', 'invoices/', 'microscope/', 'ministry-docs/'];
+const PROTECTED_UPLOAD_PREFIXES = ['reports/', 'invoices/', 'microscope/', 'ministry-docs/', 'purchases/'];
 
 const isProtectedUploadPath = (rel) =>
   PROTECTED_UPLOAD_PREFIXES.some((prefix) => rel.startsWith(prefix));
@@ -99,7 +99,7 @@ const ensureUploadDir = () => {
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
   }
-  ['reports', 'animals', 'signatures', 'temp', 'microscope'].forEach((subdir) => {
+  ['reports', 'animals', 'signatures', 'temp', 'microscope', 'purchases'].forEach((subdir) => {
     const dir = path.join(uploadPath, subdir);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });
@@ -323,6 +323,13 @@ const deleteFile = async (url) => {
 const serveUploads = async (req, res, next) => {
   const rel = req.path.replace(/^\//, '');
   if (!rel || rel.includes('..')) return next();
+
+  if (rel.startsWith('purchases/')) {
+    return res.status(403).json({
+      success: false,
+      error: { message: 'Purchase attachments must be downloaded through the API', code: 'PURCHASE_FILE_FORBIDDEN' },
+    });
+  }
 
   if (isProtectedUploadPath(rel) && !verifyStaffUploadToken(extractUploadAuthToken(req))) {
     return res.status(401).json({ success: false, error: { message: 'Authentication required' } });

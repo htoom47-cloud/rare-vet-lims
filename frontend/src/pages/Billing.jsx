@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin, Package } from 'lucide-react';
+import CreditNotePanel from '../components/billing/CreditNotePanel';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -14,12 +15,15 @@ import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSu
 import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { billingAPI, testsAPI } from '../services/api';
+import { invoiceDisplayStatus, invoiceNeedsPayment } from '../utils/invoiceDisplay';
 import {
   FIELD_VISIT_CODE,
   DEFAULT_FIELD_VISIT,
   buildFieldVisitInvoiceItem,
   isFieldVisitItem,
 } from '../utils/fieldVisitService';
+
+const PAGE_SIZE = 20;
 
 function groupItemsByAnimal(items, t) {
   const groups = new Map();
@@ -51,10 +55,17 @@ export default function Billing() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canPay = hasPermission('billing.payment');
+  const statusLabel = (invOrStatus) => {
+    const status = typeof invOrStatus === 'string' ? invOrStatus : invoiceDisplayStatus(invOrStatus);
+    return t(`billing.invoiceStatus.${status}`, { defaultValue: status });
+  };
+  const canRefund = hasPermission('billing.refund');
   const [invoices, setInvoices] = useState([]);
   const [packages, setPackages] = useState([]);
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [tab, setTab] = useState('invoices');
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
@@ -82,15 +93,23 @@ export default function Billing() {
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
 
-  const load = () => {
+  const loadInvoices = (p = page) => {
     setLoading(true);
-    billingAPI.invoices().then(({ data }) => setInvoices(data.data)).finally(() => setLoading(false));
-    billingAPI.packages().then(({ data }) => setPackages(data.data));
+    billingAPI.invoices({ page: p, limit: PAGE_SIZE })
+      .then(({ data }) => {
+        setInvoices(data.data || []);
+        setPagination(data.pagination || { total: 0, page: p, limit: PAGE_SIZE, totalPages: 0 });
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    load();
-    testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
+    loadInvoices(page);
+  }, [page]);
+
+  useEffect(() => {
+    billingAPI.packages().then(({ data }) => setPackages(data.data));
+    testsAPI.list({ limit: 500 }).then(({ data }) => setTests(data.data));
     billingAPI.extraServices()
       .then(({ data }) => {
         const svc = (data.data || []).find((s) => s.code === FIELD_VISIT_CODE);
@@ -211,7 +230,8 @@ export default function Billing() {
       setDiscountValue('');
       setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
       setFieldVisitDiscountValue('');
-      load();
+      setPage(1);
+      loadInvoices(1);
     } catch (err) {
       const details = err.response?.data?.error?.details;
       const detailMsg = Array.isArray(details) && details.length
@@ -255,7 +275,7 @@ export default function Billing() {
       setPaymentModal(false);
       setPaymentForm({ reference_number: '', notes: '' });
       setPaymentLines([{ method: '', amount: '' }]);
-      load();
+      loadInvoices(page);
       if (detailInvoice?.id === invoiceId) openInvoiceDetail({ id: invoiceId });
       await printThermalReceipt(invoiceId, {
         paymentMethod: lines.map((l) => l.method).join('+'),
@@ -350,7 +370,9 @@ export default function Billing() {
     { key: 'subtotal', label: t('billing.subtotal'), render: (r) => `SAR ${parseFloat(r.subtotal).toFixed(2)}` },
     { key: 'tax_amount', label: t('billing.tax'), render: (r) => `SAR ${parseFloat(r.tax_amount).toFixed(2)}` },
     { key: 'total', label: t('billing.total'), render: (r) => `SAR ${parseFloat(r.total).toFixed(2)}` },
-    { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'status', label: t('common.status'), render: (r) => (
+      <StatusBadge status={invoiceDisplayStatus(r)} label={statusLabel(r)} />
+    ) },
     { key: 'created_at', label: t('common.date'), render: (r) => new Date(r.created_at).toLocaleDateString() },
     { key: 'actions', label: t('common.actions'), render: (r) => (
       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -370,7 +392,7 @@ export default function Billing() {
         >
           <Printer size={14} /> {t('billing.printThermal')}
         </button>
-        {canPay && r.status !== 'paid' && r.status !== 'cancelled' ? (
+        {canPay && invoiceNeedsPayment(r) ? (
           <button type="button" onClick={() => openPayment(r)} className="text-primary-600 text-sm flex items-center gap-1">
             <CreditCard size={14} /> {t('billing.payment')}
           </button>
@@ -425,7 +447,41 @@ export default function Billing() {
       </div>
 
       {tab === 'invoices' ? (
-        <DataTable columns={columns} data={invoices} loading={loading} onRowClick={openInvoiceDetail} />
+        <>
+          <DataTable columns={columns} data={invoices} loading={loading} onRowClick={openInvoiceDetail} />
+          {pagination.total > 0 && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
+              <span>
+                {i18n.language === 'ar'
+                  ? `عرض ${invoices.length} من ${pagination.total}`
+                  : `Showing ${invoices.length} of ${pagination.total}`}
+                {pagination.totalPages > 1 && (
+                  <> · {i18n.language === 'ar' ? `صفحة ${pagination.page} / ${pagination.totalPages}` : `Page ${pagination.page} / ${pagination.totalPages}`}</>
+                )}
+              </span>
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 px-3 disabled:opacity-40"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    {i18n.language === 'ar' ? 'السابق' : 'Previous'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 px-3 disabled:opacity-40"
+                    disabled={page >= pagination.totalPages || loading}
+                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  >
+                    {i18n.language === 'ar' ? 'التالي' : 'Next'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {packages.map((pkg) => (
@@ -453,7 +509,7 @@ export default function Billing() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailInvoice.customer_name}</div>
-              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={detailInvoice.status} /></div>
+              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={invoiceDisplayStatus(detailInvoice)} label={statusLabel(detailInvoice)} /></div>
               <div><span className="text-gray-500">{t('common.date')}:</span> {new Date(detailInvoice.created_at).toLocaleString()}</div>
               <div><span className="text-gray-500">{t('billing.total')}:</span> <strong>SAR {parseFloat(detailInvoice.total).toFixed(2)}</strong></div>
               <div><span className="text-gray-500">{t('billing.paid')}:</span> SAR {parseFloat(detailInvoice.total_paid || 0).toFixed(2)}</div>
@@ -548,7 +604,16 @@ export default function Billing() {
               </div>
             )}
 
-            {canPay && detailInvoice.status !== 'paid' && detailInvoice.status !== 'cancelled' && (
+            <CreditNotePanel
+              invoice={detailInvoice}
+              canCreate={canRefund}
+              onIssued={async () => {
+                await openInvoiceDetail({ id: detailInvoice.id });
+                loadInvoices(page);
+              }}
+            />
+
+            {canPay && invoiceNeedsPayment(detailInvoice) && (
               <div className="flex justify-end">
                 <button onClick={() => openPayment(detailInvoice)} className="btn-primary flex items-center gap-2">
                   <CreditCard size={16} /> {t('billing.payment')}

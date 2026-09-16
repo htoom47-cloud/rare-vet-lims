@@ -12,6 +12,8 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { labDay } from '../utils/accountingTime';
+import { invoiceDisplayStatus, invoiceNeedsPayment } from '../utils/invoiceDisplay';
+import CreditNotePanel from '../components/billing/CreditNotePanel';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const today = () => labDay();
@@ -79,7 +81,10 @@ export default function AccountingReports() {
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
-  const statusLabel = (status) => t(`billing.invoiceStatus.${status}`, { defaultValue: status });
+  const statusLabel = (invOrStatus) => {
+    const status = typeof invOrStatus === 'string' ? invOrStatus : invoiceDisplayStatus(invOrStatus);
+    return t(`billing.invoiceStatus.${status}`, { defaultValue: status });
+  };
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -543,13 +548,13 @@ export default function AccountingReports() {
                     <td className="p-3 text-xs">
                       {(inv.payment_methods || '').split(',').filter(Boolean).map((m) => paymentMethodLabel(m)).join('، ') || '—'}
                     </td>
-                    <td className="p-3"><StatusBadge status={inv.status} label={statusLabel(inv.status)} /></td>
+                    <td className="p-3"><StatusBadge status={invoiceDisplayStatus(inv)} label={statusLabel(inv)} /></td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">
                         <button type="button" title={t('common.view')} onClick={() => openDetail(inv)} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Eye size={15} /></button>
                         <button type="button" title={t('billing.downloadPdf')} onClick={() => openInvoicePdf(inv.id)} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Download size={15} /></button>
                         <button type="button" title={t('billing.printThermal')} onClick={() => printInvoice(inv.id, { thermal: true })} className="p-1.5 rounded hover:bg-gray-100 text-primary-600"><Printer size={15} /></button>
-                        {canPay && !['paid', 'cancelled', 'refunded'].includes(inv.status) && (
+                        {canPay && invoiceNeedsPayment(inv) && (
                           <button type="button" title={t('billing.payment')} onClick={() => openPayment(inv)} className="p-1.5 rounded hover:bg-gray-100 text-green-600"><CreditCard size={15} /></button>
                         )}
                         {canCancel && !['cancelled', 'refunded'].includes(inv.status) && (
@@ -630,6 +635,8 @@ export default function AccountingReports() {
                   [t('billing.discount'), closingData.summary.discount_total],
                   [t('accounting.refundsTotal'), closingData.summary.refunds_total],
                   [t('accounting.netCollection'), closingData.summary.net_collections],
+                  [t('accounting.cashPurchaseOutflows'), closingData.summary.cash_purchase_outflows ?? 0],
+                  [t('accounting.expectedCash'), closingData.summary.expected_cash ?? closingData.summary.net_collections],
                   [t('accounting.invoiceCount'), closingData.summary.invoice_count],
                   [t('accounting.unpaidCount'), closingData.summary.unpaid_count],
                   [t('accounting.cancelledCount'), closingData.summary.cancelled_count],
@@ -824,7 +831,7 @@ export default function AccountingReports() {
           <div className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailInvoice.customer_name}</div>
-              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={detailInvoice.status} label={statusLabel(detailInvoice.status)} /></div>
+              <div><span className="text-gray-500">{t('common.status')}:</span> <StatusBadge status={invoiceDisplayStatus(detailInvoice)} label={statusLabel(detailInvoice)} /></div>
               <div><span className="text-gray-500">{t('billing.total')}:</span> <strong>{fmt(detailInvoice.total)}</strong></div>
               <div><span className="text-gray-500">{t('billing.balanceDue')}:</span> <strong className="text-amber-700">{fmt(detailInvoice.balance_due)}</strong></div>
             </div>
@@ -844,6 +851,15 @@ export default function AccountingReports() {
                 ))}
               </div>
             )}
+            <CreditNotePanel
+              invoice={detailInvoice}
+              canCreate={canRefund}
+              onIssued={async () => {
+                await openDetail({ id: detailInvoice.id });
+                loadInvoices();
+                loadDashboard();
+              }}
+            />
           </div>
         )}
       </Modal>

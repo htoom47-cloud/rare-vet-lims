@@ -94,6 +94,7 @@ const listInvoices = async ({
   const result = await query(
     `SELECT i.*, c.full_name AS customer_name, c.full_name_ar AS customer_name_ar,
             COALESCE(pay.paid, 0) AS total_paid,
+            ${withCredits ? 'COALESCE(cn.credited, 0)' : '0'} AS credit_notes_total,
             GREATEST(i.total - COALESCE(pay.paid, 0)${withCredits ? ' - COALESCE(cn.credited, 0)' : ''}, 0) AS balance_due,
             pay.methods AS payment_methods
      FROM invoices i

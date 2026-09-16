@@ -194,6 +194,93 @@ const refundSchema = Joi.object({
   reason: Joi.string().allow('', null),
 });
 
+const supplierSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(255).required(),
+  name_ar: Joi.string().trim().min(2).max(255).required(),
+  tax_number: Joi.string().trim().max(30).allow('', null),
+  phone: Joi.string().trim().max(30).allow('', null),
+  email: Joi.string().trim().email().max(255).allow('', null),
+  address: Joi.string().trim().max(1000).allow('', null),
+  iban: Joi.forbidden(),
+  notes: Joi.string().trim().max(2000).allow('', null),
+  is_active: Joi.boolean().default(true),
+  supplier_number: Joi.forbidden(),
+  balance: Joi.forbidden(),
+});
+
+const supplierQuickSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(255).required(),
+  name_ar: Joi.string().trim().min(2).max(255).allow('', null),
+  tax_number: Joi.string().trim().max(30).allow('', null),
+  phone: Joi.string().trim().max(30).allow('', null),
+  confirm: Joi.boolean().valid(true).required(),
+});
+
+const purchaseItemSchema = Joi.object({
+  description: Joi.string().trim().min(1).max(500).required(),
+  quantity: Joi.number().positive().required(),
+  unit_price_sar: Joi.number().min(0),
+  unit_price_halalas: Joi.number().integer().min(0),
+  discount_sar: Joi.number().min(0).allow(null),
+  discount_halalas: Joi.number().integer().min(0).allow(null),
+  tax_category: Joi.string().valid('standard', 'zero_rated', 'exempt', 'out_of_scope'),
+  tax_rate: Joi.number().valid(0, 15),
+  tax_rate_bps: Joi.number().integer().valid(0, 1500),
+}).or('unit_price_sar', 'unit_price_halalas');
+
+const purchaseInvoiceSchema = Joi.object({
+  supplier_id: Joi.string().uuid().allow(null),
+  uses_cash_unregistered: Joi.boolean().default(false),
+  supplier_invoice_number: Joi.string().trim().min(1).max(80).required(),
+  invoice_date: Joi.date().required(),
+  payment_method: Joi.string().valid('cash', 'bank_transfer', 'credit', 'other').default('cash'),
+  notes: Joi.string().trim().max(2000).allow('', null),
+  vat_rate_bps: Joi.any().strip(),
+  discount_sar: Joi.number().min(0).allow(null),
+  discount_halalas: Joi.number().integer().min(0).allow(null),
+  subtotal_halalas: Joi.number().integer().min(0).allow(null),
+  vat_halalas: Joi.number().integer().min(0).allow(null),
+  total_halalas: Joi.number().integer().min(0).allow(null),
+  items: Joi.array().min(1).items(purchaseItemSchema).required(),
+}).custom((value, helpers) => {
+  if (!value.uses_cash_unregistered && !value.supplier_id) {
+    return helpers.error('any.custom', { message: 'supplier_id is required unless using cash unregistered' });
+  }
+  return value;
+});
+
+const purchaseCancelSchema = Joi.object({
+  reason: Joi.string().trim().min(3).max(500).allow('', null),
+});
+
+const purchaseLineLinkSchema = Joi.object({
+  lines: Joi.array().min(1).items(Joi.object({
+    id: Joi.string().uuid().required(),
+    destination: Joi.string().valid('inventory', 'expense').allow(null),
+    inventory_item_id: Joi.string().uuid().allow(null),
+    expense_account_id: Joi.string().uuid().allow(null),
+    lot_number: Joi.string().trim().max(100).allow('', null),
+    expiry_date: Joi.date().allow(null, ''),
+  })).required(),
+});
+
+const purchasePostSchema = Joi.object({
+  posting_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).allow('', null),
+});
+
+const purchaseExtractionCorrectSchema = Joi.object({
+  payload: Joi.object().unknown(true).default({}),
+  supplier_id: Joi.string().uuid().allow(null),
+  uses_cash_unregistered: Joi.boolean(),
+});
+
+const purchaseExtractionConfirmSchema = Joi.object({
+  payload: Joi.object().unknown(true).default({}),
+  supplier_id: Joi.string().uuid().allow(null),
+  uses_cash_unregistered: Joi.boolean().default(false),
+  purchase_invoice_id: Joi.string().uuid().allow(null),
+});
+
 const inventorySchema = Joi.object({
   sku: Joi.string().required(),
   name: Joi.string().required(),
@@ -207,6 +294,16 @@ const inventorySchema = Joi.object({
   location: Joi.string().allow('', null),
   supplier: Joi.string().allow('', null),
   cost_per_unit: Joi.number().min(0).allow(null),
+});
+
+const inventoryAdjustSchema = Joi.object({
+  type: Joi.string().valid('in', 'out').required(),
+  quantity: Joi.alternatives().try(Joi.number().positive(), Joi.string().pattern(/^\d+(\.\d{1,3})?$/)).required(),
+  notes: Joi.string().allow('', null),
+  source: Joi.string().valid('lot', 'legacy', 'fefo').allow(null),
+  lot_id: Joi.string().uuid().allow(null),
+  lot_number: Joi.string().allow('', null),
+  expiry_date: Joi.date().allow(null, ''),
 });
 
 const portalOtpRequestSchema = Joi.object({
@@ -315,4 +412,13 @@ module.exports = {
   creditNoteSchema,
   refundSchema,
   inventorySchema,
+  inventoryAdjustSchema,
+  supplierSchema,
+  supplierQuickSchema,
+  purchaseInvoiceSchema,
+  purchaseCancelSchema,
+  purchaseLineLinkSchema,
+  purchasePostSchema,
+  purchaseExtractionCorrectSchema,
+  purchaseExtractionConfirmSchema,
 };

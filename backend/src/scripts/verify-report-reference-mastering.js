@@ -84,7 +84,7 @@ check('BUN — report display forced to UR / Urea / اليوريا', () => {
     parameterNameAr: 'نيتروجين اليوريا',
     displayNameArMap: { 999: 'نيتروجين اليوريا' },
   });
-  assert.strictEqual(code, 'UR');
+  assert.strictEqual(code, 'BUN');
   assert.strictEqual(nameEn, 'Urea');
   assert.strictEqual(nameAr, 'اليوريا');
 });

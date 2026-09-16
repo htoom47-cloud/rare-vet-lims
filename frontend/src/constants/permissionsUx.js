@@ -77,6 +77,15 @@ export const CODE_TO_UX_GROUP = {
   'inventory.view': 'quality',
   'inventory.manage': 'quality',
 
+  'suppliers.view': 'billing',
+  'suppliers.manage': 'billing',
+
+  'purchases.view': 'billing',
+  'purchases.create': 'billing',
+  'purchases.approve': 'billing',
+  'purchases.cancel': 'billing',
+  'purchases.post': 'billing',
+
   'quality.view': 'quality',
   'quality.manage': 'quality',
 
@@ -125,6 +134,10 @@ export const SENSITIVE_PERMISSION_CODES = new Set([
   'devices.manage',
   'quality.manage',
   'inventory.manage',
+  'suppliers.manage',
+  'purchases.approve',
+  'purchases.cancel',
+  'purchases.post',
   'data.trash.manage',
   'dashboard.admin',
 ]);
@@ -173,6 +186,13 @@ export const ROLE_PERMISSION_PRESETS = {
     'price_list.view',
     'reports.view',
     'audit.view',
+    'suppliers.view', 'suppliers.manage',
+    'purchases.view', 'purchases.create', 'purchases.approve', 'purchases.cancel', 'purchases.post',
+  ],
+  purchaser: [
+    'dashboard.view',
+    'suppliers.view',
+    'purchases.view', 'purchases.create',
   ],
   lab_specialist: [
     'dashboard.view',
@@ -196,6 +216,8 @@ export const ROLE_PERMISSION_PRESETS = {
     'billing.view', 'billing.create', 'billing.payment',
     'billing.refund', 'billing.cancel', 'billing.day_close', 'billing.day_reopen',
     'inventory.view', 'inventory.manage',
+    'suppliers.view', 'suppliers.manage',
+    'purchases.view', 'purchases.create', 'purchases.approve', 'purchases.cancel', 'purchases.post',
     'quality.view', 'quality.manage',
     'settings.view',
     'audit.view',
@@ -211,6 +233,7 @@ export const PRESET_ORDER = [
   'lab_technician',
   'veterinarian',
   'accountant',
+  'purchaser',
   'lab_specialist',
   'manager',
   'admin',

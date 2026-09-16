@@ -7,6 +7,7 @@ const statusColors = {
   archived: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
   draft: 'bg-gray-100 text-gray-600',
   issued: 'bg-blue-100 text-blue-700',
+  credited: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
   paid: 'bg-green-100 text-green-700',
   partial: 'bg-orange-100 text-orange-700',
   cancelled: 'bg-red-100 text-red-700',

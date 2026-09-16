@@ -26,6 +26,9 @@ export const parameterDisplayName = (row, language) => (
   language === 'ar' && row?.parameter_name_ar ? row.parameter_name_ar : row?.parameter_name
 );
 
-export const testDisplayName = (test, language) => (
-  language === 'ar' && test?.test_name_ar ? test.test_name_ar : test?.test_name
-);
+export const testDisplayName = (test, language) => {
+  const ar = test?.test_name_ar || test?.name_ar;
+  const en = test?.test_name || test?.name;
+  if (language === 'ar' && ar) return ar;
+  return en || ar || '';
+};

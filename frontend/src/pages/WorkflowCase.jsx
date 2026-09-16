@@ -86,7 +86,7 @@ export default function WorkflowCase() {
   const { codes: speciesCodes, label: speciesLabel } = useAnimalSpecies();
 
   useEffect(() => {
-    testsAPI.list({ limit: 200 }).then(({ data }) => setTests(data.data));
+    testsAPI.list({ limit: 500 }).then(({ data }) => setTests(data.data));
     testsAPI.listPackages().then(({ data }) => setPackages(data.data || [])).catch(() => {});
     billingAPI.extraServices()
       .then(({ data }) => {

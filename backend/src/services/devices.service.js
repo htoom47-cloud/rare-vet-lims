@@ -12,7 +12,7 @@ const {
 
 const SUPPORTED_DEVICES = [
   { name: 'Norma CBC', model: 'iVet-5 / Icon-5', protocol: 'HL7', connection_type: 'tcp', default_port: 21110 },
-  { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp', default_port: 5000 },
+  { name: 'Diasys Respons 910', model: 'Respons 910', protocol: 'ASTM', connection_type: 'tcp', default_port: 6669 },
   { name: 'Mini Vidas', model: 'Mini Vidas', protocol: 'ASTM', connection_type: 'serial' },
 ];
 

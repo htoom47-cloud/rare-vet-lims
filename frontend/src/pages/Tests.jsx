@@ -86,6 +86,7 @@ export default function Tests() {
     const params = {};
     if (categoryFilter) params.category_id = categoryFilter;
     if (search.trim()) params.search = search.trim();
+    params.limit = 500;
     testsAPI.list(params)
       .then(({ data }) => setTests(data.data))
       .finally(() => setLoading(false));

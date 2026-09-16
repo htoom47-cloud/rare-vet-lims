@@ -124,7 +124,7 @@ export default function Samples() {
 
   useEffect(() => {
 
-    testsAPI.list({ limit: 100 }).then(({ data }) => setTests(data.data));
+    testsAPI.list({ limit: 500 }).then(({ data }) => setTests(data.data));
 
     testsAPI.listPackages().then(({ data }) => setPackages(data.data || [])).catch(() => {});
 
@@ -963,19 +963,31 @@ export default function Samples() {
             ) : (
               addableTests.map((test) => {
                 const checked = addTestIds.includes(test.id);
+                const title = testDisplayName(test, i18n.language) || test.code;
+                const otherName = i18n.language === 'ar' ? test.name : test.name_ar;
+                const category = i18n.language === 'ar'
+                  ? (test.category_name_ar || test.category_name)
+                  : (test.category_name || test.category_name_ar);
+                const meta = [test.code, otherName && otherName !== title ? otherName : null, category]
+                  .filter(Boolean)
+                  .join(' · ');
                 return (
-                  <label key={test.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <label key={test.id} className="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
                     <input
                       type="checkbox"
                       checked={checked}
+                      className="mt-1"
                       onChange={() => {
                         setAddTestIds((prev) =>
                           checked ? prev.filter((id) => id !== test.id) : [...prev, test.id]
                         );
                       }}
                     />
-                    <span className="flex-1">{testDisplayName(test, i18n.language)}</span>
-                    <span className="text-gray-500">{fmtCatalog(test.price)}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-medium">{title}</span>
+                      {meta ? <span className="block text-xs text-gray-500">{meta}</span> : null}
+                    </span>
+                    <span className="text-gray-500 shrink-0">{fmtCatalog(test.price)}</span>
                   </label>
                 );
               })

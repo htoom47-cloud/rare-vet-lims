@@ -21,6 +21,18 @@ const ReportHtmlFrame = forwardRef(function ReportHtmlFrame({ html, title = 'Lab
     doc.open();
     doc.write(html);
     doc.close();
+    const fit = () => {
+      const body = doc.body;
+      if (!body) return;
+      const height = Math.max(body.scrollHeight, body.offsetHeight, 800);
+      frame.style.height = `${height + 24}px`;
+    };
+    fit();
+    requestAnimationFrame(fit);
+    const images = Array.from(doc.images || []);
+    images.forEach((img) => {
+      if (!img.complete) img.addEventListener('load', fit, { once: true });
+    });
   }, [html]);
 
   if (!html) return null;
@@ -30,7 +42,7 @@ const ReportHtmlFrame = forwardRef(function ReportHtmlFrame({ html, title = 'Lab
       ref={iframeRef}
       title={title}
       className="report-html-frame w-full border-0 bg-white shadow-lg rounded-sm"
-      style={{ minHeight: '1122px', height: 'calc(100vh - 220px)' }}
+      style={{ minHeight: '800px', height: 'auto', overflow: 'hidden' }}
       sandbox="allow-same-origin allow-modals"
     />
   );

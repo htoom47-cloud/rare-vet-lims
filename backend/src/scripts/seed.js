@@ -19,6 +19,7 @@ const ROLES = [
   { name: 'lab_specialist', name_ar: 'أخصائي مختبر', description: 'Laboratory specialist' },
   { name: 'veterinarian', name_ar: 'طبيب بيطري', description: 'Veterinarian' },
   { name: 'accountant', name_ar: 'محاسب', description: 'Accountant' },
+  { name: 'purchaser', name_ar: 'مندوب مشتريات', description: 'Purchasing agent' },
 ];
 
 const CATEGORIES = [

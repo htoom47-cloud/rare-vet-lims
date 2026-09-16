@@ -20,6 +20,8 @@ import AccountingReports from './pages/AccountingReports';
 import InvoiceSettings from './pages/InvoiceSettings';
 import PriceList from './pages/PriceList';
 import Inventory from './pages/Inventory';
+import Suppliers from './pages/Suppliers';
+import Purchases from './pages/Purchases';
 import Quality from './pages/Quality';
 import Users from './pages/Users';
 import AuditLogs from './pages/AuditLogs';
@@ -82,6 +84,8 @@ export default function App() {
               <Route path="accounting" element={<ProtectedRoute permission="billing.view"><AccountingReports /></ProtectedRoute>} />
               <Route path="invoice-settings" element={<ProtectedRoute permission="billing.view"><InvoiceSettings /></ProtectedRoute>} />
               <Route path="inventory" element={<ProtectedRoute permission="inventory.view"><Inventory /></ProtectedRoute>} />
+              <Route path="suppliers" element={<ProtectedRoute permission="suppliers.view"><Suppliers /></ProtectedRoute>} />
+              <Route path="purchases" element={<ProtectedRoute permission="purchases.view"><Purchases /></ProtectedRoute>} />
               <Route path="quality" element={<ProtectedRoute permission="quality.view"><Quality /></ProtectedRoute>} />
               <Route path="users" element={<ProtectedRoute permission="users.view" adminOnly><Users /></ProtectedRoute>} />
               <Route path="audit" element={<ProtectedRoute permission="audit.view"><AuditLogs /></ProtectedRoute>} />
