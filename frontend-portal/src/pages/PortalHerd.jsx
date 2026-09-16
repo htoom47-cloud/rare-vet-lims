@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Syringe, Baby, PawPrint, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, Syringe, Baby, AlertTriangle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import HerdAnimalPhoto from '../components/portal/HerdAnimalPhoto';
@@ -12,6 +12,7 @@ import { portalBreederAPI } from '../services/portalApi';
 import { animalLabel, genderLabel } from '../utils/animalTypes';
 import { formatHerdDate, formatComputedAge, dueStatus } from '../utils/herd';
 import { usePortal } from '../context/PortalContext';
+import HerdNavIcon from '../components/portal/HerdNavIcon';
 
 const emptyAnimal = {
   animal_type: 'camel',
@@ -108,7 +109,7 @@ export default function PortalHerd() {
   };
 
   const cards = useMemo(() => ([
-    { key: 'animals', value: stats.animals || 0, label: t('portal.herd.statAnimals'), icon: PawPrint },
+    { key: 'animals', value: stats.animals || 0, label: t('portal.herd.statAnimals'), icon: HerdNavIcon },
     { key: 'vacc', value: stats.vaccinations_due || 0, label: t('portal.herd.statVaccDue'), icon: Syringe, warn: (stats.vaccinations_due || 0) > 0 },
     { key: 'births', value: stats.expected_births || 0, label: t('portal.herd.statExpectedBirths'), icon: Baby },
     { key: 'recent', value: stats.recent_births || 0, label: t('portal.herd.statRecentBirths'), icon: Baby },
@@ -119,7 +120,7 @@ export default function PortalHerd() {
       <PortalLayout title={t('portal.herd.title')} subtitle={t('portal.herd.subtitle')}>
         <Card>
           <CardContent className="py-12 text-center space-y-2">
-            <PawPrint className="mx-auto text-muted-foreground/50" size={40} />
+            <HerdNavIcon className="mx-auto text-muted-foreground/50" size={40} />
             <p className="text-muted-foreground">{t('portal.herd.notEntitled')}</p>
           </CardContent>
         </Card>

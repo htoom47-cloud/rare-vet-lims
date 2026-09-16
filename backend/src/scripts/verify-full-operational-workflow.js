@@ -102,6 +102,19 @@ check('portal herd animal delete is deactivation and blocks lab samples', () => 
   assert.ok(animalPage.includes('deactivateAnimal'));
   assert.ok(animalPage.includes("portal.herd.deleteAnimal"));
   assert.ok(herdPage.includes('deactivateAnimal'));
+  assert.ok(!herdPage.includes('PawPrint'));
+  const dash = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalDashboard.jsx'),
+    'utf8'
+  );
+  const layout = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'components', 'portal', 'PortalLayout.jsx'),
+    'utf8'
+  );
+  assert.ok(dash.includes('HerdNavIcon'));
+  assert.ok(!dash.includes('PawPrint'));
+  assert.ok(layout.includes('HerdNavIcon'));
+  assert.ok(!layout.includes('PawPrint'));
 });
 
 check('portal follow-up KPI counts unique animals, not result rows', () => {

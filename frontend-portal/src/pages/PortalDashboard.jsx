@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { usePortal } from '../context/PortalContext';
 import {
   FileText, Bell, AlertTriangle, ChevronLeft, ChevronRight,
-  CheckCircle2, Receipt, PawPrint,
+  CheckCircle2, Receipt,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
@@ -14,6 +14,7 @@ import { portalDashboardAPI } from '../services/portalApi';
 import { animalLabel } from '../utils/animalTypes';
 import { cn } from '../lib/utils';
 import AnimalsNavIcon from '../components/portal/AnimalsNavIcon';
+import HerdNavIcon from '../components/portal/HerdNavIcon';
 
 export default function PortalDashboard() {
   const { t, i18n } = useTranslation();
@@ -55,7 +56,7 @@ export default function PortalDashboard() {
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
     { to: '/animals', icon: AnimalsNavIcon, label: t('portal.navAnimals') },
     ...(customer?.features?.breederDashboard
-      ? [{ to: '/herd', icon: PawPrint, label: t('portal.navHerd') }]
+      ? [{ to: '/herd', icon: HerdNavIcon, label: t('portal.navHerd') }]
       : []),
     { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
   ];
