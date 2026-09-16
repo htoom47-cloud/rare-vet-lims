@@ -674,6 +674,106 @@ async function applyPatches() {
       await speciesService.refreshLabelCache();
     } catch (_) { /* optional on first boot */ }
 
+    await client.query(`
+      ALTER TABLE animals
+        ADD COLUMN IF NOT EXISTS birth_date DATE,
+        ADD COLUMN IF NOT EXISTS registration_number VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS sire_id UUID REFERENCES animals(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS dam_id UUID REFERENCES animals(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS sire_name VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS dam_name VARCHAR(200)
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_entitlements (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        feature_code VARCHAR(50) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT false,
+        expires_at TIMESTAMPTZ,
+        notes TEXT,
+        granted_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (customer_id, feature_code)
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_customer_entitlements_feature
+      ON customer_entitlements (feature_code, enabled)
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS animal_vaccinations (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+        vaccine_name VARCHAR(200) NOT NULL,
+        batch_number VARCHAR(100),
+        administered_at DATE NOT NULL,
+        next_due_at DATE,
+        administered_by VARCHAR(200),
+        notes TEXT,
+        created_by_staff UUID REFERENCES users(id),
+        created_by_customer UUID REFERENCES customers(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        deleted_at TIMESTAMPTZ
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_animal_vaccinations_animal
+      ON animal_vaccinations (animal_id, next_due_at)
+      WHERE deleted_at IS NULL
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS animal_breeding_events (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+        event_type VARCHAR(30) NOT NULL DEFAULT 'natural',
+        event_date DATE NOT NULL,
+        sire_id UUID REFERENCES animals(id) ON DELETE SET NULL,
+        sire_name VARCHAR(200),
+        outcome VARCHAR(30) NOT NULL DEFAULT 'pending',
+        expected_birth_date DATE,
+        notes TEXT,
+        created_by_staff UUID REFERENCES users(id),
+        created_by_customer UUID REFERENCES customers(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        deleted_at TIMESTAMPTZ
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_animal_breeding_animal
+      ON animal_breeding_events (animal_id, event_date)
+      WHERE deleted_at IS NULL
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS animal_births (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        animal_id UUID REFERENCES animals(id) ON DELETE CASCADE,
+        mother_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+        father_id UUID REFERENCES animals(id) ON DELETE SET NULL,
+        father_name VARCHAR(200),
+        offspring_id UUID REFERENCES animals(id) ON DELETE SET NULL,
+        offspring_name VARCHAR(200),
+        birth_date DATE NOT NULL,
+        birth_weight DECIMAL(8,2),
+        gender VARCHAR(20) DEFAULT 'unknown',
+        complications TEXT,
+        notes TEXT,
+        breeding_event_id UUID REFERENCES animal_breeding_events(id) ON DELETE SET NULL,
+        created_by_staff UUID REFERENCES users(id),
+        created_by_customer UUID REFERENCES customers(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        deleted_at TIMESTAMPTZ
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_animal_births_mother
+      ON animal_births (mother_id, birth_date)
+      WHERE deleted_at IS NULL
+    `);
+
     const softDeleteTables = ['customers', 'animals', 'samples', 'reports', 'invoices'];
     for (const table of softDeleteTables) {
       await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);

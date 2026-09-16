@@ -14,6 +14,8 @@ import PortalAnimalCompare from './pages/PortalAnimalCompare';
 import PortalReportView from './pages/PortalReportView';
 import PortalDocuments from './pages/PortalDocuments';
 import PortalInvoices from './pages/PortalInvoices';
+import PortalHerd from './pages/PortalHerd';
+import PortalHerdAnimal from './pages/PortalHerdAnimal';
 
 const HomePage = lazy(() => import('./pages/public/HomePage'));
 const ServicesPage = lazy(() => import('./pages/public/ServicesPage'));
@@ -76,6 +78,8 @@ export default function App() {
               <Route path="/animals/:animalId" element={<ProtectedPortalRoute><PortalAnimalDetail /></ProtectedPortalRoute>} />
               <Route path="/animals/:animalId/compare" element={<ProtectedPortalRoute><PortalAnimalCompare /></ProtectedPortalRoute>} />
               <Route path="/compare" element={<ProtectedPortalRoute><PortalCompareHub /></ProtectedPortalRoute>} />
+              <Route path="/herd" element={<ProtectedPortalRoute><PortalHerd /></ProtectedPortalRoute>} />
+              <Route path="/herd/:animalId" element={<ProtectedPortalRoute><PortalHerdAnimal /></ProtectedPortalRoute>} />
               <Route path="/documents" element={<ProtectedPortalRoute><PortalDocuments /></ProtectedPortalRoute>} />
               <Route path="/invoices" element={<ProtectedPortalRoute><PortalInvoices /></ProtectedPortalRoute>} />
               <Route path="/reports/:id" element={<ProtectedPortalRoute><PortalReportView /></ProtectedPortalRoute>} />

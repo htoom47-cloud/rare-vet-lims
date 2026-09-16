@@ -23,6 +23,10 @@ const EMPTY_FORM = {
   rfid_chip: '',
   owner_id: '',
   medical_history: '',
+  birth_date: '',
+  registration_number: '',
+  sire_name: '',
+  dam_name: '',
 };
 
 export default function Animals() {
@@ -40,6 +44,8 @@ export default function Animals() {
   const [editingId, setEditingId] = useState(null);
   const [knownOwner, setKnownOwner] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
 
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -62,6 +68,8 @@ export default function Animals() {
     setEditingId(null);
     setKnownOwner(null);
     setForm(EMPTY_FORM);
+    setPhotoFile(null);
+    setPhotoPreview('');
     setModalOpen(true);
   };
 
@@ -83,7 +91,13 @@ export default function Animals() {
       rfid_chip: animal.rfid_chip || '',
       owner_id: animal.owner_id || '',
       medical_history: animal.medical_history || '',
+      birth_date: animal.birth_date ? String(animal.birth_date).slice(0, 10) : '',
+      registration_number: animal.registration_number || '',
+      sire_name: animal.sire_name || '',
+      dam_name: animal.dam_name || '',
     });
+    setPhotoFile(null);
+    setPhotoPreview(animal.image_url || '');
     setModalOpen(true);
   };
 
@@ -92,6 +106,8 @@ export default function Animals() {
     setEditingId(null);
     setKnownOwner(null);
     setForm(EMPTY_FORM);
+    setPhotoFile(null);
+    setPhotoPreview('');
   };
 
   const handleSubmit = async (e) => {
@@ -100,14 +116,23 @@ export default function Animals() {
       toast.error(t('animals.selectOwner'));
       return;
     }
-    const payload = { ...form, weight: form.weight !== '' && form.weight != null ? parseFloat(form.weight) : null };
+    const payload = {
+      ...form,
+      weight: form.weight !== '' && form.weight != null ? parseFloat(form.weight) : null,
+      birth_date: form.birth_date || null,
+    };
     try {
+      let id = editingId;
       if (editingId) {
         await animalsAPI.update(editingId, payload);
         toast.success(t('animals.updated'));
       } else {
-        await animalsAPI.create(payload);
+        const { data } = await animalsAPI.create(payload);
+        id = data.data?.id;
         toast.success(t('animals.created'));
+      }
+      if (id && photoFile) {
+        await animalsAPI.uploadImage(id, photoFile);
       }
       closeModal();
       load();
@@ -254,6 +279,43 @@ export default function Animals() {
           <div>
             <label className="block text-sm font-medium mb-1">{t('animals.weight')}</label>
             <input value={form.weight} onChange={(e) => setField('weight', e.target.value)} className="input-field" type="number" step="0.1" min="0" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.birthDate')}</label>
+            <input type="date" value={form.birth_date} onChange={(e) => setField('birth_date', e.target.value)} className="input-field" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.registration')}</label>
+            <input value={form.registration_number} onChange={(e) => setField('registration_number', e.target.value)} className="input-field" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.sireName')}</label>
+            <input value={form.sire_name} onChange={(e) => setField('sire_name', e.target.value)} className="input-field" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.damName')}</label>
+            <input value={form.dam_name} onChange={(e) => setField('dam_name', e.target.value)} className="input-field" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">{t('animals.photo')}</label>
+            {photoPreview && (
+              <img src={photoPreview} alt="" className="w-24 h-24 object-cover rounded-lg mb-2 border" />
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="input-field"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setPhotoFile(file);
+                if (file) setPhotoPreview(URL.createObjectURL(file));
+              }}
+            />
           </div>
 
           <div className="md:col-span-2">

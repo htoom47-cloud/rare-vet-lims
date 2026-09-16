@@ -87,6 +87,9 @@ const getProfile = async (id) => {
     getCustomerStatement(id),
   ]);
 
+  const entitlementsService = require('./entitlements.service');
+  const breederEntitlement = await entitlementsService.getBreederEntitlement(id);
+
   return {
     ...customer,
     animals: animals.rows,
@@ -94,6 +97,9 @@ const getProfile = async (id) => {
     payments: statement.payments,
     invoices: statement.invoices,
     financial_statement: statement.summary,
+    entitlements: {
+      breeder_dashboard: breederEntitlement,
+    },
   };
 };
 

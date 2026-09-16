@@ -58,6 +58,7 @@ export const customersAPI = {
   readyReports: (id) => api.get(`/customers/${id}/ready-reports`),
   sendReadyReports: (id, body) => api.post(`/customers/${id}/send-ready-reports`, body),
   skipReadyReports: (id, body) => api.post(`/customers/${id}/skip-ready-reports`, body),
+  setEntitlement: (id, body) => api.put(`/customers/${id}/entitlements`, body),
 };
 
 /** Hatif WhatsApp (feature-flagged; no-op until HATIF_WHATSAPP_ENABLED=true) */
@@ -438,6 +439,7 @@ export const billingAPI = {
   collectionsReport: (params) => api.get('/billing/reports/collections', { params }),
   arAgingReport: () => api.get('/billing/reports/ar-aging'),
   revenueReport: (params) => api.get('/billing/reports/revenue', { params }),
+  monthlyReport: (params) => api.get('/billing/reports/monthly', { params }),
   journalReport: (params) => api.get('/billing/reports/journal', { params }),
   customerStatement: (customerId) => api.get(`/billing/customers/${customerId}/statement`),
   invoiceSettings: () => api.get('/billing/invoice-settings'),

@@ -101,6 +101,50 @@ export const portalReportsAPI = {
   },
 };
 
+export const portalBreederAPI = {
+  dashboard: () => portalApi.get('/breeder/dashboard'),
+  species: () => portalApi.get('/breeder/species'),
+  listAnimals: () => portalApi.get('/breeder/animals'),
+  getAnimal: (id) => portalApi.get(`/breeder/animals/${id}`),
+  createAnimal: (body) => portalApi.post('/breeder/animals', body),
+  updateAnimal: (id, body) => portalApi.put(`/breeder/animals/${id}`, body),
+  deactivateAnimal: (id) => portalApi.delete(`/breeder/animals/${id}`),
+  photoBlob: async (id) => {
+    const token = localStorage.getItem('portalAccessToken');
+    const response = await fetch(`${API_URL}/portal/breeder/animals/${id}/photo`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Photo not found');
+    return response.blob();
+  },
+  uploadPhoto: async (id, file) => {
+    const form = new FormData();
+    form.append('image', file, file?.name || 'photo.jpg');
+    const token = localStorage.getItem('portalAccessToken');
+    const response = await fetch(`${API_URL}/portal/breeder/animals/${id}/photo`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data?.error?.message || 'Upload failed');
+      error.response = { status: response.status, data };
+      throw error;
+    }
+    return data;
+  },
+  addVaccination: (animalId, body) => portalApi.post(`/breeder/animals/${animalId}/vaccinations`, body),
+  updateVaccination: (id, body) => portalApi.put(`/breeder/vaccinations/${id}`, body),
+  removeVaccination: (id) => portalApi.delete(`/breeder/vaccinations/${id}`),
+  addBreeding: (animalId, body) => portalApi.post(`/breeder/animals/${animalId}/breeding`, body),
+  updateBreeding: (id, body) => portalApi.put(`/breeder/breeding/${id}`, body),
+  removeBreeding: (id) => portalApi.delete(`/breeder/breeding/${id}`),
+  addBirth: (animalId, body) => portalApi.post(`/breeder/animals/${animalId}/births`, body),
+  updateBirth: (id, body) => portalApi.put(`/breeder/births/${id}`, body),
+  removeBirth: (id) => portalApi.delete(`/breeder/births/${id}`),
+};
+
 export const portalInvoicesAPI = {
   list: (params) => portalApi.get('/invoices', { params }),
   openPdf: async (id) => {

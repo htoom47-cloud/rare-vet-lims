@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, FileText, GitCompare, FolderOpen, LogOut,
-  Globe, Sun, Moon, Menu, Search, Receipt,
+  Globe, Sun, Moon, Menu, Search, Receipt, PawPrint,
 } from 'lucide-react';
 import { usePortal } from '../../context/PortalContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -45,12 +45,18 @@ export default function PortalLayout({ children, title, subtitle, wide = false, 
     if (pathname === '/dashboard') {
       return { h: t('portal.dashboard'), sub: displayName || undefined };
     }
+    if (pathname === '/herd' || pathname.startsWith('/herd/')) {
+      return { h: t('portal.herd.title'), sub: displayName || undefined };
+    }
     return { h: null, sub: null };
   }, [title, subtitle, pathname, t, displayName]);
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('portal.navDashboard'), end: true },
     { to: '/animals', icon: AnimalsNavIcon, label: t('portal.navAnimals') },
+    ...(customer?.features?.breederDashboard
+      ? [{ to: '/herd', icon: PawPrint, label: t('portal.navHerd') }]
+      : []),
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
     { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
     { to: '/compare', icon: GitCompare, label: t('portal.navCompare') },

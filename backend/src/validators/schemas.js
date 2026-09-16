@@ -38,6 +38,12 @@ const animalSchema = Joi.object({
   rfid_chip: Joi.string().allow('', null),
   owner_id: Joi.string().uuid().required(),
   medical_history: Joi.string().allow('', null),
+  birth_date: Joi.date().iso().allow(null, ''),
+  registration_number: Joi.string().max(100).allow('', null),
+  sire_id: Joi.string().uuid().allow(null, ''),
+  dam_id: Joi.string().uuid().allow(null, ''),
+  sire_name: Joi.string().max(200).allow('', null),
+  dam_name: Joi.string().max(200).allow('', null),
 });
 
 const sampleSchema = Joi.object({
@@ -309,11 +315,87 @@ const portalOtpVerifySchema = Joi.object({
   otp: Joi.string().length(4).pattern(/^\d{4}$/).required(),
 });
 
+const entitlementSchema = Joi.object({
+  feature_code: Joi.string().valid('breeder_dashboard').default('breeder_dashboard'),
+  enabled: Joi.boolean().required(),
+  expires_at: Joi.date().iso().allow(null, ''),
+  notes: Joi.string().max(500).allow('', null),
+});
+
+const portalAnimalSchema = Joi.object({
+  animal_type: Joi.string().max(50).required(),
+  name_tag: Joi.string().allow('', null),
+  age: Joi.string().allow('', null),
+  gender: Joi.string().valid('male', 'female', 'unknown').default('unknown'),
+  weight: Joi.number().allow(null, ''),
+  color: Joi.string().allow('', null),
+  breed: Joi.string().allow('', null),
+  rfid_chip: Joi.string().allow('', null),
+  birth_date: Joi.date().iso().allow(null, ''),
+  registration_number: Joi.string().max(100).allow('', null),
+  sire_id: Joi.string().uuid().allow(null, ''),
+  dam_id: Joi.string().uuid().allow(null, ''),
+  sire_name: Joi.string().max(200).allow('', null),
+  dam_name: Joi.string().max(200).allow('', null),
+});
+
+const portalAnimalUpdateSchema = portalAnimalSchema.fork('animal_type', (s) => s.optional());
+
+const portalVaccinationSchema = Joi.object({
+  vaccine_name: Joi.string().max(200).required(),
+  batch_number: Joi.string().max(100).allow('', null),
+  administered_at: Joi.date().iso().required(),
+  next_due_at: Joi.date().iso().allow(null, ''),
+  administered_by: Joi.string().max(200).allow('', null),
+  notes: Joi.string().allow('', null),
+});
+
+const portalVaccinationUpdateSchema = portalVaccinationSchema.fork('vaccine_name', (s) => s.optional())
+  .fork('administered_at', (s) => s.optional());
+
+const portalBreedingSchema = Joi.object({
+  event_type: Joi.string().valid('natural', 'ai', 'embryo').default('natural'),
+  event_date: Joi.date().iso().required(),
+  sire_id: Joi.string().uuid().allow(null, ''),
+  sire_name: Joi.string().max(200).allow('', null),
+  outcome: Joi.string().valid('pending', 'pregnant', 'not_pregnant', 'aborted', 'born').default('pending'),
+  expected_birth_date: Joi.date().iso().allow(null, ''),
+  notes: Joi.string().allow('', null),
+});
+
+const portalBreedingUpdateSchema = portalBreedingSchema.fork('event_date', (s) => s.optional());
+
+const portalBirthSchema = Joi.object({
+  birth_date: Joi.date().iso().required(),
+  father_id: Joi.string().uuid().allow(null, ''),
+  father_name: Joi.string().max(200).allow('', null),
+  offspring_id: Joi.string().uuid().allow(null, ''),
+  offspring_name: Joi.string().max(200).allow('', null),
+  birth_weight: Joi.number().allow(null, ''),
+  gender: Joi.string().valid('male', 'female', 'unknown').default('unknown'),
+  color: Joi.string().allow('', null),
+  complications: Joi.string().allow('', null),
+  notes: Joi.string().allow('', null),
+  breeding_event_id: Joi.string().uuid().allow(null, ''),
+  register_offspring: Joi.boolean().default(false),
+});
+
+const portalBirthUpdateSchema = portalBirthSchema.fork('birth_date', (s) => s.optional());
+
 module.exports = {
   loginSchema,
   registerSchema,
   portalOtpRequestSchema,
   portalOtpVerifySchema,
+  entitlementSchema,
+  portalAnimalSchema,
+  portalAnimalUpdateSchema,
+  portalVaccinationSchema,
+  portalVaccinationUpdateSchema,
+  portalBreedingSchema,
+  portalBreedingUpdateSchema,
+  portalBirthSchema,
+  portalBirthUpdateSchema,
   customerSchema,
   animalSchema,
   sampleSchema,

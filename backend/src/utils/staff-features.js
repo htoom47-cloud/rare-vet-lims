@@ -20,6 +20,8 @@ const getStaffFeatures = () => ({
   hatifCall: !!env.features?.hatifCall,
   /** When true: Samples detail may add tests to an existing sample */
   addTestToSample: !!env.features?.addTestToSample,
+  /** When true: Customers profile may grant herd dashboard access in the client portal */
+  breederDashboard: !!env.features?.breederDashboard,
 });
 
 module.exports = { getStaffFeatures };
