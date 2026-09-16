@@ -102,6 +102,18 @@ check('portal herd animal delete is deactivation and blocks lab samples', () => 
   assert.ok(animalPage.includes('deactivateAnimal'));
   assert.ok(animalPage.includes("portal.herd.deleteAnimal"));
   assert.ok(herdPage.includes('deactivateAnimal'));
+  assert.ok(herdPage.includes('filterHerdAnimals'));
+  assert.ok(herdPage.includes('viewMode'));
+  assert.ok(herdPage.includes('viewList'));
+  const herdUtil = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'utils', 'herd.js'),
+    'utf8'
+  );
+  assert.ok(herdUtil.includes('filterHerdAnimals'));
+  assert.ok(herdUtil.includes('unvaccinated'));
+  const breederSrc = fs.readFileSync(path.join(ROOT, 'services', 'breeder.service.js'), 'utf8');
+  assert.ok(breederSrc.includes('vaccination_count'));
+  assert.ok(breederSrc.includes('is_mother'));
   assert.ok(!herdPage.includes('PawPrint'));
   const animalNotes = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalHerdAnimal.jsx'),

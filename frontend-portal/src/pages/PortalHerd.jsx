@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Syringe, Baby, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, Syringe, Baby, AlertTriangle, Trash2, LayoutGrid, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import HerdAnimalPhoto from '../components/portal/HerdAnimalPhoto';
@@ -10,10 +10,12 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { portalBreederAPI } from '../services/portalApi';
 import { animalLabel, genderLabel } from '../utils/animalTypes';
-import { formatHerdDate, formatComputedAge, dueStatus } from '../utils/herd';
+import { formatHerdDate, formatComputedAge, dueStatus, filterHerdAnimals } from '../utils/herd';
 import { usePortal } from '../context/PortalContext';
 import HerdNavIcon from '../components/portal/HerdNavIcon';
 
+const VIEW_KEY = 'portalHerdViewMode';
+const selectClass = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm';
 const emptyAnimal = {
   animal_type: 'camel',
   name_tag: '',
@@ -40,6 +42,16 @@ export default function PortalHerd() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyAnimal);
   const [photoFile, setPhotoFile] = useState(null);
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [ageFilter, setAgeFilter] = useState('all');
+  const [vaxFilter, setVaxFilter] = useState('all');
 
   const entitled = !!customer?.features?.breederDashboard;
 
@@ -114,6 +126,37 @@ export default function PortalHerd() {
     { key: 'births', value: stats.expected_births || 0, label: t('portal.herd.statExpectedBirths'), icon: Baby },
     { key: 'recent', value: stats.recent_births || 0, label: t('portal.herd.statRecentBirths'), icon: Baby },
   ]), [stats, t]);
+
+  const filteredAnimals = useMemo(
+    () => filterHerdAnimals(data?.animals || [], { role: roleFilter, age: ageFilter, vax: vaxFilter }),
+    [data?.animals, roleFilter, ageFilter, vaxFilter]
+  );
+
+  const setView = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_KEY, mode); } catch { /* ignore */ }
+  };
+
+  const animalFacts = (a) => (
+    <>
+      <p className="font-bold truncate">{a.name_tag || a.animal_code}</p>
+      <p className="text-xs text-muted-foreground truncate">
+        {animalLabel(a.animal_type, isAr)} · {genderLabel(a.gender, isAr)}
+        {a.rfid_chip ? ` · ${a.rfid_chip}` : ''}
+      </p>
+      <p className="text-xs text-muted-foreground truncate">
+        {formatComputedAge(a.age_computed, isAr) || a.age || t('portal.herd.ageUnknown')}
+        {a.color ? ` · ${a.color}` : ''}
+      </p>
+      {a.vaccination_count > 0 ? (
+        a.vaccinations_due > 0
+          ? <p className="text-xs text-amber-700">{t('portal.herd.vaccDueCount', { count: a.vaccinations_due })}</p>
+          : <p className="text-xs text-emerald-700">{t('portal.herd.vaccinated')}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{t('portal.herd.unvaccinated')}</p>
+      )}
+    </>
+  );
 
   if (!entitled) {
     return (
@@ -200,12 +243,70 @@ export default function PortalHerd() {
             </Card>
           )}
 
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold">{t('portal.herd.myHerd')}</h2>
-            <Button size="sm" onClick={() => { setForm({ ...emptyAnimal, animal_type: species[0]?.code || 'camel' }); setModalOpen(true); }}>
-              <Plus size={16} /> {t('portal.herd.addAnimal')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-xl border border-input overflow-hidden">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  className="rounded-none h-9 w-9"
+                  aria-label={t('portal.herd.viewGrid')}
+                  onClick={() => setView('grid')}
+                >
+                  <LayoutGrid size={16} />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  className="rounded-none h-9 w-9"
+                  aria-label={t('portal.herd.viewList')}
+                  onClick={() => setView('list')}
+                >
+                  <List size={16} />
+                </Button>
+              </div>
+              <Button size="sm" onClick={() => { setForm({ ...emptyAnimal, animal_type: species[0]?.code || 'camel' }); setModalOpen(true); }}>
+                <Plus size={16} /> {t('portal.herd.addAnimal')}
+              </Button>
+            </div>
           </div>
+
+          {(data.animals || []).length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label className="text-xs space-y-1">
+                <span className="text-muted-foreground">{t('portal.herd.filterRole')}</span>
+                <select className={selectClass} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+                  <option value="all">{t('portal.herd.filterAll')}</option>
+                  <option value="mothers">{t('portal.herd.filterMothers')}</option>
+                  <option value="sires">{t('portal.herd.filterSires')}</option>
+                  <option value="offspring">{t('portal.herd.filterOffspring')}</option>
+                </select>
+              </label>
+              <label className="text-xs space-y-1">
+                <span className="text-muted-foreground">{t('portal.herd.filterAge')}</span>
+                <select className={selectClass} value={ageFilter} onChange={(e) => setAgeFilter(e.target.value)}>
+                  <option value="all">{t('portal.herd.filterAll')}</option>
+                  <option value="under1">{t('portal.herd.ageUnder1')}</option>
+                  <option value="1to3">{t('portal.herd.age1to3')}</option>
+                  <option value="3to5">{t('portal.herd.age3to5')}</option>
+                  <option value="over5">{t('portal.herd.ageOver5')}</option>
+                  <option value="unknown">{t('portal.herd.ageUnknown')}</option>
+                </select>
+              </label>
+              <label className="text-xs space-y-1">
+                <span className="text-muted-foreground">{t('portal.herd.filterVax')}</span>
+                <select className={selectClass} value={vaxFilter} onChange={(e) => setVaxFilter(e.target.value)}>
+                  <option value="all">{t('portal.herd.filterAll')}</option>
+                  <option value="vaccinated">{t('portal.herd.vaccinated')}</option>
+                  <option value="unvaccinated">{t('portal.herd.unvaccinated')}</option>
+                  <option value="due">{t('portal.herd.statVaccDue')}</option>
+                </select>
+              </label>
+            </div>
+          )}
 
           {(!data.animals || data.animals.length === 0) && (
             <Card>
@@ -215,51 +316,89 @@ export default function PortalHerd() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {(data.animals || []).map((a) => (
-              <div key={a.id} className="relative">
-                <button
-                  type="button"
-                  className="text-start w-full"
-                  onClick={() => navigate(`/herd/${a.id}`)}
-                >
-                  <Card className="hover:shadow-md transition-shadow overflow-hidden h-full">
-                    <HerdAnimalPhoto
-                      animalId={a.id}
-                      hasPhoto={a.has_photo}
-                      animalType={a.animal_type}
-                      className="w-full h-40"
-                      iconSize={40}
-                    />
-                    <CardContent className="p-4 space-y-1">
-                      <p className="font-bold truncate">{a.name_tag || a.animal_code}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {animalLabel(a.animal_type, isAr)} · {genderLabel(a.gender, isAr)}
-                        {a.rfid_chip ? ` · ${a.rfid_chip}` : ''}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatComputedAge(a.age_computed, isAr) || a.age || t('portal.herd.ageUnknown')}
-                        {a.color ? ` · ${a.color}` : ''}
-                      </p>
-                      {a.vaccinations_due > 0 && (
-                        <p className="text-xs text-amber-700">{t('portal.herd.vaccDueCount', { count: a.vaccinations_due })}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="destructive"
-                  className="absolute top-2 end-2 h-9 w-9 z-10 shadow-md"
-                  aria-label={t('portal.herd.deleteAnimal')}
-                  onClick={(e) => removeAnimal(e, a.id)}
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </div>
-            ))}
-          </div>
+          {data.animals?.length > 0 && filteredAnimals.length === 0 && (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground text-sm">
+                {t('portal.herd.noFilterResults')}
+              </CardContent>
+            </Card>
+          )}
+
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {filteredAnimals.map((a) => (
+                <div key={a.id} className="relative">
+                  <button
+                    type="button"
+                    className="text-start w-full"
+                    onClick={() => navigate(`/herd/${a.id}`)}
+                  >
+                    <Card className="hover:shadow-md transition-shadow overflow-hidden h-full">
+                      <HerdAnimalPhoto
+                        animalId={a.id}
+                        hasPhoto={a.has_photo}
+                        animalType={a.animal_type}
+                        className="w-full h-40"
+                        iconSize={40}
+                      />
+                      <CardContent className="p-4 space-y-1">
+                        {animalFacts(a)}
+                      </CardContent>
+                    </Card>
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="absolute top-2 end-2 h-9 w-9 z-10 shadow-md"
+                    aria-label={t('portal.herd.deleteAnimal')}
+                    onClick={(e) => removeAnimal(e, a.id)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {viewMode === 'list' && (
+            <div className="space-y-2">
+              {filteredAnimals.map((a) => (
+                <div key={a.id} className="relative">
+                  <button
+                    type="button"
+                    className="text-start w-full"
+                    onClick={() => navigate(`/herd/${a.id}`)}
+                  >
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <HerdAnimalPhoto
+                          animalId={a.id}
+                          hasPhoto={a.has_photo}
+                          animalType={a.animal_type}
+                          className="w-14 h-14 rounded-xl shrink-0"
+                          iconSize={22}
+                        />
+                        <div className="min-w-0 flex-1 space-y-0.5 pe-10">
+                          {animalFacts(a)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="absolute top-1/2 -translate-y-1/2 end-2 h-9 w-9 z-10 text-red-600"
+                    aria-label={t('portal.herd.deleteAnimal')}
+                    onClick={(e) => removeAnimal(e, a.id)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

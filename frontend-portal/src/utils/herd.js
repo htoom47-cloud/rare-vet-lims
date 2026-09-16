@@ -37,6 +37,30 @@ export const formatComputedAge = (age, isAr) => {
   return [ys, ms].filter(Boolean).join(' ');
 };
 
+export const herdAgeBucket = (animal) => {
+  const months = animal?.age_computed?.total_months;
+  if (months == null || Number.isNaN(Number(months))) return 'unknown';
+  const n = Number(months);
+  if (n < 12) return 'under1';
+  if (n < 36) return '1to3';
+  if (n < 60) return '3to5';
+  return 'over5';
+};
+
+export const filterHerdAnimals = (animals, { role = 'all', age = 'all', vax = 'all' } = {}) => {
+  const list = Array.isArray(animals) ? animals : [];
+  return list.filter((a) => {
+    if (role === 'mothers' && !a.is_mother) return false;
+    if (role === 'sires' && !a.is_sire) return false;
+    if (role === 'offspring' && !a.is_offspring) return false;
+    if (age !== 'all' && herdAgeBucket(a) !== age) return false;
+    if (vax === 'vaccinated' && !(a.vaccination_count > 0)) return false;
+    if (vax === 'unvaccinated' && a.vaccination_count > 0) return false;
+    if (vax === 'due' && !(a.vaccinations_due > 0)) return false;
+    return true;
+  });
+};
+
 export const dueStatus = (nextDue) => {
   if (!nextDue) return null;
   const due = new Date(nextDue);
