@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, ArrowLeft, Syringe, Heart, Baby, FileText, Trash2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Syringe, Heart, Baby, FileText, Trash2, Stethoscope, StickyNote } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import HerdAnimalPhoto from '../components/portal/HerdAnimalPhoto';
@@ -10,10 +10,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { portalBreederAPI } from '../services/portalApi';
 import { animalLabel, genderLabel } from '../utils/animalTypes';
-import { formatHerdDate, formatComputedAge, isoDate, dueStatus } from '../utils/herd';
+import { formatHerdDate, formatHerdDateTime, formatComputedAge, isoDate, dueStatus } from '../utils/herd';
 import { usePortal } from '../context/PortalContext';
 
-const TABS = ['profile', 'vaccinations', 'breeding', 'births'];
+const TABS = ['profile', 'health', 'vaccinations', 'breeding', 'births'];
 
 const emptyVacc = { vaccine_name: '', batch_number: '', administered_at: '', next_due_at: '', administered_by: '', notes: '' };
 const emptyBreed = { event_type: 'natural', event_date: '', sire_id: '', sire_name: '', outcome: 'pending', expected_birth_date: '', notes: '' };
@@ -21,6 +21,7 @@ const emptyBirth = {
   birth_date: '', father_id: '', father_name: '', offspring_name: '', birth_weight: '',
   gender: 'unknown', register_offspring: true, notes: '',
 };
+const emptyNote = () => ({ body: '', noted_at: isoDate(new Date()) });
 
 export default function PortalHerdAnimal() {
   const { t, i18n } = useTranslation();
@@ -39,8 +40,17 @@ export default function PortalHerdAnimal() {
   const [vaccForm, setVaccForm] = useState(emptyVacc);
   const [breedForm, setBreedForm] = useState(emptyBreed);
   const [birthForm, setBirthForm] = useState(emptyBirth);
+  const [healthForm, setHealthForm] = useState(emptyNote);
+  const [extraForm, setExtraForm] = useState(emptyNote);
+  const [removing, setRemoving] = useState(false);
 
   const entitled = !!customer?.features?.breederDashboard;
+
+  const herdError = (err) => {
+    const code = err.response?.data?.error?.code;
+    if (code === 'HAS_SAMPLES') return t('portal.herd.cannotDeleteHasSamples');
+    return err.response?.data?.error?.message || t('common.error');
+  };
 
   const load = () => {
     if (!entitled) { setLoading(false); return; }
@@ -156,12 +166,46 @@ export default function PortalHerdAnimal() {
     } finally { setSaving(false); }
   };
 
+  const removeAnimal = async () => {
+    if (!window.confirm(t('portal.herd.confirmDeleteAnimal'))) return;
+    setRemoving(true);
+    try {
+      await portalBreederAPI.deactivateAnimal(animalId);
+      toast.success(t('portal.herd.animalDeleted'));
+      navigate('/herd');
+    } catch (err) {
+      toast.error(herdError(err));
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const addNote = async (e, kind) => {
+    e.preventDefault();
+    const form = kind === 'health' ? healthForm : extraForm;
+    setSaving(true);
+    try {
+      await portalBreederAPI.addNote(animalId, {
+        kind,
+        body: form.body,
+        noted_at: form.noted_at || isoDate(new Date()),
+      });
+      if (kind === 'health') setHealthForm(emptyNote());
+      else setExtraForm(emptyNote());
+      toast.success(t('portal.herd.saved'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    } finally { setSaving(false); }
+  };
+
   const removeRow = async (kind, id) => {
     if (!window.confirm(t('portal.herd.confirmDelete'))) return;
     try {
       if (kind === 'vacc') await portalBreederAPI.removeVaccination(id);
       if (kind === 'breed') await portalBreederAPI.removeBreeding(id);
       if (kind === 'birth') await portalBreederAPI.removeBirth(id);
+      if (kind === 'note') await portalBreederAPI.removeNote(id);
       toast.success(t('portal.herd.deleted'));
       load();
     } catch (err) {
@@ -222,9 +266,14 @@ export default function PortalHerdAnimal() {
                 {animal.sire_display && (
                   <p className="text-xs text-muted-foreground">{t('portal.herd.sire')}: {animal.sire_display}</p>
                 )}
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/animals/${animal.id}`)}>
-                  <FileText size={14} /> {t('portal.herd.labHealth')}
-                </Button>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/animals/${animal.id}`)}>
+                    <FileText size={14} /> {t('portal.herd.labHealth')}
+                  </Button>
+                  <Button size="sm" variant="destructive" disabled={removing} onClick={removeAnimal}>
+                    <Trash2 size={14} /> {t('portal.herd.deleteAnimal')}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -305,6 +354,81 @@ export default function PortalHerdAnimal() {
                 <Button type="submit" disabled={saving}>{t('portal.herd.save')}</Button>
               </div>
             </form>
+          )}
+
+          {tab === 'health' && (
+            <div className="space-y-6">
+              <form onSubmit={(e) => addNote(e, 'health')} className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl border border-border">
+                <h3 className="sm:col-span-2 font-semibold flex items-center gap-2"><Stethoscope size={16} /> {t('portal.herd.healthTitle')}</h3>
+                <label className="text-xs space-y-1">
+                  <span>{t('portal.herd.addedOn')}</span>
+                  <Input type="date" required value={healthForm.noted_at} onChange={field(healthForm, setHealthForm)('noted_at')} />
+                </label>
+                <div className="sm:col-span-2">
+                  <textarea
+                    required
+                    rows={3}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                    placeholder={t('portal.herd.healthPlaceholder')}
+                    value={healthForm.body}
+                    onChange={field(healthForm, setHealthForm)('body')}
+                  />
+                </div>
+                <div className="sm:col-span-2 flex justify-end">
+                  <Button type="submit" disabled={saving}>{t('portal.herd.addHealth')}</Button>
+                </div>
+              </form>
+              {(pack.health_notes || []).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">{t('portal.herd.noHealth')}</p>
+              )}
+              {(pack.health_notes || []).map((n) => (
+                <Card key={n.id}>
+                  <CardContent className="p-4 flex justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm whitespace-pre-wrap break-words">{n.body}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('portal.herd.addedOn')}: {formatHerdDate(n.noted_at, isAr)}
+                        {n.created_at ? ` · ${formatHerdDateTime(n.created_at, isAr)}` : ''}
+                      </p>
+                    </div>
+                    <Button size="icon" variant="ghost" onClick={() => removeRow('note', n.id)}><Trash2 size={16} /></Button>
+                  </CardContent>
+                </Card>
+              ))}
+
+              <form onSubmit={(e) => addNote(e, 'extra')} className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl border border-border">
+                <h3 className="sm:col-span-2 font-semibold flex items-center gap-2"><StickyNote size={16} /> {t('portal.herd.extraTitle')}</h3>
+                <div className="sm:col-span-2">
+                  <textarea
+                    required
+                    rows={3}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                    placeholder={t('portal.herd.extraPlaceholder')}
+                    value={extraForm.body}
+                    onChange={field(extraForm, setExtraForm)('body')}
+                  />
+                </div>
+                <div className="sm:col-span-2 flex justify-end">
+                  <Button type="submit" disabled={saving}>{t('portal.herd.addExtra')}</Button>
+                </div>
+              </form>
+              {(pack.extra_notes || []).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">{t('portal.herd.noExtra')}</p>
+              )}
+              {(pack.extra_notes || []).map((n) => (
+                <Card key={n.id}>
+                  <CardContent className="p-4 flex justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm whitespace-pre-wrap break-words">{n.body}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('portal.herd.addedOn')}: {formatHerdDateTime(n.created_at || n.noted_at, isAr)}
+                      </p>
+                    </div>
+                    <Button size="icon" variant="ghost" onClick={() => removeRow('note', n.id)}><Trash2 size={16} /></Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
 
           {tab === 'vaccinations' && (

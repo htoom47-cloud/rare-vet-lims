@@ -84,6 +84,48 @@ check('customer-scope resolves mobile aggregation', () => {
   assert.ok(src.includes('slice(-9)'));
 });
 
+check('portal herd animal delete is deactivation and blocks lab samples', () => {
+  const svc = fs.readFileSync(path.join(ROOT, 'services', 'breeder.service.js'), 'utf8');
+  const routes = fs.readFileSync(path.join(ROOT, 'routes', 'portal-breeder.routes.js'), 'utf8');
+  const animalPage = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalHerdAnimal.jsx'),
+    'utf8'
+  );
+  const herdPage = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalHerd.jsx'),
+    'utf8'
+  );
+  assert.ok(svc.includes("code: 'HAS_SAMPLES'") || svc.includes('HAS_SAMPLES'));
+  assert.ok(svc.includes('is_active = false'));
+  assert.ok(!/DELETE FROM animals/i.test(svc));
+  assert.ok(routes.includes("router.delete('/animals/:id'"));
+  assert.ok(animalPage.includes('deactivateAnimal'));
+  assert.ok(animalPage.includes("portal.herd.deleteAnimal"));
+  assert.ok(herdPage.includes('deactivateAnimal'));
+  assert.ok(!herdPage.includes('PawPrint'));
+  const animalNotes = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalHerdAnimal.jsx'),
+    'utf8'
+  );
+  assert.ok(animalNotes.includes("tab === 'health'"));
+  assert.ok(animalNotes.includes('addNote'));
+  const migrate = fs.readFileSync(path.join(ROOT, 'scripts', 'migrate.js'), 'utf8');
+  assert.ok(migrate.includes('CREATE TABLE IF NOT EXISTS animal_herd_notes'));
+  assert.ok(migrate.includes("kind IN ('health', 'extra')"));
+  const dash = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalDashboard.jsx'),
+    'utf8'
+  );
+  const layout = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'components', 'portal', 'PortalLayout.jsx'),
+    'utf8'
+  );
+  assert.ok(dash.includes('HerdNavIcon'));
+  assert.ok(!dash.includes('PawPrint'));
+  assert.ok(layout.includes('HerdNavIcon'));
+  assert.ok(!layout.includes('PawPrint'));
+});
+
 check('portal follow-up KPI counts unique animals, not result rows', () => {
   const src = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalDashboard.jsx'),

@@ -773,6 +773,25 @@ async function applyPatches() {
       ON animal_births (mother_id, birth_date)
       WHERE deleted_at IS NULL
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS animal_herd_notes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+        kind VARCHAR(20) NOT NULL,
+        body TEXT NOT NULL,
+        noted_at DATE NOT NULL DEFAULT CURRENT_DATE,
+        created_by_customer UUID REFERENCES customers(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        deleted_at TIMESTAMPTZ,
+        CONSTRAINT animal_herd_notes_kind_check CHECK (kind IN ('health', 'extra'))
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_animal_herd_notes_animal
+      ON animal_herd_notes (animal_id, kind, noted_at DESC)
+      WHERE deleted_at IS NULL
+    `);
 
     const softDeleteTables = ['customers', 'animals', 'samples', 'reports', 'invoices'];
     for (const table of softDeleteTables) {

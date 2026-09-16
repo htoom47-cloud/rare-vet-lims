@@ -143,6 +143,8 @@ export const portalBreederAPI = {
   addBirth: (animalId, body) => portalApi.post(`/breeder/animals/${animalId}/births`, body),
   updateBirth: (id, body) => portalApi.put(`/breeder/births/${id}`, body),
   removeBirth: (id) => portalApi.delete(`/breeder/births/${id}`),
+  addNote: (animalId, body) => portalApi.post(`/breeder/animals/${animalId}/notes`, body),
+  removeNote: (id) => portalApi.delete(`/breeder/notes/${id}`),
 };
 
 export const portalInvoicesAPI = {

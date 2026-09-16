@@ -13,6 +13,7 @@ const {
   portalBreedingUpdateSchema,
   portalBirthSchema,
   portalBirthUpdateSchema,
+  portalHerdNoteSchema,
 } = require('../validators/schemas');
 const { saveFile, createReadStream } = require('../config/storage');
 const { diskStorage, readAndCleanupUpload, cleanupUploadFile } = require('../utils/upload-disk');
@@ -196,6 +197,20 @@ router.put('/births/:id', writeLimiter, validate(portalBirthUpdateSchema), async
 router.delete('/births/:id', writeLimiter, async (req, res, next) => {
   try {
     const data = await breeder.removeBirth(req.params.id, req.portalCustomerIds);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/animals/:id/notes', writeLimiter, validate(portalHerdNoteSchema), async (req, res, next) => {
+  try {
+    const data = await breeder.createHerdNote(req.params.id, req.portalCustomerIds, req.customer.id, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/notes/:id', writeLimiter, async (req, res, next) => {
+  try {
+    const data = await breeder.removeHerdNote(req.params.id, req.portalCustomerIds);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

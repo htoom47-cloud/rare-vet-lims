@@ -382,6 +382,12 @@ const portalBirthSchema = Joi.object({
 
 const portalBirthUpdateSchema = portalBirthSchema.fork('birth_date', (s) => s.optional());
 
+const portalHerdNoteSchema = Joi.object({
+  kind: Joi.string().valid('health', 'extra').required(),
+  body: Joi.string().trim().min(1).max(4000).required(),
+  noted_at: Joi.date().iso().allow(null, ''),
+});
+
 module.exports = {
   loginSchema,
   registerSchema,
@@ -396,6 +402,7 @@ module.exports = {
   portalBreedingUpdateSchema,
   portalBirthSchema,
   portalBirthUpdateSchema,
+  portalHerdNoteSchema,
   customerSchema,
   animalSchema,
   sampleSchema,

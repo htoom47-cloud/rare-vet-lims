@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Syringe, Baby, PawPrint, AlertTriangle } from 'lucide-react';
+import { Plus, Syringe, Baby, AlertTriangle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import HerdAnimalPhoto from '../components/portal/HerdAnimalPhoto';
@@ -12,6 +12,7 @@ import { portalBreederAPI } from '../services/portalApi';
 import { animalLabel, genderLabel } from '../utils/animalTypes';
 import { formatHerdDate, formatComputedAge, dueStatus } from '../utils/herd';
 import { usePortal } from '../context/PortalContext';
+import HerdNavIcon from '../components/portal/HerdNavIcon';
 
 const emptyAnimal = {
   animal_type: 'camel',
@@ -61,6 +62,25 @@ export default function PortalHerd() {
 
   const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
+  const herdError = (err) => {
+    const code = err.response?.data?.error?.code;
+    if (code === 'HAS_SAMPLES') return t('portal.herd.cannotDeleteHasSamples');
+    return err.response?.data?.error?.message || t('common.error');
+  };
+
+  const removeAnimal = async (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(t('portal.herd.confirmDeleteAnimal'))) return;
+    try {
+      await portalBreederAPI.deactivateAnimal(id);
+      toast.success(t('portal.herd.animalDeleted'));
+      load();
+    } catch (err) {
+      toast.error(herdError(err));
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -89,7 +109,7 @@ export default function PortalHerd() {
   };
 
   const cards = useMemo(() => ([
-    { key: 'animals', value: stats.animals || 0, label: t('portal.herd.statAnimals'), icon: PawPrint },
+    { key: 'animals', value: stats.animals || 0, label: t('portal.herd.statAnimals'), icon: HerdNavIcon },
     { key: 'vacc', value: stats.vaccinations_due || 0, label: t('portal.herd.statVaccDue'), icon: Syringe, warn: (stats.vaccinations_due || 0) > 0 },
     { key: 'births', value: stats.expected_births || 0, label: t('portal.herd.statExpectedBirths'), icon: Baby },
     { key: 'recent', value: stats.recent_births || 0, label: t('portal.herd.statRecentBirths'), icon: Baby },
@@ -100,7 +120,7 @@ export default function PortalHerd() {
       <PortalLayout title={t('portal.herd.title')} subtitle={t('portal.herd.subtitle')}>
         <Card>
           <CardContent className="py-12 text-center space-y-2">
-            <PawPrint className="mx-auto text-muted-foreground/50" size={40} />
+            <HerdNavIcon className="mx-auto text-muted-foreground/50" size={40} />
             <p className="text-muted-foreground">{t('portal.herd.notEntitled')}</p>
           </CardContent>
         </Card>
@@ -197,36 +217,47 @@ export default function PortalHerd() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {(data.animals || []).map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className="text-start"
-                onClick={() => navigate(`/herd/${a.id}`)}
-              >
-                <Card className="hover:shadow-md transition-shadow overflow-hidden h-full">
-                  <HerdAnimalPhoto
-                    animalId={a.id}
-                    hasPhoto={a.has_photo}
-                    animalType={a.animal_type}
-                    className="w-full h-40"
-                    iconSize={40}
-                  />
-                  <CardContent className="p-4 space-y-1">
-                    <p className="font-bold truncate">{a.name_tag || a.animal_code}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {animalLabel(a.animal_type, isAr)} · {genderLabel(a.gender, isAr)}
-                      {a.rfid_chip ? ` · ${a.rfid_chip}` : ''}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatComputedAge(a.age_computed, isAr) || a.age || t('portal.herd.ageUnknown')}
-                      {a.color ? ` · ${a.color}` : ''}
-                    </p>
-                    {a.vaccinations_due > 0 && (
-                      <p className="text-xs text-amber-700">{t('portal.herd.vaccDueCount', { count: a.vaccinations_due })}</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </button>
+              <div key={a.id} className="relative">
+                <button
+                  type="button"
+                  className="text-start w-full"
+                  onClick={() => navigate(`/herd/${a.id}`)}
+                >
+                  <Card className="hover:shadow-md transition-shadow overflow-hidden h-full">
+                    <HerdAnimalPhoto
+                      animalId={a.id}
+                      hasPhoto={a.has_photo}
+                      animalType={a.animal_type}
+                      className="w-full h-40"
+                      iconSize={40}
+                    />
+                    <CardContent className="p-4 space-y-1">
+                      <p className="font-bold truncate">{a.name_tag || a.animal_code}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {animalLabel(a.animal_type, isAr)} · {genderLabel(a.gender, isAr)}
+                        {a.rfid_chip ? ` · ${a.rfid_chip}` : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatComputedAge(a.age_computed, isAr) || a.age || t('portal.herd.ageUnknown')}
+                        {a.color ? ` · ${a.color}` : ''}
+                      </p>
+                      {a.vaccinations_due > 0 && (
+                        <p className="text-xs text-amber-700">{t('portal.herd.vaccDueCount', { count: a.vaccinations_due })}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="destructive"
+                  className="absolute top-2 end-2 h-9 w-9 z-10 shadow-md"
+                  aria-label={t('portal.herd.deleteAnimal')}
+                  onClick={(e) => removeAnimal(e, a.id)}
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
             ))}
           </div>
         </div>

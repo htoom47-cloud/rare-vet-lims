@@ -7,6 +7,16 @@ export const formatHerdDate = (value, isAr) => {
   });
 };
 
+export const formatHerdDateTime = (value, isAr) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString(isAr ? 'ar-SA' : 'en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+};
+
 export const isoDate = (value) => {
   if (!value) return '';
   return String(value).slice(0, 10);

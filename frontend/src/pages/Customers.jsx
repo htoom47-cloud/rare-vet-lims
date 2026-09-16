@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban, Phone, PawPrint } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban, Phone, Tent } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -514,7 +514,7 @@ export default function Customers() {
             {canHerdGrant && (
               <div className="border rounded-lg p-4 space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20">
                 <h4 className="font-semibold flex items-center gap-2">
-                  <PawPrint size={16} /> {t('customers.herdSection')}
+                  <Tent size={16} /> {t('customers.herdSection')}
                 </h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">{t('customers.herdHint')}</p>
                 <label className="flex items-center gap-2 text-sm">
