@@ -45,10 +45,12 @@ export default function PortalHerdAnimal() {
   const [removing, setRemoving] = useState(false);
 
   const entitled = !!customer?.features?.breederDashboard;
+  const canShare = !!customer?.features?.herdOwner;
 
   const herdError = (err) => {
     const code = err.response?.data?.error?.code;
     if (code === 'HAS_SAMPLES') return t('portal.herd.cannotDeleteHasSamples');
+    if (code === 'OWNER_ONLY') return t('portal.herd.ownerOnlyAction');
     return err.response?.data?.error?.message || t('common.error');
   };
 
@@ -270,9 +272,11 @@ export default function PortalHerdAnimal() {
                   <Button size="sm" variant="outline" onClick={() => navigate(`/animals/${animal.id}`)}>
                     <FileText size={14} /> {t('portal.herd.labHealth')}
                   </Button>
-                  <Button size="sm" variant="destructive" disabled={removing} onClick={removeAnimal}>
-                    <Trash2 size={14} /> {t('portal.herd.deleteAnimal')}
-                  </Button>
+                  {canShare && (
+                    <Button size="sm" variant="destructive" disabled={removing} onClick={removeAnimal}>
+                      <Trash2 size={14} /> {t('portal.herd.deleteAnimal')}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>

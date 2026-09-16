@@ -5,7 +5,7 @@ const { generateRandomAnimalCode, ANIMAL_CODE_LOCK } = require('../utils/helpers
 const { notDeleted } = require('../utils/soft-delete-sql');
 const speciesService = require('./animal-species.service');
 const entitlements = require('./entitlements.service');
-const { GESTATION_DAYS, BREEDING_TYPES, BREEDING_OUTCOMES, GENDERS, NOTE_KINDS } = require('../constants/breeder');
+const { GESTATION_DAYS, BREEDING_TYPES, BREEDING_OUTCOMES, GENDERS, NOTE_KINDS, FEATURE_BREEDER_DASHBOARD } = require('../constants/breeder');
 
 const asIds = (ids) => (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
 
@@ -269,9 +269,28 @@ const profileFieldsFrom = (data, existing = {}) => {
   };
 };
 
+const pickHerdOwnerId = async (customerIds, actorCustomerId) => {
+  const ids = asIds(customerIds);
+  try {
+    const result = await query(
+      `SELECT customer_id FROM customer_entitlements
+       WHERE customer_id = ANY($1::uuid[])
+         AND feature_code = $2 AND enabled = true
+         AND (expires_at IS NULL OR expires_at > NOW())
+       ORDER BY CASE WHEN customer_id = $3 THEN 0 ELSE 1 END, customer_id
+       LIMIT 1`,
+      [ids, FEATURE_BREEDER_DASHBOARD, actorCustomerId || '00000000-0000-0000-0000-000000000000']
+    );
+    if (result.rows[0]) return result.rows[0].customer_id;
+  } catch (err) {
+    if (err.code !== '42P01') throw err;
+  }
+  return actorCustomerId || ids[0];
+};
+
 const createAnimal = async (customerIds, actorCustomerId, data) => {
   await assertHerdAccess(customerIds);
-  const ownerId = actorCustomerId || asIds(customerIds)[0];
+  const ownerId = await pickHerdOwnerId(customerIds, actorCustomerId);
   const speciesCode = await speciesService.assertActiveSpecies(data.animal_type);
   const fields = profileFieldsFrom(data);
   if (fields.sire_id) {

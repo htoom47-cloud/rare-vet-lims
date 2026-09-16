@@ -145,6 +145,9 @@ export const portalBreederAPI = {
   removeBirth: (id) => portalApi.delete(`/breeder/births/${id}`),
   addNote: (animalId, body) => portalApi.post(`/breeder/animals/${animalId}/notes`, body),
   removeNote: (id) => portalApi.delete(`/breeder/notes/${id}`),
+  listShares: () => portalApi.get('/breeder/shares'),
+  addShare: (body) => portalApi.post('/breeder/shares', body),
+  removeShare: (id) => portalApi.delete(`/breeder/shares/${id}`),
 };
 
 export const portalInvoicesAPI = {

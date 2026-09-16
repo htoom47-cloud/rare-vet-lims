@@ -388,6 +388,12 @@ const portalHerdNoteSchema = Joi.object({
   noted_at: Joi.date().iso().allow(null, ''),
 });
 
+const portalHerdShareSchema = Joi.object({
+  mobile: Joi.string().required(),
+  name: Joi.string().max(200).allow('', null),
+  role: Joi.string().valid('agent', 'worker').default('worker'),
+});
+
 module.exports = {
   loginSchema,
   registerSchema,
@@ -403,6 +409,7 @@ module.exports = {
   portalBirthSchema,
   portalBirthUpdateSchema,
   portalHerdNoteSchema,
+  portalHerdShareSchema,
   customerSchema,
   animalSchema,
   sampleSchema,

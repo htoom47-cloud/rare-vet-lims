@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Syringe, Baby, AlertTriangle, Trash2, LayoutGrid, List } from 'lucide-react';
+import { Plus, Syringe, Baby, AlertTriangle, Trash2, LayoutGrid, List, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
 import HerdAnimalPhoto from '../components/portal/HerdAnimalPhoto';
@@ -52,8 +52,12 @@ export default function PortalHerd() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [ageFilter, setAgeFilter] = useState('all');
   const [vaxFilter, setVaxFilter] = useState('all');
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shares, setShares] = useState([]);
+  const [shareForm, setShareForm] = useState({ mobile: '', name: '', role: 'worker' });
 
   const entitled = !!customer?.features?.breederDashboard;
+  const canShare = !!customer?.features?.herdOwner;
 
   const load = () => {
     if (!entitled) {
@@ -67,7 +71,15 @@ export default function PortalHerd() {
       .finally(() => setLoading(false));
   };
 
+  const loadShares = () => {
+    if (!canShare) return;
+    portalBreederAPI.listShares()
+      .then(({ data: res }) => setShares(res.data || []))
+      .catch(() => setShares([]));
+  };
+
   useEffect(() => { load(); }, [entitled, t]);
+  useEffect(() => { loadShares(); }, [canShare]);
 
   const species = data?.species || [];
   const stats = data?.stats || {};
@@ -77,6 +89,12 @@ export default function PortalHerd() {
   const herdError = (err) => {
     const code = err.response?.data?.error?.code;
     if (code === 'HAS_SAMPLES') return t('portal.herd.cannotDeleteHasSamples');
+    if (code === 'OWNER_ONLY') return t('portal.herd.ownerOnlyAction');
+    if (code === 'CANNOT_SHARE_SELF') return t('portal.herd.shareSelf');
+    if (code === 'SHARE_LIMIT') return t('portal.herd.shareLimit');
+    if (code === 'ALREADY_SHARED') return t('portal.herd.shareExists');
+    if (code === 'INVALID_MOBILE') return t('portal.herd.shareInvalid');
+    if (code === 'CUSTOMER_INACTIVE') return t('portal.herd.shareInactive');
     return err.response?.data?.error?.message || t('common.error');
   };
 
@@ -117,6 +135,32 @@ export default function PortalHerd() {
       toast.error(err.response?.data?.error?.message || t('common.error'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleShare = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await portalBreederAPI.addShare(shareForm);
+      toast.success(t('portal.herd.shareSaved'));
+      setShareForm({ mobile: '', name: '', role: 'worker' });
+      loadShares();
+    } catch (err) {
+      toast.error(herdError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const revokeShare = async (id) => {
+    if (!window.confirm(t('portal.herd.confirmRevokeShare'))) return;
+    try {
+      await portalBreederAPI.removeShare(id);
+      toast.success(t('portal.herd.shareRevoked'));
+      loadShares();
+    } catch (err) {
+      toast.error(herdError(err));
     }
   };
 
@@ -177,6 +221,15 @@ export default function PortalHerd() {
 
       {!loading && data && (
         <div className="space-y-6">
+          {(data.share?.is_delegate || customer?.features?.herdShared) && (
+            <Card>
+              <CardContent className="p-3 text-sm text-muted-foreground">
+                {data.share?.owner_name
+                  ? t('portal.herd.sharedBannerNamed', { name: data.share.owner_name })
+                  : t('portal.herd.sharedBanner')}
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {cards.map((c) => (
               <Card key={c.key}>
@@ -271,6 +324,11 @@ export default function PortalHerd() {
               <Button size="sm" onClick={() => { setForm({ ...emptyAnimal, animal_type: species[0]?.code || 'camel' }); setModalOpen(true); }}>
                 <Plus size={16} /> {t('portal.herd.addAnimal')}
               </Button>
+              {canShare && (
+                <Button size="sm" variant="outline" onClick={() => setShareOpen(true)}>
+                  <Share2 size={16} /> {t('portal.herd.share')}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -346,16 +404,18 @@ export default function PortalHerd() {
                       </CardContent>
                     </Card>
                   </button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="destructive"
-                    className="absolute top-2 end-2 h-9 w-9 z-10 shadow-md"
-                    aria-label={t('portal.herd.deleteAnimal')}
-                    onClick={(e) => removeAnimal(e, a.id)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  {canShare && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="destructive"
+                      className="absolute top-2 end-2 h-9 w-9 z-10 shadow-md"
+                      aria-label={t('portal.herd.deleteAnimal')}
+                      onClick={(e) => removeAnimal(e, a.id)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -385,16 +445,18 @@ export default function PortalHerd() {
                       </CardContent>
                     </Card>
                   </button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="absolute top-1/2 -translate-y-1/2 end-2 h-9 w-9 z-10 text-red-600"
-                    aria-label={t('portal.herd.deleteAnimal')}
-                    onClick={(e) => removeAnimal(e, a.id)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  {canShare && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="absolute top-1/2 -translate-y-1/2 end-2 h-9 w-9 z-10 text-red-600"
+                      aria-label={t('portal.herd.deleteAnimal')}
+                      onClick={(e) => removeAnimal(e, a.id)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -458,6 +520,54 @@ export default function PortalHerd() {
               <Button type="submit" disabled={saving}>{t('portal.herd.save')}</Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {shareOpen && canShare && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setShareOpen(false)} aria-label="Close" />
+          <div className="relative w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto shadow-xl">
+            <h3 className="font-semibold text-lg">{t('portal.herd.shareTitle')}</h3>
+            <p className="text-sm text-muted-foreground">{t('portal.herd.shareHint')}</p>
+            <form onSubmit={handleShare} className="space-y-3">
+              <label className="text-sm space-y-1 block">
+                <span>{t('portal.herd.shareMobile')}</span>
+                <Input value={shareForm.mobile} onChange={(e) => setShareForm((p) => ({ ...p, mobile: e.target.value }))} required placeholder="05xxxxxxxx" />
+              </label>
+              <label className="text-sm space-y-1 block">
+                <span>{t('portal.herd.shareName')}</span>
+                <Input value={shareForm.name} onChange={(e) => setShareForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('portal.herd.shareNamePlaceholder')} />
+              </label>
+              <label className="text-sm space-y-1 block">
+                <span>{t('portal.herd.shareRole')}</span>
+                <select className={selectClass} value={shareForm.role} onChange={(e) => setShareForm((p) => ({ ...p, role: e.target.value }))}>
+                  <option value="worker">{t('portal.herd.roleWorker')}</option>
+                  <option value="agent">{t('portal.herd.roleAgent')}</option>
+                </select>
+              </label>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShareOpen(false)}>{t('portal.herd.cancel')}</Button>
+                <Button type="submit" disabled={saving}>{t('portal.herd.shareAdd')}</Button>
+              </div>
+            </form>
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold">{t('portal.herd.shareList')}</h4>
+              {shares.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t('portal.herd.shareEmpty')}</p>
+              )}
+              {shares.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{s.name || s.mobile}</p>
+                    <p className="text-xs text-muted-foreground">{s.mobile} · {s.role === 'agent' ? t('portal.herd.roleAgent') : t('portal.herd.roleWorker')}</p>
+                  </div>
+                  <Button type="button" size="sm" variant="ghost" className="text-red-600" onClick={() => revokeShare(s.id)}>
+                    {t('portal.herd.shareRevoke')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </PortalLayout>
