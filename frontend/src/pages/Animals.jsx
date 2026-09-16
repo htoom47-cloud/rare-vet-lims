@@ -4,7 +4,8 @@ import { Plus, Search, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
-import { animalsAPI, customersAPI } from '../services/api';
+import CustomerSearch from '../components/customers/CustomerSearch';
+import { animalsAPI } from '../services/api';
 import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,6 +23,10 @@ const EMPTY_FORM = {
   rfid_chip: '',
   owner_id: '',
   medical_history: '',
+  birth_date: '',
+  registration_number: '',
+  sire_name: '',
+  dam_name: '',
 };
 
 export default function Animals() {
@@ -31,14 +36,16 @@ export default function Animals() {
   const { codes, label } = useAnimalSpecies();
   const isAr = i18n.language === 'ar';
   const [animals, setAnimals] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [knownOwner, setKnownOwner] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
 
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -53,22 +60,26 @@ export default function Animals() {
   };
 
   useEffect(() => {
-    customersAPI.list({ limit: 100 }).then(({ data }) => setCustomers(data.data || []));
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
   }, [search, page]);
 
   const openCreate = () => {
     setEditingId(null);
+    setKnownOwner(null);
     setForm(EMPTY_FORM);
+    setPhotoFile(null);
+    setPhotoPreview('');
     setModalOpen(true);
   };
 
   const openEdit = (animal) => {
     setEditingId(animal.id);
+    setKnownOwner(animal.owner_id ? {
+      id: animal.owner_id,
+      full_name: animal.owner_name || '',
+      mobile: animal.owner_mobile || '',
+    } : null);
     setForm({
       animal_type: animal.animal_type || 'camel',
       gender: animal.gender || 'unknown',
@@ -80,26 +91,48 @@ export default function Animals() {
       rfid_chip: animal.rfid_chip || '',
       owner_id: animal.owner_id || '',
       medical_history: animal.medical_history || '',
+      birth_date: animal.birth_date ? String(animal.birth_date).slice(0, 10) : '',
+      registration_number: animal.registration_number || '',
+      sire_name: animal.sire_name || '',
+      dam_name: animal.dam_name || '',
     });
+    setPhotoFile(null);
+    setPhotoPreview(animal.image_url || '');
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
+    setKnownOwner(null);
     setForm(EMPTY_FORM);
+    setPhotoFile(null);
+    setPhotoPreview('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...form, weight: form.weight !== '' && form.weight != null ? parseFloat(form.weight) : null };
+    if (!form.owner_id) {
+      toast.error(t('animals.selectOwner'));
+      return;
+    }
+    const payload = {
+      ...form,
+      weight: form.weight !== '' && form.weight != null ? parseFloat(form.weight) : null,
+      birth_date: form.birth_date || null,
+    };
     try {
+      let id = editingId;
       if (editingId) {
         await animalsAPI.update(editingId, payload);
         toast.success(t('animals.updated'));
       } else {
-        await animalsAPI.create(payload);
+        const { data } = await animalsAPI.create(payload);
+        id = data.data?.id;
         toast.success(t('animals.created'));
+      }
+      if (id && photoFile) {
+        await animalsAPI.uploadImage(id, photoFile);
       }
       closeModal();
       load();
@@ -195,10 +228,13 @@ export default function Animals() {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">{t('animals.owner')}</label>
-            <select value={form.owner_id} onChange={(e) => setField('owner_id', e.target.value)} className="input-field" required>
-              <option value="">{t('animals.selectOwner')}</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-            </select>
+            <CustomerSearch
+              key={editingId || 'new'}
+              value={form.owner_id}
+              onChange={(id) => setField('owner_id', id || '')}
+              knownCustomer={knownOwner}
+              required
+            />
           </div>
 
           <div>
@@ -243,6 +279,43 @@ export default function Animals() {
           <div>
             <label className="block text-sm font-medium mb-1">{t('animals.weight')}</label>
             <input value={form.weight} onChange={(e) => setField('weight', e.target.value)} className="input-field" type="number" step="0.1" min="0" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.birthDate')}</label>
+            <input type="date" value={form.birth_date} onChange={(e) => setField('birth_date', e.target.value)} className="input-field" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.registration')}</label>
+            <input value={form.registration_number} onChange={(e) => setField('registration_number', e.target.value)} className="input-field" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.sireName')}</label>
+            <input value={form.sire_name} onChange={(e) => setField('sire_name', e.target.value)} className="input-field" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('animals.damName')}</label>
+            <input value={form.dam_name} onChange={(e) => setField('dam_name', e.target.value)} className="input-field" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">{t('animals.photo')}</label>
+            {photoPreview && (
+              <img src={photoPreview} alt="" className="w-24 h-24 object-cover rounded-lg mb-2 border" />
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="input-field"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setPhotoFile(file);
+                if (file) setPhotoPreview(URL.createObjectURL(file));
+              }}
+            />
           </div>
 
           <div className="md:col-span-2">

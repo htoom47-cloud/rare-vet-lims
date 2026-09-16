@@ -10,6 +10,8 @@ const reportsService = require('./reports.service');
 const portalSync = require('./portal-sync.service');
 const billingService = require('./billing.service');
 const notificationProvider = require('./notification-providers');
+const entitlements = require('./entitlements.service');
+const { resolveCustomerIdsByMobile } = require('../utils/customer-scope');
 const {
   PANELS,
   panelStatusFromResults,
@@ -30,12 +32,15 @@ const asArray = (v) => (Array.isArray(v) ? v : [v]);
 
 const generateOtp = () => env.portal.staticOtp || String(Math.floor(10 ** (OTP_LENGTH - 1) + Math.random() * 9 * 10 ** (OTP_LENGTH - 1)));
 
-const issuePortalToken = (customer) => {
+const issuePortalToken = async (customer) => {
   const accessToken = jwt.sign(
     { customerId: customer.id, type: 'customer' },
     env.jwt.secret,
     { expiresIn: env.jwt.portalExpiresIn }
   );
+
+  const portalCustomerIds = await resolveCustomerIdsByMobile(customer.id);
+  const features = await entitlements.getPortalFeatures(portalCustomerIds);
 
   return {
     accessToken,
@@ -46,6 +51,7 @@ const issuePortalToken = (customer) => {
       mobile: customer.mobile,
       city: customer.city,
       farm_company: customer.farm_company,
+      features,
     },
   };
 };
@@ -897,7 +903,9 @@ const listInvoices = async (customerIds, { page, limit } = {}) => {
   const ids = asArray(customerIds);
   const { offset, page: p, limit: l } = paginate(page, limit);
   const countResult = await query(
-    'SELECT COUNT(*) FROM invoices WHERE customer_id = ANY($1::uuid[]) AND status NOT IN (\'cancelled\', \'refunded\')',
+    `SELECT COUNT(*) FROM invoices WHERE customer_id = ANY($1::uuid[])
+       AND deleted_at IS NULL
+       AND status NOT IN ('cancelled', 'refunded')`,
     [ids]
   );
   const total = parseInt(countResult.rows[0].count, 10);
@@ -908,7 +916,9 @@ const listInvoices = async (customerIds, { page, limit } = {}) => {
             GREATEST(i.total - COALESCE(p.paid, 0), 0) AS balance_due
      FROM invoices i
      LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments GROUP BY invoice_id) p ON p.invoice_id = i.id
-     WHERE i.customer_id = ANY($1::uuid[]) AND i.status NOT IN ('cancelled', 'refunded')
+     WHERE i.customer_id = ANY($1::uuid[])
+       AND ${notDeleted('i')}
+       AND i.status NOT IN ('cancelled', 'refunded')
      ORDER BY i.created_at DESC
      LIMIT $2 OFFSET $3`,
     [ids, l, offset]
@@ -921,7 +931,7 @@ const listInvoices = async (customerIds, { page, limit } = {}) => {
 const serveInvoicePdf = async (invoiceId, customerIds, res) => {
   const ids = asArray(customerIds);
   const invoice = await query(
-    'SELECT id FROM invoices WHERE id = $1 AND customer_id = ANY($2::uuid[])',
+    `SELECT id FROM invoices WHERE id = $1 AND customer_id = ANY($2::uuid[]) AND deleted_at IS NULL`,
     [invoiceId, ids]
   );
   if (!invoice.rows[0]) throw new AppError('Invoice not found', 404, 'NOT_FOUND');

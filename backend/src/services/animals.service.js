@@ -68,9 +68,17 @@ const create = async (data, userId) => {
     await client.query('SELECT pg_advisory_xact_lock($1)', [ANIMAL_CODE_LOCK]);
     const animalCode = await generateRandomAnimalCode(client.query.bind(client));
     const result = await client.query(
-      `INSERT INTO animals (id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip, owner_id, medical_history, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [uuidv4(), animalCode, speciesCode, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId]
+      `INSERT INTO animals (
+         id, animal_code, animal_type, name_tag, age, gender, weight, color, breed, rfid_chip,
+         owner_id, medical_history, created_by, birth_date, registration_number, sire_id, dam_id, sire_name, dam_name
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+      [
+        uuidv4(), animalCode, speciesCode, data.name_tag, data.age, data.gender, data.weight, data.color,
+        data.breed, data.rfid_chip, data.owner_id, data.medical_history, userId,
+        data.birth_date || null, data.registration_number || null, data.sire_id || null, data.dam_id || null,
+        data.sire_name || null, data.dam_name || null,
+      ]
     );
     await client.query('COMMIT');
     return result.rows[0];
@@ -83,12 +91,19 @@ const create = async (data, userId) => {
 };
 
 const update = async (id, data) => {
-  await getById(id);
+  const existing = await getById(id);
   const speciesCode = await speciesService.assertActiveSpecies(data.animal_type);
+  const pick = (key, fallback = existing[key]) => (data[key] !== undefined ? (data[key] || null) : fallback);
   const result = await query(
     `UPDATE animals SET animal_type=$1, name_tag=$2, age=$3, gender=$4, weight=$5, color=$6, breed=$7,
-     rfid_chip=$8, owner_id=$9, medical_history=$10, updated_at=NOW() WHERE id=$11 RETURNING *`,
-    [speciesCode, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed, data.rfid_chip, data.owner_id, data.medical_history, id]
+     rfid_chip=$8, owner_id=$9, medical_history=$10, birth_date=$11, registration_number=$12,
+     sire_id=$13, dam_id=$14, sire_name=$15, dam_name=$16, updated_at=NOW() WHERE id=$17 RETURNING *`,
+    [
+      speciesCode, data.name_tag, data.age, data.gender, data.weight, data.color, data.breed,
+      data.rfid_chip, data.owner_id, data.medical_history,
+      pick('birth_date'), pick('registration_number'), pick('sire_id'), pick('dam_id'),
+      pick('sire_name'), pick('dam_name'), id,
+    ]
   );
   const lifecycle = require('./report-lifecycle.service');
   await lifecycle.markReportsNeedsUpdateByAnimalId(id, 'ANIMAL');

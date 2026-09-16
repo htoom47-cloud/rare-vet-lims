@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban, Phone } from 'lucide-react';
+import { Plus, Search, Route, Receipt, CreditCard, Pencil, Send, MessageCircle, Ban, Phone, PawPrint } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -38,6 +38,7 @@ export default function Customers() {
   const canSkipReadyReports = canSendReports && !!user?.features?.skipReadyReports;
   const canHatifWhatsapp = canSendReports && !!user?.features?.hatifWhatsapp;
   const canHatifCall = canSendReports && !!user?.features?.hatifCall;
+  const canHerdGrant = canEdit && !!user?.features?.breederDashboard;
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -63,6 +64,17 @@ export default function Customers() {
   const [hatifSending, setHatifSending] = useState(false);
   const [hatifCalling, setHatifCalling] = useState(false);
   const [hatifOpeningChat, setHatifOpeningChat] = useState(false);
+  const [herdGrant, setHerdGrant] = useState({ enabled: false, expires_at: '', notes: '' });
+  const [herdSaving, setHerdSaving] = useState(false);
+
+  const applyHerdFromCustomer = (customer) => {
+    const row = customer?.entitlements?.breeder_dashboard;
+    setHerdGrant({
+      enabled: row?.enabled === true,
+      expires_at: row?.expires_at ? String(row.expires_at).slice(0, 10) : '',
+      notes: row?.notes || '',
+    });
+  };
 
   const load = () => {
     setLoading(true);
@@ -130,6 +142,7 @@ export default function Customers() {
         if (profileOpen && selected?.id === editingId) {
           const { data } = await customersAPI.get(editingId);
           setSelected(data.data);
+          applyHerdFromCustomer(data.data);
           await loadReadyReports(editingId);
         }
       } else {
@@ -148,6 +161,7 @@ export default function Customers() {
   const viewProfile = async (customer) => {
     const { data } = await customersAPI.get(customer.id);
     setSelected(data.data);
+    applyHerdFromCustomer(data.data);
     setProfileOpen(true);
     setConfirmSendOpen(false);
     setConfirmSkipOpen(false);
@@ -494,6 +508,71 @@ export default function Customers() {
             </div>
             {selected.notes && (
               <div className="text-sm"><span className="text-gray-500">{t('common.notes')}:</span> {selected.notes}</div>
+            )}
+
+            {canHerdGrant && (
+              <div className="border rounded-lg p-4 space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <PawPrint size={16} /> {t('customers.herdSection')}
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('customers.herdHint')}</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={herdGrant.enabled}
+                    onChange={(e) => setHerdGrant((p) => ({ ...p, enabled: e.target.checked }))}
+                  />
+                  {t('customers.herdEnable')}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('customers.herdExpires')}</label>
+                    <input
+                      type="date"
+                      value={herdGrant.expires_at}
+                      onChange={(e) => setHerdGrant((p) => ({ ...p, expires_at: e.target.value }))}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('customers.herdNotes')}</label>
+                    <input
+                      value={herdGrant.notes}
+                      onChange={(e) => setHerdGrant((p) => ({ ...p, notes: e.target.value }))}
+                      className="input-field"
+                      placeholder={t('customers.herdNotesPlaceholder')}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="btn-primary text-sm"
+                    disabled={herdSaving}
+                    onClick={async () => {
+                      setHerdSaving(true);
+                      try {
+                        await customersAPI.setEntitlement(selected.id, {
+                          feature_code: 'breeder_dashboard',
+                          enabled: herdGrant.enabled,
+                          expires_at: herdGrant.expires_at || null,
+                          notes: herdGrant.notes || null,
+                        });
+                        toast.success(t('customers.herdSaved'));
+                        const { data } = await customersAPI.get(selected.id);
+                        setSelected(data.data);
+                        applyHerdFromCustomer(data.data);
+                      } catch (err) {
+                        toast.error(err.response?.data?.error?.message || t('common.error'));
+                      } finally {
+                        setHerdSaving(false);
+                      }
+                    }}
+                  >
+                    {t('common.save')}
+                  </button>
+                </div>
+              </div>
             )}
 
             {canSendReports && (

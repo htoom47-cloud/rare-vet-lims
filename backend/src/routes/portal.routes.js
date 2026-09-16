@@ -4,6 +4,8 @@ const portalService = require('../services/portal.service');
 const { validate } = require('../middleware/validate');
 const { portalOtpRequestSchema, portalOtpVerifySchema } = require('../validators/schemas');
 const { authenticateCustomer } = require('../middleware/customerAuth');
+const entitlements = require('../services/entitlements.service');
+const breederRoutes = require('./portal-breeder.routes');
 
 const router = express.Router();
 
@@ -29,9 +31,14 @@ router.post('/auth/verify-otp', otpLimiter, validate(portalOtpVerifySchema), asy
 
 router.use(authenticateCustomer);
 
-router.get('/me', (req, res) => {
-  res.json({ success: true, data: req.customer });
+router.get('/me', async (req, res, next) => {
+  try {
+    const features = await entitlements.getPortalFeatures(req.portalCustomerIds);
+    res.json({ success: true, data: { ...req.customer, features } });
+  } catch (err) { next(err); }
 });
+
+router.use('/breeder', breederRoutes);
 
 router.get('/reports', async (req, res, next) => {
   try {
@@ -99,6 +106,13 @@ router.get('/animals/:animalId/compare', async (req, res, next) => {
       reportIds
     );
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/:id/html', async (req, res, next) => {
+  try {
+    const html = await portalService.getReportHtml(req.params.id, req.portalCustomerIds);
+    res.type('text/html; charset=utf-8').send(html);
   } catch (err) { next(err); }
 });
 

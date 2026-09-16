@@ -3,7 +3,8 @@ const service = require('../services/customers.service');
 const reportNotify = require('../services/customer-report-notifications.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { customerSchema } = require('../validators/schemas');
+const { customerSchema, entitlementSchema } = require('../validators/schemas');
+const entitlements = require('../services/entitlements.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { auditLog } = require('../middleware/audit');
 
@@ -72,6 +73,26 @@ router.post('/:id/skip-ready-reports', authorize(PERMISSIONS.NOTIFICATIONS_SEND_
   } catch (err) {
     next(err);
   }
+});
+
+router.get('/:id/entitlements', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next) => {
+  try {
+    const data = await entitlements.getBreederEntitlement(req.params.id);
+    res.json({
+      success: true,
+      data: {
+        feature_available: entitlements.isGlobalEnabled(),
+        breeder_dashboard: data,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+router.put('/:id/entitlements', authorize(PERMISSIONS.CUSTOMERS_UPDATE), validate(entitlementSchema), auditLog('update', 'customer_entitlements'), async (req, res, next) => {
+  try {
+    const data = await entitlements.upsertBreederDashboard(req.params.id, req.body, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 });
 
 router.get('/:id', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next) => {

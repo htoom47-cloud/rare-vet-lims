@@ -139,6 +139,11 @@ const env = {
      * Default false — no change until explicitly enabled.
      */
     addTestToSample: process.env.ADD_TEST_TO_SAMPLE === 'true',
+    /**
+     * When true: entitled portal customers may use the herd / breeder dashboard.
+     * Default false — no portal change until explicitly enabled, then granted per customer.
+     */
+    breederDashboard: process.env.BREEDER_DASHBOARD_ENABLED === 'true',
   },
   hatif: {
     apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',

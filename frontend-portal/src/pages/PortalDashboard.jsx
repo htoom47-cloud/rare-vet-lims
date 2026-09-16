@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { usePortal } from '../context/PortalContext';
 import {
   FileText, Bell, AlertTriangle, ChevronLeft, ChevronRight,
-  CheckCircle2, Receipt,
+  CheckCircle2, Receipt, PawPrint,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PortalLayout from '../components/portal/PortalLayout';
@@ -16,6 +17,7 @@ import AnimalsNavIcon from '../components/portal/AnimalsNavIcon';
 
 export default function PortalDashboard() {
   const { t, i18n } = useTranslation();
+  const { customer } = usePortal();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,10 +54,13 @@ export default function PortalDashboard() {
   const quickActions = [
     { to: '/reports', icon: FileText, label: t('portal.navReports') },
     { to: '/animals', icon: AnimalsNavIcon, label: t('portal.navAnimals') },
+    ...(customer?.features?.breederDashboard
+      ? [{ to: '/herd', icon: PawPrint, label: t('portal.navHerd') }]
+      : []),
     { to: '/invoices', icon: Receipt, label: t('portal.navInvoices') },
   ];
 
-  const needsAttention = (data?.stats?.animalsNeedingFollowUp ?? 0) + (data?.stats?.abnormalResults ?? 0);
+  const needsAttention = data?.stats?.animalsNeedingFollowUp ?? 0;
 
   return (
     <PortalLayout compact wide>
@@ -66,7 +71,7 @@ export default function PortalDashboard() {
 
         {!loading && data && (
           <>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className={`grid gap-2 sm:gap-3 ${quickActions.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
               {quickActions.map(({ to, icon: Icon, label }) => (
                 <button
                   key={to}

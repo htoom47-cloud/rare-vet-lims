@@ -60,6 +60,7 @@ check('staff-features exposes flags to UI', () => {
   assert.strictEqual(f.requireInvoiceBeforeBarcode, false);
   assert.strictEqual(f.requireLabHandover, false);
   assert.strictEqual(f.lockApprovedReports, false);
+  assert.strictEqual(f.breederDashboard, false);
 });
 
 console.log('\n--- Portal safety ---\n');
@@ -81,6 +82,18 @@ check('portal listDocuments filters attachments by visibility', () => {
 check('customer-scope resolves mobile aggregation', () => {
   const src = fs.readFileSync(path.join(ROOT, 'utils', 'customer-scope.js'), 'utf8');
   assert.ok(src.includes('slice(-9)'));
+});
+
+check('portal follow-up KPI counts unique animals, not result rows', () => {
+  const src = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalDashboard.jsx'),
+    'utf8'
+  );
+  assert.ok(src.includes('animalsNeedingFollowUp'));
+  assert.ok(
+    !/\(data\?\.stats\?\.animalsNeedingFollowUp[\s\S]*?\)\s*\+\s*\(data\?\.stats\?\.abnormalResults/.test(src),
+    'follow-up KPI must not add animalsNeedingFollowUp + abnormalResults'
+  );
 });
 
 console.log('\n--- Customer ready reports ---\n');
