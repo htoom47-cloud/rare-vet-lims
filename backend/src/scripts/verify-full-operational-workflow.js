@@ -138,6 +138,45 @@ check('portal herd animal delete is deactivation and blocks lab samples', () => 
   assert.ok(!layout.includes('PawPrint'));
 });
 
+check('portal herd share-by-mobile is isolated from lab reports', () => {
+  const migrate = fs.readFileSync(path.join(ROOT, 'scripts', 'migrate.js'), 'utf8');
+  assert.ok(migrate.includes('CREATE TABLE IF NOT EXISTS portal_herd_delegates'));
+  assert.ok(migrate.includes("role IN ('agent', 'worker')"));
+  const share = fs.readFileSync(path.join(ROOT, 'services', 'herd-share.service.js'), 'utf8');
+  assert.ok(share.includes('resolveHerdOwnerIds'));
+  assert.ok(share.includes('ensureDelegateCustomer'));
+  assert.ok(share.includes('revoked_at IS NOT NULL'));
+  const auth = fs.readFileSync(path.join(ROOT, 'middleware', 'customerAuth.js'), 'utf8');
+  assert.ok(auth.includes('req.herdOwnerIds'));
+  assert.ok(auth.includes('req.portalCustomerIds'));
+  const portalRoutes = fs.readFileSync(path.join(ROOT, 'routes', 'portal.routes.js'), 'utf8');
+  assert.ok(portalRoutes.includes('listReports(req.portalCustomerIds'));
+  assert.ok(!portalRoutes.includes('listReports(req.herdOwnerIds'));
+  const breederRoutes = fs.readFileSync(path.join(ROOT, 'routes', 'portal-breeder.routes.js'), 'utf8');
+  assert.ok(breederRoutes.includes("router.get('/shares'"));
+  assert.ok(breederRoutes.includes("router.post('/shares'"));
+  assert.ok(breederRoutes.includes("OWNER_ONLY"));
+  const breeder = fs.readFileSync(path.join(ROOT, 'services', 'breeder.service.js'), 'utf8');
+  assert.ok(breeder.includes('pickHerdOwnerId'));
+  const entitlements = fs.readFileSync(path.join(ROOT, 'services', 'entitlements.service.js'), 'utf8');
+  assert.ok(entitlements.includes('herdOwner'));
+  assert.ok(entitlements.includes('herdShared'));
+  const portalService = fs.readFileSync(path.join(ROOT, 'services', 'portal.service.js'), 'utf8');
+  assert.ok(portalService.includes('customerId: customer.id'));
+  const herdPage = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalHerd.jsx'),
+    'utf8'
+  );
+  assert.ok(herdPage.includes('listShares'));
+  assert.ok(herdPage.includes('addShare'));
+  assert.ok(herdPage.includes('features?.herdOwner'));
+  const api = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'services', 'portalApi.js'),
+    'utf8'
+  );
+  assert.ok(api.includes('/breeder/shares'));
+});
+
 check('portal follow-up KPI counts unique animals, not result rows', () => {
   const src = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalDashboard.jsx'),

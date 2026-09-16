@@ -33,7 +33,7 @@ router.use(authenticateCustomer);
 
 router.get('/me', async (req, res, next) => {
   try {
-    const features = await entitlements.getPortalFeatures(req.portalCustomerIds);
+    const features = await entitlements.getPortalFeatures(req.portalCustomerIds, { customerId: req.customer.id });
     res.json({ success: true, data: { ...req.customer, features } });
   } catch (err) { next(err); }
 });

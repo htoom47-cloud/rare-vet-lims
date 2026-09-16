@@ -56,9 +56,19 @@ const hasBreederDashboard = async (customerIds) => {
   }
 };
 
-const getPortalFeatures = async (customerIds) => ({
-  breederDashboard: await hasBreederDashboard(customerIds),
-});
+const getPortalFeatures = async (customerIds, { customerId } = {}) => {
+  const herdOwner = await hasBreederDashboard(customerIds);
+  let herdShared = false;
+  if (!herdOwner && customerId) {
+    const herdShare = require('./herd-share.service');
+    herdShared = await herdShare.hasDelegatedHerdAccess(customerId);
+  }
+  return {
+    breederDashboard: herdOwner || herdShared,
+    herdOwner,
+    herdShared,
+  };
+};
 
 const upsertBreederDashboard = async (customerId, { enabled, expires_at, notes }, userId) => {
   const customer = await query(

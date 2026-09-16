@@ -3,6 +3,7 @@ const { query } = require('../config/database');
 const env = require('../config/env');
 const { AppError } = require('./errorHandler');
 const { resolveCustomerIdsByMobile } = require('../utils/customer-scope');
+const herdShare = require('../services/herd-share.service');
 
 const resolvePortalCustomerIds = async (customer) => {
   if (!customer?.id) return [];
@@ -34,6 +35,11 @@ const authenticateCustomer = async (req, res, next) => {
 
     req.customer = result.rows[0];
     req.portalCustomerIds = await resolvePortalCustomerIds(result.rows[0]);
+    try {
+      req.herdOwnerIds = await herdShare.resolveHerdOwnerIds(result.rows[0].id);
+    } catch {
+      req.herdOwnerIds = req.portalCustomerIds;
+    }
     next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {

@@ -40,7 +40,7 @@ const issuePortalToken = async (customer) => {
   );
 
   const portalCustomerIds = await resolveCustomerIdsByMobile(customer.id);
-  const features = await entitlements.getPortalFeatures(portalCustomerIds);
+  const features = await entitlements.getPortalFeatures(portalCustomerIds, { customerId: customer.id });
 
   return {
     accessToken,

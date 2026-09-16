@@ -792,6 +792,33 @@ async function applyPatches() {
       ON animal_herd_notes (animal_id, kind, noted_at DESC)
       WHERE deleted_at IS NULL
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS portal_herd_delegates (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        owner_customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        delegate_customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        shared_mobile VARCHAR(30) NOT NULL,
+        shared_mobile_norm VARCHAR(20) NOT NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'worker',
+        display_name VARCHAR(200),
+        granted_by_customer_id UUID REFERENCES customers(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        revoked_at TIMESTAMPTZ,
+        CONSTRAINT portal_herd_delegates_role_check CHECK (role IN ('agent', 'worker')),
+        CONSTRAINT portal_herd_delegates_not_self CHECK (owner_customer_id <> delegate_customer_id)
+      )
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_portal_herd_delegates_active
+      ON portal_herd_delegates (owner_customer_id, shared_mobile_norm)
+      WHERE revoked_at IS NULL
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_portal_herd_delegates_delegate
+      ON portal_herd_delegates (delegate_customer_id)
+      WHERE revoked_at IS NULL
+    `);
 
     const softDeleteTables = ['customers', 'animals', 'samples', 'reports', 'invoices'];
     for (const table of softDeleteTables) {
