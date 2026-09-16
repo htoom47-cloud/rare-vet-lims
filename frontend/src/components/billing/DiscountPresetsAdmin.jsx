@@ -22,7 +22,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
   const load = () => {
     setLoading(true);
     billingAPI.listDiscountPresets({ all: true })
-      .then(({ data }) => setPresets(data.data || []))
+      .then(({ data }) => setPresets(Array.isArray(data?.data) ? data.data : []))
       .catch(() => toast.error(t('invoiceSettings.discountLoadFailed')))
       .finally(() => setLoading(false));
   };
@@ -117,7 +117,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
     return <div className="text-center py-10 text-gray-500">{t('common.loading')}</div>;
   }
 
-  const ar = i18n.language?.startsWith('ar');
+  const rows = Array.isArray(presets) ? presets : [];
 
   return (
     <div className="card p-5 space-y-5">
@@ -139,7 +139,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
             </tr>
           </thead>
           <tbody>
-            {presets.map((preset) => (
+            {rows.map((preset) => (
               <tr key={preset.id} className="border-t">
                 <td className="p-2">{preset.name_ar || preset.name}</td>
                 <td className="p-2">{preset.name || preset.name_ar}</td>
