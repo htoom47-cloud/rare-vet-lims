@@ -103,6 +103,15 @@ check('portal herd animal delete is deactivation and blocks lab samples', () => 
   assert.ok(animalPage.includes("portal.herd.deleteAnimal"));
   assert.ok(herdPage.includes('deactivateAnimal'));
   assert.ok(!herdPage.includes('PawPrint'));
+  const animalNotes = fs.readFileSync(
+    path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalHerdAnimal.jsx'),
+    'utf8'
+  );
+  assert.ok(animalNotes.includes("tab === 'health'"));
+  assert.ok(animalNotes.includes('addNote'));
+  const migrate = fs.readFileSync(path.join(ROOT, 'scripts', 'migrate.js'), 'utf8');
+  assert.ok(migrate.includes('CREATE TABLE IF NOT EXISTS animal_herd_notes'));
+  assert.ok(migrate.includes("kind IN ('health', 'extra')"));
   const dash = fs.readFileSync(
     path.join(ROOT, '..', '..', 'frontend-portal', 'src', 'pages', 'PortalDashboard.jsx'),
     'utf8'

@@ -5,7 +5,7 @@ const { generateRandomAnimalCode, ANIMAL_CODE_LOCK } = require('../utils/helpers
 const { notDeleted } = require('../utils/soft-delete-sql');
 const speciesService = require('./animal-species.service');
 const entitlements = require('./entitlements.service');
-const { GESTATION_DAYS, BREEDING_TYPES, BREEDING_OUTCOMES, GENDERS } = require('../constants/breeder');
+const { GESTATION_DAYS, BREEDING_TYPES, BREEDING_OUTCOMES, GENDERS, NOTE_KINDS } = require('../constants/breeder');
 
 const asIds = (ids) => (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
 
@@ -204,10 +204,12 @@ const getDashboard = async (customerIds) => {
 const getAnimal = async (animalId, customerIds) => {
   await assertHerdAccess(customerIds);
   const row = await assertOwnedAnimal(animalId, customerIds);
-  const [vaccinations, breeding, births, herdMales, herdFemales] = await Promise.all([
+  const [vaccinations, breeding, births, healthNotes, extraNotes, herdMales, herdFemales] = await Promise.all([
     listVaccinations(animalId, customerIds, { skipAccess: true }),
     listBreeding(animalId, customerIds, { skipAccess: true }),
     listBirths(animalId, customerIds, { skipAccess: true }),
+    listHerdNotes(animalId, customerIds, 'health', { skipAccess: true }),
+    listHerdNotes(animalId, customerIds, 'extra', { skipAccess: true }),
     query(
       `SELECT id, name_tag, animal_code, animal_type FROM animals
        WHERE owner_id = ANY($1::uuid[]) AND is_active = true AND gender = 'male' AND ${notDeleted()}
@@ -226,6 +228,8 @@ const getAnimal = async (animalId, customerIds) => {
     vaccinations,
     breeding,
     births,
+    health_notes: healthNotes,
+    extra_notes: extraNotes,
     sires: herdMales.rows,
     dams: herdFemales.rows,
     gestation_days: gestationDaysFor(row.animal_type),
@@ -648,6 +652,67 @@ const removeBirth = async (id, customerIds) => {
   return { deleted: true };
 };
 
+const mapHerdNote = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    animal_id: row.animal_id,
+    kind: row.kind,
+    body: row.body,
+    noted_at: row.noted_at,
+    created_at: row.created_at,
+  };
+};
+
+const listHerdNotes = async (animalId, customerIds, kind, { skipAccess = false } = {}) => {
+  if (!skipAccess) {
+    await assertHerdAccess(customerIds);
+    await assertOwnedAnimal(animalId, customerIds);
+  }
+  const kinds = kind && NOTE_KINDS.includes(kind) ? [kind] : NOTE_KINDS;
+  try {
+    const result = await query(
+      `SELECT id, animal_id, kind, body, noted_at, created_at
+       FROM animal_herd_notes
+       WHERE animal_id = $1 AND kind = ANY($2::text[]) AND deleted_at IS NULL
+       ORDER BY noted_at DESC, created_at DESC`,
+      [animalId, kinds]
+    );
+    return result.rows.map(mapHerdNote);
+  } catch (err) {
+    if (err.code === '42P01') return [];
+    throw err;
+  }
+};
+
+const createHerdNote = async (animalId, customerIds, actorCustomerId, data) => {
+  await assertHerdAccess(customerIds);
+  await assertOwnedAnimal(animalId, customerIds);
+  const noteKind = NOTE_KINDS.includes(data.kind) ? data.kind : null;
+  if (!noteKind) throw new AppError('Invalid note type', 400, 'VALIDATION');
+  const body = emptyToNull(data.body);
+  if (!body) throw new AppError('Note text is required', 400, 'VALIDATION');
+  const notedAt = emptyToNull(data.noted_at) || new Date().toISOString().slice(0, 10);
+  try {
+    const result = await query(
+      `INSERT INTO animal_herd_notes (id, animal_id, kind, body, noted_at, created_by_customer)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, animal_id, kind, body, noted_at, created_at`,
+      [uuidv4(), animalId, noteKind, body, notedAt, actorCustomerId || null]
+    );
+    return mapHerdNote(result.rows[0]);
+  } catch (err) {
+    if (err.code === '42P01') throw new AppError('Herd notes are not available yet', 503, 'SCHEMA_OUTDATED');
+    throw err;
+  }
+};
+
+const removeHerdNote = async (id, customerIds) => {
+  await assertHerdAccess(customerIds);
+  await getOwnedEvent('animal_herd_notes', id, customerIds);
+  await query('UPDATE animal_herd_notes SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1', [id]);
+  return { deleted: true };
+};
+
 module.exports = {
   listSpecies,
   getDashboard,
@@ -670,4 +735,7 @@ module.exports = {
   createBirth,
   updateBirth,
   removeBirth,
+  listHerdNotes,
+  createHerdNote,
+  removeHerdNote,
 };

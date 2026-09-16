@@ -14,6 +14,7 @@ const GESTATION_DAYS = {
 const BREEDING_TYPES = ['natural', 'ai', 'embryo'];
 const BREEDING_OUTCOMES = ['pending', 'pregnant', 'not_pregnant', 'aborted', 'born'];
 const GENDERS = ['male', 'female', 'unknown'];
+const NOTE_KINDS = ['health', 'extra'];
 
 module.exports = {
   FEATURE_BREEDER_DASHBOARD,
@@ -21,4 +22,5 @@ module.exports = {
   BREEDING_TYPES,
   BREEDING_OUTCOMES,
   GENDERS,
+  NOTE_KINDS,
 };
