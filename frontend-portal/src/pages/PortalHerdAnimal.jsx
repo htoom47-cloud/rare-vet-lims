@@ -39,8 +39,15 @@ export default function PortalHerdAnimal() {
   const [vaccForm, setVaccForm] = useState(emptyVacc);
   const [breedForm, setBreedForm] = useState(emptyBreed);
   const [birthForm, setBirthForm] = useState(emptyBirth);
+  const [removing, setRemoving] = useState(false);
 
   const entitled = !!customer?.features?.breederDashboard;
+
+  const herdError = (err) => {
+    const code = err.response?.data?.error?.code;
+    if (code === 'HAS_SAMPLES') return t('portal.herd.cannotDeleteHasSamples');
+    return err.response?.data?.error?.message || t('common.error');
+  };
 
   const load = () => {
     if (!entitled) { setLoading(false); return; }
@@ -156,6 +163,20 @@ export default function PortalHerdAnimal() {
     } finally { setSaving(false); }
   };
 
+  const removeAnimal = async () => {
+    if (!window.confirm(t('portal.herd.confirmDeleteAnimal'))) return;
+    setRemoving(true);
+    try {
+      await portalBreederAPI.deactivateAnimal(animalId);
+      toast.success(t('portal.herd.animalDeleted'));
+      navigate('/herd');
+    } catch (err) {
+      toast.error(herdError(err));
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const removeRow = async (kind, id) => {
     if (!window.confirm(t('portal.herd.confirmDelete'))) return;
     try {
@@ -222,9 +243,14 @@ export default function PortalHerdAnimal() {
                 {animal.sire_display && (
                   <p className="text-xs text-muted-foreground">{t('portal.herd.sire')}: {animal.sire_display}</p>
                 )}
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/animals/${animal.id}`)}>
-                  <FileText size={14} /> {t('portal.herd.labHealth')}
-                </Button>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/animals/${animal.id}`)}>
+                    <FileText size={14} /> {t('portal.herd.labHealth')}
+                  </Button>
+                  <Button size="sm" variant="destructive" disabled={removing} onClick={removeAnimal}>
+                    <Trash2 size={14} /> {t('portal.herd.deleteAnimal')}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
