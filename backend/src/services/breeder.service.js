@@ -5,7 +5,7 @@ const { generateRandomAnimalCode, ANIMAL_CODE_LOCK } = require('../utils/helpers
 const { notDeleted } = require('../utils/soft-delete-sql');
 const speciesService = require('./animal-species.service');
 const entitlements = require('./entitlements.service');
-const { GESTATION_DAYS, BREEDING_TYPES, BREEDING_OUTCOMES, GENDERS, NOTE_KINDS } = require('../constants/breeder');
+const { GESTATION_DAYS, BREEDING_TYPES, BREEDING_OUTCOMES, GENDERS, NOTE_KINDS, ADULT_MONTHS } = require('../constants/breeder');
 
 const asIds = (ids) => (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
 
@@ -36,17 +36,31 @@ const ageFromBirthDate = (birthDate) => {
   return { years: Math.floor(months / 12), months: months % 12, total_months: months };
 };
 
+const adultMonthsFor = (animalType) => (
+  ADULT_MONTHS[String(animalType || '').toLowerCase()] || ADULT_MONTHS.default
+);
+
+const isAdultByAge = (animalType, ageComputed) => {
+  const months = ageComputed?.total_months;
+  if (months == null || Number.isNaN(Number(months))) return false;
+  return Number(months) >= adultMonthsFor(animalType);
+};
+
 const mapAnimal = (row) => {
   if (!row) return null;
   const sireDisplay = row.sire_animal_name || row.sire_name || null;
   const damDisplay = row.dam_animal_name || row.dam_name || null;
+  const ageComputed = ageFromBirthDate(row.birth_date);
+  const offspringCount = parseInt(row.offspring_count, 10) || 0;
+  const damChildren = parseInt(row.dam_children, 10) || 0;
+  const produced = offspringCount > 0 || damChildren > 0;
   return {
     id: row.id,
     animal_code: row.animal_code,
     animal_type: row.animal_type,
     name_tag: row.name_tag,
     age: row.age,
-    age_computed: ageFromBirthDate(row.birth_date),
+    age_computed: ageComputed,
     gender: row.gender,
     weight: row.weight,
     color: row.color,
@@ -64,8 +78,8 @@ const mapAnimal = (row) => {
     vaccinations_due: parseInt(row.vaccinations_due, 10) || 0,
     vaccination_count: parseInt(row.vaccination_count, 10) || 0,
     pending_breeding: parseInt(row.pending_breeding, 10) || 0,
-    offspring_count: parseInt(row.offspring_count, 10) || 0,
-    is_mother: (parseInt(row.offspring_count, 10) || 0) > 0 || (parseInt(row.dam_children, 10) || 0) > 0,
+    offspring_count: offspringCount,
+    is_mother: row.gender === 'female' && (produced || isAdultByAge(row.animal_type, ageComputed)),
     is_sire: row.gender === 'male' || (parseInt(row.sire_children, 10) || 0) > 0,
     is_offspring: Boolean(row.sire_id || row.dam_id) || (parseInt(row.birth_as_offspring, 10) || 0) > 0,
     created_at: row.created_at,

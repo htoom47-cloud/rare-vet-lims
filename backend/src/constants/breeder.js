@@ -16,6 +16,18 @@ const BREEDING_OUTCOMES = ['pending', 'pregnant', 'not_pregnant', 'aborted', 'bo
 const GENDERS = ['male', 'female', 'unknown'];
 const NOTE_KINDS = ['health', 'extra'];
 
+/** Typical age (months) when a female is treated as adult for the mothers filter. */
+const ADULT_MONTHS = {
+  camel: 36,
+  horse: 36,
+  sheep: 12,
+  goat: 12,
+  cow: 24,
+  cattle: 24,
+  buffalo: 30,
+  default: 24,
+};
+
 module.exports = {
   FEATURE_BREEDER_DASHBOARD,
   GESTATION_DAYS,
@@ -23,4 +35,5 @@ module.exports = {
   BREEDING_OUTCOMES,
   GENDERS,
   NOTE_KINDS,
+  ADULT_MONTHS,
 };
