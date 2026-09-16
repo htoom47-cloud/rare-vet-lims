@@ -8,6 +8,7 @@ const fs = require('fs');
 const { generateQuotePDF } = require('../utils/quote-pdf');
 const invoiceSettingsService = require('./invoice-settings.service');
 const { calcDocumentTotals } = require('../utils/discount');
+const discountPresets = require('./discount-presets.service');
 const { prepareCatalogItems } = require('../utils/vat');
 
 const quotePdfDir = () => path.join(env.storage.path, 'quotes');
@@ -95,8 +96,9 @@ const createQuote = async (data, userId) => {
 
     if (!customerName) throw new AppError('Customer name is required', 400, 'VALIDATION_ERROR');
 
-    const catalogItems = prepareCatalogItems(data.items);
-    const totals = calcDocumentTotals(catalogItems, data);
+    const discounted = await discountPresets.applyToDocumentData(data);
+    const catalogItems = prepareCatalogItems(discounted.items);
+    const totals = calcDocumentTotals(catalogItems, discounted);
     const validUntil = data.valid_until || defaultValidUntil();
 
     const quoteId = uuidv4();

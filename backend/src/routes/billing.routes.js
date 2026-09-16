@@ -7,7 +7,8 @@ const ledger = require('../services/ledger.service');
 const quoteService = require('../services/quote.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { invoiceSchema, quoteSchema, paymentSchema, creditNoteSchema, refundSchema } = require('../validators/schemas');
+const discountPresetService = require('../services/discount-presets.service');
+const { invoiceSchema, quoteSchema, paymentSchema, creditNoteSchema, refundSchema, discountPresetSchema } = require('../validators/schemas');
 const creditNoteService = require('../services/credit-note.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { listExtraBillingServices } = require('../constants/fieldVisit');
@@ -124,6 +125,40 @@ router.put('/invoice-settings', authorize(PERMISSIONS.BILLING_CREATE), async (re
 router.post('/invoice-settings/preview', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     await invoiceSettingsService.previewInvoicePdf(res, req.body || null);
+  } catch (err) { next(err); }
+});
+
+router.get(
+  '/discount-presets',
+  authorize(PERMISSIONS.BILLING_VIEW, PERMISSIONS.BILLING_CREATE, PERMISSIONS.PRICE_LIST_VIEW),
+  async (req, res, next) => {
+    try {
+      const canManage = req.user.role_name === 'admin' || req.user.permissions.includes(PERMISSIONS.BILLING_CREATE);
+      const includeInactive = req.query.all === '1' && canManage;
+      const data = await discountPresetService.list({ includeInactive });
+      res.json({ success: true, data });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post('/discount-presets', authorize(PERMISSIONS.BILLING_CREATE), validate(discountPresetSchema), async (req, res, next) => {
+  try {
+    const data = await discountPresetService.create(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/discount-presets/:id', authorize(PERMISSIONS.BILLING_CREATE), validate(discountPresetSchema), async (req, res, next) => {
+  try {
+    const data = await discountPresetService.update(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.delete('/discount-presets/:id', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await discountPresetService.deactivate(req.params.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

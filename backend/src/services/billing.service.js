@@ -13,6 +13,7 @@ const ledger = require('./ledger.service');
 const { assertDayOpen } = require('./daily-closing.service');
 const { logBillingAudit } = require('../utils/billing-audit');
 const { calcDocumentTotals } = require('../utils/discount');
+const discountPresets = require('./discount-presets.service');
 const { prepareCatalogItems } = require('../utils/vat');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { fromHalalas, toHalalas } = require('../utils/money');
@@ -197,8 +198,9 @@ const getInvoiceById = async (id, options = {}) => {
 const createInvoice = async (data, userId, options = {}) => {
   return withBillingClient(options.client, async (client) => {
     const invoiceNumber = generateCode('INV');
-    const catalogItems = prepareCatalogItems(data.items);
-    const totals = calcDocumentTotals(catalogItems, data);
+    const discounted = await discountPresets.applyToDocumentData(data);
+    const catalogItems = prepareCatalogItems(discounted.items);
+    const totals = calcDocumentTotals(catalogItems, discounted);
 
     const invoiceId = uuidv4();
     const invoiceResult = await client.query(

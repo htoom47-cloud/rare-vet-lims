@@ -7,6 +7,19 @@ export const DISCOUNT_TYPES = {
   AMOUNT: 'amount',
 };
 
+export function countUniqueAnimals(items = []) {
+  const ids = new Set();
+  for (const item of items) {
+    if (item?.animal_id) ids.add(String(item.animal_id));
+  }
+  return ids.size;
+}
+
+export function isDiscountPresetAllowed(preset, animalCount) {
+  const min = parseInt(preset?.min_animal_count, 10) || 0;
+  return min <= 0 || Number(animalCount) > min;
+}
+
 /** Compute discount amount from subtotal and type/value. */
 export function resolveDiscountAmount(subtotal, type, value) {
   const sub = Math.max(0, parseFloat(subtotal) || 0);

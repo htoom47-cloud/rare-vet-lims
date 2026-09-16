@@ -11,7 +11,7 @@ import Modal from '../components/ui/Modal';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
-import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals } from '../utils/discount';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals, countUniqueAnimals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import { printInvoiceToEpson, EPSON_PRINT_ERROR } from '../utils/epsonPrint';
 import { billingAPI, testsAPI } from '../services/api';
@@ -643,6 +643,7 @@ export default function Billing() {
               onTypeChange={setDiscountType}
               onValueChange={setDiscountValue}
               labelKey="billing.servicesDiscount"
+              animalCount={countUniqueAnimals(invoiceForm.items)}
             />
             <DiscountField
               subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -651,6 +652,7 @@ export default function Billing() {
               onTypeChange={setFieldVisitDiscountType}
               onValueChange={setFieldVisitDiscountValue}
               labelKey="billing.fieldVisitDiscount"
+              animalCount={countUniqueAnimals(invoiceForm.items)}
             />
           </div>
 

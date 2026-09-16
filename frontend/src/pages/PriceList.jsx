@@ -9,7 +9,7 @@ import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
-import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals } from '../utils/discount';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals, countUniqueAnimals } from '../utils/discount';
 import { fmtCatalog, fmtNet, fmtGross, catalogLinesGrossTotal, VAT_RATE } from '../utils/vat';
 import toast from 'react-hot-toast';
 import {
@@ -521,6 +521,7 @@ export default function PriceList() {
                 onTypeChange={setDiscountType}
                 onValueChange={setDiscountValue}
                 labelKey="billing.servicesDiscount"
+                animalCount={countUniqueAnimals(lineItems)}
               />
               <DiscountField
                 subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -529,6 +530,7 @@ export default function PriceList() {
                 onTypeChange={setFieldVisitDiscountType}
                 onValueChange={setFieldVisitDiscountValue}
                 labelKey="billing.fieldVisitDiscount"
+                animalCount={countUniqueAnimals(lineItems)}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

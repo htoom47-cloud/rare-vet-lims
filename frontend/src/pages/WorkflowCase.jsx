@@ -743,6 +743,7 @@ export default function WorkflowCase() {
                     onTypeChange={setDiscountType}
                     onValueChange={setDiscountValue}
                     labelKey="billing.servicesDiscount"
+                    animalCount={selectedAnimalIds.length}
                   />
                   <DiscountField
                     subtotal={invoiceTotalsPreview.fieldVisitSubtotal}
@@ -751,6 +752,7 @@ export default function WorkflowCase() {
                     onTypeChange={setFieldVisitDiscountType}
                     onValueChange={setFieldVisitDiscountValue}
                     labelKey="billing.fieldVisitDiscount"
+                    animalCount={selectedAnimalIds.length}
                   />
                 </div>
                 <div className="bg-primary-50 rounded-lg p-3 text-sm space-y-1">

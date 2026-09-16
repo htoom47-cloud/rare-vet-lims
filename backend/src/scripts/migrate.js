@@ -829,6 +829,29 @@ async function applyPatches() {
         `CREATE INDEX IF NOT EXISTS idx_${table}_trash ON ${table}(purge_after) WHERE deleted_at IS NOT NULL`
       );
     }
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discount_presets (
+        id UUID PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        name_ar VARCHAR(120) NOT NULL,
+        percent DECIMAL(5,2) NOT NULL,
+        min_animal_count INTEGER NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order)
+      VALUES
+        ('8f0c1b10-4c11-4a2e-9d01-d15c00000001', 'opening', 'Opening discount', 'خصم الافتتاح', 20, 0, true, 10),
+        ('8f0c1b10-4c11-4a2e-9d01-d15c00000002', 'national_day', 'National Day discount', 'خصم اليوم الوطني', 30, 0, true, 20),
+        ('8f0c1b10-4c11-4a2e-9d01-d15c00000003', 'bulk', 'Large volume discount', 'خصم الاعداد الكبيرة', 35, 10, true, 30)
+      ON CONFLICT (code) DO NOTHING
+    `);
   } finally {
     client.release();
   }

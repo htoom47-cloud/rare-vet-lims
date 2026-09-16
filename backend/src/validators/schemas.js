@@ -142,8 +142,10 @@ const invoiceSchema = Joi.object({
   })).min(1).required(),
   discount_amount: Joi.number().min(0).default(0),
   discount_percent: Joi.number().min(0).max(100).default(0),
+  discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   field_visit_discount_amount: Joi.number().min(0).default(0),
   field_visit_discount_percent: Joi.number().min(0).max(100).default(0),
+  field_visit_discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   notes: Joi.string().allow('', null),
 });
 
@@ -155,6 +157,7 @@ const quoteSchema = Joi.object({
   items: Joi.array().items(Joi.object({
     test_id: Joi.string().uuid().allow(null),
     package_id: Joi.string().uuid().allow(null),
+    animal_id: Joi.string().uuid().allow(null),
     service_code: Joi.string().allow(null, ''),
     description: Joi.string().required(),
     quantity: Joi.number().integer().min(1).default(1),
@@ -162,11 +165,23 @@ const quoteSchema = Joi.object({
   })).min(1).required(),
   discount_amount: Joi.number().min(0).default(0),
   discount_percent: Joi.number().min(0).max(100).default(0),
+  discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   field_visit_discount_amount: Joi.number().min(0).default(0),
   field_visit_discount_percent: Joi.number().min(0).max(100).default(0),
+  field_visit_discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   notes: Joi.string().allow('', null),
   valid_until: Joi.date().iso().allow(null),
 });
+
+const discountPresetSchema = Joi.object({
+  code: Joi.string().max(50).allow('', null),
+  name: Joi.string().max(120).allow('', null),
+  name_ar: Joi.string().max(120).allow('', null),
+  percent: Joi.number().min(0.01).max(100).required(),
+  min_animal_count: Joi.number().integer().min(0).default(0),
+  sort_order: Joi.number().integer().default(0),
+  is_active: Joi.boolean(),
+}).or('name', 'name_ar');
 
 const paymentSchema = Joi.object({
   invoice_id: Joi.string().uuid().required(),
@@ -422,6 +437,7 @@ module.exports = {
   resultValidateSchema,
   invoiceSchema,
   quoteSchema,
+  discountPresetSchema,
   paymentSchema,
   creditNoteSchema,
   refundSchema,
