@@ -62,8 +62,12 @@ const mapAnimal = (row) => {
     dam_display: damDisplay,
     has_photo: Boolean(row.image_url),
     vaccinations_due: parseInt(row.vaccinations_due, 10) || 0,
+    vaccination_count: parseInt(row.vaccination_count, 10) || 0,
     pending_breeding: parseInt(row.pending_breeding, 10) || 0,
     offspring_count: parseInt(row.offspring_count, 10) || 0,
+    is_mother: (parseInt(row.offspring_count, 10) || 0) > 0 || (parseInt(row.dam_children, 10) || 0) > 0,
+    is_sire: row.gender === 'male' || (parseInt(row.sire_children, 10) || 0) > 0,
+    is_offspring: Boolean(row.sire_id || row.dam_id) || (parseInt(row.birth_as_offspring, 10) || 0) > 0,
     created_at: row.created_at,
   };
 };
@@ -78,7 +82,15 @@ const animalSelect = `
          (SELECT COUNT(*) FROM animal_breeding_events b
            WHERE b.animal_id = a.id AND b.deleted_at IS NULL AND b.outcome = 'pending') AS pending_breeding,
          (SELECT COUNT(*) FROM animal_births br
-           WHERE br.mother_id = a.id AND br.deleted_at IS NULL) AS offspring_count
+           WHERE br.mother_id = a.id AND br.deleted_at IS NULL) AS offspring_count,
+         (SELECT COUNT(*) FROM animal_vaccinations v
+           WHERE v.animal_id = a.id AND v.deleted_at IS NULL) AS vaccination_count,
+         (SELECT COUNT(*) FROM animals c
+           WHERE c.dam_id = a.id AND c.is_active = true) AS dam_children,
+         (SELECT COUNT(*) FROM animals c
+           WHERE c.sire_id = a.id AND c.is_active = true) AS sire_children,
+         (SELECT COUNT(*) FROM animal_births br
+           WHERE br.offspring_id = a.id AND br.deleted_at IS NULL) AS birth_as_offspring
   FROM animals a
   LEFT JOIN animals sire ON sire.id = a.sire_id
   LEFT JOIN animals dam ON dam.id = a.dam_id
