@@ -49,7 +49,9 @@ check('env.js defines operational flags', () => {
   assert.ok(src.includes('requireInvoiceBeforeBarcode'));
   assert.ok(src.includes('requireLabHandover'));
   assert.ok(src.includes('lockApprovedReports'));
+  assert.ok(src.includes('preliminaryReports'));
   assert.ok(src.includes("REQUIRE_INVOICE_BEFORE_BARCODE === 'true'"));
+  assert.ok(src.includes("PRELIMINARY_REPORTS_ENABLED === 'true'"));
 });
 
 check('staff-features exposes flags to UI', () => {
@@ -61,6 +63,7 @@ check('staff-features exposes flags to UI', () => {
   assert.strictEqual(f.requireLabHandover, false);
   assert.strictEqual(f.lockApprovedReports, false);
   assert.strictEqual(f.breederDashboard, false);
+  assert.strictEqual(f.preliminaryReports, false);
 });
 
 console.log('\n--- Portal safety ---\n');
@@ -237,6 +240,7 @@ check('report-lock gated by LOCK_APPROVED_REPORTS', () => {
   const src = fs.readFileSync(path.join(ROOT, 'services', 'report-lock.service.js'), 'utf8');
   assert.ok(src.includes('lockApprovedReports'));
   assert.ok(src.includes('reopenReport'));
+  assert.ok(src.includes('lab_specialist_approved_by IS NOT NULL'));
 });
 
 check('reopen report route exists', () => {
