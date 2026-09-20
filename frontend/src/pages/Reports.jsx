@@ -89,6 +89,7 @@ export default function Reports() {
   const canApproveLab = LAB_ROLES.has(user?.role || user?.role_name);
   const canApproveVet = VET_ROLES.has(user?.role || user?.role_name);
   const canRegeneratePdf = hasPermission('reports.generate');
+  const prelimEnabled = !!user?.features?.preliminaryReports;
   const userDisplayName = i18n.language === 'ar'
     ? (user?.full_name_ar || user?.full_name)
     : user?.full_name;
@@ -107,7 +108,7 @@ export default function Reports() {
   const loadCompletedSamples = (search = sampleSearch, pageNum = samplePage) => {
     setSamplesLoading(true);
     samplesAPI.list({
-      status: 'completed',
+      ...(prelimEnabled ? { reportable: true } : { status: 'completed' }),
       search: search.trim() || undefined,
       page: pageNum,
       limit: SAMPLE_PAGE_SIZE,
@@ -126,7 +127,7 @@ export default function Reports() {
     if (!generateOpen || selectedSample) return undefined;
     const timer = setTimeout(() => loadCompletedSamples(sampleSearch, samplePage), sampleSearch ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [generateOpen, selectedSample, sampleSearch, samplePage]);
+  }, [generateOpen, selectedSample, sampleSearch, samplePage, prelimEnabled]);
 
   const openGenerateModal = () => {
     setSelectedSample(null);
@@ -151,10 +152,12 @@ export default function Reports() {
     if (!sampleId || !canRegeneratePdf) return;
     samplesAPI.get(sampleId)
       .then(({ data }) => {
-        if (data.data?.status === 'completed') openGenerateForSample(data.data);
+        const sample = data.data;
+        const prelimOk = prelimEnabled && Number(sample?.validated_results_count) > 0;
+        if (sample?.status === 'completed' || prelimOk) openGenerateForSample(sample);
       })
       .catch(() => toast.error(t('common.error')));
-  }, [searchParams, canRegeneratePdf]);
+  }, [searchParams, canRegeneratePdf, prelimEnabled]);
 
   const handleVerify = async () => {
     try {
@@ -230,10 +233,12 @@ export default function Reports() {
       }
 
       const wasExisting = Boolean(selectedSample.latest_report_id || selectedSample.has_report || selectedSample.reports_count > 0);
+      const createdFinalAfterPrelim = selectedSample.latest_report_is_final === false
+        && data.data?.is_final !== false;
       toast.success(
-        wasExisting
+        wasExisting && !createdFinalAfterPrelim
           ? t('reports.updateReportDone')
-          : `${t('reports.created')} ${data.data.report_number}`
+          : `${data.data?.is_final === false ? t('reports.createdPreliminary') : t('reports.created')} ${data.data.report_number}`
       );
       setGenerateOpen(false);
       setSelectedSample(null);
@@ -267,6 +272,15 @@ export default function Reports() {
     { key: 'sample_code', label: t('reports.sampleNo') },
     { key: 'customer_name', label: t('customers.fullName') },
     { key: 'language', label: t('reports.language'), render: (r) => (r.language === 'ar' ? 'عربي' : 'EN') },
+    ...(prelimEnabled ? [{
+      key: 'is_final',
+      label: t('reports.reportKind'),
+      render: (r) => (
+        <span className={r.is_final === false ? 'text-amber-700' : 'text-emerald-700'}>
+          {r.is_final === false ? t('labReport.preliminary') : t('labReport.final')}
+        </span>
+      ),
+    }] : []),
     { key: 'created_at', label: t('common.date'), render: (r) => {
       const d = new Date(r.created_at);
       return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
@@ -402,7 +416,9 @@ export default function Reports() {
       >
         {!selectedSample ? (
           <>
-            <p className="text-sm text-gray-500 mb-3">{t('reports.selectSampleHint')}</p>
+            <p className="text-sm text-gray-500 mb-3">
+              {prelimEnabled ? t('reports.selectSampleHintPrelim') : t('reports.selectSampleHint')}
+            </p>
             <div className="relative mb-3">
               <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -416,7 +432,9 @@ export default function Reports() {
             {samplesLoading ? (
               <p className="text-center text-gray-500 py-8">{t('common.loading')}</p>
             ) : completedSamples.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">{t('reports.noCompleted')}</p>
+              <p className="text-center text-gray-500 py-8">
+                {prelimEnabled ? t('reports.noReportable') : t('reports.noCompleted')}
+              </p>
             ) : (
               <>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -429,6 +447,12 @@ export default function Reports() {
                     >
                       <p className="font-mono font-medium">{s.sample_code}</p>
                       <p className="text-sm text-gray-500">{s.customer_name} — {s.animal_code}</p>
+                      {s.status !== 'completed' && (
+                        <p className="text-xs text-amber-700 mt-1">{t('reports.preliminaryBadge')}</p>
+                      )}
+                      {s.status === 'completed' && s.latest_report_is_final === false && (
+                        <p className="text-xs text-emerald-700 mt-1">{t('reports.finalAfterPrelimBadge')}</p>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -472,6 +496,12 @@ export default function Reports() {
             <div className="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
               <p className="font-mono font-semibold">{selectedSample.sample_code}</p>
               <p className="text-sm text-primary-600">{selectedSample.customer_name} — {selectedSample.animal_code}</p>
+              {selectedSample.status !== 'completed' && (
+                <p className="text-xs text-amber-800 mt-2">{t('reports.preliminaryHint')}</p>
+              )}
+              {selectedSample.status === 'completed' && selectedSample.latest_report_is_final === false && (
+                <p className="text-xs text-emerald-800 mt-2">{t('reports.finalAfterPrelimHint')}</p>
+              )}
               <button type="button" onClick={() => setSelectedSample(null)} className="text-xs text-primary-500 mt-1 underline">
                 {t('reports.changeSample')}
               </button>

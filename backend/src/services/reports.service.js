@@ -18,6 +18,7 @@ const { buildReportSections, filterReportableAttachments, buildApprovalSection }
 const portalSync = require('./portal-sync.service');
 const reportLifecycle = require('./report-lifecycle.service');
 const { notDeleted } = require('../utils/soft-delete-sql');
+const { resolveGenerateMode, shouldReuseExistingReport } = require('../utils/preliminary-report');
 
 const INSTRUMENT_BY_CATEGORY = {
   CBC: 'Norma Icon',
@@ -256,6 +257,32 @@ const buildReportData = async (sampleId, opts) => {
     throw new AppError('No validated results found', 400, 'NO_RESULTS');
   }
 
+  let pendingTests = [];
+  if (env.features?.preliminaryReports) {
+    const pendingTestsResult = await query(
+      `SELECT DISTINCT ON (t.id) t.id AS test_id, t.code AS test_code,
+              t.name AS test_name, t.name_ar AS test_name_ar,
+              tc.code AS category_code
+       FROM sample_tests st
+       JOIN tests t ON st.test_id = t.id
+       LEFT JOIN test_categories tc ON t.category_id = tc.id
+       WHERE st.sample_id = $1 AND st.status != 'cancelled'
+         AND NOT EXISTS (
+           SELECT 1 FROM results r
+           WHERE r.sample_test_id = st.id AND r.is_validated = true
+         )
+       ORDER BY t.id, st.created_at DESC`,
+      [sampleId]
+    );
+    pendingTestsResult.rows.sort((a, b) =>
+      String(a.test_name_ar || a.test_name || '').localeCompare(
+        String(b.test_name_ar || b.test_name || ''),
+        'ar'
+      )
+    );
+    pendingTests = pendingTestsResult.rows;
+  }
+
   const uniqueByParameter = [];
   const seenParameters = new Set();
 
@@ -368,6 +395,7 @@ const buildReportData = async (sampleId, opts) => {
     previousByCode,
     trendHistory,
     attachments: reportableAttachments,
+    pendingTests,
     approvalSection: buildApprovalSection({
       labApproval: labApproval ?? { approved: false },
       vetApproval: vetApproval ?? { approved: false },
@@ -438,37 +466,110 @@ const ensurePdfFile = async (reportRow) => {
   return regeneratePdf(reportRow);
 };
 
+const loadGenerateEligibility = async (sampleId) => {
+  const sampleResult = await query(
+    'SELECT id, status FROM samples WHERE id = $1',
+    [sampleId]
+  );
+  const sample = sampleResult.rows[0];
+  if (!sample) return null;
+
+  const validated = await query(
+    `SELECT 1
+     FROM sample_tests st
+     JOIN results r ON r.sample_test_id = st.id AND r.is_validated = true
+     WHERE st.sample_id = $1 AND st.status != 'cancelled'
+     LIMIT 1`,
+    [sampleId]
+  );
+  const pending = await query(
+    `SELECT COUNT(*)::int AS n
+     FROM sample_tests st
+     WHERE st.sample_id = $1 AND st.status != 'cancelled'
+       AND NOT EXISTS (
+         SELECT 1 FROM results r
+         WHERE r.sample_test_id = st.id AND r.is_validated = true
+       )`,
+    [sampleId]
+  );
+
+  return {
+    id: sample.id,
+    status: sample.status,
+    completed: sample.status === 'completed',
+    hasValidated: Boolean(validated.rows[0]),
+    pendingCount: pending.rows[0]?.n || 0,
+  };
+};
+
+const reuseExistingReportRow = async (existing, options) => {
+  if (options.treatment_recommendations !== undefined) {
+    const next = (options.treatment_recommendations || '').trim() || null;
+    const prev = (existing.treatment_recommendations || '').trim() || null;
+    if (next !== prev) {
+      await updateNotes(existing.id, { treatment_recommendations: options.treatment_recommendations });
+      return regeneratePdfById(existing.id);
+    }
+  }
+  return getById(existing.id);
+};
+
 const generate = async (sampleId, userId, userRole, language = 'ar', options = {}) => {
   try {
   const { reconcileSampleStatuses } = require('./samples.service');
   await reconcileSampleStatuses();
 
-  const existingReport = await query(
-    `SELECT id, treatment_recommendations FROM reports
-     WHERE sample_id = $1 AND deleted_at IS NULL
-     ORDER BY created_at DESC LIMIT 1`,
-    [sampleId]
-  );
-  if (existingReport.rows[0] && !options.forceRegenerate) {
-    const existing = existingReport.rows[0];
-    // Allow editing recommendations when "creating" again for the same sample.
-    if (options.treatment_recommendations !== undefined) {
-      const next = (options.treatment_recommendations || '').trim() || null;
-      const prev = (existing.treatment_recommendations || '').trim() || null;
-      if (next !== prev) {
-        await updateNotes(existing.id, { treatment_recommendations: options.treatment_recommendations });
-        return regeneratePdfById(existing.id);
-      }
-    }
-    return getById(existing.id);
-  }
+  const prelimEnabled = !!env.features?.preliminaryReports;
+  let mode = 'final';
 
-  const sampleResult = await query(
-    'SELECT id FROM samples WHERE id = $1 AND status = $2',
-    [sampleId, 'completed']
-  );
-  if (!sampleResult.rows[0]) {
-    throw new AppError('Sample not found or not completed', 400, 'INVALID_SAMPLE');
+  if (!prelimEnabled) {
+    const existingReport = await query(
+      `SELECT id, treatment_recommendations FROM reports
+       WHERE sample_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [sampleId]
+    );
+    if (existingReport.rows[0] && !options.forceRegenerate) {
+      return reuseExistingReportRow(existingReport.rows[0], options);
+    }
+
+    const sampleResult = await query(
+      'SELECT id FROM samples WHERE id = $1 AND status = $2',
+      [sampleId, 'completed']
+    );
+    if (!sampleResult.rows[0]) {
+      throw new AppError('Sample not found or not completed', 400, 'INVALID_SAMPLE');
+    }
+  } else {
+    const eligibility = await loadGenerateEligibility(sampleId);
+    if (!eligibility) {
+      throw new AppError('Sample not found or not completed', 400, 'INVALID_SAMPLE');
+    }
+
+    mode = resolveGenerateMode({
+      flagEnabled: true,
+      completed: eligibility.completed,
+      hasValidated: eligibility.hasValidated,
+      pendingCount: eligibility.pendingCount,
+    });
+    if (!mode) {
+      throw new AppError('Sample not found or not completed', 400, 'INVALID_SAMPLE');
+    }
+
+    const existingReport = await query(
+      `SELECT id, treatment_recommendations, is_final FROM reports
+       WHERE sample_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [sampleId]
+    );
+    const existing = existingReport.rows[0];
+    if (existing && shouldReuseExistingReport({
+      forceRegenerate: options.forceRegenerate,
+      mode,
+      existingIsFinal: existing.is_final !== false,
+    })) {
+      return reuseExistingReportRow(existing, options);
+    }
   }
 
   const reportNumber = generateCode('RPT');
@@ -502,7 +603,8 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
     labApproval,
     vetApproval,
   });
-  reportData.isFinal = true;
+  const isFinal = mode === 'final';
+  reportData.isFinal = isFinal;
 
   const outputDir = path.join(ensureUploadDir(), 'reports');
   const pdf = await generateReportPDF(reportData, outputDir);
@@ -515,17 +617,24 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
   }
 
   const dupBeforeInsert = await query(
-    'SELECT id FROM reports WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1',
+    `SELECT id, treatment_recommendations, is_final FROM reports
+     WHERE sample_id = $1 AND deleted_at IS NULL
+     ORDER BY created_at DESC LIMIT 1`,
     [sampleId]
   );
-  if (dupBeforeInsert.rows[0] && !options.forceRegenerate) {
+  const dup = dupBeforeInsert.rows[0];
+  const reuseDup = dup && (
+    !prelimEnabled
+      ? !options.forceRegenerate
+      : shouldReuseExistingReport({
+        forceRegenerate: options.forceRegenerate,
+        mode,
+        existingIsFinal: dup.is_final !== false,
+      })
+  );
+  if (reuseDup) {
     try { await deleteFile(savedPdf.url); } catch { /* ignore */ }
-    const existingId = dupBeforeInsert.rows[0].id;
-    if (options.treatment_recommendations !== undefined) {
-      await updateNotes(existingId, { treatment_recommendations: options.treatment_recommendations });
-      return regeneratePdfById(existingId);
-    }
-    return getById(existingId);
+    return reuseExistingReportRow(dup, options);
   }
 
   const result = await query(
@@ -536,7 +645,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
        vet_approved_by, vet_approved_at,
        is_final
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11, $12, true)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11, $12, $13)
      RETURNING *`,
     [
       uuidv4(), reportNumber, sampleId, savedPdf.url, verificationCode, userId, language,
@@ -545,6 +654,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
       approveLab ? now : null,
       approveVet ? userId : null,
       approveVet ? now : null,
+      isFinal,
     ]
   );
 

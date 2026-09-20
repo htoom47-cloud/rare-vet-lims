@@ -22,6 +22,8 @@ const getStaffFeatures = () => ({
   addTestToSample: !!env.features?.addTestToSample,
   /** When true: Customers profile may grant herd dashboard access in the client portal */
   breederDashboard: !!env.features?.breederDashboard,
+  /** When true: staff may extract a preliminary report before remaining tests finish */
+  preliminaryReports: !!env.features?.preliminaryReports,
 });
 
 module.exports = { getStaffFeatures };

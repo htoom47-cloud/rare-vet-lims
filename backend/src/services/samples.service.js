@@ -68,7 +68,7 @@ const queueStatusWhere = () => {
   return `s.lab_handover_at IS NOT NULL AND s.status IN ('pending', 'received', 'running')`;
 };
 
-const list = async ({ status, search, awaiting_validation, page, limit }) => {
+const list = async ({ status, search, awaiting_validation, page, limit, reportable }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
   let where = `WHERE ${notDeleted('s')}`;
@@ -81,7 +81,32 @@ const list = async ({ status, search, awaiting_validation, page, limit }) => {
       WHERE st.sample_id = s.id AND r.is_validated = false
     )`;
   }
-  if (status) {
+  const wantReportable = reportable === 'true' || reportable === true || reportable === '1';
+  if (wantReportable) {
+    if (env.features?.preliminaryReports) {
+      where += ` AND (
+        s.status = 'completed'
+        OR (
+          s.status IN ('received', 'running')
+          AND EXISTS (
+            SELECT 1 FROM sample_tests st
+            JOIN results r ON r.sample_test_id = st.id AND r.is_validated = true
+            WHERE st.sample_id = s.id AND st.status != 'cancelled'
+          )
+          AND EXISTS (
+            SELECT 1 FROM sample_tests st
+            WHERE st.sample_id = s.id AND st.status != 'cancelled'
+              AND NOT EXISTS (
+                SELECT 1 FROM results r
+                WHERE r.sample_test_id = st.id AND r.is_validated = true
+              )
+          )
+        )
+      )`;
+    } else {
+      where += ` AND s.status = 'completed'`;
+    }
+  } else if (status) {
     params.push(status);
     where += ` AND s.status = $${params.length}`;
   }
@@ -115,6 +140,9 @@ const list = async ({ status, search, awaiting_validation, page, limit }) => {
             (SELECT rep.id FROM reports rep
              WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
              ORDER BY rep.created_at DESC LIMIT 1) as latest_report_id,
+            ${env.features?.preliminaryReports ? `(SELECT rep.is_final FROM reports rep
+             WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
+             ORDER BY rep.created_at DESC LIMIT 1) as latest_report_is_final,` : ''}
             (SELECT rep.treatment_recommendations FROM reports rep
              WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
              ORDER BY rep.created_at DESC LIMIT 1) as treatment_recommendations,
@@ -145,6 +173,9 @@ const getById = async (id) => {
              JOIN sample_tests st ON r.sample_test_id = st.id
              WHERE st.sample_id = s.id AND r.is_validated = true) as validated_results_count,
             (SELECT COUNT(*) FROM reports rep WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL) as reports_count,
+            ${env.features?.preliminaryReports ? `(SELECT rep.is_final FROM reports rep
+             WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
+             ORDER BY rep.created_at DESC LIMIT 1) as latest_report_is_final,` : ''}
             (SELECT COUNT(*) FROM notification_queue nq
              WHERE nq.metadata::jsonb->>'sample_id' = s.id::text) as notifications_count
      FROM samples s

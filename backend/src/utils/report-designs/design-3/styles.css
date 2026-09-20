@@ -282,6 +282,38 @@ body[dir='rtl'] {
   color: #fff;
 }
 
+.section--pending .section__head--pending {
+  background: #d97706;
+  color: #fff;
+}
+
+.pending-intro {
+  font-size: 9pt;
+  margin: 0 0 8px;
+  color: #444;
+}
+
+.pending-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pending-test {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 10pt;
+}
+
+.pending-test__status {
+  color: #d97706;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .badge--panel {
   background: var(--color-navy);
   color: #fff;

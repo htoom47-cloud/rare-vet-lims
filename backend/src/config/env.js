@@ -144,6 +144,12 @@ const env = {
      * Default false — no portal change until explicitly enabled, then granted per customer.
      */
     breederDashboard: process.env.BREEDER_DASHBOARD_ENABLED === 'true',
+    /**
+     * When true: staff may generate a preliminary report from validated results
+     * while other sample tests are still pending (culture / ELISA / smears).
+     * Default false — completed-sample reports only until explicitly enabled.
+     */
+    preliminaryReports: process.env.PRELIMINARY_REPORTS_ENABLED === 'true',
   },
   hatif: {
     apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',

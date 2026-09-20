@@ -10,15 +10,18 @@ const isReportApproved = (reportRow) => Boolean(
 );
 
 const fetchApprovedReportForSample = async (sampleId) => {
+  const lockClause = env.features?.preliminaryReports
+    ? 'is_final = true'
+    : `(
+         lab_specialist_approved_by IS NOT NULL
+         OR vet_approved_by IS NOT NULL
+         OR is_final = true
+       )`;
   const result = await query(
     `SELECT id, report_number, lab_specialist_approved_by, vet_approved_by, is_final
      FROM reports
      WHERE sample_id = $1
-       AND (
-         lab_specialist_approved_by IS NOT NULL
-         OR vet_approved_by IS NOT NULL
-         OR is_final = true
-       )
+       AND ${lockClause}
      ORDER BY created_at DESC
      LIMIT 1`,
     [sampleId]

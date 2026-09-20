@@ -923,6 +923,20 @@ export default function Samples() {
 
               )}
 
+              {!!user?.features?.preliminaryReports && canGenerateReport && (() => {
+                const allValidated = !!detailSample.workflow?.all_validated;
+                const hasReport = !!detailSample.workflow?.has_report;
+                const hasValidated = Number(detailSample.validated_results_count) > 0;
+                const latestIsPrelim = hasReport && detailSample.latest_report_is_final === false;
+                const showPrelimExtract = (hasValidated && !allValidated) || (allValidated && latestIsPrelim);
+                if (!showPrelimExtract) return null;
+                return (
+                  <button onClick={generateReportOnly} className="btn-primary text-sm">
+                    {allValidated ? t('workflow.goExtract') : t('workflow.goExtractPrelim')}
+                  </button>
+                );
+              })()}
+
             </div>
 
           </div>

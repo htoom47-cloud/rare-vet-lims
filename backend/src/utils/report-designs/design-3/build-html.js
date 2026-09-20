@@ -297,6 +297,31 @@ const buildClinicalSummarySection = (items, lang) => {
     </section>`;
 };
 
+const buildPendingTestsSection = (pendingTests, lang) => {
+  if (!pendingTests?.length) return '';
+  const title = t(lang, 'Tests in progress', 'فحوصات قيد الإجراء');
+  const intro = t(
+    lang,
+    'The following tests are still in progress. A final report will be issued when they are completed.',
+    'الفحوصات التالية قيد الإجراء، وسيصدر تقرير نهائي عند اكتمالها.',
+  );
+  const status = t(lang, 'In progress', 'قيد الإجراء');
+  const items = pendingTests.map((pt) => {
+    const name = lang === 'ar'
+      ? (pt.test_name_ar || pt.test_name || pt.test_code || '')
+      : (pt.test_name || pt.test_name_ar || pt.test_code || '');
+    return `<li class="pending-test"><span>${escapeHtml(name)}</span><span class="pending-test__status">${escapeHtml(status)}</span></li>`;
+  }).join('');
+  return `
+    <section class="section card section--pending">
+      <div class="section__head section__head--pending">${escapeHtml(title)}</div>
+      <div class="card__body">
+        <p class="pending-intro">${escapeHtml(intro)}</p>
+        <ul class="pending-list">${items}</ul>
+      </div>
+    </section>`;
+};
+
 const buildTreatmentRecommendationsSection = (text, lang) => {
   const body = String(text || '').trim();
   if (!body) return '';
@@ -390,6 +415,7 @@ const buildReportHtml = async (reportData) => {
       ${overviewResults.length ? buildOverview(counts, lang) : ''}
       ${recommendationsBlock}
       ${dynamicSections}
+      ${buildPendingTestsSection(reportData.pendingTests, lang)}
     </div>`;
 
   const clinicalBlock = `
