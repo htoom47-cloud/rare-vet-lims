@@ -3,7 +3,7 @@
  * Usage: node src/scripts/verify-astm-parser.js
  */
 const assert = require('assert');
-const { parseAstm, firstComponent, recordType } = require('../utils/astm');
+const { parseAstm, firstComponent, astmAssayCode, recordType } = require('../utils/astm');
 const { mapDiasysDeviceCodeToLims } = require('../utils/diasys-chem-map');
 
 let passed = 0;
@@ -24,6 +24,13 @@ console.log('\n=== ASTM parser (Diasys / generic) ===\n');
 
 check('firstComponent reads ^^^GLU^Glucose', () => {
   assert.strictEqual(firstComponent('^^^GLU^Glucose'), 'GLU');
+});
+
+check('astmAssayCode prefers BUN over DiaSys method 054', () => {
+  assert.strictEqual(astmAssayCode('^^^054^BUN'), 'BUN');
+  assert.strictEqual(astmAssayCode('^^^054^Urea'), 'Urea');
+  assert.strictEqual(astmAssayCode('^^^054'), '054');
+  assert.strictEqual(astmAssayCode('^^^BUN^Urea'), 'BUN');
 });
 
 check('recordType strips frame number', () => {
@@ -67,6 +74,7 @@ check('Does not apply Norma CBC codes to chemistry results', () => {
 
 check('Diasys static map: UREA/GPT/GOT → LIMS codes', () => {
   assert.strictEqual(mapDiasysDeviceCodeToLims('UREA'), 'BUN');
+  assert.strictEqual(mapDiasysDeviceCodeToLims('UR'), 'BUN');
   assert.strictEqual(mapDiasysDeviceCodeToLims('GPT'), 'ALT');
   assert.strictEqual(mapDiasysDeviceCodeToLims('GOT'), 'AST');
   assert.strictEqual(mapDiasysDeviceCodeToLims('UNKNOWN-XYZ'), null);
@@ -98,6 +106,17 @@ check('Prefers O barcode 260903400105 over short P patient id 553', () => {
   const parsed = parseAstm(raw);
   assert.strictEqual(parsed.sampleId, '260903400105');
   assert.strictEqual(parsed.results[0].code, 'ALB');
+});
+
+check('Empty R code uses following BUN comment as urea', () => {
+  const raw = [
+    'R|11|^^^|24.1|||||V||Guest|',
+    'C|1|I|WARNING !!! Chemistry BUN. Host Reference missing.|I',
+    'R|12|^^^MG|1.7|mg/dL||||V||Guest|',
+  ].join('\r');
+  const parsed = parseAstm(raw);
+  assert.strictEqual(parsed.results[0].code, 'BUN');
+  assert.strictEqual(parsed.results[0].value, '24.1');
 });
 
 check('Empty R code uses following GLUC GOD comment as glucose', () => {

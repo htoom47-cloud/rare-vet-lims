@@ -24,7 +24,7 @@ const SEC_H = 11;
 const ROW_H = 10;
 
 const CHEM_CODES = new Set([
-  'GLU', 'BUN', 'CREA', 'ALP', 'AST', 'GGT', 'ALT', 'ALB', 'TP',
+  'GLU', 'BUN', 'UREA', 'UR', 'URE', 'CREA', 'ALP', 'AST', 'GGT', 'ALT', 'ALB', 'TP',
   'CK', 'LDH', 'IRON', 'CA', 'PHOS', 'T4', 'PCR-RES', 'SP-RATIO', 'GROWTH', 'TITER', 'FINDINGS',
 ]);
 
@@ -53,7 +53,7 @@ const CBC_SECTIONS = [
 ];
 
 const CHEM_SECTIONS = [
-  { key: 'renal', titleEn: 'Renal function', titleAr: 'وظائف الكلى', codes: ['BUN', 'CREA'], column: 'left' },
+  { key: 'renal', titleEn: 'Renal function', titleAr: 'وظائف الكلى', codes: ['BUN', 'UREA', 'UR', 'URE', 'CREA'], column: 'left' },
   { key: 'sugar', titleEn: 'Sugar level', titleAr: 'مستويات السكر', codes: ['GLU'], column: 'left' },
   { key: 'lft', titleEn: 'L.F.T', titleAr: 'وظائف الكبد', codes: ['ALP', 'AST', 'GGT', 'ALT', 'ALB', 'TP'], column: 'left' },
   { key: 'muscle', titleEn: 'Muscle profiles', titleAr: 'العضلات', codes: ['CK', 'LDH'], column: 'right' },

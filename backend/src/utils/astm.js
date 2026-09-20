@@ -7,6 +7,18 @@ const firstComponent = (field) => {
   return parts[0] || '';
 };
 
+/**
+ * Assay code from an R-record Universal Test ID.
+ * Prefer a named token (BUN, UREA, GLU) over a leading sequence/method number,
+ * but keep numeric method codes such as DiaSys 054 when that is all that is sent.
+ */
+const astmAssayCode = (field) => {
+  const parts = String(field || '').split('^').map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  const named = parts.find((p) => /[A-Za-z]/.test(p));
+  return named || parts[0];
+};
+
 /** H / 1H / P / 2P → record letter. */
 const recordType = (rawType) => {
   const s = String(rawType || '').trim();
@@ -22,7 +34,7 @@ const inferCodeFromComments = (lines, startIndex) => {
     if (type !== 'C') continue;
     const text = String(lines[j] || '');
     if (/GLUC/i.test(text)) return 'GLU';
-    if (/\bBUN\b/i.test(text) || /UREA|URE\b/i.test(text)) return 'BUN';
+    if (/\bBUN\b/i.test(text) || /UREA/i.test(text) || /\bURE\b/i.test(text) || /\bUR\b/i.test(text)) return 'BUN';
     if (/CREA/i.test(text)) return 'CREAJ';
   }
   return '';
@@ -65,7 +77,7 @@ function parseAstm(raw) {
     }
 
     if (type === 'R') {
-      let code = firstComponent(fields[2]);
+      let code = astmAssayCode(fields[2]);
       const value = (fields[3] ?? '').trim();
       const unit = (fields[4] || '').trim();
       const refRaw = (fields[5] || '').trim();
@@ -97,4 +109,4 @@ function parseAstm(raw) {
   };
 }
 
-module.exports = { parseAstm, firstComponent, recordType };
+module.exports = { parseAstm, firstComponent, astmAssayCode, recordType };
