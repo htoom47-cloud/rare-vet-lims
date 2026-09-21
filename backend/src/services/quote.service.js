@@ -13,6 +13,36 @@ const { prepareCatalogItems } = require('../utils/vat');
 
 const quotePdfDir = () => path.join(env.storage.path, 'quotes');
 
+const attachQuoteDiscountLabels = async (quote) => {
+  const servicePct = parseFloat(quote.discount_percent) || 0;
+  const fvPct = parseFloat(quote.field_visit_discount_percent) || 0;
+  let discount_name_ar = 'خصم الخدمات';
+  let discount_name_en = 'Services discount';
+  let field_visit_discount_name_ar = 'خصم الزيارة الميدانية';
+  let field_visit_discount_name_en = 'Field visit discount';
+  if (servicePct > 0) {
+    const preset = await discountPresets.findActiveByPercent(servicePct);
+    if (preset) {
+      discount_name_ar = preset.name_ar || preset.name || discount_name_ar;
+      discount_name_en = preset.name || preset.name_ar || discount_name_en;
+    }
+  }
+  if (fvPct > 0) {
+    const preset = await discountPresets.findActiveByPercent(fvPct);
+    if (preset) {
+      field_visit_discount_name_ar = preset.name_ar || preset.name || field_visit_discount_name_ar;
+      field_visit_discount_name_en = preset.name || preset.name_ar || field_visit_discount_name_en;
+    }
+  }
+  return {
+    ...quote,
+    discount_name_ar,
+    discount_name_en,
+    field_visit_discount_name_ar,
+    field_visit_discount_name_en,
+  };
+};
+
 const defaultValidUntil = () => {
   const d = new Date();
   d.setDate(d.getDate() + 14);
@@ -131,7 +161,7 @@ const createQuote = async (data, userId) => {
 
     await client.query('COMMIT');
 
-    const quote = await getQuoteById(quoteId);
+    const quote = await attachQuoteDiscountLabels(await getQuoteById(quoteId));
     const settings = await invoiceSettingsService.getInvoiceSettings();
     const filename = `quote-${quote.quote_number}-${uuidv4().slice(0, 8)}.pdf`;
     const pdf = await generateQuotePDF(quote, quotePdfDir(), { filename, settings });
@@ -147,7 +177,7 @@ const createQuote = async (data, userId) => {
 };
 
 const ensureQuotePdf = async (id) => {
-  const quote = await getQuoteById(id);
+  const quote = await attachQuoteDiscountLabels(await getQuoteById(id));
   const existingName = quote.pdf_url?.split('/').pop();
   if (existingName) {
     const filePath = path.join(quotePdfDir(), existingName);

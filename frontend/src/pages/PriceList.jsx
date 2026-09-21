@@ -9,8 +9,8 @@ import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import DiscountField from '../components/billing/DiscountField';
 import FieldVisitDistanceField from '../components/billing/FieldVisitDistanceField';
-import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals, countUniqueAnimals } from '../utils/discount';
-import { fmtCatalog, fmtNet, fmtGross, catalogLinesGrossTotal, VAT_RATE } from '../utils/vat';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, splitLineSubtotals, discountVolumeCount } from '../utils/discount';
+import { fmtCatalog, fmtNet, fmtGross, VAT_RATE } from '../utils/vat';
 import toast from 'react-hot-toast';
 import {
   FIELD_VISIT_CODE,
@@ -70,6 +70,8 @@ export default function PriceList() {
   const [quotesLoading, setQuotesLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
+  const [serviceDiscountPreset, setServiceDiscountPreset] = useState(null);
+  const [fieldVisitDiscountPreset, setFieldVisitDiscountPreset] = useState(null);
 
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
   const catLabel = (cat) => (i18n.language === 'ar' && cat?.name_ar ? cat.name_ar : cat?.name);
@@ -217,6 +219,8 @@ export default function PriceList() {
     setDiscountValue('');
     setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
     setFieldVisitDiscountValue('');
+    setServiceDiscountPreset(null);
+    setFieldVisitDiscountPreset(null);
     setNotes('');
     setValidUntil(defaultValidUntil());
     setLastQuote(null);
@@ -264,6 +268,8 @@ export default function PriceList() {
           unit_price: parseFloat(unit_price) || 0,
         })),
         ...discountFields,
+        discount_preset_id: serviceDiscountPreset?.id || null,
+        field_visit_discount_preset_id: fieldVisitDiscountPreset?.id || null,
         notes: notes.trim() || null,
         valid_until: validUntil || null,
       };
@@ -520,8 +526,9 @@ export default function PriceList() {
                 value={discountValue}
                 onTypeChange={setDiscountType}
                 onValueChange={setDiscountValue}
+                onPresetChange={setServiceDiscountPreset}
                 labelKey="billing.servicesDiscount"
-                animalCount={countUniqueAnimals(lineItems)}
+                animalCount={discountVolumeCount(lineItems)}
               />
               <DiscountField
                 subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -529,8 +536,9 @@ export default function PriceList() {
                 value={fieldVisitDiscountValue}
                 onTypeChange={setFieldVisitDiscountType}
                 onValueChange={setFieldVisitDiscountValue}
+                onPresetChange={setFieldVisitDiscountPreset}
                 labelKey="billing.fieldVisitDiscount"
-                animalCount={countUniqueAnimals(lineItems)}
+                animalCount={discountVolumeCount(lineItems)}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -546,21 +554,44 @@ export default function PriceList() {
             </div>
 
             <div className="bg-primary-50 rounded-lg p-4 space-y-1 text-sm max-w-xs ms-auto">
-              {catalogLinesGrossTotal(lineItems) > 0 && (
-                <div className="flex justify-between text-primary-700">
-                  <span>{t('priceList.catalogTotalIncl')}</span>
-                  <span>{fmtGross(catalogLinesGrossTotal(lineItems))}</span>
+              <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(totals.subtotal)}</span></div>
+              {(totals.discountAmount > 0 || totals.fieldVisitDiscountAmount > 0) && (
+                <div className="flex justify-between font-medium">
+                  <span>{t('priceList.totalBeforeDiscount')}</span>
+                  <span>{fmtGross(totals.totalBeforeDiscount)}</span>
                 </div>
               )}
-              <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(totals.subtotal)}</span></div>
               {totals.discountAmount > 0 && (
-                <div className="flex justify-between text-red-600"><span>{t('priceList.servicesDiscount')}</span><span>- {fmtNet(totals.discountAmount)}</span></div>
+                <div className="flex justify-between text-red-600">
+                  <span>
+                    {serviceDiscountPreset
+                      ? (i18n.language === 'ar' ? (serviceDiscountPreset.name_ar || serviceDiscountPreset.name) : (serviceDiscountPreset.name || serviceDiscountPreset.name_ar))
+                      : t('priceList.servicesDiscount')}
+                    {discountType === DISCOUNT_TYPES.PERCENT && discountValue ? ` (${discountValue}%)` : ''}
+                  </span>
+                  <span>- {fmtGross(totals.discountAmountGross)}</span>
+                </div>
               )}
               {totals.fieldVisitDiscountAmount > 0 && (
-                <div className="flex justify-between text-red-600"><span>{t('priceList.fieldVisitDiscount')}</span><span>- {fmtNet(totals.fieldVisitDiscountAmount)}</span></div>
+                <div className="flex justify-between text-red-600">
+                  <span>
+                    {fieldVisitDiscountPreset
+                      ? (i18n.language === 'ar' ? (fieldVisitDiscountPreset.name_ar || fieldVisitDiscountPreset.name) : (fieldVisitDiscountPreset.name || fieldVisitDiscountPreset.name_ar))
+                      : t('priceList.fieldVisitDiscount')}
+                    {fieldVisitDiscountType === DISCOUNT_TYPES.PERCENT && fieldVisitDiscountValue ? ` (${fieldVisitDiscountValue}%)` : ''}
+                  </span>
+                  <span>- {fmtGross(totals.fieldVisitDiscountAmountGross)}</span>
+                </div>
               )}
               <div className="flex justify-between"><span>{t('priceList.vat')}</span><span>{fmtNet(totals.taxAmount)}</span></div>
-              <div className="flex justify-between font-bold text-base border-t pt-1 mt-1"><span>{t('priceList.grandTotal')}</span><span>{fmtGross(totals.total)}</span></div>
+              <div className="flex justify-between font-bold text-base border-t pt-1 mt-1">
+                <span>
+                  {(totals.discountAmount > 0 || totals.fieldVisitDiscountAmount > 0)
+                    ? t('priceList.totalAfterDiscount')
+                    : t('priceList.grandTotal')}
+                </span>
+                <span>{fmtGross(totals.total)}</span>
+              </div>
             </div>
 
             <div className="flex gap-3">

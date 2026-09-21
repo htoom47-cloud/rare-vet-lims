@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { isReception } from '../utils/roles';
 import { fmtCatalog, fmtNet, VAT_RATE } from '../utils/vat';
 import DiscountField from '../components/billing/DiscountField';
-import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload } from '../utils/discount';
+import { DISCOUNT_TYPES, calcSplitTotals, buildSplitDiscountPayload, discountVolumeCount } from '../utils/discount';
 import {
   customersAPI, animalsAPI, testsAPI, billingAPI, samplesAPI,
 } from '../services/api';
@@ -743,7 +743,7 @@ export default function WorkflowCase() {
                     onTypeChange={setDiscountType}
                     onValueChange={setDiscountValue}
                     labelKey="billing.servicesDiscount"
-                    animalCount={selectedAnimalIds.length}
+                    animalCount={discountVolumeCount(workflowInvoiceItems, selectedAnimalIds.length)}
                   />
                   <DiscountField
                     subtotal={invoiceTotalsPreview.fieldVisitSubtotal}
@@ -752,7 +752,7 @@ export default function WorkflowCase() {
                     onTypeChange={setFieldVisitDiscountType}
                     onValueChange={setFieldVisitDiscountValue}
                     labelKey="billing.fieldVisitDiscount"
-                    animalCount={selectedAnimalIds.length}
+                    animalCount={discountVolumeCount(workflowInvoiceItems, selectedAnimalIds.length)}
                   />
                 </div>
                 <div className="bg-primary-50 rounded-lg p-3 text-sm space-y-1">

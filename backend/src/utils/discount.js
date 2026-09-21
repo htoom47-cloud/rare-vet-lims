@@ -23,6 +23,36 @@ const lineNetAmount = (item) => {
   return (parseFloat(item.unit_price) || 0) * qty;
 };
 
+const countDistinctAnimals = (items = []) => {
+  const ids = new Set();
+  for (const item of items) {
+    if (item?.animal_id) ids.add(String(item.animal_id));
+  }
+  return ids.size;
+};
+
+/** Test/package quantity on a quote or invoice — field visit does not count. */
+const countCatalogTestQuantity = (items = []) => {
+  let n = 0;
+  for (const item of items) {
+    if (isFieldVisitItem(item)) continue;
+    n += Math.max(1, parseInt(item.quantity, 10) || 1);
+  }
+  return n;
+};
+
+/** Volume used to unlock bulk discounts: animals or test quantity, whichever is higher. */
+const discountVolumeCount = (items = [], extraAnimalCount = 0) => Math.max(
+  countDistinctAnimals(items),
+  parseInt(extraAnimalCount, 10) || 0,
+  countCatalogTestQuantity(items),
+);
+
+const grossFromNet = (net, taxRate = 15) => {
+  const rate = parseFloat(taxRate) || 15;
+  return snapHalalaDrift(roundMoney((parseFloat(net) || 0) * (1 + rate / 100)));
+};
+
 const splitCatalogSubtotals = (items = []) => {
   let serviceSubtotal = 0;
   let fieldVisitSubtotal = 0;
@@ -93,6 +123,7 @@ const calcDocumentTotals = (items, data = {}) => {
     + Math.max(0, fieldVisitSubtotal - field_visit_discount_amount);
   const subtotal = roundMoney(subtotalRaw);
   const total = resolveVatInclusiveTotal(list, taxableRaw, taxRate);
+  const total_before_discount = resolveVatInclusiveTotal(list, subtotalRaw, taxRate);
   const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   return {
     subtotal,
@@ -100,9 +131,12 @@ const calcDocumentTotals = (items, data = {}) => {
     discount_percent,
     field_visit_discount_amount,
     field_visit_discount_percent,
+    discount_amount_gross: grossFromNet(discount_amount, taxRate),
+    field_visit_discount_amount_gross: grossFromNet(field_visit_discount_amount, taxRate),
     taxRate,
     taxAmount,
     total,
+    total_before_discount,
   };
 };
 
@@ -111,4 +145,8 @@ module.exports = {
   isFieldVisitItem,
   splitCatalogSubtotals,
   calcDocumentTotals,
+  countDistinctAnimals,
+  countCatalogTestQuantity,
+  discountVolumeCount,
+  grossFromNet,
 };

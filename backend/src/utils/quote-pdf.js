@@ -5,6 +5,7 @@ const { drawArBox, drawEn, registerPdfFonts, hasArabic, resolveBilingualCustomer
 const { mergeInvoiceSettings } = require('./invoice-settings');
 const { bilingualMetaRow, drawCustomerBlock, drawBilingualTableHeader } = require('./pdf-billing-layout');
 const { HAS_LOGO, DEFAULT_LOGO_SIZE, getBrandLogoBuffer, drawBillingHeaderLogo } = require('./pdf-logo');
+const { calcDocumentTotals, grossFromNet } = require('./discount');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 
@@ -181,9 +182,9 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
     });
 
     y += 8;
-    const totalsX = MARGIN + TW - 210;
-    const totalsW = 210;
-    const labelW = 100;
+    const totalsX = MARGIN + TW - 240;
+    const totalsW = 240;
+    const labelW = 120;
     const totalLine = (labelEn, labelAr, val, bold = false) => {
       strokeBox(doc, totalsX, y, totalsW, 16, '#faf8f5');
       cellLatin(doc, labelEn, totalsX + 4, y + 3, 48, { size: 7, bold });
@@ -191,21 +192,47 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
       cellArabic(doc, labelAr, totalsX + 52, y + 3, labelW, { size: 7, bold, align: 'right' });
       y += 16;
     };
+
+    const taxRate = parseFloat(quote.tax_rate) || 15;
+    const computed = calcDocumentTotals(quote.items || [], {
+      tax_rate: taxRate,
+      discount_percent: quote.discount_percent,
+      discount_amount: quote.discount_amount,
+      field_visit_discount_percent: quote.field_visit_discount_percent,
+      field_visit_discount_amount: quote.field_visit_discount_amount,
+    });
+    const totalBefore = computed.total_before_discount;
+    const totalAfter = parseFloat(quote.total) || computed.total;
+    const hasServiceDisc = parseFloat(quote.discount_amount) > 0;
+    const hasFvDisc = parseFloat(quote.field_visit_discount_amount) > 0;
+    const servicePct = parseFloat(quote.discount_percent) || 0;
+    const fvPct = parseFloat(quote.field_visit_discount_percent) || 0;
+    const serviceNameAr = quote.discount_name_ar || 'خصم الخدمات';
+    const serviceNameEn = quote.discount_name_en || 'Services discount';
+    const fvNameAr = quote.field_visit_discount_name_ar || 'خصم الزيارة الميدانية';
+    const fvNameEn = quote.field_visit_discount_name_en || 'Field visit discount';
+    const serviceLabelAr = servicePct > 0 ? `${serviceNameAr} (${servicePct}%)` : serviceNameAr;
+    const serviceLabelEn = servicePct > 0 ? `${serviceNameEn} (${servicePct}%)` : serviceNameEn;
+    const fvLabelAr = fvPct > 0 ? `${fvNameAr} (${fvPct}%)` : fvNameAr;
+    const fvLabelEn = fvPct > 0 ? `${fvNameEn} (${fvPct}%)` : fvNameEn;
+
     totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(quote.subtotal));
-    if (parseFloat(quote.discount_amount) > 0) {
-      const pct = parseFloat(quote.discount_percent) || 0;
-      const discEn = pct > 0 ? `Services discount (${pct}%)` : 'Services discount';
-      const discAr = pct > 0 ? `خصم الخدمات (${pct}%)` : 'خصم الخدمات';
-      totalLine(discEn, discAr, `- ${fmtMoney(quote.discount_amount)}`);
+    if (hasServiceDisc || hasFvDisc) {
+      totalLine('Total incl. VAT before discount', 'الإجمالي شامل الضريبة قبل الخصم', fmtMoney(totalBefore), true);
+      if (hasServiceDisc) {
+        totalLine(serviceLabelEn, serviceLabelAr, `- ${fmtMoney(computed.discount_amount_gross || grossFromNet(quote.discount_amount, taxRate))}`);
+      }
+      if (hasFvDisc) {
+        totalLine(fvLabelEn, fvLabelAr, `- ${fmtMoney(computed.field_visit_discount_amount_gross || grossFromNet(quote.field_visit_discount_amount, taxRate))}`);
+      }
     }
-    if (parseFloat(quote.field_visit_discount_amount) > 0) {
-      const pct = parseFloat(quote.field_visit_discount_percent) || 0;
-      const discEn = pct > 0 ? `Field visit discount (${pct}%)` : 'Field visit discount';
-      const discAr = pct > 0 ? `خصم الزيارة الميدانية (${pct}%)` : 'خصم الزيارة الميدانية';
-      totalLine(discEn, discAr, `- ${fmtMoney(quote.field_visit_discount_amount)}`);
-    }
-    totalLine(`VAT ${quote.tax_rate || 15}%`, `ضريبة القيمة المضافة ${quote.tax_rate || 15}%`, fmtMoney(quote.tax_amount));
-    totalLine('Total incl. VAT', 'الإجمالي شامل الضريبة', fmtMoney(quote.total), true);
+    totalLine(`VAT ${taxRate}%`, `ضريبة القيمة المضافة ${taxRate}%`, fmtMoney(quote.tax_amount));
+    totalLine(
+      hasServiceDisc || hasFvDisc ? 'Total incl. VAT after discount' : 'Total incl. VAT',
+      hasServiceDisc || hasFvDisc ? 'الإجمالي شامل الضريبة بعد الخصم' : 'الإجمالي شامل الضريبة',
+      fmtMoney(totalAfter),
+      true,
+    );
 
     if (quote.notes) {
       y += 10;

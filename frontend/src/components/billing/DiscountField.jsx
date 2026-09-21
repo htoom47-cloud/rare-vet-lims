@@ -19,6 +19,7 @@ export default function DiscountField({
   className = '',
   labelKey = 'billing.discountType',
   animalCount = 0,
+  onPresetChange,
 }) {
   const { t, i18n } = useTranslation();
   const [presets, setPresets] = useState([]);
@@ -61,6 +62,15 @@ export default function DiscountField({
       onValueChange?.('');
     }
   }, [animalCount, presets, type, value, onTypeChange, onValueChange]);
+
+  useEffect(() => {
+    if (!onPresetChange) return;
+    if (type !== DISCOUNT_TYPES.PERCENT || !selectedId) {
+      onPresetChange(null);
+      return;
+    }
+    onPresetChange(presets.find((p) => p.id === selectedId) || null);
+  }, [onPresetChange, presets, selectedId, type]);
 
   const gatedMins = useMemo(
     () => [...new Set(presets.filter((p) => (parseInt(p.min_animal_count, 10) || 0) > 0).map((p) => parseInt(p.min_animal_count, 10)))],
@@ -106,7 +116,7 @@ export default function DiscountField({
       {gatedMins.length > 0 && gatedMins.some((min) => animalCount <= min) && (
         <p className="text-xs text-gray-500 mt-1.5">
           {t('billing.discountBulkHint', { count: Math.min(...gatedMins) })}
-          {animalCount > 0 ? ` (${t('billing.discountAnimalsCount', { count: animalCount })})` : ''}
+          {animalCount > 0 ? ` (${t('billing.discountVolumeCount', { count: animalCount })})` : ''}
         </p>
       )}
       {applied > 0 && (

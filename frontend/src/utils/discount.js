@@ -15,9 +15,26 @@ export function countUniqueAnimals(items = []) {
   return ids.size;
 }
 
-export function isDiscountPresetAllowed(preset, animalCount) {
+export function countCatalogTestQuantity(items = []) {
+  let n = 0;
+  for (const item of items) {
+    if (isFieldVisitItem(item)) continue;
+    n += Math.max(1, parseInt(item.quantity, 10) || 1);
+  }
+  return n;
+}
+
+export function discountVolumeCount(items = [], extraAnimalCount = 0) {
+  return Math.max(
+    countUniqueAnimals(items),
+    parseInt(extraAnimalCount, 10) || 0,
+    countCatalogTestQuantity(items),
+  );
+}
+
+export function isDiscountPresetAllowed(preset, volumeCount) {
   const min = parseInt(preset?.min_animal_count, 10) || 0;
-  return min <= 0 || Number(animalCount) > min;
+  return min <= 0 || Number(volumeCount) > min;
 }
 
 /** Compute discount amount from subtotal and type/value. */
@@ -132,15 +149,22 @@ export function calcSplitTotals(
     + Math.max(0, fieldVisitSubtotal - fieldVisitDiscountAmount);
   const subtotal = roundMoney(subtotalRaw);
   const total = resolveVatInclusiveTotal(list, taxableRaw, rate, catalogPrices);
+  const totalBeforeDiscount = resolveVatInclusiveTotal(list, subtotalRaw, rate, catalogPrices);
   const taxAmount = roundMoney(total - roundMoney(taxableRaw));
+  const factor = 1 + rate / 100;
+  const discountAmountGross = snapHalalaDrift(roundMoney(discountAmount * factor));
+  const fieldVisitDiscountAmountGross = snapHalalaDrift(roundMoney(fieldVisitDiscountAmount * factor));
   return {
     subtotal,
     serviceSubtotal: roundMoney(serviceSubtotal),
     fieldVisitSubtotal: roundMoney(fieldVisitSubtotal),
     discountAmount,
     fieldVisitDiscountAmount,
+    discountAmountGross,
+    fieldVisitDiscountAmountGross,
     taxAmount,
     total,
+    totalBeforeDiscount,
   };
 }
 

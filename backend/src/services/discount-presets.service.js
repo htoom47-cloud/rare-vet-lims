@@ -1,14 +1,7 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { uuidv4 } = require('../utils/uuid');
-
-const countDistinctAnimals = (items = []) => {
-  const ids = new Set();
-  for (const item of items) {
-    if (item?.animal_id) ids.add(String(item.animal_id));
-  }
-  return ids.size;
-};
+const { countDistinctAnimals, discountVolumeCount } = require('../utils/discount');
 
 const isPresetAllowed = (preset, animalCount) => {
   const min = parseInt(preset?.min_animal_count, 10) || 0;
@@ -114,7 +107,7 @@ const resolvePresetForDocument = async (data, { presetId, percent, amount, anima
   }
   if (!isPresetAllowed(preset, animalCount)) {
     throw new AppError(
-      `هذا الخصم يتطلب أكثر من ${preset.min_animal_count} حيوانات في الفاتورة`,
+      `هذا الخصم يتطلب أكثر من ${preset.min_animal_count} فحوصات أو حيوانات`,
       400,
       'DISCOUNT_ANIMAL_MINIMUM'
     );
@@ -123,7 +116,7 @@ const resolvePresetForDocument = async (data, { presetId, percent, amount, anima
 };
 
 const applyToDocumentData = async (data) => {
-  const animalCount = countDistinctAnimals(data.items);
+  const animalCount = discountVolumeCount(data.items);
   const service = await resolvePresetForDocument(data, {
     presetId: data.discount_preset_id,
     percent: data.discount_percent,
@@ -147,9 +140,11 @@ const applyToDocumentData = async (data) => {
 
 module.exports = {
   countDistinctAnimals,
+  discountVolumeCount,
   isPresetAllowed,
   list,
   getById,
+  findActiveByPercent,
   create,
   update,
   deactivate,
