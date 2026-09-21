@@ -32,6 +32,18 @@ export function discountVolumeCount(items = [], extraAnimalCount = 0) {
   );
 }
 
+export function isFieldVisitDiscountPreset(preset) {
+  const s = `${preset?.code || ''} ${preset?.name || ''} ${preset?.name_ar || ''}`;
+  return /زيار|visit|field[_\s-]?visit|free[_\s-]?visit/i.test(s);
+}
+
+export function filterPresetsByScope(presets = [], scope = 'services') {
+  const list = Array.isArray(presets) ? presets : [];
+  if (scope === 'field_visit') return list.filter(isFieldVisitDiscountPreset);
+  if (scope === 'services') return list.filter((p) => !isFieldVisitDiscountPreset(p));
+  return list;
+}
+
 export function isDiscountPresetAllowed(preset, volumeCount) {
   const min = parseInt(preset?.min_animal_count, 10) || 0;
   return min <= 0 || Number(volumeCount) > min;

@@ -71,6 +71,8 @@ export default function WorkflowCase() {
   const [discountValue, setDiscountValue] = useState('');
   const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
+  const [serviceDiscountPreset, setServiceDiscountPreset] = useState(null);
+  const [fieldVisitDiscountPreset, setFieldVisitDiscountPreset] = useState(null);
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [samples, setSamples] = useState([]);
@@ -340,6 +342,8 @@ export default function WorkflowCase() {
         customer_id: customerId,
         items,
         ...discountFields,
+        discount_preset_id: serviceDiscountPreset?.id || null,
+        field_visit_discount_preset_id: fieldVisitDiscountPreset?.id || null,
       });
       setInvoiceId(data.data.id);
       setInvoiceNumber(data.data.invoice_number);
@@ -744,6 +748,9 @@ export default function WorkflowCase() {
                     onValueChange={setDiscountValue}
                     labelKey="billing.servicesDiscount"
                     animalCount={discountVolumeCount(workflowInvoiceItems, selectedAnimalIds.length)}
+                    onPresetChange={setServiceDiscountPreset}
+                    scope="services"
+                    allowOpen={hasPermission('billing.open_discount')}
                   />
                   <DiscountField
                     subtotal={invoiceTotalsPreview.fieldVisitSubtotal}
@@ -753,6 +760,9 @@ export default function WorkflowCase() {
                     onValueChange={setFieldVisitDiscountValue}
                     labelKey="billing.fieldVisitDiscount"
                     animalCount={discountVolumeCount(workflowInvoiceItems, selectedAnimalIds.length)}
+                    onPresetChange={setFieldVisitDiscountPreset}
+                    scope="field_visit"
+                    allowOpen={hasPermission('billing.open_discount')}
                   />
                 </div>
                 <div className="bg-primary-50 rounded-lg p-3 text-sm space-y-1">

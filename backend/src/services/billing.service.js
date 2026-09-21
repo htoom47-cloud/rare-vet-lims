@@ -198,7 +198,9 @@ const getInvoiceById = async (id, options = {}) => {
 const createInvoice = async (data, userId, options = {}) => {
   return withBillingClient(options.client, async (client) => {
     const invoiceNumber = generateCode('INV');
-    const discounted = await discountPresets.applyToDocumentData(data);
+    const discounted = await discountPresets.applyToDocumentData(data, {
+      allowOpenDiscount: options.allowOpenDiscount === true,
+    });
     const catalogItems = prepareCatalogItems(discounted.items);
     const totals = calcDocumentTotals(catalogItems, discounted);
 

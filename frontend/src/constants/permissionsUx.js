@@ -73,6 +73,7 @@ export const CODE_TO_UX_GROUP = {
   'billing.cancel': 'billing',
   'billing.day_close': 'billing',
   'billing.day_reopen': 'billing',
+  'billing.open_discount': 'billing',
 
   'inventory.view': 'quality',
   'inventory.manage': 'quality',
@@ -129,6 +130,7 @@ export const SENSITIVE_PERMISSION_CODES = new Set([
   'billing.refund',
   'billing.cancel',
   'billing.day_reopen',
+  'billing.open_discount',
   'settings.manage',
   'tests.manage',
   'devices.manage',

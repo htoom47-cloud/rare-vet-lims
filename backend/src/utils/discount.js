@@ -15,6 +15,19 @@ const isFieldVisitItem = (item) => {
   return /field visit|زيارة ميدانية/i.test(d);
 };
 
+/** Named discount that applies to field visit only (not lab tests). */
+const isFieldVisitDiscountPreset = (preset) => {
+  const s = `${preset?.code || ''} ${preset?.name || ''} ${preset?.name_ar || ''}`;
+  return /زيار|visit|field[_\s-]?visit|free[_\s-]?visit/i.test(s);
+};
+
+const filterPresetsByScope = (presets = [], scope = 'services') => {
+  const list = Array.isArray(presets) ? presets : [];
+  if (scope === 'field_visit') return list.filter(isFieldVisitDiscountPreset);
+  if (scope === 'services') return list.filter((p) => !isFieldVisitDiscountPreset(p));
+  return list;
+};
+
 const lineNetAmount = (item) => {
   const qty = parseInt(item.quantity, 10) || 1;
   if (item.total_price != null && item.total_price !== '') {
@@ -143,6 +156,8 @@ const calcDocumentTotals = (items, data = {}) => {
 module.exports = {
   resolveDiscount,
   isFieldVisitItem,
+  isFieldVisitDiscountPreset,
+  filterPresetsByScope,
   splitCatalogSubtotals,
   calcDocumentTotals,
   countDistinctAnimals,

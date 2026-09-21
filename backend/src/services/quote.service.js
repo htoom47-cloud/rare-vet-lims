@@ -13,36 +13,6 @@ const { prepareCatalogItems } = require('../utils/vat');
 
 const quotePdfDir = () => path.join(env.storage.path, 'quotes');
 
-const attachQuoteDiscountLabels = async (quote) => {
-  const servicePct = parseFloat(quote.discount_percent) || 0;
-  const fvPct = parseFloat(quote.field_visit_discount_percent) || 0;
-  let discount_name_ar = 'خصم الخدمات';
-  let discount_name_en = 'Services discount';
-  let field_visit_discount_name_ar = 'خصم الزيارة الميدانية';
-  let field_visit_discount_name_en = 'Field visit discount';
-  if (servicePct > 0) {
-    const preset = await discountPresets.findActiveByPercent(servicePct);
-    if (preset) {
-      discount_name_ar = preset.name_ar || preset.name || discount_name_ar;
-      discount_name_en = preset.name || preset.name_ar || discount_name_en;
-    }
-  }
-  if (fvPct > 0) {
-    const preset = await discountPresets.findActiveByPercent(fvPct);
-    if (preset) {
-      field_visit_discount_name_ar = preset.name_ar || preset.name || field_visit_discount_name_ar;
-      field_visit_discount_name_en = preset.name || preset.name_ar || field_visit_discount_name_en;
-    }
-  }
-  return {
-    ...quote,
-    discount_name_ar,
-    discount_name_en,
-    field_visit_discount_name_ar,
-    field_visit_discount_name_en,
-  };
-};
-
 const defaultValidUntil = () => {
   const d = new Date();
   d.setDate(d.getDate() + 14);
@@ -105,7 +75,7 @@ const getQuoteById = async (id) => {
   return { ...quoteResult.rows[0], items: itemsResult.rows };
 };
 
-const createQuote = async (data, userId) => {
+const createQuote = async (data, userId, options = {}) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -126,7 +96,9 @@ const createQuote = async (data, userId) => {
 
     if (!customerName) throw new AppError('Customer name is required', 400, 'VALIDATION_ERROR');
 
-    const discounted = await discountPresets.applyToDocumentData(data);
+    const discounted = await discountPresets.applyToDocumentData(data, {
+      allowOpenDiscount: options.allowOpenDiscount === true,
+    });
     const catalogItems = prepareCatalogItems(discounted.items);
     const totals = calcDocumentTotals(catalogItems, discounted);
     const validUntil = data.valid_until || defaultValidUntil();
@@ -161,7 +133,10 @@ const createQuote = async (data, userId) => {
 
     await client.query('COMMIT');
 
-    const quote = await attachQuoteDiscountLabels(await getQuoteById(quoteId));
+    const quote = await discountPresets.resolveQuoteDiscountLabels(await getQuoteById(quoteId), {
+      discount_preset_id: discounted.discount_preset_id,
+      field_visit_discount_preset_id: discounted.field_visit_discount_preset_id,
+    });
     const settings = await invoiceSettingsService.getInvoiceSettings();
     const filename = `quote-${quote.quote_number}-${uuidv4().slice(0, 8)}.pdf`;
     const pdf = await generateQuotePDF(quote, quotePdfDir(), { filename, settings });
@@ -177,7 +152,7 @@ const createQuote = async (data, userId) => {
 };
 
 const ensureQuotePdf = async (id) => {
-  const quote = await attachQuoteDiscountLabels(await getQuoteById(id));
+  const quote = await discountPresets.resolveQuoteDiscountLabels(await getQuoteById(id));
   const existingName = quote.pdf_url?.split('/').pop();
   if (existingName) {
     const filePath = path.join(quotePdfDir(), existingName);

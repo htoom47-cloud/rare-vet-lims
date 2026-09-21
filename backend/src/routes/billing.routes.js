@@ -16,6 +16,9 @@ const { listExtraBillingServices } = require('../constants/fieldVisit');
 const router = express.Router();
 router.use(authenticate);
 
+const canOpenDiscount = (user) =>
+  user?.role_name === 'admin' || (user?.permissions || []).includes(PERMISSIONS.BILLING_OPEN_DISCOUNT);
+
 router.get('/dashboard-summary', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     const data = await accounting.getDashboardSummary(req.query.date);
@@ -206,7 +209,9 @@ router.get('/quotes', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next
 
 router.post('/quotes', authorize(PERMISSIONS.BILLING_CREATE), validate(quoteSchema), async (req, res, next) => {
   try {
-    const data = await quoteService.createQuote(req.body, req.user.id);
+    const data = await quoteService.createQuote(req.body, req.user.id, {
+      allowOpenDiscount: canOpenDiscount(req.user),
+    });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -273,7 +278,9 @@ router.get(
 
 router.post('/invoices', authorize(PERMISSIONS.BILLING_CREATE), validate(invoiceSchema), async (req, res, next) => {
   try {
-    const data = await service.createInvoice(req.body, req.user.id);
+    const data = await service.createInvoice(req.body, req.user.id, {
+      allowOpenDiscount: canOpenDiscount(req.user),
+    });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 });

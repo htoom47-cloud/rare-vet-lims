@@ -6,7 +6,22 @@ const {
   countDistinctAnimals,
   countCatalogTestQuantity,
   discountVolumeCount,
+  isFieldVisitDiscountPreset,
+  filterPresetsByScope,
 } = require('../utils/discount');
+
+assert.strictEqual(isFieldVisitDiscountPreset({ name_ar: 'خصم الزيارة المجانية', name: 'Free visit' }), true);
+assert.strictEqual(isFieldVisitDiscountPreset({ name_ar: 'خصم الاعداد الكبيرة', name: 'Large volume discount' }), false);
+assert.strictEqual(isFieldVisitDiscountPreset({ name_ar: 'خصم الطبيب', name: 'Doctor discount' }), false);
+assert.strictEqual(filterPresetsByScope([
+  { id: '1', name_ar: 'خصم الطبيب' },
+  { id: '2', name_ar: 'خصم الزيارة المجانية' },
+  { id: '3', name_ar: 'خصم الاعداد الكبيرة' },
+], 'services').map((p) => p.id).join(','), '1,3');
+assert.strictEqual(filterPresetsByScope([
+  { id: '1', name_ar: 'خصم الطبيب' },
+  { id: '2', name_ar: 'خصم الزيارة المجانية' },
+], 'field_visit').map((p) => p.id).join(','), '2');
 
 assert.strictEqual(countDistinctAnimals([
   { animal_id: 'a' },

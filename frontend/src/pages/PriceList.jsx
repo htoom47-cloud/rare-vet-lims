@@ -529,6 +529,8 @@ export default function PriceList() {
                 onPresetChange={setServiceDiscountPreset}
                 labelKey="billing.servicesDiscount"
                 animalCount={discountVolumeCount(lineItems)}
+                scope="services"
+                allowOpen={hasPermission('billing.open_discount')}
               />
               <DiscountField
                 subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -539,6 +541,8 @@ export default function PriceList() {
                 onPresetChange={setFieldVisitDiscountPreset}
                 labelKey="billing.fieldVisitDiscount"
                 animalCount={discountVolumeCount(lineItems)}
+                scope="field_visit"
+                allowOpen={hasPermission('billing.open_discount')}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -566,7 +570,7 @@ export default function PriceList() {
                   <span>
                     {serviceDiscountPreset
                       ? (i18n.language === 'ar' ? (serviceDiscountPreset.name_ar || serviceDiscountPreset.name) : (serviceDiscountPreset.name || serviceDiscountPreset.name_ar))
-                      : t('priceList.servicesDiscount')}
+                      : t('billing.discountOpen')}
                     {discountType === DISCOUNT_TYPES.PERCENT && discountValue ? ` (${discountValue}%)` : ''}
                   </span>
                   <span>- {fmtGross(totals.discountAmountGross)}</span>
@@ -577,7 +581,7 @@ export default function PriceList() {
                   <span>
                     {fieldVisitDiscountPreset
                       ? (i18n.language === 'ar' ? (fieldVisitDiscountPreset.name_ar || fieldVisitDiscountPreset.name) : (fieldVisitDiscountPreset.name || fieldVisitDiscountPreset.name_ar))
-                      : t('priceList.fieldVisitDiscount')}
+                      : t('billing.discountOpen')}
                     {fieldVisitDiscountType === DISCOUNT_TYPES.PERCENT && fieldVisitDiscountValue ? ` (${fieldVisitDiscountValue}%)` : ''}
                   </span>
                   <span>- {fmtGross(totals.fieldVisitDiscountAmountGross)}</span>

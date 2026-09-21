@@ -79,6 +79,8 @@ export default function Billing() {
   const [discountValue, setDiscountValue] = useState('');
   const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
+  const [serviceDiscountPreset, setServiceDiscountPreset] = useState(null);
+  const [fieldVisitDiscountPreset, setFieldVisitDiscountPreset] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
     reference_number: '', notes: '',
   });
@@ -219,6 +221,8 @@ export default function Billing() {
           unit_price: parseFloat(unit_price) || 0,
         })),
         ...discountFields,
+        discount_preset_id: serviceDiscountPreset?.id || null,
+        field_visit_discount_preset_id: fieldVisitDiscountPreset?.id || null,
       });
       toast.success('تم إنشاء الفاتورة');
       setInvoiceModal(false);
@@ -644,6 +648,9 @@ export default function Billing() {
               onValueChange={setDiscountValue}
               labelKey="billing.servicesDiscount"
               animalCount={discountVolumeCount(invoiceForm.items)}
+              onPresetChange={setServiceDiscountPreset}
+              scope="services"
+              allowOpen={hasPermission('billing.open_discount')}
             />
             <DiscountField
               subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -653,6 +660,9 @@ export default function Billing() {
               onValueChange={setFieldVisitDiscountValue}
               labelKey="billing.fieldVisitDiscount"
               animalCount={discountVolumeCount(invoiceForm.items)}
+              onPresetChange={setFieldVisitDiscountPreset}
+              scope="field_visit"
+              allowOpen={hasPermission('billing.open_discount')}
             />
           </div>
 

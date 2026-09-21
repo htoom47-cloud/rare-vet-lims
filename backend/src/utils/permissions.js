@@ -56,6 +56,7 @@ const PERMISSIONS = {
   BILLING_CANCEL: 'billing.cancel',
   BILLING_DAY_CLOSE: 'billing.day_close',
   BILLING_DAY_REOPEN: 'billing.day_reopen',
+  BILLING_OPEN_DISCOUNT: 'billing.open_discount',
 
   // Inventory
   INVENTORY_VIEW: 'inventory.view',
