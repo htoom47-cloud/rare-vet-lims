@@ -6,6 +6,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { catalogLabel, aggregateThermalInvoiceItems } = require('../utils/thermal-invoice-items');
+const { paymentMethodAr } = require('../utils/invoice-thermal-pdf');
 
 let passed = 0;
 let failed = 0;
@@ -63,6 +64,37 @@ check('thermal PDF uses aggregator and omits name_tag', () => {
   const src = fs.readFileSync(path.join(__dirname, '../utils/invoice-thermal-pdf.js'), 'utf8');
   assert.ok(src.includes('aggregateThermalInvoiceItems'));
   assert.ok(!src.includes('item.name_tag'));
+});
+
+check('thermal PDF is black ink with wider margin and Arabic meta', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../utils/invoice-thermal-pdf.js'), 'utf8');
+  assert.ok(/const INK = '#000000'/.test(src));
+  assert.ok(/const MARGIN = 14/.test(src));
+  assert.ok(src.includes("drawArBox(doc, 'الحالة'"));
+  assert.ok(src.includes('status.ar'));
+  assert.ok(!/drawEn\(doc, status/.test(src));
+  assert.ok(src.includes("drawArBox(doc, 'الصنف'"));
+  assert.ok(src.includes("drawArBox(doc, 'العدد'"));
+  assert.ok(src.includes("drawArBox(doc, 'ريال'"));
+  assert.ok(src.includes('paymentMethodAr'));
+  assert.ok(!src.includes('${qty} ${'));
+});
+
+check('HTML thermal receipt uses Arabic headers and isolated qty', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../../frontend/src/utils/thermalInvoicePrint.js'),
+    'utf8'
+  );
+  assert.ok(src.includes('الصنف'));
+  assert.ok(src.includes('العدد'));
+  assert.ok(src.includes('unicode-bidi: isolate'));
+  assert.ok(src.includes("color: #000"));
+});
+
+check('paymentMethodAr maps Epson receipt methods', () => {
+  assert.strictEqual(paymentMethodAr('bank_transfer'), 'تحويل بنكي');
+  assert.strictEqual(paymentMethodAr('cash'), 'نقدي');
+  assert.strictEqual(paymentMethodAr('card'), 'شبكة');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

@@ -8,11 +8,52 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
 
-const money = (value) => `${Number(value || 0).toFixed(2)} SAR`;
+const money = (value) => Number(value || 0).toFixed(2);
 
 const lineRow = (label, value, bold = false) => (
   `<tr><td>${escapeHtml(label)}</td><td class="${bold ? 'bold' : ''}">${escapeHtml(value)}</td></tr>`
 );
+
+const PAYMENT_METHOD_AR = {
+  cash: 'نقدي',
+  card: 'شبكة',
+  bank_transfer: 'تحويل بنكي',
+  credit: 'آجل',
+};
+const PAYMENT_METHOD_EN = {
+  cash: 'Cash',
+  card: 'Card',
+  bank_transfer: 'Bank transfer',
+  credit: 'On account',
+};
+const STATUS_AR = {
+  draft: 'مسودة',
+  issued: 'صادرة',
+  paid: 'مدفوعة',
+  partial: 'مدفوعة جزئياً',
+  cancelled: 'ملغاة',
+  refunded: 'مستردة',
+};
+const STATUS_EN = {
+  draft: 'Draft',
+  issued: 'Issued',
+  paid: 'Paid',
+  partial: 'Partial',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+};
+
+const paymentMethodLabelOf = (method, isArabic) => {
+  const key = String(method || '').trim().toLowerCase().replace(/\s+/g, '_');
+  const map = isArabic ? PAYMENT_METHOD_AR : PAYMENT_METHOD_EN;
+  return map[key] || String(method || '').trim();
+};
+
+const statusLabelOf = (status, isArabic) => {
+  const key = String(status || '').trim().toLowerCase();
+  const map = isArabic ? STATUS_AR : STATUS_EN;
+  return map[key] || String(status || '').trim();
+};
 
 const DEFAULT_LAB = {
   name: 'AL NAWADER VETERINARY CARE CENTER',
@@ -56,13 +97,16 @@ export function buildThermalInvoiceHtml(invoice, labInput, {
   );
   const discount = Number(invoice.discount_amount || 0)
     + Number(invoice.field_visit_discount_amount || 0);
+  const lastPayment = (invoice.payments || []).slice(-1)[0];
+  const methodLabel = paymentMethodLabel
+    || paymentMethodLabelOf(lastPayment?.method || invoice.payment_method, isArabic);
+  const statusLabel = statusLabelOf(invoice.status, isArabic);
 
   const itemRows = items.map((item) => (
     `<tr>
       <td>${escapeHtml(item.description || item.test_name || item.service_name || '-')}</td>
-      <td>${Number(item.quantity || 1)}</td>
-      <td>${Number(item.unit_price || item.price || 0).toFixed(2)}</td>
-      <td>${Number(item.total_price || item.total || 0).toFixed(2)}</td>
+      <td class="qty">${Number(item.quantity || 1)}</td>
+      <td class="price">${money(item.total_price || item.total || 0)}</td>
     </tr>`
   )).join('');
 
@@ -77,32 +121,44 @@ export function buildThermalInvoiceHtml(invoice, labInput, {
   <meta charset="utf-8" />
   <title>${escapeHtml(invoice.invoice_number || title)}</title>
   <style>
-    @page { size: 80mm auto; margin: 2mm; }
+    @page { size: 80mm auto; margin: 4mm; }
     * { box-sizing: border-box; }
     body {
-      font-family: Tahoma, Arial, sans-serif;
-      font-size: 11px;
-      line-height: 1.35;
-      width: 76mm;
+      font-family: "IBM Plex Sans Arabic", Cairo, Tahoma, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.4;
+      width: 72mm;
       margin: 0 auto;
-      color: #111;
+      color: #000;
+      -webkit-font-smoothing: none;
     }
     .center { text-align: center; }
-    .bold { font-weight: 700; }
-    .lab { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
-    .title { font-size: 12px; font-weight: 700; margin-top: 4px; }
-    .muted { font-size: 10px; opacity: 0.85; }
-    hr { border: none; border-top: 1px dashed #333; margin: 6px 0; }
+    .bold { font-weight: 800; }
+    .lab { font-size: 16px; font-weight: 800; margin-bottom: 3px; }
+    .title { font-size: 14px; font-weight: 800; margin-top: 6px; }
+    .muted { font-size: 12px; }
+    hr { border: none; border-top: 2px solid #000; margin: 7px 0; }
     table { width: 100%; border-collapse: collapse; }
-    td, th { padding: 2px 0; vertical-align: top; }
-    .items th { border-bottom: 1px solid #333; font-size: 10px; }
-    .items td { font-size: 10px; word-break: break-word; }
-    .items th:nth-child(2), .items td:nth-child(2),
-    .items th:nth-child(3), .items td:nth-child(3),
-    .items th:nth-child(4), .items td:nth-child(4) { text-align: ${isArabic ? 'left' : 'right'}; white-space: nowrap; }
-    .totals td:last-child { text-align: ${isArabic ? 'left' : 'right'}; white-space: nowrap; }
-    .meta td:first-child { opacity: 0.75; width: 42%; }
-    .qr { display: block; margin: 8px auto 4px; width: 110px; height: 110px; }
+    td, th { padding: 3px 0; vertical-align: top; color: #000; }
+    .items th { border-bottom: 2px solid #000; font-size: 12px; }
+    .items td { font-size: 13px; word-break: break-word; }
+    .items .qty, .items th.qty {
+      width: 12mm;
+      text-align: center;
+      unicode-bidi: isolate;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .items .price, .items th.price {
+      width: 18mm;
+      text-align: ${isArabic ? 'left' : 'right'};
+      unicode-bidi: isolate;
+      white-space: nowrap;
+    }
+    .totals td:last-child { text-align: ${isArabic ? 'left' : 'right'}; white-space: nowrap; unicode-bidi: isolate; }
+    .meta td:first-child { width: 42%; }
+    .qr { display: block; margin: 8px auto 4px; width: 120px; height: 120px; }
   </style>
 </head>
 <body>
@@ -114,6 +170,7 @@ export function buildThermalInvoiceHtml(invoice, labInput, {
   <table class="meta">
     ${lineRow(isArabic ? 'رقم الفاتورة' : 'Invoice #', invoice.invoice_number, true)}
     ${lineRow(isArabic ? 'التاريخ' : 'Date', when)}
+    ${lineRow(isArabic ? 'الحالة' : 'Status', statusLabel, true)}
     ${lineRow(isArabic ? 'العميل' : 'Customer', customerName)}
     ${vatNo ? lineRow(isArabic ? 'الرقم الضريبي' : 'VAT No.', vatNo) : ''}
   </table>
@@ -121,22 +178,21 @@ export function buildThermalInvoiceHtml(invoice, labInput, {
   <table class="items">
     <thead>
       <tr>
-        <th>${isArabic ? 'البند' : 'Item'}</th>
-        <th>${isArabic ? 'كم' : 'Qty'}</th>
-        <th>${isArabic ? 'سعر' : 'Price'}</th>
-        <th>${isArabic ? 'الإجمالي' : 'Total'}</th>
+        <th>${isArabic ? 'الصنف' : 'Item'}</th>
+        <th class="qty">${isArabic ? 'العدد' : 'Qty'}</th>
+        <th class="price">${isArabic ? 'ريال' : 'SAR'}</th>
       </tr>
     </thead>
-    <tbody>${itemRows || `<tr><td colspan="4">-</td></tr>`}</tbody>
+    <tbody>${itemRows || `<tr><td colspan="3">-</td></tr>`}</tbody>
   </table>
   <hr />
   <table class="totals">
-    ${lineRow(isArabic ? 'المجموع (بدون ضريبة)' : 'Subtotal excl. VAT', money(invoice.subtotal))}
+    ${lineRow(isArabic ? 'المجموع بدون ضريبة' : 'Subtotal excl. VAT', money(invoice.subtotal))}
     ${discount > 0.009 ? lineRow(isArabic ? 'الخصم' : 'Discount', `-${money(discount)}`) : ''}
-    ${lineRow(isArabic ? 'ضريبة القيمة المضافة' : 'VAT', money(invoice.tax_amount))}
-    ${lineRow(isArabic ? 'الإجمالي شامل الضريبة' : 'Total incl. VAT', money(invoice.total), true)}
+    ${lineRow(isArabic ? 'الضريبة' : 'VAT', money(invoice.tax_amount))}
+    ${lineRow(isArabic ? 'الإجمالي' : 'Total incl. VAT', money(invoice.total), true)}
     ${paid > 0.009 ? lineRow(isArabic ? 'المدفوع' : 'Paid', money(paid)) : ''}
-    ${paymentMethodLabel ? lineRow(isArabic ? 'طريقة الدفع' : 'Payment method', paymentMethodLabel) : ''}
+    ${methodLabel ? lineRow(isArabic ? 'طريقة الدفع' : 'Payment method', methodLabel) : ''}
     ${balance > 0.009 ? lineRow(isArabic ? 'المتبقي' : 'Balance due', money(balance), true) : ''}
   </table>
   ${qrDataUrl ? `<hr /><img class="qr" src="${qrDataUrl}" alt="ZATCA QR" />` : ''}
@@ -151,7 +207,11 @@ async function buildVatQrDataUrl(vatQrData) {
   if (!vatQrData || typeof document === 'undefined') return '';
   try {
     const QRCode = (await import('qrcode')).default;
-    return await QRCode.toDataURL(String(vatQrData), { width: 160, margin: 1 });
+    return await QRCode.toDataURL(String(vatQrData), {
+      width: 180,
+      margin: 1,
+      color: { dark: '#000000', light: '#FFFFFF' },
+    });
   } catch {
     // Optional dependency — receipt still prints without QR
     return '';

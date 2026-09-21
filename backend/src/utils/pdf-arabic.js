@@ -124,7 +124,7 @@ const drawArBox = (doc, text, x, y, w, opts = {}) => {
   const imgY = fromTop ? y : y - h + 2;
 
   if (raster.available && hasArabic(str)) {
-    const buf = raster.rasterAr(str, w, h, { size, color, bold, align });
+    const buf = raster.rasterAr(str, w, h, { size, color, bold, align, scale: opts.scale });
     if (buf) {
       doc.image(buf, x, imgY, { width: w, height: h });
       return w;
