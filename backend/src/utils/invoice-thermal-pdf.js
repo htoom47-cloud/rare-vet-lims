@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const { drawArBox, drawEn, registerPdfFonts, hasArabic, resolveBilingualCustomer } = require('./pdf-arabic');
 const { mergeInvoiceSettings } = require('./invoice-settings');
 const { HAS_LOGO, getBrandLogoBuffer } = require('./pdf-logo');
+const { aggregateThermalInvoiceItems } = require('./thermal-invoice-items');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
 
@@ -28,7 +29,7 @@ const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', {
 });
 
 const estimateHeight = (invoice, { showQr, showPayments, showLogo }) => {
-  const items = invoice.items || [];
+  const items = aggregateThermalInvoiceItems(invoice.items || []);
   const payments = showPayments ? (invoice.payments || []) : [];
   let h = MARGIN;
   h += showLogo ? 52 : 36;
@@ -154,11 +155,9 @@ const generateThermalInvoicePDF = async (invoice, outputDir, options = {}) => {
     line(doc, y);
     y += 4;
 
-    (invoice.items || []).forEach((item) => {
-      const desc = item.description || item.test_name || '-';
-      const tag = item.name_tag ? ` (${item.name_tag})` : '';
+    aggregateThermalInvoiceItems(invoice.items || []).forEach((item) => {
       const qty = parseFloat(item.quantity) || 1;
-      const full = qty > 1 ? `${desc}${tag} x${qty}` : `${desc}${tag}`;
+      const full = `${qty} ${item.description || '-'}`;
       const price = fmtMoney(item.total_price);
 
       if (hasArabic(full)) {

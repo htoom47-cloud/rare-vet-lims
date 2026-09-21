@@ -270,6 +270,7 @@ check('thermal invoice HTML utility (80mm)', () => {
   assert.ok(src.includes('80mm'));
   assert.ok(src.includes('buildThermalInvoiceHtml'));
   assert.ok(src.includes('@page'));
+  assert.ok(src.includes('aggregateThermalInvoiceItems'));
 });
 
 check('WorkflowCase thermal print button', () => {

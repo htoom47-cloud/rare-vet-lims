@@ -1,6 +1,7 @@
 /**
  * Browser print — 80mm thermal simplified tax invoice (HTML/CSS, not ESC/POS).
  */
+import { aggregateThermalInvoiceItems } from './thermalInvoiceItems';
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -42,7 +43,7 @@ export function buildThermalInvoiceHtml(invoice, labInput, {
   const dir = isArabic ? 'rtl' : 'ltr';
   const lang = isArabic ? 'ar' : 'en';
   const locale = isArabic ? 'ar-SA' : 'en-GB';
-  const items = invoice.items || invoice.invoice_items || [];
+  const items = aggregateThermalInvoiceItems(invoice.items || invoice.invoice_items || []);
   const customerName = isArabic
     ? (invoice.customer_name_ar || invoice.customer_name || '-')
     : (invoice.customer_name || invoice.customer_name_ar || '-');
