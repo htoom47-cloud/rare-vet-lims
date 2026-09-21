@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BarChart3, ClipboardList, FlaskConical, Receipt } from 'lucide-react';
@@ -49,6 +49,8 @@ export default function OpsReports() {
   const [to, setTo] = useState(() => labDay());
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState(null);
+  const [serviceType, setServiceType] = useState('all');
+  const [serviceKey, setServiceKey] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +71,35 @@ export default function OpsReports() {
   const sales = report?.sales;
   const tests = report?.tests;
   const samples = report?.samples;
+  const serviceRows = sales?.by_service || [];
+  const typeOptions = useMemo(() => {
+    const present = new Set(serviceRows.map((row) => row.type).filter(Boolean));
+    return ['field_visit', 'lab_test', 'package', 'other'].filter((type) => present.has(type));
+  }, [serviceRows]);
+  const serviceOptions = useMemo(() => {
+    const list = serviceType === 'all' ? serviceRows : serviceRows.filter((row) => row.type === serviceType);
+    return list.map((row) => ({ key: row.key, type: row.type, name: row.service_name }));
+  }, [serviceRows, serviceType]);
+  const visibleServices = useMemo(() => {
+    return serviceRows.filter((row) => {
+      if (serviceType !== 'all' && row.type !== serviceType) return false;
+      if (serviceKey !== 'all' && row.key !== serviceKey) return false;
+      return true;
+    });
+  }, [serviceRows, serviceType, serviceKey]);
+  const filteredTotals = useMemo(() => ({
+    revenue: visibleServices.reduce((sum, row) => sum + (parseFloat(row.revenue) || 0), 0),
+    quantity: visibleServices.reduce((sum, row) => sum + (parseFloat(row.quantity) || 0), 0),
+    lines: visibleServices.reduce((sum, row) => sum + (parseInt(row.line_count, 10) || 0), 0),
+  }), [visibleServices]);
+  const serviceLabel = (row) => (
+    row.type === 'field_visit' ? t('opsReports.serviceTypes.field_visit') : (row.service_name || row.name || '—')
+  );
+
+  const onTypeChange = (nextType) => {
+    setServiceType(nextType);
+    setServiceKey('all');
+  };
 
   const tabs = [
     { id: 'sales', icon: Receipt, label: t('opsReports.sales') },
@@ -142,10 +173,45 @@ export default function OpsReports() {
             ])}
             empty={t('opsReports.noData')}
           />
-          <h2 className="text-sm font-semibold">{t('opsReports.byService')}</h2>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <h2 className="text-sm font-semibold">{t('opsReports.byService')}</h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="text-sm">
+                <span className="block text-gray-500 mb-1">{t('opsReports.serviceTypeFilter')}</span>
+                <select className="input-field min-w-[180px]" value={serviceType} onChange={(e) => onTypeChange(e.target.value)}>
+                  <option value="all">{t('opsReports.allTypes')}</option>
+                  {typeOptions.map((type) => (
+                    <option key={type} value={type}>{t(`opsReports.serviceTypes.${type}`)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="block text-gray-500 mb-1">{t('opsReports.serviceFilter')}</span>
+                <select className="input-field min-w-[220px]" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)}>
+                  <option value="all">{t('opsReports.allServices')}</option>
+                  {serviceOptions.map((row) => (
+                    <option key={row.key} value={row.key}>{serviceLabel(row)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+          {(serviceType !== 'all' || serviceKey !== 'all') && (
+            <div className="flex flex-wrap gap-2">
+              <SummaryCard label={t('opsReports.filteredRevenue')} value={fmt(filteredTotals.revenue)} />
+              <SummaryCard label={t('opsReports.quantity')} value={filteredTotals.quantity} />
+              <SummaryCard label={t('accounting.lineCount')} value={filteredTotals.lines} />
+            </div>
+          )}
           <ReportTable
-            headers={[t('accounting.service'), t('opsReports.revenue'), t('accounting.lineCount')]}
-            rows={(sales.by_service || []).map((row) => [row.service_name, fmt(row.revenue), row.line_count])}
+            headers={[t('opsReports.serviceTypeFilter'), t('accounting.service'), t('opsReports.quantity'), t('opsReports.revenue'), t('accounting.lineCount')]}
+            rows={visibleServices.map((row) => [
+              t(`opsReports.serviceTypes.${row.type}`, { defaultValue: row.type }),
+              serviceLabel(row),
+              row.quantity,
+              fmt(row.revenue),
+              row.line_count,
+            ])}
             empty={t('opsReports.noData')}
           />
           <h2 className="text-sm font-semibold">{t('opsReports.byCustomer')}</h2>

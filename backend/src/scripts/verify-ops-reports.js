@@ -7,6 +7,12 @@ const fs = require('fs');
 const path = require('path');
 const { labDay, labMonthRange } = require('../utils/accounting-time');
 const { resolveOperationsRange, MAX_RANGE_DAYS, isIsoDate } = require('../utils/ops-report-range');
+const {
+  stripDistanceFromServiceName,
+  classifyService,
+  groupServiceRows,
+  filterServiceRows,
+} = require('../utils/ops-service-group');
 
 const month = labMonthRange();
 const today = labDay();
@@ -34,6 +40,25 @@ try {
   threw = err.statusCode === 400 && err.code === 'VALIDATION_ERROR';
 }
 assert.strictEqual(threw, true);
+
+assert.strictEqual(stripDistanceFromServiceName('زيارة ميدانية — 60 كم من المختبر'), 'زيارة ميدانية');
+assert.strictEqual(stripDistanceFromServiceName('Field Visit — 12 km from lab'), 'Field Visit');
+assert.strictEqual(classifyService({
+  service_name: 'زيارة ميدانية — 30 كم من المختبر',
+}).type, 'field_visit');
+assert.strictEqual(classifyService({
+  test_id: 't1', service_name: 'CBC',
+}).type, 'lab_test');
+const grouped = groupServiceRows([
+  { service_name: 'زيارة ميدانية — 30 كم من المختبر', revenue: 150, quantity: 1, line_count: 1 },
+  { service_name: 'زيارة ميدانية — 80 كم من المختبر', revenue: 250, quantity: 1, line_count: 1 },
+  { test_id: 't1', service_name: 'CBC', revenue: 100, quantity: 2, line_count: 2 },
+]);
+assert.strictEqual(grouped.length, 2);
+const visit = grouped.find((row) => row.type === 'field_visit');
+assert.strictEqual(visit.revenue, 400);
+assert.strictEqual(visit.line_count, 2);
+assert.strictEqual(filterServiceRows(grouped, { type: 'field_visit' }).length, 1);
 
 const serviceSrc = fs.readFileSync(path.join(__dirname, '../services/ops-reports.service.js'), 'utf8');
 assert.ok(!/\b(INSERT|UPDATE|DELETE|ALTER)\b/.test(serviceSrc));

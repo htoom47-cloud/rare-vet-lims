@@ -2,6 +2,7 @@ const { query } = require('../config/database');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { labDateSql } = require('../utils/accounting-time');
 const { resolveOperationsRange } = require('../utils/ops-report-range');
+const { groupServiceRows } = require('../utils/ops-service-group');
 const accounting = require('./accounting.service');
 
 const OPEN_STATUSES = `status NOT IN ('cancelled', 'refunded')`;
@@ -12,7 +13,7 @@ const getOperationsReport = async (from, to) => {
 
   const [
     revenue,
-    byService,
+    serviceLines,
     byCustomer,
     invoiceStats,
     testCount,
@@ -23,7 +24,22 @@ const getOperationsReport = async (from, to) => {
     approvedReports,
   ] = await Promise.all([
     accounting.getRevenueSummary(fromDate, toDate),
-    accounting.getRevenueByService(fromDate, toDate),
+    query(
+      `SELECT ii.test_id, ii.package_id,
+              COALESCE(ii.description, t.name_ar, t.name, p.name_ar, p.name, 'General') AS service_name,
+              COALESCE(SUM(ii.total_price), 0) AS revenue,
+              COALESCE(SUM(ii.quantity), 0) AS quantity,
+              COUNT(*)::int AS line_count
+       FROM invoice_items ii
+       JOIN invoices i ON i.id = ii.invoice_id
+       LEFT JOIN tests t ON t.id = ii.test_id
+       LEFT JOIN packages p ON p.id = ii.package_id
+       WHERE ${labDateSql('i.created_at')} BETWEEN $1::date AND $2::date
+         AND i.status NOT IN ('cancelled', 'refunded')
+       GROUP BY ii.test_id, ii.package_id,
+                COALESCE(ii.description, t.name_ar, t.name, p.name_ar, p.name, 'General')`,
+      range
+    ),
     accounting.getCustomerRevenueReport(fromDate, toDate),
     query(
       `SELECT
@@ -117,7 +133,7 @@ const getOperationsReport = async (from, to) => {
       tax_total: revenue.tax_total,
       collections_total: revenue.collections_total,
       by_method: revenue.by_method || [],
-      by_service: byService.services || [],
+      by_service: groupServiceRows(serviceLines.rows),
       by_customer: byCustomer.customers || [],
     },
     tests: {
