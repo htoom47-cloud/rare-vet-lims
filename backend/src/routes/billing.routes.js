@@ -2,6 +2,7 @@ const express = require('express');
 const service = require('../services/billing.service');
 const invoiceSettingsService = require('../services/invoice-settings.service');
 const accounting = require('../services/accounting.service');
+const opsReports = require('../services/ops-reports.service');
 const dailyClosing = require('../services/daily-closing.service');
 const ledger = require('../services/ledger.service');
 const quoteService = require('../services/quote.service');
@@ -107,6 +108,13 @@ router.get('/reports/by-service', authorize(PERMISSIONS.BILLING_VIEW), async (re
 router.get('/reports/by-customer', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     const data = await accounting.getCustomerRevenueReport(req.query.from, req.query.to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/operations', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await opsReports.getOperationsReport(req.query.from, req.query.to);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

@@ -31,10 +31,29 @@ const defaultLabRange = (from, to, daysBack = 30) => ({
   toDate: to || labDay(),
 });
 
+/** First and last lab calendar dates of a month (1 → last day). Invalid input → current lab month. */
+const labMonthRange = (year, month) => {
+  const today = labDay();
+  let y = parseInt(year, 10);
+  let m = parseInt(month, 10);
+  if (!Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) {
+    y = parseInt(today.slice(0, 4), 10);
+    m = parseInt(today.slice(5, 7), 10);
+  }
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return {
+    year: y,
+    month: m,
+    fromDate: `${y}-${pad2(m)}-01`,
+    toDate: `${y}-${pad2(m)}-${pad2(lastDay)}`,
+  };
+};
+
 module.exports = {
   ACCOUNTING_TIMEZONE,
   RIYADH_OFFSET_MS,
   labDay,
   labDateSql,
   defaultLabRange,
+  labMonthRange,
 };

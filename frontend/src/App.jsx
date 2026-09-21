@@ -17,6 +17,7 @@ import ReportDemo from './pages/ReportDemo';
 import ReportLive from './pages/ReportLive';
 import Billing from './pages/Billing';
 import AccountingReports from './pages/AccountingReports';
+import OpsReports from './pages/OpsReports';
 import InvoiceSettings from './pages/InvoiceSettings';
 import PriceList from './pages/PriceList';
 import Inventory from './pages/Inventory';
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="reports/:id/view" element={<ProtectedRoute permission="reports.view"><LaboratoryReport /></ProtectedRoute>} />
               <Route path="billing" element={<ProtectedRoute permission="billing.view"><Billing /></ProtectedRoute>} />
               <Route path="accounting" element={<ProtectedRoute permission="billing.view"><AccountingReports /></ProtectedRoute>} />
+              <Route path="ops-reports" element={<ProtectedRoute permission="billing.view"><OpsReports /></ProtectedRoute>} />
               <Route path="invoice-settings" element={<ProtectedRoute permission="billing.view"><InvoiceSettings /></ProtectedRoute>} />
               <Route path="inventory" element={<ProtectedRoute permission="inventory.view"><Inventory /></ProtectedRoute>} />
               <Route path="suppliers" element={<ProtectedRoute permission="suppliers.view"><Suppliers /></ProtectedRoute>} />

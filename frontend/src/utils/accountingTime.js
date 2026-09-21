@@ -9,3 +9,6 @@ export const labDay = (instant = new Date()) => {
   const riyadh = new Date(ms);
   return `${riyadh.getUTCFullYear()}-${pad2(riyadh.getUTCMonth() + 1)}-${pad2(riyadh.getUTCDate())}`;
 };
+
+/** YYYY-MM of the lab calendar day. */
+export const labMonth = (instant = new Date()) => labDay(instant).slice(0, 7);

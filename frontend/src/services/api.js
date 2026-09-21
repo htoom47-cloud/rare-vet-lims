@@ -440,6 +440,7 @@ export const billingAPI = {
   arAgingReport: () => api.get('/billing/reports/ar-aging'),
   revenueReport: (params) => api.get('/billing/reports/revenue', { params }),
   monthlyReport: (params) => api.get('/billing/reports/monthly', { params }),
+  operationsReport: (params) => api.get('/billing/reports/operations', { params }),
   journalReport: (params) => api.get('/billing/reports/journal', { params }),
   customerStatement: (customerId) => api.get(`/billing/customers/${customerId}/statement`),
   invoiceSettings: () => api.get('/billing/invoice-settings'),
