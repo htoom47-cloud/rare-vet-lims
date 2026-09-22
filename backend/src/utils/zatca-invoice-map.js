@@ -104,7 +104,6 @@ const buildLiveInvoice = ({ invoice, items, cfg, customerName, invoiceCounterVal
       invoiceCounterValue,
       previousInvoiceHash,
       seller: { ...sellerParty(cfg), address },
-      buyer: customerName ? { registrationName: String(customerName).slice(0, 200) } : undefined,
       paymentMeansCode: '10',
       allowances: allowances.length ? allowances : undefined,
       allowanceTotalAmount: allowanceTotal || undefined,

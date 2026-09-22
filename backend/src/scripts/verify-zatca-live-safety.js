@@ -48,7 +48,8 @@ const ready = buildLiveInvoice({
 assert.strictEqual(ready.ok, true);
 assert.strictEqual(ready.invoice.invoiceSubType, '0200000');
 assert.strictEqual(ready.invoice.invoiceTypeCode, '388');
-assert.ok(!ready.invoice.buyer?.vatNumber);
+assert.strictEqual(ready.invoice.buyer, undefined);
+assert.ok(ready.invoice.seller.address.street);
 
 const incomplete = buildLiveInvoice({
   invoice,
