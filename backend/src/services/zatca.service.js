@@ -286,4 +286,91 @@ const runComplianceTests = async (userId) => {
   return publicView(next, { sendLiveInvoices: env.features.zatcaEinvoice === true });
 };
 
-module.exports = { getStatus, saveConfig, onboardSandbox, runComplianceTests };
+const requestProductionCsidApi = async (environment, token, secret, complianceRequestId) => {
+  const url = `${baseUrl(environment)}/production/csids`;
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Accept-Version': 'V2',
+        'Accept-Language': 'ar',
+        Authorization: `Basic ${Buffer.from(`${token}:${secret}`).toString('base64')}`,
+      },
+      body: JSON.stringify({ compliance_request_id: String(complianceRequestId) }),
+    });
+  } catch (err) {
+    throw new AppError(
+      'تعذر الاتصال بمنصة فاتورة. تحقق من الشبكة ثم أعد المحاولة.',
+      502,
+      'ZATCA_NETWORK',
+      { detail: err.message }
+    );
+  }
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new AppError(
+      body.message || body.error || 'رفضت منصة فاتورة طلب شهادة الإنتاج التجريبية.',
+      400,
+      'ZATCA_PRODUCTION_CSID_REJECTED',
+      { status: response.status, body }
+    );
+  }
+  return body;
+};
+
+/**
+ * Request a sandbox/simulation production CSID after compliance tests pass.
+ * Does not submit customer invoices and does not call reporting/clearance.
+ */
+const requestSandboxProductionCsid = async (userId) => {
+  const stored = await loadStored();
+  if (stored.status !== 'sandbox_linked' || !stored.binary_security_token || !stored.secret || !stored.private_key_pem) {
+    throw new AppError('اربط الجهاز تجريبياً أولاً قبل طلب شهادة الإنتاج التجريبية.', 400, 'ZATCA_NOT_LINKED');
+  }
+  if (stored.compliance_status !== 'passed') {
+    throw new AppError('شغّل اختبارات الامتثال بنجاح أولاً.', 400, 'ZATCA_COMPLIANCE_REQUIRED');
+  }
+  if (stored.production_binary_security_token && stored.production_secret) {
+    return publicView(stored, { sendLiveInvoices: env.features.zatcaEinvoice === true });
+  }
+  if (stored.compliance_request_id == null || stored.compliance_request_id === '') {
+    throw new AppError('معرف طلب الامتثال غير موجود. أعد الربط التجريبي ثم اختبارات الامتثال.', 400, 'ZATCA_COMPLIANCE_ID_MISSING');
+  }
+
+  try {
+    const result = await requestProductionCsidApi(
+      stored.environment,
+      stored.binary_security_token,
+      stored.secret,
+      stored.compliance_request_id
+    );
+    const next = {
+      ...stored,
+      production_binary_security_token: result.binarySecurityToken || result.binary_security_token || null,
+      production_secret: result.secret || null,
+      production_request_id: result.requestID || result.request_id || null,
+      production_status: 'issued',
+      production_linked_at: new Date().toISOString(),
+      last_error: null,
+    };
+    if (!next.production_binary_security_token || !next.production_secret) {
+      throw new AppError('استجابت منصة فاتورة بدون شهادة إنتاج صالحة.', 502, 'ZATCA_PRODUCTION_CSID_INCOMPLETE');
+    }
+    await saveStored(next, userId);
+    return publicView(next, { sendLiveInvoices: env.features.zatcaEinvoice === true });
+  } catch (err) {
+    const failed = {
+      ...stored,
+      production_status: 'error',
+      last_error: err.message || 'ZATCA production CSID failed',
+    };
+    await saveStored(failed, userId);
+    throw err;
+  }
+};
+
+module.exports = { getStatus, saveConfig, onboardSandbox, runComplianceTests, requestSandboxProductionCsid };

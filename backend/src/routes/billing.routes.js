@@ -162,6 +162,13 @@ router.post('/zatca/compliance-tests', authorize(PERMISSIONS.BILLING_CREATE), as
   } catch (err) { next(err); }
 });
 
+router.post('/zatca/production-csid', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await zatcaService.requestSandboxProductionCsid(req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.post('/invoice-settings/preview', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     await invoiceSettingsService.previewInvoicePdf(res, req.body || null);

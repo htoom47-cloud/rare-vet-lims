@@ -19,6 +19,9 @@ const empty = () => ({
   compliance_status: 'not_run',
   compliance_ran_at: null,
   compliance_results: [],
+  has_production_certificate: false,
+  production_status: 'not_issued',
+  production_linked_at: null,
 });
 
 export default function ZatcaLinkAdmin({ canEdit }) {
@@ -29,6 +32,7 @@ export default function ZatcaLinkAdmin({ canEdit }) {
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [requestingProduction, setRequestingProduction] = useState(false);
 
   const load = () => billingAPI.zatcaStatus()
     .then(({ data }) => setForm({ ...empty(), ...(data.data || {}) }))
@@ -94,6 +98,21 @@ export default function ZatcaLinkAdmin({ canEdit }) {
     }
   };
 
+  const requestProduction = async () => {
+    if (!canEdit) return;
+    setRequestingProduction(true);
+    try {
+      const { data } = await billingAPI.zatcaProductionCsid();
+      setForm({ ...empty(), ...(data.data || {}) });
+      toast.success(t('zatca.productionIssued'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('zatca.productionFailed'));
+      load();
+    } finally {
+      setRequestingProduction(false);
+    }
+  };
+
   if (loading) {
     return <p className="text-center py-10 text-gray-500">{t('common.loading')}</p>;
   }
@@ -121,6 +140,15 @@ export default function ZatcaLinkAdmin({ canEdit }) {
         {form.compliance_ran_at && (
           <p className="text-gray-500 mt-1">
             {t('zatca.complianceAt')}: {new Date(form.compliance_ran_at).toLocaleString()}
+          </p>
+        )}
+        <p className="mt-2">
+          <strong>{t('zatca.productionStatus')}:</strong>{' '}
+          {t(`zatca.production.${form.production_status || 'not_issued'}`, { defaultValue: form.production_status })}
+        </p>
+        {form.production_linked_at && (
+          <p className="text-gray-500 mt-1">
+            {t('zatca.productionAt')}: {new Date(form.production_linked_at).toLocaleString()}
           </p>
         )}
       </div>
@@ -187,11 +215,20 @@ export default function ZatcaLinkAdmin({ canEdit }) {
               {form.compliance_results.map((row) => (
                 <li key={row.key || row.label}>
                   <strong>{row.label}:</strong> {row.status}
-                  {row.message ? ` — ${row.message}` : ''}
+                  {row.message && row.message !== row.status ? ` — ${row.message}` : ''}
                 </li>
               ))}
             </ul>
           )}
+          <p className="text-sm text-gray-500 pt-2">{t('zatca.productionHint')}</p>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={requestProduction}
+            disabled={requestingProduction || form.compliance_status !== 'passed' || form.has_production_certificate}
+          >
+            {requestingProduction ? t('common.loading') : t('zatca.requestProduction')}
+          </button>
         </div>
       )}
     </div>

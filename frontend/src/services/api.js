@@ -449,6 +449,7 @@ export const billingAPI = {
   updateZatca: (data) => api.put('/billing/zatca', data),
   onboardZatca: (data) => api.post('/billing/zatca/onboard', data),
   zatcaComplianceTests: () => api.post('/billing/zatca/compliance-tests'),
+  zatcaProductionCsid: () => api.post('/billing/zatca/production-csid'),
   listDiscountPresets: (params) => api.get('/billing/discount-presets', { params: params?.all ? { all: 1 } : {} }),
   createDiscountPreset: (data) => api.post('/billing/discount-presets', data),
   updateDiscountPreset: (id, data) => api.put(`/billing/discount-presets/${id}`, data),

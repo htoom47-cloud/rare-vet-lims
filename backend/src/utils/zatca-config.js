@@ -38,6 +38,11 @@ const publicView = (stored, { sendLiveInvoices = false } = {}) => {
     compliance_request_id: merged.compliance_request_id || null,
     last_error: merged.last_error || null,
     has_certificate: Boolean(merged.binary_security_token && merged.secret && merged.private_key_pem),
+    has_production_certificate: Boolean(merged.production_binary_security_token && merged.production_secret && merged.private_key_pem),
+    production_status: merged.production_status === 'issued' || merged.production_status === 'error'
+      ? merged.production_status
+      : 'not_issued',
+    production_linked_at: merged.production_linked_at || null,
     send_live_invoices: sendLiveInvoices === true,
     compliance_status: merged.compliance_status === 'passed' || merged.compliance_status === 'failed'
       ? merged.compliance_status

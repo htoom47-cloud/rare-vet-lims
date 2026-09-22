@@ -17,7 +17,10 @@ assert.ok(/router\.(get|put)\('\/zatca'/.test(routesSrc));
 assert.ok(/router\.post\('\/zatca\/onboard'/.test(routesSrc));
 assert.ok(/router\.post\('\/zatca\/compliance-tests'/.test(routesSrc));
 assert.ok(/runComplianceTests/.test(zatcaSrc));
-assert.ok(!/issueProductionCertificate|finishOnboarding|\/production\/csids/.test(zatcaSrc));
+assert.ok(/requestSandboxProductionCsid/.test(zatcaSrc));
+assert.ok(/router\.post\('\/zatca\/production-csid'/.test(routesSrc));
+assert.ok(!/issueProductionCertificate|finishOnboarding/.test(zatcaSrc));
+assert.ok(!/invoices\/reporting|invoices\/clearance/.test(zatcaSrc));
 assert.ok(/zatcaEinvoice: process\.env\.ZATCA_EINVOICE_ENABLED === 'true'/.test(envSrc));
 assert.ok(zatcaSrc.includes('developer-portal') || fs.readFileSync(path.join(__dirname, '../utils/zatca-config.js'), 'utf8').includes('developer-portal'));
 
@@ -30,6 +33,8 @@ const view = publicView({
   status: 'sandbox_linked',
 });
 assert.strictEqual(view.has_certificate, true);
+assert.strictEqual(view.has_production_certificate, false);
+assert.strictEqual(view.production_status, 'not_issued');
 assert.strictEqual(view.private_key_pem, undefined);
 assert.strictEqual(view.secret, undefined);
 assert.strictEqual(mergePublicFields({}, { vat_number: '3110-424-873-00003' }).vat_number, '311042487300003');
