@@ -20,6 +20,7 @@ const {
 const { buildComplianceSamples } = require('../utils/zatca-compliance-samples');
 const { buildLiveInvoice } = require('../utils/zatca-invoice-map');
 const { labDay } = require('../utils/accounting-time');
+const { notDeleted } = require('../utils/soft-delete-sql');
 const logger = require('../config/logger');
 
 const loadStored = async () => {
@@ -394,16 +395,45 @@ const requestSandboxProductionCsid = async (userId) => {
   }
 };
 
+const reportedView = (stored, invoiceId) => {
+  const row = stored?.reported_invoices && typeof stored.reported_invoices === 'object'
+    ? stored.reported_invoices[invoiceId]
+    : null;
+  if (!row || typeof row !== 'object') return null;
+  return {
+    status: String(row.status || ''),
+    reason: String(row.reason || '').slice(0, 400),
+    at: row.at || null,
+  };
+};
+
+const getInvoiceSubmitStatus = async (invoiceId) => reportedView(await loadStored(), invoiceId);
+
 const recordLiveSubmit = async (stored, userId, entry) => {
+  const at = new Date().toISOString();
   const next = {
     ...stored,
     last_live_submit: {
       invoice_number: entry.invoice_number || '',
       status: entry.status || '',
       reason: entry.reason || '',
-      at: new Date().toISOString(),
+      at,
     },
   };
+  if (entry.invoice_id) {
+    const current = stored.reported_invoices && typeof stored.reported_invoices === 'object'
+      ? stored.reported_invoices
+      : {};
+    next.reported_invoices = {
+      ...current,
+      [entry.invoice_id]: {
+        invoice_number: entry.invoice_number || '',
+        status: entry.status || '',
+        reason: entry.reason || '',
+        at,
+      },
+    };
+  }
   if (entry.invoice_counter != null) next.invoice_counter = entry.invoice_counter;
   if (entry.previous_invoice_hash) next.previous_invoice_hash = entry.previous_invoice_hash;
   await saveStored(next, userId);
@@ -414,21 +444,30 @@ let liveSubmitChain = Promise.resolve();
 
 /**
  * Best-effort live submit. Never throws and never changes invoice rows.
- * Skips sandbox and stays off unless ZATCA_EINVOICE_ENABLED=true.
+ * Automatic issue path stays off unless ZATCA_EINVOICE_ENABLED=true.
+ * Manual staff submit ignores that flag.
  */
-const submitIssuedInvoiceSafe = async (issued, userId) => {
+const submitIssuedInvoiceSafe = async (issued, userId, { manual = false } = {}) => {
   const run = async () => {
     try {
-      if (env.features.zatcaEinvoice !== true) {
+      if (!manual && env.features.zatcaEinvoice !== true) {
         return { ok: false, skipped: true, reason: 'flag_off' };
       }
       if (!issued?.id || !issued.invoice_number) {
         return { ok: false, skipped: true, reason: 'no_invoice' };
       }
+      if (['cancelled', 'refunded'].includes(issued.status)) {
+        return { ok: false, skipped: true, reason: 'invalid_status' };
+      }
 
       const stored = await loadStored();
+      const already = reportedView(stored, issued.id);
+      if (already?.status === 'reported') {
+        return { ok: false, skipped: true, reason: 'already_reported', zatca_submit: already };
+      }
       if (stored.environment !== 'simulation' && stored.environment !== 'core') {
         await recordLiveSubmit(stored, userId, {
+          invoice_id: issued.id,
           invoice_number: issued.invoice_number,
           status: 'skipped',
           reason: 'sandbox_not_live',
@@ -437,6 +476,7 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
       }
       if (!stored.production_binary_security_token || !stored.production_secret || !stored.private_key_pem) {
         await recordLiveSubmit(stored, userId, {
+          invoice_id: issued.id,
           invoice_number: issued.invoice_number,
           status: 'skipped',
           reason: 'no_production_csid',
@@ -449,6 +489,7 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
         sdk = await loadZatcaSdk();
       } catch (err) {
         await recordLiveSubmit(stored, userId, {
+          invoice_id: issued.id,
           invoice_number: issued.invoice_number,
           status: 'skipped',
           reason: err.message || 'sdk_missing',
@@ -471,6 +512,7 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
       });
       if (!mapped.ok) {
         await recordLiveSubmit(stored, userId, {
+          invoice_id: issued.id,
           invoice_number: issued.invoice_number,
           status: 'skipped',
           reason: mapped.reason,
@@ -488,6 +530,7 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
       });
       if (!signed.success) {
         await recordLiveSubmit(stored, userId, {
+          invoice_id: issued.id,
           invoice_number: issued.invoice_number,
           status: 'error',
           reason: signed.error?.message || 'sign_failed',
@@ -506,6 +549,7 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
         invoice: signed.data.invoiceBase64,
       });
       await recordLiveSubmit(stored, userId, {
+        invoice_id: issued.id,
         invoice_number: issued.invoice_number,
         status: reported.success ? 'reported' : 'error',
         reason: reported.success ? 'REPORTED' : (reported.error?.message || 'report_failed'),
@@ -528,6 +572,76 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
   return pending;
 };
 
+const submitInvoiceById = async (invoiceId, userId) => {
+  const invoiceResult = await query(
+    `SELECT * FROM invoices WHERE id = $1 AND ${notDeleted()}`,
+    [invoiceId]
+  );
+  const invoice = invoiceResult.rows[0];
+  if (!invoice) throw new AppError('الفاتورة غير موجودة', 404, 'NOT_FOUND');
+  if (['cancelled', 'refunded'].includes(invoice.status)) {
+    throw new AppError('لا يمكن إرسال فاتورة ملغاة أو مستردة.', 400, 'INVALID_STATUS');
+  }
+  const itemsResult = await query(
+    'SELECT * FROM invoice_items WHERE invoice_id = $1 ORDER BY description',
+    [invoiceId]
+  );
+  const result = await submitIssuedInvoiceSafe(
+    { ...invoice, items: itemsResult.rows },
+    userId,
+    { manual: true }
+  );
+  return {
+    ...result,
+    zatca_submit: result.zatca_submit || await getInvoiceSubmitStatus(invoiceId),
+  };
+};
+
+const MANUAL_BATCH_LIMIT = 40;
+
+const submitEligibleInvoices = async (userId) => {
+  const stored = await loadStored();
+  const reported = stored.reported_invoices && typeof stored.reported_invoices === 'object'
+    ? stored.reported_invoices
+    : {};
+  const candidates = await query(
+    `SELECT id FROM invoices
+     WHERE ${notDeleted()}
+       AND status NOT IN ('cancelled', 'refunded')
+     ORDER BY created_at ASC`
+  );
+  const unsent = candidates.rows.filter((row) => reported[row.id]?.status !== 'reported');
+  const pending = unsent.slice(0, MANUAL_BATCH_LIMIT);
+  const remaining = Math.max(0, unsent.length - pending.length);
+
+  const results = [];
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const row of pending) {
+    const one = await submitInvoiceById(row.id, userId);
+    results.push({
+      id: row.id,
+      ok: one.ok === true,
+      skipped: one.skipped === true,
+      reason: one.reason || one.status || '',
+    });
+    if (one.ok) sent += 1;
+    else if (one.skipped) skipped += 1;
+    else failed += 1;
+  }
+
+  return {
+    ok: failed === 0,
+    sent,
+    skipped,
+    failed,
+    remaining,
+    limit: MANUAL_BATCH_LIMIT,
+    results,
+  };
+};
+
 module.exports = {
   getStatus,
   saveConfig,
@@ -535,4 +649,7 @@ module.exports = {
   runComplianceTests,
   requestSandboxProductionCsid,
   submitIssuedInvoiceSafe,
+  getInvoiceSubmitStatus,
+  submitInvoiceById,
+  submitEligibleInvoices,
 };

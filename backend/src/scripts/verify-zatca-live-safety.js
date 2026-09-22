@@ -79,6 +79,8 @@ assert.ok(/ZATCA_EINVOICE_ENABLED === 'true'/.test(envSrc));
 assert.ok(!/ZATCA_EINVOICE_ENABLED === 'true' \|\|/.test(envSrc));
 assert.ok(/submitIssuedInvoiceSafe/.test(billingSrc));
 assert.ok(/void zatcaService\.submitIssuedInvoiceSafe/.test(billingSrc));
+assert.ok(/!manual && env\.features\.zatcaEinvoice !== true/.test(zatcaSrc));
+assert.ok(/submitInvoiceById/.test(zatcaSrc));
 assert.ok(!/UPDATE invoices|INSERT INTO invoices/.test(zatcaSrc));
 assert.ok(!/clearanceInvoice/.test(zatcaSrc));
 assert.ok(/environment !== 'simulation' && stored.environment !== 'core'/.test(zatcaSrc)

@@ -296,9 +296,23 @@ router.get('/invoices/:id/pdf', authorize(PERMISSIONS.BILLING_VIEW), async (req,
   } catch (err) { next(err); }
 });
 
+router.post('/invoices/zatca-submit-all', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await zatcaService.submitEligibleInvoices(req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/invoices/:id', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     const data = await service.getInvoiceById(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/invoices/:id/zatca-submit', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await zatcaService.submitInvoiceById(req.params.id, req.user.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

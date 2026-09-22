@@ -193,6 +193,7 @@ const getInvoiceById = async (id, options = {}) => {
     credit_available: settlement.credit_available,
     net_total: settlement.net_total,
     settlement,
+    zatca_submit: await zatcaService.getInvoiceSubmitStatus(id),
   };
 };
 

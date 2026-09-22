@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin, Package } from 'lucide-react';
+import { Plus, CreditCard, Download, Printer, BarChart3, Receipt, MapPin, Package, Send } from 'lucide-react';
 import CreditNotePanel from '../components/billing/CreditNotePanel';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
@@ -60,6 +60,7 @@ export default function Billing() {
     return t(`billing.invoiceStatus.${status}`, { defaultValue: status });
   };
   const canRefund = hasPermission('billing.refund');
+  const canSendZatca = hasPermission('billing.create');
   const [invoices, setInvoices] = useState([]);
   const [packages, setPackages] = useState([]);
   const [tests, setTests] = useState([]);
@@ -90,6 +91,7 @@ export default function Billing() {
   const [packageQuantity, setPackageQuantity] = useState(1);
 
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [sendingZatca, setSendingZatca] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
 
@@ -119,6 +121,51 @@ export default function Billing() {
       })
       .catch(() => {});
   }, []);
+
+  const sendAllInvoicesToZatca = async () => {
+    if (sendingZatca) return;
+    if (!window.confirm(t('billing.zatcaSendAllConfirm'))) return;
+    setSendingZatca(true);
+    try {
+      const { data } = await billingAPI.submitAllInvoicesZatca();
+      const result = data.data || {};
+      toast.success(t('billing.zatcaSendAllDone', {
+        sent: result.sent || 0,
+        skipped: result.skipped || 0,
+        failed: result.failed || 0,
+        remaining: result.remaining || 0,
+      }));
+      loadInvoices(page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.response?.data?.error?.message || t('billing.zatcaSendFailed'));
+    } finally {
+      setSendingZatca(false);
+    }
+  };
+
+  const sendInvoiceToZatca = async (invoice) => {
+    if (!invoice?.id || sendingZatca) return;
+    if (invoice.zatca_submit?.status === 'reported') {
+      toast.success(t('billing.zatcaAlreadySent'));
+      return;
+    }
+    if (!window.confirm(t('billing.zatcaSendConfirm', { number: invoice.invoice_number }))) return;
+    setSendingZatca(true);
+    try {
+      const { data } = await billingAPI.submitInvoiceZatca(invoice.id);
+      const result = data.data || {};
+      if (result.ok) {
+        toast.success(t('billing.zatcaSent'));
+      } else {
+        toast.error(t(`billing.zatcaReason.${result.reason}`, { defaultValue: result.reason || t('billing.zatcaSendFailed') }));
+      }
+      await openInvoiceDetail({ id: invoice.id });
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.response?.data?.error?.message || t('billing.zatcaSendFailed'));
+    } finally {
+      setSendingZatca(false);
+    }
+  };
 
   const openInvoiceDetail = async (invoice) => {
     setDetailLoading(true);
@@ -435,6 +482,16 @@ export default function Billing() {
           <Link to="/invoice-settings" className="btn-secondary flex items-center gap-2">
             <Receipt size={18} /> {t('nav.invoiceSettings')}
           </Link>
+          {canSendZatca && (
+            <button
+              type="button"
+              onClick={sendAllInvoicesToZatca}
+              disabled={sendingZatca}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Send size={18} /> {sendingZatca ? t('common.loading') : t('billing.sendAllToZatca')}
+            </button>
+          )}
           <button onClick={() => setInvoiceModal(true)} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> {t('billing.invoice')}
           </button>
@@ -518,6 +575,12 @@ export default function Billing() {
               <div><span className="text-gray-500">{t('billing.total')}:</span> <strong>SAR {parseFloat(detailInvoice.total).toFixed(2)}</strong></div>
               <div><span className="text-gray-500">{t('billing.paid')}:</span> SAR {parseFloat(detailInvoice.total_paid || 0).toFixed(2)}</div>
               <div><span className="text-gray-500">{t('billing.balanceDue')}:</span> <strong className="text-amber-700">SAR {parseFloat(detailInvoice.balance_due || 0).toFixed(2)}</strong></div>
+              {detailInvoice.zatca_submit?.status && (
+                <div>
+                  <span className="text-gray-500">{t('billing.zatcaStatus')}:</span>{' '}
+                  {t(`billing.zatcaSubmitStatus.${detailInvoice.zatca_submit.status}`, { defaultValue: detailInvoice.zatca_submit.status })}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -545,6 +608,21 @@ export default function Billing() {
               >
                 <Printer size={16} /> {t('billing.regeneratePdf')}
               </button>
+              {canSendZatca && !['cancelled', 'refunded'].includes(detailInvoice.status) && (
+                <button
+                  type="button"
+                  onClick={() => sendInvoiceToZatca(detailInvoice)}
+                  disabled={sendingZatca || detailInvoice.zatca_submit?.status === 'reported'}
+                  className="btn-primary flex items-center gap-2 text-sm"
+                >
+                  <Send size={16} />
+                  {sendingZatca
+                    ? t('common.loading')
+                    : detailInvoice.zatca_submit?.status === 'reported'
+                      ? t('billing.zatcaAlreadySent')
+                      : t('billing.sendToZatca')}
+                </button>
+              )}
             </div>
 
             <div>
