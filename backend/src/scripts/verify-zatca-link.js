@@ -34,7 +34,7 @@ assert.ok(/zatcaEinvoice: process\.env\.ZATCA_EINVOICE_ENABLED === 'true'/.test(
 assert.ok(configSrc.includes('developer-portal'));
 assert.ok(configSrc.includes('e-invoicing/core'));
 
-const { publicView, mergePublicFields, productionNeedsRefresh, ENVIRONMENTS } = require('../utils/zatca-config');
+const { publicView, mergePublicFields, productionNeedsRefresh, sdkEnvironment, ENVIRONMENTS } = require('../utils/zatca-config');
 const view = publicView({
   private_key_pem: 'SECRET',
   secret: 'SECRET',
@@ -55,6 +55,10 @@ assert.strictEqual(view.secret, undefined);
 assert.strictEqual(view.address_ready, true);
 assert.strictEqual(view.send_live_invoices, false);
 assert.strictEqual(ENVIRONMENTS.core, 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core');
+assert.strictEqual(sdkEnvironment('core'), 'production');
+assert.strictEqual(sdkEnvironment('simulation'), 'simulation');
+assert.strictEqual(sdkEnvironment('sandbox'), 'sandbox');
+assert.ok(/sdkEnvironment\(stored\.environment\)/.test(zatcaSrc));
 assert.strictEqual(mergePublicFields({}, { vat_number: '3110-424-873-00003' }).vat_number, '311042487300003');
 assert.strictEqual(mergePublicFields({}, { building_number: '4371', postal_code: '13771' }).building_number, '4371');
 assert.strictEqual(productionNeedsRefresh({

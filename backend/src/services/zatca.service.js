@@ -15,6 +15,7 @@ const {
   mergePublicFields,
   productionNeedsRefresh,
   baseUrl,
+  sdkEnvironment,
 } = require('../utils/zatca-config');
 const { buildComplianceSamples } = require('../utils/zatca-compliance-samples');
 const { buildLiveInvoice } = require('../utils/zatca-invoice-map');
@@ -234,7 +235,7 @@ const runComplianceTests = async (userId) => {
     ZATCAAPIClient,
     INITIAL_PREVIOUS_HASH,
   } = sdk;
-  const environment = stored.environment === 'simulation' ? 'simulation' : 'sandbox';
+  const environment = sdkEnvironment(stored.environment);
   const apiClient = new ZATCAAPIClient({
     env: environment,
     certificate: stored.binary_security_token,
@@ -495,7 +496,7 @@ const submitIssuedInvoiceSafe = async (issued, userId) => {
       }
 
       const apiClient = new sdk.ZATCAAPIClient({
-        env: stored.environment === 'core' ? 'production' : stored.environment,
+        env: sdkEnvironment(stored.environment),
         certificate: stored.production_binary_security_token,
         secret: stored.production_secret,
       });

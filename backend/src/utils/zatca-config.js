@@ -122,6 +122,12 @@ const mergePublicFields = (stored, payload = {}) => {
 
 const baseUrl = (environment) => ENVIRONMENTS[environment] || ENVIRONMENTS.sandbox;
 
+const sdkEnvironment = (environment) => {
+  if (environment === 'simulation') return 'simulation';
+  if (environment === 'core') return 'production';
+  return 'sandbox';
+};
+
 module.exports = {
   SETTINGS_KEY,
   ENVIRONMENTS,
@@ -130,4 +136,5 @@ module.exports = {
   mergePublicFields,
   productionNeedsRefresh,
   baseUrl,
+  sdkEnvironment,
 };
