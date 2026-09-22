@@ -39,6 +39,18 @@ const publicView = (stored, { sendLiveInvoices = false } = {}) => {
     last_error: merged.last_error || null,
     has_certificate: Boolean(merged.binary_security_token && merged.secret && merged.private_key_pem),
     send_live_invoices: sendLiveInvoices === true,
+    compliance_status: merged.compliance_status === 'passed' || merged.compliance_status === 'failed'
+      ? merged.compliance_status
+      : 'not_run',
+    compliance_ran_at: merged.compliance_ran_at || null,
+    compliance_results: Array.isArray(merged.compliance_results)
+      ? merged.compliance_results.map((row) => ({
+        key: String(row.key || ''),
+        label: String(row.label || ''),
+        status: String(row.status || ''),
+        message: String(row.message || '').slice(0, 400),
+      }))
+      : [],
   };
 };
 

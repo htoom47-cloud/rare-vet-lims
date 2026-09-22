@@ -16,6 +16,9 @@ const empty = () => ({
   has_certificate: false,
   last_error: null,
   send_live_invoices: false,
+  compliance_status: 'not_run',
+  compliance_ran_at: null,
+  compliance_results: [],
 });
 
 export default function ZatcaLinkAdmin({ canEdit }) {
@@ -25,6 +28,7 @@ export default function ZatcaLinkAdmin({ canEdit }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const load = () => billingAPI.zatcaStatus()
     .then(({ data }) => setForm({ ...empty(), ...(data.data || {}) }))
@@ -75,6 +79,21 @@ export default function ZatcaLinkAdmin({ canEdit }) {
     }
   };
 
+  const runCompliance = async () => {
+    if (!canEdit) return;
+    setTesting(true);
+    try {
+      const { data } = await billingAPI.zatcaComplianceTests();
+      setForm({ ...empty(), ...(data.data || {}) });
+      toast.success(t('zatca.complianceDone'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('zatca.complianceFailed'));
+      load();
+    } finally {
+      setTesting(false);
+    }
+  };
+
   if (loading) {
     return <p className="text-center py-10 text-gray-500">{t('common.loading')}</p>;
   }
@@ -95,6 +114,15 @@ export default function ZatcaLinkAdmin({ canEdit }) {
           {form.send_live_invoices ? t('zatca.liveOn') : t('zatca.liveOff')}
         </p>
         {form.last_error && <p className="text-red-700 mt-2">{form.last_error}</p>}
+        <p className="mt-2">
+          <strong>{t('zatca.complianceStatus')}:</strong>{' '}
+          {t(`zatca.compliance.${form.compliance_status || 'not_run'}`, { defaultValue: form.compliance_status })}
+        </p>
+        {form.compliance_ran_at && (
+          <p className="text-gray-500 mt-1">
+            {t('zatca.complianceAt')}: {new Date(form.compliance_ran_at).toLocaleString()}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -140,6 +168,30 @@ export default function ZatcaLinkAdmin({ canEdit }) {
           <button type="button" className="btn-primary" onClick={onboard} disabled={linking || otp.replace(/\D/g, '').length !== 6}>
             {linking ? t('common.loading') : t('zatca.connect')}
           </button>
+        </div>
+      )}
+
+      {canEdit && form.has_certificate && (
+        <div className="border-t pt-4 space-y-3">
+          <p className="text-sm text-gray-500">{t('zatca.complianceHint')}</p>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={runCompliance}
+            disabled={testing || form.status !== 'sandbox_linked'}
+          >
+            {testing ? t('common.loading') : t('zatca.runCompliance')}
+          </button>
+          {Array.isArray(form.compliance_results) && form.compliance_results.length > 0 && (
+            <ul className="text-sm space-y-1">
+              {form.compliance_results.map((row) => (
+                <li key={row.key || row.label}>
+                  <strong>{row.label}:</strong> {row.status}
+                  {row.message ? ` — ${row.message}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

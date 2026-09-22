@@ -15,6 +15,9 @@ assert.ok(!/UPDATE invoices|INSERT INTO invoices|createInvoice/.test(zatcaSrc));
 assert.ok(!/zatca/i.test(billingSrc));
 assert.ok(/router\.(get|put)\('\/zatca'/.test(routesSrc));
 assert.ok(/router\.post\('\/zatca\/onboard'/.test(routesSrc));
+assert.ok(/router\.post\('\/zatca\/compliance-tests'/.test(routesSrc));
+assert.ok(/runComplianceTests/.test(zatcaSrc));
+assert.ok(!/issueProductionCertificate|finishOnboarding|\/production\/csids/.test(zatcaSrc));
 assert.ok(/zatcaEinvoice: process\.env\.ZATCA_EINVOICE_ENABLED === 'true'/.test(envSrc));
 assert.ok(zatcaSrc.includes('developer-portal') || fs.readFileSync(path.join(__dirname, '../utils/zatca-config.js'), 'utf8').includes('developer-portal'));
 

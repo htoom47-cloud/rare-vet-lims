@@ -1,5 +1,5 @@
 /**
- * ZATCA / Fatoora sandbox onboarding only.
+ * ZATCA / Fatoora sandbox onboarding and compliance tests only.
  * Does not issue, update, or submit customer invoices.
  */
 const { execFileSync } = require('child_process');
@@ -15,6 +15,7 @@ const {
   mergePublicFields,
   baseUrl,
 } = require('../utils/zatca-config');
+const { buildComplianceSamples } = require('../utils/zatca-compliance-samples');
 
 const loadStored = async () => {
   const result = await query('SELECT value FROM settings WHERE key = $1', [SETTINGS_KEY]);
@@ -172,4 +173,117 @@ const onboardSandbox = async ({ otp }, userId) => {
   }
 };
 
-module.exports = { getStatus, saveConfig, onboardSandbox };
+const summarizeValidation = (validation) => {
+  const status = String(validation?.status || '').toUpperCase();
+  const errors = (validation?.errorMessages || []).map((row) => row.message || row.code).filter(Boolean);
+  const warnings = (validation?.warningMessages || []).map((row) => row.message || row.code).filter(Boolean);
+  return {
+    ok: status === 'PASS' || status === 'WARNING',
+    status: status || 'ERROR',
+    message: errors[0] || warnings[0] || status || 'UNKNOWN',
+  };
+};
+
+const loadZatcaSdk = async () => import('zatca-sdk');
+
+/**
+ * Submit six synthetic documents to Fatoora compliance checks.
+ * Does not read, update, or create customer invoices.
+ * Does not request a production CSID.
+ */
+const runComplianceTests = async (userId) => {
+  const stored = await loadStored();
+  if (stored.status !== 'sandbox_linked' || !stored.binary_security_token || !stored.secret || !stored.private_key_pem) {
+    throw new AppError('اربط الجهاز تجريبياً أولاً قبل اختبارات الامتثال.', 400, 'ZATCA_NOT_LINKED');
+  }
+
+  let sdk;
+  try {
+    sdk = await loadZatcaSdk();
+  } catch (err) {
+    throw new AppError(
+      'تعذر تحميل مكتبة توقيع فاتورة. تحقق من تثبيت zatca-sdk على الخادم.',
+      500,
+      'ZATCA_SDK_MISSING',
+      { detail: err.message }
+    );
+  }
+
+  const {
+    signInvoice,
+    checkInvoiceCompliance,
+    ZATCAAPIClient,
+    INITIAL_PREVIOUS_HASH,
+  } = sdk;
+  const environment = stored.environment === 'simulation' ? 'simulation' : 'sandbox';
+  const apiClient = new ZATCAAPIClient({
+    env: environment,
+    certificate: stored.binary_security_token,
+    secret: stored.secret,
+  });
+
+  const samples = buildComplianceSamples(stored);
+  const results = [];
+  let previousHash = INITIAL_PREVIOUS_HASH;
+  let passedAll = true;
+
+  for (const sample of samples) {
+    sample.invoice.previousInvoiceHash = previousHash;
+    const signed = await signInvoice(sample.invoice, {
+      credentials: {
+        certificate: stored.binary_security_token,
+        privateKey: stored.private_key_pem,
+      },
+      skipQrImage: true,
+      allowCertificateKeyMismatch: environment === 'sandbox',
+    });
+    if (!signed.success) {
+      passedAll = false;
+      results.push({
+        key: sample.key,
+        label: sample.label,
+        status: 'ERROR',
+        message: signed.error?.message || 'تعذر توقيع مستند الاختبار',
+      });
+      continue;
+    }
+
+    previousHash = signed.data.invoiceHash;
+    const check = await checkInvoiceCompliance(apiClient, {
+      invoiceHash: signed.data.invoiceHash,
+      uuid: signed.data.uuid,
+      invoice: signed.data.invoiceBase64,
+    });
+    if (!check.success) {
+      passedAll = false;
+      results.push({
+        key: sample.key,
+        label: sample.label,
+        status: 'ERROR',
+        message: check.error?.message || 'رفضت منصة فاتورة مستند الاختبار',
+      });
+      continue;
+    }
+
+    const summary = summarizeValidation(check.data?.validationResults || check.data);
+    if (!summary.ok) passedAll = false;
+    results.push({
+      key: sample.key,
+      label: sample.label,
+      status: summary.status,
+      message: summary.message,
+    });
+  }
+
+  const next = {
+    ...stored,
+    compliance_status: passedAll ? 'passed' : 'failed',
+    compliance_ran_at: new Date().toISOString(),
+    compliance_results: results,
+    last_error: passedAll ? null : 'فشلت بعض اختبارات الامتثال التجريبية',
+  };
+  await saveStored(next, userId);
+  return publicView(next, { sendLiveInvoices: env.features.zatcaEinvoice === true });
+};
+
+module.exports = { getStatus, saveConfig, onboardSandbox, runComplianceTests };

@@ -57,7 +57,8 @@
     "swagger-ui-express": "^5.0.1",
     "utif2": "^4.1.0",
     "uuid": "^11.0.5",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "zatca-sdk": "^0.1.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.9",
