@@ -40,7 +40,11 @@ const productionNeedsRefresh = (stored) => {
   }
   const complianceAt = Date.parse(merged.compliance_ran_at || '');
   const productionAt = Date.parse(merged.production_linked_at || '');
-  return Number.isFinite(complianceAt) && Number.isFinite(productionAt) && complianceAt > productionAt;
+  if (Number.isFinite(complianceAt) && Number.isFinite(productionAt) && complianceAt > productionAt) {
+    return true;
+  }
+  const lastReason = String(merged.last_live_submit?.reason || '');
+  return /sign_failed|private key|certificate|binarySecurityToken/i.test(lastReason);
 };
 
 const publicView = (stored, { sendLiveInvoices = false } = {}) => {

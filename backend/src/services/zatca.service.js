@@ -529,13 +529,14 @@ const submitIssuedInvoiceSafe = async (issued, userId, { manual = false } = {}) 
         allowCertificateKeyMismatch: false,
       });
       if (!signed.success) {
+        const signReason = signed.error?.message || signed.error?.code || 'sign_failed';
         await recordLiveSubmit(stored, userId, {
           invoice_id: issued.id,
           invoice_number: issued.invoice_number,
           status: 'error',
-          reason: signed.error?.message || 'sign_failed',
+          reason: signReason,
         });
-        return { ok: false, reason: 'sign_failed' };
+        return { ok: false, reason: 'sign_failed', message: signReason };
       }
 
       const apiClient = new sdk.ZATCAAPIClient({

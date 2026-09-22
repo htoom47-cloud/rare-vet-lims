@@ -157,7 +157,7 @@ export default function Billing() {
       if (result.ok) {
         toast.success(t('billing.zatcaSent'));
       } else {
-        toast.error(t(`billing.zatcaReason.${result.reason}`, { defaultValue: result.reason || t('billing.zatcaSendFailed') }));
+        toast.error(result.message || t(`billing.zatcaReason.${result.reason}`, { defaultValue: result.reason || t('billing.zatcaSendFailed') }));
       }
       await openInvoiceDetail({ id: invoice.id });
     } catch (err) {
