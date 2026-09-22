@@ -32,12 +32,12 @@ const money = (net) => {
 };
 
 const sellerAddress = (cfg) => ({
-  street: String(cfg.address || cfg.organization_unit || 'Al Muzahimiyah').slice(0, 80),
-  buildingNumber: '4371',
-  citySubdivision: String(cfg.organization_unit || cfg.address || 'Al Muzahimiyah').slice(0, 80),
-  city: String(cfg.address || cfg.organization_unit || 'Al Muzahimiyah').slice(0, 80),
-  postalCode: '13771',
-  countrySubentity: 'Riyadh',
+  street: String(cfg.street || cfg.address || cfg.organization_unit || 'Al Muzahimiyah').slice(0, 80),
+  buildingNumber: /^\d{4}$/.test(String(cfg.building_number || '')) ? String(cfg.building_number) : '4371',
+  citySubdivision: String(cfg.city_subdivision || cfg.organization_unit || cfg.address || 'Al Muzahimiyah').slice(0, 80),
+  city: String(cfg.city || cfg.address || cfg.organization_unit || 'Al Muzahimiyah').slice(0, 80),
+  postalCode: /^\d{5}$/.test(String(cfg.postal_code || '')) ? String(cfg.postal_code) : '13771',
+  countrySubentity: String(cfg.country_subentity || 'Riyadh').slice(0, 80),
   country: 'SA',
 });
 

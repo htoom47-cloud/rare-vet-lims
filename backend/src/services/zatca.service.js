@@ -1,6 +1,6 @@
 /**
- * ZATCA / Fatoora sandbox onboarding and compliance tests only.
- * Does not issue, update, or submit customer invoices.
+ * ZATCA / Fatoora onboarding plus gated live submit.
+ * Live submit never updates invoice rows and never throws to billing.
  */
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -16,6 +16,9 @@ const {
   baseUrl,
 } = require('../utils/zatca-config');
 const { buildComplianceSamples } = require('../utils/zatca-compliance-samples');
+const { buildLiveInvoice } = require('../utils/zatca-invoice-map');
+const { labDay } = require('../utils/accounting-time');
+const logger = require('../config/logger');
 
 const loadStored = async () => {
   const result = await query('SELECT value FROM settings WHERE key = $1', [SETTINGS_KEY]);
@@ -43,6 +46,12 @@ const saveConfig = async (payload, userId) => {
 
 const escapeCnf = (value) => String(value || '').replace(/[\r\n#=\\]/g, ' ').trim();
 
+const csrTemplateName = (environment) => {
+  if (environment === 'simulation') return 'PREZATCA-Code-Signing';
+  if (environment === 'core') return 'ZATCA-Code-Signing';
+  return 'TSTZATCA-Code-Signing';
+};
+
 const generateCsr = (cfg) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zatca-'));
   const keyPath = path.join(dir, 'private.pem');
@@ -64,7 +73,7 @@ const generateCsr = (cfg) => {
     `O = ${escapeCnf(cfg.organization)}`,
     `CN = ${escapeCnf(cfg.common_name)}`,
     '[v3_req]',
-    '1.3.6.1.4.1.311.20.2 = ASN1:PRINTABLESTRING:ZATCA-Code-Signing',
+    `1.3.6.1.4.1.311.20.2 = ASN1:PRINTABLESTRING:${csrTemplateName(cfg.environment)}`,
     'subjectAltName = dirName:alt_names',
     '[alt_names]',
     `SN = ${escapeCnf(cfg.serial)}`,
@@ -373,4 +382,145 @@ const requestSandboxProductionCsid = async (userId) => {
   }
 };
 
-module.exports = { getStatus, saveConfig, onboardSandbox, runComplianceTests, requestSandboxProductionCsid };
+const recordLiveSubmit = async (stored, userId, entry) => {
+  const next = {
+    ...stored,
+    last_live_submit: {
+      invoice_number: entry.invoice_number || '',
+      status: entry.status || '',
+      reason: entry.reason || '',
+      at: new Date().toISOString(),
+    },
+  };
+  if (entry.invoice_counter != null) next.invoice_counter = entry.invoice_counter;
+  if (entry.previous_invoice_hash) next.previous_invoice_hash = entry.previous_invoice_hash;
+  await saveStored(next, userId);
+  return next;
+};
+
+let liveSubmitChain = Promise.resolve();
+
+/**
+ * Best-effort live submit. Never throws and never changes invoice rows.
+ * Skips sandbox and stays off unless ZATCA_EINVOICE_ENABLED=true.
+ */
+const submitIssuedInvoiceSafe = async (issued, userId) => {
+  const run = async () => {
+    try {
+      if (env.features.zatcaEinvoice !== true) {
+        return { ok: false, skipped: true, reason: 'flag_off' };
+      }
+      if (!issued?.id || !issued.invoice_number) {
+        return { ok: false, skipped: true, reason: 'no_invoice' };
+      }
+
+      const stored = await loadStored();
+      if (stored.environment !== 'simulation' && stored.environment !== 'core') {
+        await recordLiveSubmit(stored, userId, {
+          invoice_number: issued.invoice_number,
+          status: 'skipped',
+          reason: 'sandbox_not_live',
+        });
+        return { ok: false, skipped: true, reason: 'sandbox_not_live' };
+      }
+      if (!stored.production_binary_security_token || !stored.production_secret || !stored.private_key_pem) {
+        await recordLiveSubmit(stored, userId, {
+          invoice_number: issued.invoice_number,
+          status: 'skipped',
+          reason: 'no_production_csid',
+        });
+        return { ok: false, skipped: true, reason: 'no_production_csid' };
+      }
+
+      let sdk;
+      try {
+        sdk = await loadZatcaSdk();
+      } catch (err) {
+        await recordLiveSubmit(stored, userId, {
+          invoice_number: issued.invoice_number,
+          status: 'skipped',
+          reason: err.message || 'sdk_missing',
+        });
+        return { ok: false, skipped: true, reason: 'sdk_missing' };
+      }
+
+      const customerResult = issued.customer_id
+        ? await query('SELECT full_name, full_name_ar FROM customers WHERE id = $1', [issued.customer_id])
+        : { rows: [] };
+      const customerName = customerResult.rows[0]?.full_name_ar || customerResult.rows[0]?.full_name || '';
+      const mapped = buildLiveInvoice({
+        invoice: issued,
+        items: issued.items || [],
+        cfg: stored,
+        customerName,
+        invoiceCounterValue: Number(stored.invoice_counter || 0) + 1,
+        previousInvoiceHash: stored.previous_invoice_hash || sdk.INITIAL_PREVIOUS_HASH,
+        issueDate: labDay(issued.created_at),
+      });
+      if (!mapped.ok) {
+        await recordLiveSubmit(stored, userId, {
+          invoice_number: issued.invoice_number,
+          status: 'skipped',
+          reason: mapped.reason,
+        });
+        return { ok: false, skipped: true, reason: mapped.reason };
+      }
+
+      const signed = await sdk.signInvoice(mapped.invoice, {
+        credentials: {
+          certificate: stored.production_binary_security_token,
+          privateKey: stored.private_key_pem,
+        },
+        skipQrImage: true,
+        allowCertificateKeyMismatch: false,
+      });
+      if (!signed.success) {
+        await recordLiveSubmit(stored, userId, {
+          invoice_number: issued.invoice_number,
+          status: 'error',
+          reason: signed.error?.message || 'sign_failed',
+        });
+        return { ok: false, reason: 'sign_failed' };
+      }
+
+      const apiClient = new sdk.ZATCAAPIClient({
+        env: stored.environment === 'core' ? 'production' : stored.environment,
+        certificate: stored.production_binary_security_token,
+        secret: stored.production_secret,
+      });
+      const reported = await sdk.reportInvoice(apiClient, {
+        invoiceHash: signed.data.invoiceHash,
+        uuid: signed.data.uuid,
+        invoice: signed.data.invoiceBase64,
+      });
+      await recordLiveSubmit(stored, userId, {
+        invoice_number: issued.invoice_number,
+        status: reported.success ? 'reported' : 'error',
+        reason: reported.success ? 'REPORTED' : (reported.error?.message || 'report_failed'),
+        ...(reported.success ? {
+          invoice_counter: mapped.invoice.invoiceCounterValue,
+          previous_invoice_hash: signed.data.invoiceHash,
+        } : {}),
+      });
+      return reported.success
+        ? { ok: true, status: 'reported' }
+        : { ok: false, reason: 'report_failed' };
+    } catch (err) {
+      logger.warn('ZATCA live submit skipped', { error: err.message, invoice: issued?.invoice_number });
+      return { ok: false, reason: err.message || 'submit_failed' };
+    }
+  };
+
+  const pending = liveSubmitChain.then(run, run);
+  liveSubmitChain = pending.then(() => undefined, () => undefined);
+  return pending;
+};
+
+module.exports = {
+  getStatus,
+  saveConfig,
+  onboardSandbox,
+  runComplianceTests,
+  requestSandboxProductionCsid,
+  submitIssuedInvoiceSafe,
+};

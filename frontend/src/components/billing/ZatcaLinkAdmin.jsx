@@ -10,11 +10,19 @@ const empty = () => ({
   organization_unit: '',
   common_name: 'RareVet-LIMS',
   address: '',
+  street: '',
+  building_number: '',
+  city_subdivision: '',
+  city: '',
+  postal_code: '',
+  country_subentity: 'Riyadh',
   invoice_types: '1100',
   status: 'not_linked',
   linked_at: null,
   has_certificate: false,
   last_error: null,
+  last_live_submit: null,
+  address_ready: false,
   send_live_invoices: false,
   compliance_status: 'not_run',
   compliance_ran_at: null,
@@ -55,6 +63,12 @@ export default function ZatcaLinkAdmin({ canEdit }) {
         organization_unit: form.organization_unit,
         common_name: form.common_name,
         address: form.address,
+        street: form.street,
+        building_number: form.building_number,
+        city_subdivision: form.city_subdivision,
+        city: form.city,
+        postal_code: form.postal_code,
+        country_subentity: form.country_subentity,
         invoice_types: form.invoice_types,
       });
       setForm({ ...empty(), ...(data.data || {}) });
@@ -151,6 +165,18 @@ export default function ZatcaLinkAdmin({ canEdit }) {
             {t('zatca.productionAt')}: {new Date(form.production_linked_at).toLocaleString()}
           </p>
         )}
+        <p className="mt-2">
+          <strong>{t('zatca.nationalAddress')}:</strong>{' '}
+          {form.address_ready ? t('zatca.addressReady') : t('zatca.addressIncomplete')}
+        </p>
+        {form.last_live_submit?.at && (
+          <p className="text-gray-500 mt-1">
+            {t('zatca.lastSubmit')}: {form.last_live_submit.invoice_number} — {form.last_live_submit.status}
+            {form.last_live_submit.reason ? ` (${form.last_live_submit.reason})` : ''}
+            {' · '}
+            {new Date(form.last_live_submit.at).toLocaleString()}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -159,6 +185,7 @@ export default function ZatcaLinkAdmin({ canEdit }) {
           <select className="input-field" value={form.environment} disabled={!canEdit} onChange={(e) => setField('environment', e.target.value)}>
             <option value="sandbox">{t('zatca.envSandbox')}</option>
             <option value="simulation">{t('zatca.envSimulation')}</option>
+            <option value="core">{t('zatca.envCore')}</option>
           </select>
         </label>
         <label className="text-sm">
@@ -181,13 +208,38 @@ export default function ZatcaLinkAdmin({ canEdit }) {
           <span className="block mb-1">{t('invoiceSettings.address')}</span>
           <input className="input-field" value={form.address} disabled={!canEdit} onChange={(e) => setField('address', e.target.value)} />
         </label>
+        <label className="text-sm">
+          <span className="block mb-1">{t('zatca.street')}</span>
+          <input className="input-field" value={form.street} disabled={!canEdit} onChange={(e) => setField('street', e.target.value)} />
+        </label>
+        <label className="text-sm">
+          <span className="block mb-1">{t('zatca.buildingNumber')}</span>
+          <input className="input-field" inputMode="numeric" maxLength={4} value={form.building_number} disabled={!canEdit} onChange={(e) => setField('building_number', e.target.value)} />
+        </label>
+        <label className="text-sm">
+          <span className="block mb-1">{t('zatca.district')}</span>
+          <input className="input-field" value={form.city_subdivision} disabled={!canEdit} onChange={(e) => setField('city_subdivision', e.target.value)} />
+        </label>
+        <label className="text-sm">
+          <span className="block mb-1">{t('zatca.city')}</span>
+          <input className="input-field" value={form.city} disabled={!canEdit} onChange={(e) => setField('city', e.target.value)} />
+        </label>
+        <label className="text-sm">
+          <span className="block mb-1">{t('zatca.postalCode')}</span>
+          <input className="input-field" inputMode="numeric" maxLength={5} value={form.postal_code} disabled={!canEdit} onChange={(e) => setField('postal_code', e.target.value)} />
+        </label>
+        <label className="text-sm">
+          <span className="block mb-1">{t('zatca.countrySubentity')}</span>
+          <input className="input-field" value={form.country_subentity} disabled={!canEdit} onChange={(e) => setField('country_subentity', e.target.value)} />
+        </label>
       </div>
+      <p className="text-xs text-gray-500">{t('zatca.nationalAddressHint')}</p>
 
       {canEdit && (
         <div className="flex flex-col sm:flex-row gap-3 items-end">
           <label className="text-sm flex-1">
             <span className="block mb-1">{t('zatca.otp')}</span>
-            <input className="input-field" inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="123456" />
+            <input className="input-field" inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="••••••" />
             <span className="block text-xs text-gray-500 mt-1">{t('zatca.otpHint')}</span>
           </label>
           <button type="button" className="btn-secondary" onClick={save} disabled={saving}>

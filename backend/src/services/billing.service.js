@@ -50,6 +50,7 @@ const withBillingClient = async (externalClient, work) => {
 };
 const { creditNotesTableExists } = require('../utils/credit-notes-schema');
 const creditNotes = require('./credit-note.service');
+const zatcaService = require('./zatca.service');
 
 const generateVatQR = (invoice) => {
   const tlv = [
@@ -196,7 +197,7 @@ const getInvoiceById = async (id, options = {}) => {
 };
 
 const createInvoice = async (data, userId, options = {}) => {
-  return withBillingClient(options.client, async (client) => {
+  const issued = await withBillingClient(options.client, async (client) => {
     const invoiceNumber = generateCode('INV');
     const discounted = await discountPresets.applyToDocumentData(data, {
       allowOpenDiscount: options.allowOpenDiscount === true,
@@ -229,7 +230,7 @@ const createInvoice = async (data, userId, options = {}) => {
     const vatQR = generateVatQR(invoice);
     await client.query('UPDATE invoices SET vat_qr_data = $1 WHERE id = $2', [vatQR, invoice.id]);
 
-    const issued = { ...invoice, vat_qr_data: vatQR };
+    const issued = { ...invoice, vat_qr_data: vatQR, items: catalogItems };
     await ledger.postInvoice(issued, userId, client);
     await syncCustomerArBalance(data.customer_id, client);
     await logBillingAudit({
@@ -243,6 +244,10 @@ const createInvoice = async (data, userId, options = {}) => {
     });
     return issued;
   });
+  if (!options.client) {
+    void zatcaService.submitIssuedInvoiceSafe(issued, userId).catch(() => { /* live submit must never block billing */ });
+  }
+  return issued;
 };
 
 const recordPayment = async (data, userId, req = null, options = {}) => {

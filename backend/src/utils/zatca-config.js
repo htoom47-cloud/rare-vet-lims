@@ -1,8 +1,11 @@
+const { sellerAddress, sellerAddressReady } = require('./zatca-invoice-map');
+
 const SETTINGS_KEY = 'zatca_link';
 
 const ENVIRONMENTS = {
   sandbox: 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal',
   simulation: 'https://gw-fatoora.zatca.gov.sa/e-invoicing/simulation',
+  core: 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core',
 };
 
 const defaults = () => ({
@@ -12,6 +15,12 @@ const defaults = () => ({
   organization_unit: '',
   common_name: 'RareVet-LIMS',
   address: '',
+  street: '',
+  building_number: '',
+  city_subdivision: '',
+  city: '',
+  postal_code: '',
+  country_subentity: 'Riyadh',
   invoice_types: '1100',
   serial: '1-RareVet|2-LIMS|3-1.0',
   status: 'not_linked',
@@ -29,6 +38,12 @@ const publicView = (stored, { sendLiveInvoices = false } = {}) => {
     organization_unit: String(merged.organization_unit || ''),
     common_name: String(merged.common_name || 'RareVet-LIMS'),
     address: String(merged.address || ''),
+    street: String(merged.street || merged.address || ''),
+    building_number: String(merged.building_number || '').replace(/\D/g, '').slice(0, 4),
+    city_subdivision: String(merged.city_subdivision || merged.organization_unit || ''),
+    city: String(merged.city || merged.address || ''),
+    postal_code: String(merged.postal_code || '').replace(/\D/g, '').slice(0, 5),
+    country_subentity: String(merged.country_subentity || 'Riyadh'),
     invoice_types: merged.invoice_types === '0100' || merged.invoice_types === '1000'
       ? merged.invoice_types
       : '1100',
@@ -37,6 +52,15 @@ const publicView = (stored, { sendLiveInvoices = false } = {}) => {
     linked_at: merged.linked_at || null,
     compliance_request_id: merged.compliance_request_id || null,
     last_error: merged.last_error || null,
+    last_live_submit: merged.last_live_submit && typeof merged.last_live_submit === 'object'
+      ? {
+        invoice_number: String(merged.last_live_submit.invoice_number || ''),
+        status: String(merged.last_live_submit.status || ''),
+        reason: String(merged.last_live_submit.reason || '').slice(0, 400),
+        at: merged.last_live_submit.at || null,
+      }
+      : null,
+    address_ready: sellerAddressReady(sellerAddress(merged)),
     has_certificate: Boolean(merged.binary_security_token && merged.secret && merged.private_key_pem),
     has_production_certificate: Boolean(merged.production_binary_security_token && merged.production_secret && merged.private_key_pem),
     production_status: merged.production_status === 'issued' || merged.production_status === 'error'
@@ -70,6 +94,12 @@ const mergePublicFields = (stored, payload = {}) => {
     organization_unit: next.organization_unit.slice(0, 200),
     common_name: next.common_name.slice(0, 120),
     address: next.address.slice(0, 200),
+    street: next.street.slice(0, 80),
+    building_number: next.building_number,
+    city_subdivision: next.city_subdivision.slice(0, 80),
+    city: next.city.slice(0, 80),
+    postal_code: next.postal_code,
+    country_subentity: next.country_subentity.slice(0, 80),
     invoice_types: next.invoice_types,
     serial: next.serial.slice(0, 120),
   };
