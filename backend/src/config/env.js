@@ -150,6 +150,11 @@ const env = {
      * Default false — completed-sample reports only until explicitly enabled.
      */
     preliminaryReports: process.env.PRELIMINARY_REPORTS_ENABLED === 'true',
+    /**
+     * When true: live invoice reporting/clearance to Fatoora is allowed.
+     * Default false — sandbox device onboarding only until explicitly enabled.
+     */
+    zatcaEinvoice: process.env.ZATCA_EINVOICE_ENABLED === 'true',
   },
   hatif: {
     apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',

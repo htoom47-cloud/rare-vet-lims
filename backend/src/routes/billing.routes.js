@@ -9,6 +9,7 @@ const quoteService = require('../services/quote.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const discountPresetService = require('../services/discount-presets.service');
+const zatcaService = require('../services/zatca.service');
 const { invoiceSchema, quoteSchema, paymentSchema, creditNoteSchema, refundSchema, discountPresetSchema } = require('../validators/schemas');
 const creditNoteService = require('../services/credit-note.service');
 const { PERMISSIONS } = require('../utils/permissions');
@@ -129,6 +130,27 @@ router.get('/invoice-settings', authorize(PERMISSIONS.BILLING_VIEW), async (req,
 router.put('/invoice-settings', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
   try {
     const data = await invoiceSettingsService.updateInvoiceSettings(req.body, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/zatca', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await zatcaService.getStatus();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.put('/zatca', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await zatcaService.saveConfig(req.body, req.user.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/zatca/onboard', authorize(PERMISSIONS.BILLING_CREATE), async (req, res, next) => {
+  try {
+    const data = await zatcaService.onboardSandbox({ otp: req.body?.otp }, req.user.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { billingAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import DiscountPresetsAdmin from '../components/billing/DiscountPresetsAdmin';
+import ZatcaLinkAdmin from '../components/billing/ZatcaLinkAdmin';
 
 const emptySettings = () => ({
   lab: {
@@ -81,6 +82,7 @@ export default function InvoiceSettings() {
     { id: 'design', label: t('invoiceSettings.tabDesign') },
     { id: 'options', label: t('invoiceSettings.tabOptions') },
     { id: 'discounts', label: t('invoiceSettings.tabDiscounts') },
+    { id: 'zatca', label: t('invoiceSettings.tabZatca') },
   ];
 
   if (loading) {
@@ -103,7 +105,7 @@ export default function InvoiceSettings() {
           <button type="button" onClick={preview} disabled={previewing} className="btn-secondary flex items-center gap-2">
             <Eye size={16} /> {previewing ? t('common.loading') : t('invoiceSettings.preview')}
           </button>
-          {canEdit && tab !== 'discounts' && (
+          {canEdit && tab !== 'discounts' && tab !== 'zatca' && (
             <button type="button" onClick={save} disabled={saving} className="btn-primary flex items-center gap-2">
               <Save size={16} /> {saving ? t('common.loading') : t('invoiceSettings.save')}
             </button>
@@ -256,6 +258,7 @@ export default function InvoiceSettings() {
       )}
 
       {tab === 'discounts' && <DiscountPresetsAdmin canEdit={canEdit} />}
+      {tab === 'zatca' && <ZatcaLinkAdmin canEdit={canEdit} />}
     </div>
   );
 }
