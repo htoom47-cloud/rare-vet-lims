@@ -29,6 +29,20 @@ const defaults = () => ({
   last_error: null,
 });
 
+const productionNeedsRefresh = (stored) => {
+  const merged = { ...(stored && typeof stored === 'object' ? stored : {}) };
+  if (!merged.production_binary_security_token || !merged.production_secret) return true;
+  if (
+    merged.production_compliance_request_id != null
+    && String(merged.production_compliance_request_id) !== String(merged.compliance_request_id || '')
+  ) {
+    return true;
+  }
+  const complianceAt = Date.parse(merged.compliance_ran_at || '');
+  const productionAt = Date.parse(merged.production_linked_at || '');
+  return Number.isFinite(complianceAt) && Number.isFinite(productionAt) && complianceAt > productionAt;
+};
+
 const publicView = (stored, { sendLiveInvoices = false } = {}) => {
   const merged = { ...defaults(), ...(stored && typeof stored === 'object' ? stored : {}) };
   return {
@@ -63,6 +77,7 @@ const publicView = (stored, { sendLiveInvoices = false } = {}) => {
     address_ready: sellerAddressReady(sellerAddress(merged)),
     has_certificate: Boolean(merged.binary_security_token && merged.secret && merged.private_key_pem),
     has_production_certificate: Boolean(merged.production_binary_security_token && merged.production_secret && merged.private_key_pem),
+    production_needs_refresh: productionNeedsRefresh(merged),
     production_status: merged.production_status === 'issued' || merged.production_status === 'error'
       ? merged.production_status
       : 'not_issued',
@@ -113,5 +128,6 @@ module.exports = {
   defaults,
   publicView,
   mergePublicFields,
+  productionNeedsRefresh,
   baseUrl,
 };

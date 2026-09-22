@@ -13,6 +13,7 @@ const {
   SETTINGS_KEY,
   publicView,
   mergePublicFields,
+  productionNeedsRefresh,
   baseUrl,
 } = require('../utils/zatca-config');
 const { buildComplianceSamples } = require('../utils/zatca-compliance-samples');
@@ -165,6 +166,15 @@ const onboardSandbox = async ({ otp }, userId) => {
       status: 'sandbox_linked',
       linked_at: new Date().toISOString(),
       last_error: null,
+      compliance_status: 'not_run',
+      compliance_ran_at: null,
+      compliance_results: [],
+      production_binary_security_token: null,
+      production_secret: null,
+      production_request_id: null,
+      production_compliance_request_id: null,
+      production_status: 'not_issued',
+      production_linked_at: null,
     };
     if (!next.binary_security_token || !next.secret) {
       throw new AppError('استجابت منصة فاتورة بدون شهادة صالحة.', 502, 'ZATCA_ONBOARD_INCOMPLETE');
@@ -343,7 +353,7 @@ const requestSandboxProductionCsid = async (userId) => {
   if (stored.compliance_status !== 'passed') {
     throw new AppError('شغّل اختبارات الامتثال بنجاح أولاً.', 400, 'ZATCA_COMPLIANCE_REQUIRED');
   }
-  if (stored.production_binary_security_token && stored.production_secret) {
+  if (!productionNeedsRefresh(stored)) {
     return publicView(stored, { sendLiveInvoices: env.features.zatcaEinvoice === true });
   }
   if (stored.compliance_request_id == null || stored.compliance_request_id === '') {
@@ -362,6 +372,7 @@ const requestSandboxProductionCsid = async (userId) => {
       production_binary_security_token: result.binarySecurityToken || result.binary_security_token || null,
       production_secret: result.secret || null,
       production_request_id: result.requestID || result.request_id || null,
+      production_compliance_request_id: stored.compliance_request_id || null,
       production_status: 'issued',
       production_linked_at: new Date().toISOString(),
       last_error: null,

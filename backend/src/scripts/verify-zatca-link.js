@@ -34,7 +34,7 @@ assert.ok(/zatcaEinvoice: process\.env\.ZATCA_EINVOICE_ENABLED === 'true'/.test(
 assert.ok(configSrc.includes('developer-portal'));
 assert.ok(configSrc.includes('e-invoicing/core'));
 
-const { publicView, mergePublicFields, ENVIRONMENTS } = require('../utils/zatca-config');
+const { publicView, mergePublicFields, productionNeedsRefresh, ENVIRONMENTS } = require('../utils/zatca-config');
 const view = publicView({
   private_key_pem: 'SECRET',
   secret: 'SECRET',
@@ -57,5 +57,18 @@ assert.strictEqual(view.send_live_invoices, false);
 assert.strictEqual(ENVIRONMENTS.core, 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core');
 assert.strictEqual(mergePublicFields({}, { vat_number: '3110-424-873-00003' }).vat_number, '311042487300003');
 assert.strictEqual(mergePublicFields({}, { building_number: '4371', postal_code: '13771' }).building_number, '4371');
+assert.strictEqual(productionNeedsRefresh({
+  production_binary_security_token: 'OLD',
+  production_secret: 'OLD',
+  production_linked_at: '2026-09-22T10:02:00.000Z',
+  compliance_ran_at: '2026-09-22T10:40:00.000Z',
+}), true);
+assert.strictEqual(publicView({
+  production_binary_security_token: 'OLD',
+  production_secret: 'OLD',
+  private_key_pem: 'SECRET',
+  production_linked_at: '2026-09-22T10:02:00.000Z',
+  compliance_ran_at: '2026-09-22T10:40:00.000Z',
+}).production_needs_refresh, true);
 
 console.log('zatca link wiring ok');

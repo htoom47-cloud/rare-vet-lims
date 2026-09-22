@@ -28,6 +28,7 @@ const empty = () => ({
   compliance_ran_at: null,
   compliance_results: [],
   has_production_certificate: false,
+  production_needs_refresh: false,
   production_status: 'not_issued',
   production_linked_at: null,
 });
@@ -277,7 +278,7 @@ export default function ZatcaLinkAdmin({ canEdit }) {
             type="button"
             className="btn-primary"
             onClick={requestProduction}
-            disabled={requestingProduction || form.compliance_status !== 'passed' || form.has_production_certificate}
+            disabled={requestingProduction || form.compliance_status !== 'passed' || (form.has_production_certificate && !form.production_needs_refresh)}
           >
             {requestingProduction ? t('common.loading') : t('zatca.requestProduction')}
           </button>
