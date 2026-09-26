@@ -28,6 +28,7 @@ import { fmtCatalog } from '../utils/vat';
 import { testDisplayName } from '../utils/formatResultValue';
 import { packageLabel, packageTestIds } from '../utils/packageSelection';
 import { useAuth } from '../context/AuthContext';
+import { speciesLabel } from '../utils/speciesLabels';
 
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
@@ -452,6 +453,20 @@ export default function Samples() {
         {r.animal_name ? ` · ${r.animal_name}` : ''}
       </span>
     ) },
+
+    { key: 'animal_type', label: t('samples.animalType'), render: (r) => (
+      speciesLabel(r.animal_type, i18n.language === 'ar') || '—'
+    ) },
+
+    { key: 'received_at', label: t('samples.receivedAt'), render: (r) => {
+      const value = r.received_date || r.created_at;
+      if (!value) return '—';
+      return new Date(value).toLocaleString(i18n.language === 'ar' ? 'ar-SA' : 'en-GB', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+        timeZone: 'Asia/Riyadh',
+      });
+    } },
 
     { key: 'status', label: t('common.status'), render: (r) => <StatusBadge status={r.status} label={t(`samples.statuses.${r.status}`)} /> },
 

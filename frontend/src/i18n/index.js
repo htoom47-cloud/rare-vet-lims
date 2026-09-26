@@ -725,6 +725,8 @@ const resources = {
       },
       samples: {
         title: 'Sample Management', register: 'Register Sample', barcode: 'Barcode',
+        receivedAt: 'Received date & time',
+        animalType: 'Animal type',
         reassignAnimal: 'Correct linked animal',
         saveAnimalLink: 'Save animal link',
         reassignAnimalDone: 'Sample linked to the selected animal — regenerate report PDF if needed',
@@ -2282,6 +2284,8 @@ const resources = {
       },
       samples: {
         title: 'إدارة العينات', register: 'تسجيل عينة', barcode: 'الباركود',
+        receivedAt: 'تاريخ ووقت الاستلام',
+        animalType: 'نوع الحيوان',
         reassignAnimal: 'تصحيح الحيوان المرتبط',
         saveAnimalLink: 'حفظ ربط الحيوان',
         reassignAnimalDone: 'تم ربط العينة بالحيوان المختار — أعد توليد PDF التقرير إن لزم',
