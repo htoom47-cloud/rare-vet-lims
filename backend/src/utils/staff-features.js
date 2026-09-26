@@ -24,6 +24,8 @@ const getStaffFeatures = () => ({
   breederDashboard: !!env.features?.breederDashboard,
   /** When true: staff may extract a preliminary report before remaining tests finish */
   preliminaryReports: !!env.features?.preliminaryReports,
+  /** When true: culture/smear workbench + AST report layout */
+  cultureAstReport: !!env.features?.cultureAstReport,
 });
 
 module.exports = { getStaffFeatures };

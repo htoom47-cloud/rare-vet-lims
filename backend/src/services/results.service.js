@@ -15,6 +15,13 @@ const { normalizeMicroscopeImage } = require('../utils/image-normalize');
 const autoInvoice = require('./auto-invoice.service');
 const { assertSampleNotReportLocked } = require('./report-lock.service');
 const { isNoneFoundValue } = require('../utils/parasitologyTests');
+const env = require('../config/env');
+const {
+  isCultureTest,
+  hasCulturePayload,
+  ensureCultureParameters,
+  mapCultureToValues,
+} = require('../utils/culture-ast');
 
 const formatQualValue = (value, unit) => {
   if (unit !== 'qual' || !value) return value;
@@ -132,6 +139,28 @@ const enterResults = async (data, userId) => {
 
     const { animal_type, gender, age, test_id: sampleTestIdTestId } = stResult.rows[0];
     let hasCritical = false;
+
+    if (hasCulturePayload(data.culture)) {
+      if (!env.features?.cultureAstReport) {
+        throw new AppError('Culture sensitivity entry is not enabled', 400, 'FEATURE_DISABLED');
+      }
+      const testMeta = await client.query(
+        `SELECT t.id, t.code, t.name, t.name_ar, tc.code AS category_code
+         FROM tests t
+         LEFT JOIN test_categories tc ON tc.id = t.category_id
+         WHERE t.id = $1`,
+        [sampleTestIdTestId]
+      );
+      if (!isCultureTest(testMeta.rows[0] || {})) {
+        throw new AppError('This test is not a culture / smear panel', 400, 'NOT_CULTURE_TEST');
+      }
+      const ensured = await ensureCultureParameters(client, sampleTestIdTestId);
+      const mapped = mapCultureToValues(data.culture, ensured);
+      if (!mapped.length) {
+        throw new AppError('Enter at least one culture result value', 400, 'VALIDATION_ERROR');
+      }
+      data.values = mapped;
+    }
 
     let resultId;
     const existing = await client.query('SELECT id FROM results WHERE sample_test_id = $1', [data.sample_test_id]);

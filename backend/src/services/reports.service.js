@@ -30,6 +30,7 @@ const INSTRUMENT_BY_CATEGORY = {
   PCR: 'PCR',
   MICRO: 'Microscope',
   PARAS: 'Microscope',
+  CULT: 'Microbiology',
   URINE: 'Microscope',
 };
 

@@ -14,12 +14,24 @@ import {
   findQualParamIndex,
   elisaTechniqueLabel,
 } from '../utils/elisaEntry';
+import {
+  isCultureTest,
+  CULTURE_ANTIBIOTICS,
+  GRAM_PRESETS,
+  GROWTH_NO,
+  GROWTH_YES,
+  emptyCultureForm,
+  cultureFormFromFields,
+  culturePayloadFromForm,
+  cultureFormHasValue,
+} from '../utils/cultureEntry';
 
 export default function TechnicianWorkbench() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const elisaSpecial = !!user?.features?.elisaSpecialEntry;
+  const cultureAst = !!user?.features?.cultureAstReport;
   const isAr = i18n.language === 'ar';
   const [searchParams] = useSearchParams();
   const [queue, setQueue] = useState([]);
@@ -27,6 +39,7 @@ export default function TechnicianWorkbench() {
   const [critical, setCritical] = useState([]);
   const [selectedSample, setSelectedSample] = useState(null);
   const [resultForm, setResultForm] = useState({});
+  const [cultureForm, setCultureForm] = useState({});
   const [testValidated, setTestValidated] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,6 +82,7 @@ export default function TechnicianWorkbench() {
       return;
     }
     const form = {};
+    const nextCulture = {};
     const validated = {};
     for (const test of labTests) {
       const testDetail = await testsAPI.get(test.test_id);
@@ -101,10 +115,22 @@ export default function TechnicianWorkbench() {
       // Catalog meta for ELISA layout only (does not change save payload)
       test.method = detail.method || test.method;
       test.category_code = detail.category_code || test.category_code;
+      test.test_name_ar = detail.name_ar || test.test_name_ar;
+      test.test_name = detail.name || test.test_name;
+      if (cultureAst && isCultureTest({ ...test, ...detail, test_code: detail.code || test.test_code })) {
+        nextCulture[test.id] = cultureFormFromFields(form[test.id], {
+          ...test,
+          test_code: detail.code || test.test_code,
+          category_code: detail.category_code || test.category_code,
+          test_name: detail.name || test.test_name,
+          test_name_ar: detail.name_ar || test.test_name_ar,
+        });
+      }
     }
     setSelectedSample({ ...data.data, tests: labTests });
     setTestValidated(validated);
     setResultForm(form);
+    setCultureForm(nextCulture);
   };
 
   const submitAllResults = async () => {
@@ -112,6 +138,12 @@ export default function TechnicianWorkbench() {
 
     const payloads = selectedSample.tests
       .map((test) => {
+        if (cultureAst && isCultureTest(test) && cultureFormHasValue(cultureForm[test.id])) {
+          return {
+            sample_test_id: test.id,
+            culture: culturePayloadFromForm(cultureForm[test.id] || emptyCultureForm()),
+          };
+        }
         const fields = resultForm[test.id] || [];
         const values = fields
           .filter((v) => v.parameter_id && String(v.value ?? '').trim() !== '');
@@ -142,7 +174,7 @@ export default function TechnicianWorkbench() {
   };
 
   const hasEnterableFields = selectedSample?.tests?.some(
-    (test) => (resultForm[test.id] || []).length > 0
+    (test) => (cultureAst && isCultureTest(test)) || (resultForm[test.id] || []).length > 0
   );
 
   const clearTestResults = async (test) => {
@@ -292,7 +324,130 @@ export default function TechnicianWorkbench() {
     );
   };
 
+  const patchCulture = (testId, patch) => {
+    setCultureForm((prev) => ({
+      ...prev,
+      [testId]: { ...(prev[testId] || emptyCultureForm()), ...patch },
+    }));
+  };
+
+  const setCultureAst = (testId, antibiotic, rank) => {
+    const current = cultureForm[testId] || emptyCultureForm();
+    patchCulture(testId, {
+      ast: { ...current.ast, [antibiotic]: rank },
+    });
+  };
+
+  const renderCultureFields = (test) => {
+    const form = cultureForm[test.id] || emptyCultureForm();
+    const locked = !!testValidated[test.id];
+    const noGrowth = form.growth === GROWTH_NO;
+    return (
+      <div className="space-y-4 rounded-lg border border-primary-200 dark:border-primary-800 p-3">
+        <div className="text-center text-sm font-semibold text-primary-800 dark:text-primary-200">
+          {isAr ? 'المزرعة وحساسية المضادات' : 'Culture & Antibiotic Sensitivity'}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">{isAr ? 'نوع العينة' : 'Sample'}</label>
+            <input
+              className="input-field mt-1"
+              value={form.specimen}
+              disabled={locked}
+              onChange={(e) => patchCulture(test.id, { specimen: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">{isAr ? 'النتيجة' : 'Result'}</label>
+            <select
+              className="input-field mt-1"
+              value={form.growth}
+              disabled={locked}
+              onChange={(e) => patchCulture(test.id, { growth: e.target.value })}
+            >
+              <option value="">—</option>
+              <option value={GROWTH_NO}>{isAr ? 'لا نمو' : 'No growth'}</option>
+              <option value={GROWTH_YES}>{isAr ? 'نمو' : 'Growth'}</option>
+            </select>
+          </div>
+        </div>
+        {!noGrowth && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">{isAr ? 'الكائن المعزول' : 'Organism'}</label>
+                <input
+                  className="input-field mt-1"
+                  value={form.organism}
+                  disabled={locked}
+                  placeholder={isAr ? 'مثال: Coliform Bacilli' : 'e.g. Coliform Bacilli'}
+                  onChange={(e) => patchCulture(test.id, { organism: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">{isAr ? 'صبغة جرام' : 'Gram stain'}</label>
+                <input
+                  className="input-field mt-1"
+                  list={`gram-presets-${test.id}`}
+                  value={form.gram}
+                  disabled={locked}
+                  onChange={(e) => patchCulture(test.id, { gram: e.target.value })}
+                />
+                <datalist id={`gram-presets-${test.id}`}>
+                  {GRAM_PRESETS.map((g) => <option key={g} value={g} />)}
+                </datalist>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-primary-800 text-white">
+                    <th className="px-2 py-1.5 text-start">{isAr ? 'المضاد' : 'Antibiotic'}</th>
+                    <th className="px-2 py-1.5">—</th>
+                    <th className="px-2 py-1.5">{isAr ? 'حساس جداً' : 'Highly Sens.'}</th>
+                    <th className="px-2 py-1.5">{isAr ? 'ضعيف' : 'Weak Sens.'}</th>
+                    <th className="px-2 py-1.5">{isAr ? 'مقاوم' : 'Resistant'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CULTURE_ANTIBIOTICS.map((ab) => (
+                    <tr key={ab} className="border-t">
+                      <td className="px-2 py-1.5 font-medium">{ab}</td>
+                      {['', 'high', 'weak', 'res'].map((rank) => (
+                        <td key={rank || 'none'} className="px-2 py-1.5 text-center">
+                          <input
+                            type="radio"
+                            name={`ast-${test.id}-${ab}`}
+                            checked={(form.ast?.[ab] || '') === rank}
+                            disabled={locked}
+                            onChange={() => setCultureAst(test.id, ab, rank)}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        <div>
+          <label className="text-sm font-medium">{isAr ? 'ملاحظات' : 'Notes'}</label>
+          <input
+            className="input-field mt-1"
+            value={form.notes}
+            disabled={locked}
+            onChange={(e) => patchCulture(test.id, { notes: e.target.value })}
+          />
+        </div>
+      </div>
+    );
+  };
+
   const renderTestFields = (test, fields) => {
+    if (cultureAst && isCultureTest(test)) {
+      return renderCultureFields(test);
+    }
     if (elisaSpecial && isElisaTest(test)) {
       return renderElisaFields(test, fields);
     }
@@ -391,7 +546,10 @@ export default function TechnicianWorkbench() {
             <div key={test.id} className="mb-6 border-b pb-4 last:border-0">
               <div className="flex justify-between items-center mb-3 gap-2">
                 <h4 className="font-semibold">{test.test_name}</h4>
-                {!testValidated[test.id] && (resultForm[test.id] || []).some((v) => String(v.value ?? '').trim() !== '') && (
+                {!testValidated[test.id] && (
+                  cultureFormHasValue(cultureForm[test.id])
+                  || (resultForm[test.id] || []).some((v) => String(v.value ?? '').trim() !== '')
+                ) && (
                   <button type="button" onClick={() => clearTestResults(test)} className="text-red-600 text-sm hover:underline">
                     {t('workbench.clearResults')}
                   </button>
@@ -400,7 +558,7 @@ export default function TechnicianWorkbench() {
                   <span className="text-xs text-green-700 dark:text-green-400">{t('workbench.approvedLocked', { defaultValue: 'Approved — use Vet Review to edit' })}</span>
                 )}
               </div>
-              {fields.length === 0 ? (
+              {fields.length === 0 && !(cultureAst && isCultureTest(test)) ? (
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm text-amber-800 dark:text-amber-300">
                   <p className="mb-2">{t('workbench.noParametersHint')}</p>
                   <Link to="/tests" className="text-primary-600 underline font-medium" onClick={() => setSelectedSample(null)}>

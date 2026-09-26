@@ -3,6 +3,11 @@
  *
  * PDF (active design) and Preview both consume the same `sections` array from buildReportSections().
  */
+const env = require('../config/env');
+const { isCultureTest } = require('../utils/culture-ast');
+
+const isCultureAstEnabled = () => !!env.features?.cultureAstReport;
+
 const SECTION_META = {
   hematology: {
     titleEn: 'Hematology Report',
@@ -61,6 +66,12 @@ const SECTION_META = {
     sortOrder: 9,
     categoryCodes: ['PCR'],
   },
+  culture: {
+    titleEn: 'Culture & Antibiotic Sensitivity',
+    titleAr: 'المزرعة وحساسية المضادات',
+    sortOrder: 9.5,
+    categoryCodes: ['CULT'],
+  },
   microscopy: {
     titleEn: 'Microscopy / Parasite Images',
     titleAr: 'صور الميكروسكوب / الطفيليات',
@@ -84,7 +95,14 @@ const SECTION_ORDER = Object.fromEntries(
   Object.entries(SECTION_META).map(([key, meta]) => [key, meta.sortOrder ?? 99])
 );
 
-const resolveSectionType = (testCode, categoryCode) => {
+const cultureSectionHint = (testCode, categoryCode, extra = {}) => ({
+  test_code: testCode,
+  category_code: categoryCode,
+  test_name: extra.testNameEn || extra.name || extra.test_name,
+  test_name_ar: extra.testNameAr || extra.name_ar || extra.test_name_ar,
+});
+
+const resolveSectionType = (testCode, categoryCode, extra = {}) => {
   const code = String(testCode || '').toUpperCase();
   const cat = String(categoryCode || '').toUpperCase();
 
@@ -98,6 +116,9 @@ const resolveSectionType = (testCode, categoryCode) => {
   if (cat === 'ELISA' || /ELISA/i.test(code)) return 'elisa';
   if (['SERO', 'IMMUNO'].includes(cat) || /^SERO/.test(code)) return 'serology';
   if (/PCR/.test(code) || cat === 'PCR') return 'pcr';
+  if (isCultureAstEnabled() && isCultureTest(cultureSectionHint(testCode, categoryCode, extra))) {
+    return 'culture';
+  }
   return 'other';
 };
 
@@ -140,7 +161,10 @@ const groupResultsBySection = (results = [], context = {}) => {
 
   for (const row of results || []) {
     if (!hasResultValue(row)) continue;
-    const sectionType = resolveSectionType(row.testCode, row.categoryCode);
+    const sectionType = resolveSectionType(row.testCode, row.categoryCode, {
+      testNameEn: row.testNameEn,
+      testNameAr: row.testNameAr,
+    });
     if (!grouped.has(sectionType)) grouped.set(sectionType, createEmptySection(sectionType, language));
     const section = grouped.get(sectionType);
     section.results.push(row);
@@ -225,7 +249,10 @@ const collectOrderedContext = (orderedTests = []) => {
   for (const test of orderedTests) {
     const code = test.test_code || test.testCode;
     if (code) orderedTestCodes.push(code);
-    orderedSectionTypes.add(resolveSectionType(code, test.category_code || test.categoryCode));
+    orderedSectionTypes.add(resolveSectionType(code, test.category_code || test.categoryCode, {
+      testNameEn: test.name || test.test_name,
+      testNameAr: test.name_ar || test.test_name_ar,
+    }));
   }
 
   return {
@@ -271,7 +298,10 @@ const buildReportSections = (reportData = {}, context = {}) => {
     const items = (resultsByTest.get(testCode) || []).filter(hasResultValue);
     if (!items.length) continue;
 
-    const sectionType = resolveSectionType(testCode, test.category_code || test.categoryCode);
+    const sectionType = resolveSectionType(testCode, test.category_code || test.categoryCode, {
+      testNameEn: test.name || test.test_name,
+      testNameAr: test.name_ar || test.test_name_ar,
+    });
     const section = ensureSection(sectionType);
     section.results.push(...items);
     if (testCode && !section.testCodes.includes(testCode)) section.testCodes.push(testCode);
@@ -283,7 +313,10 @@ const buildReportSections = (reportData = {}, context = {}) => {
       if (!validItems.length) continue;
       const already = [...sectionMap.values()].some((s) => s.testCodes.includes(testCode));
       if (already) continue;
-      const sectionType = resolveSectionType(testCode, validItems[0]?.categoryCode);
+      const sectionType = resolveSectionType(testCode, validItems[0]?.categoryCode, {
+        testNameEn: validItems[0]?.testNameEn,
+        testNameAr: validItems[0]?.testNameAr,
+      });
       const section = ensureSection(sectionType);
       section.results.push(...validItems);
       if (!section.testCodes.includes(testCode)) section.testCodes.push(testCode);

@@ -98,15 +98,40 @@ const packageSchema = Joi.object({
   test_ids: Joi.array().items(Joi.string().uuid()).min(1).required(),
 });
 
+const cultureEntrySchema = Joi.object({
+  specimen: Joi.string().allow('', null),
+  growth: Joi.string().allow('', null),
+  organism: Joi.string().allow('', null),
+  gram: Joi.string().allow('', null),
+  highly_sensitive: Joi.array().items(Joi.string().allow('')).default([]),
+  weak_sensitive: Joi.array().items(Joi.string().allow('')).default([]),
+  resistant: Joi.array().items(Joi.string().allow('')).default([]),
+  notes: Joi.string().allow('', null),
+});
+
 const resultEntrySchema = Joi.object({
   sample_test_id: Joi.string().uuid().required(),
   values: Joi.array().items(Joi.object({
     parameter_id: Joi.string().uuid().required(),
     value: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
     notes: Joi.string().allow('', null),
-  })).min(1).required(),
+  })).default([]),
+  culture: cultureEntrySchema.optional(),
   technician_notes: Joi.string().allow('', null),
-});
+}).custom((value, helpers) => {
+  const hasValues = (value.values || []).some((v) => String(v?.value ?? '').trim() !== '');
+  const culture = value.culture || {};
+  const hasCulture = [
+    culture.growth, culture.specimen, culture.organism, culture.gram, culture.notes,
+  ].some((v) => String(v || '').trim() !== '')
+    || (culture.highly_sensitive || []).some((v) => String(v || '').trim() !== '')
+    || (culture.weak_sensitive || []).some((v) => String(v || '').trim() !== '')
+    || (culture.resistant || []).some((v) => String(v || '').trim() !== '');
+  if (!hasValues && !hasCulture) {
+    return helpers.error('any.custom', { message: 'Enter at least one result value' });
+  }
+  return value;
+}, 'require values or culture payload');
 
 const resultValidateSchema = Joi.object({
   doctor_notes: Joi.string().allow('', null),

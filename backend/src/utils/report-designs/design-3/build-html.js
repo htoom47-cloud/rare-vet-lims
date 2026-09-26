@@ -24,6 +24,12 @@ const {
   hasPositiveRoseBengal,
   roseBengalConfirmNote,
 } = require('../../rose-bengal-note');
+const { isCultureRow } = require('../../culture-ast');
+const {
+  buildCultureCards,
+  splitCultureSectionResults,
+  isCultureRecommendationDuplicate,
+} = require('../../culture-report');
 
 const ASSETS = path.join(__dirname, '../../../assets');
 const FONTS = path.join(ASSETS, 'fonts');
@@ -201,6 +207,70 @@ const formatElisaRefHtml = (text) => escapeHtml(text || '')
   .filter(Boolean)
   .join('<br />');
 
+const cultureList = (items) => (
+  items?.length
+    ? `<ul class="culture-ast__list">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : `<p class="culture-ast__empty">—</p>`
+);
+
+const buildCultureAstSection = (results, lang, sectionTitle) => {
+  const cards = buildCultureCards(results, lang);
+  if (!cards.length) return '';
+  const title = sectionTitle || t(lang, 'Culture & Antibiotic Sensitivity', 'المزرعة وحساسية المضادات');
+  const sampleLbl = lang === 'ar' ? 'العينة' : 'Sample';
+  const organismLbl = lang === 'ar' ? 'الكائن' : 'Organism';
+  const gramLbl = lang === 'ar' ? 'صبغة جرام' : 'Gram stain';
+  const resultLbl = lang === 'ar' ? 'النتيجة' : 'Result';
+  const highLbl = 'Organism is Highly Sens. To';
+  const weakLbl = 'Organism is Weak Sens. To';
+  const resLbl = 'Organism is Resistant To';
+
+  const blocks = cards.map((card) => {
+    const meta = [
+      `<div class="culture-meta__item"><span>${escapeHtml(sampleLbl)}</span><strong>${escapeHtml(card.specimen)}</strong></div>`,
+      `<div class="culture-meta__item"><span>${escapeHtml(resultLbl)}</span><strong>${escapeHtml(card.growth)}</strong></div>`,
+    ];
+    if (card.organism) {
+      meta.push(`<div class="culture-meta__item"><span>${escapeHtml(organismLbl)}</span><strong>${escapeHtml(card.organism)}</strong></div>`);
+    }
+    if (card.gram) {
+      meta.push(`<div class="culture-meta__item"><span>${escapeHtml(gramLbl)}</span><strong>${escapeHtml(card.gram)}</strong></div>`);
+    }
+    const ast = (!card.noGrowth && card.hasAst)
+      ? `<div class="culture-ast">
+          <div class="culture-ast__col culture-ast__col--high">
+            <h4>${escapeHtml(highLbl)}</h4>
+            ${cultureList(card.highly)}
+          </div>
+          <div class="culture-ast__col culture-ast__col--weak">
+            <h4>${escapeHtml(weakLbl)}</h4>
+            ${cultureList(card.weak)}
+          </div>
+          <div class="culture-ast__col culture-ast__col--res">
+            <h4>${escapeHtml(resLbl)}</h4>
+            ${cultureList(card.resistant)}
+          </div>
+        </div>`
+      : '';
+    const notes = card.notes
+      ? `<p class="culture-notes">${escapeHtml(card.notes)}</p>`
+      : '';
+    return `
+      <div class="culture-card">
+        ${card.title ? `<div class="culture-card__title">${escapeHtml(card.title)}</div>` : ''}
+        <div class="culture-meta">${meta.join('')}</div>
+        ${ast}
+        ${notes}
+      </div>`;
+  }).join('');
+
+  return `
+    <section class="section section--culture card">
+      <div class="section__head section__head--culture">${escapeHtml(title)}</div>
+      <div class="culture-box__body">${blocks}</div>
+    </section>`;
+};
+
 /** ELISA disease matrix — only when ELISA_SPECIAL_ENTRY=true. */
 const buildElisaResultsTable = (results, lang, sectionTitle, sampleCode) => {
   const matrix = buildElisaMatrixRows(results, { sampleCode, lang });
@@ -259,7 +329,15 @@ const buildDynamicSections = async (sections, lang, sampleCode = '') => {
     if (section.isImageSection && section.attachments?.length) {
       blocks.push(await buildImagesSection(section.attachments, lang, section.title));
     } else if (section.results?.length) {
-      if (elisaSpecial && section.sectionType === 'elisa') {
+      if (section.sectionType === 'culture') {
+        const { culture, other } = splitCultureSectionResults(section.results);
+        if (culture.length) {
+          blocks.push(buildCultureAstSection(culture, lang, section.title));
+        }
+        if (other.length) {
+          blocks.push(buildResultsTable(other, lang, culture.length ? null : section.title));
+        }
+      } else if (elisaSpecial && section.sectionType === 'elisa') {
         const { elisa, other } = splitElisaSectionResults(section.results);
         const elisaTitle = t(lang, 'ELISA Technique', 'تقنية إليزا');
         if (elisa.length) {
@@ -395,16 +473,26 @@ const buildReportHtml = async (reportData) => {
     });
   } catch { /* */ }
 
-  // ELISA qualitative results must not feed HIGH/LOW/NORMAL overview counts
-  const overviewResults = (reportData.results || []).filter((r) => !isElisaRow(r));
+  const cultureAst = !!env.features?.cultureAstReport;
+  // ELISA qualitative results must not feed HIGH/LOW/NORMAL overview counts.
+  // Culture rows are excluded only when the culture AST layout is on.
+  const overviewResults = (reportData.results || []).filter((r) => {
+    if (isElisaRow(r)) return false;
+    if (cultureAst && isCultureRow(r)) return false;
+    return true;
+  });
   const counts = buildResultCounts(overviewResults);
   const css = loadStyles();
   const dynamicSections = reportData.sections?.length
     ? await buildDynamicSections(reportData.sections, lang, reportData.sampleCode || '')
     : buildResultsTable(reportData.results || [], lang);
 
-  const recommendationsBlock = buildTreatmentRecommendationsSection(
+  const recommendationsText = (cultureAst && isCultureRecommendationDuplicate(
     reportData.treatmentRecommendations,
+    reportData.results
+  )) ? '' : reportData.treatmentRecommendations;
+  const recommendationsBlock = buildTreatmentRecommendationsSection(
+    recommendationsText,
     lang
   );
 

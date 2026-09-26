@@ -628,6 +628,116 @@ body[dir='rtl'] {
   white-space: pre-line;
 }
 
+.section--culture {
+  margin-top: 0;
+  margin-bottom: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.section__head--culture {
+  background: var(--color-navy);
+  color: #fff;
+  text-align: center;
+  justify-content: center;
+  font-size: var(--font-md);
+  font-weight: 700;
+}
+
+.culture-box__body {
+  padding: var(--space-2);
+}
+
+.culture-card + .culture-card {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.culture-card__title {
+  font-weight: 700;
+  font-size: var(--font-md);
+  color: var(--color-navy);
+  margin-bottom: var(--space-1);
+  text-align: center;
+}
+
+.culture-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.culture-meta__item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--color-surface-alt);
+}
+
+.culture-meta__item span {
+  display: block;
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+}
+
+.culture-meta__item strong {
+  display: block;
+  font-size: var(--font-sm);
+  color: var(--color-ink);
+}
+
+.culture-ast {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+  direction: ltr;
+  text-align: left;
+}
+
+.culture-ast__col {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  min-height: 80px;
+}
+
+.culture-ast__col h4 {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+}
+
+.culture-ast__col--high h4 { background: #15803d; }
+.culture-ast__col--weak h4 { background: #a16207; }
+.culture-ast__col--res h4 { background: #b91c1c; }
+
+.culture-ast__list {
+  margin: 0;
+  padding: 8px 10px 8px 22px;
+  font-size: var(--font-sm);
+}
+
+.culture-ast__empty {
+  margin: 0;
+  padding: 8px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.culture-notes {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-sm);
+  color: var(--color-ink);
+}
+
 .test-name {
   display: flex;
   flex-direction: column;
@@ -984,8 +1094,13 @@ body[dir='rtl'] {
     break-inside: auto;
   }
 
-  .section--elisa {
+  .section--elisa,
+  .section--culture {
     margin-top: 0;
     margin-bottom: 0;
+  }
+
+  .culture-ast {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

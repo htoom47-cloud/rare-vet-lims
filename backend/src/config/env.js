@@ -151,6 +151,12 @@ const env = {
      */
     preliminaryReports: process.env.PRELIMINARY_REPORTS_ENABLED === 'true',
     /**
+     * When true: culture / smear entry uses growth + organism + AST columns,
+     * and the report renders a Culture & Antibiotic Sensitivity box.
+     * Default false — generic workbench/table until explicitly enabled.
+     */
+    cultureAstReport: process.env.CULTURE_AST_REPORT === 'true',
+    /**
      * When true: live invoice reporting/clearance to Fatoora is allowed.
      * Default false — sandbox device onboarding only until explicitly enabled.
      */

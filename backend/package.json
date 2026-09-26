@@ -22,6 +22,7 @@
     "test:s3": "node src/scripts/test-s3-storage.js",
     "verify:result-engine": "node src/scripts/verify-result-engine.js",
     "verify:elisa-report": "node src/scripts/verify-elisa-report.js",
+    "verify:culture-ast": "node src/scripts/verify-culture-ast-report.js",
     "verify:rose-bengal-note": "node src/scripts/verify-rose-bengal-note.js",
     "verify:mindray-urea": "node src/scripts/verify-mindray-urea-map.js",
     "verify:report-boxes": "node src/scripts/verify-report-section-boxes.js",
