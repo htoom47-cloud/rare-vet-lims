@@ -666,6 +666,28 @@ body[dir='rtl'] {
   text-align: center;
 }
 
+.culture-card--neg {
+  text-align: center;
+  padding: var(--space-2) var(--space-1);
+}
+
+.culture-neg__sample {
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  margin-bottom: var(--space-1);
+}
+
+.culture-neg__sample span {
+  margin-inline-end: 4px;
+}
+
+.culture-neg__result {
+  font-size: var(--font-2xl);
+  font-weight: 700;
+  color: var(--color-navy);
+  padding: var(--space-2);
+}
+
 .culture-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

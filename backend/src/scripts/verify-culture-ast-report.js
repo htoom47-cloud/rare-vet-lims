@@ -193,6 +193,7 @@ check('isCultureRow uses test name', () => {
       }],
     });
     assert.ok(html.includes('section--culture'));
+    assert.ok(html.includes('culture-neg__result'));
     assert.ok(html.includes('لا نمو'));
     assert.ok(html.includes('المسحات الرحمية'));
     assert.ok(!html.includes('Highly Sens'));

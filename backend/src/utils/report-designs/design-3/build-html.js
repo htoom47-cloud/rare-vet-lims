@@ -226,6 +226,24 @@ const buildCultureAstSection = (results, lang, sectionTitle) => {
   const resLbl = 'Organism is Resistant To';
 
   const blocks = cards.map((card) => {
+    const notes = card.notes
+      ? `<p class="culture-notes">${escapeHtml(card.notes)}</p>`
+      : '';
+    const showTitle = card.title && card.title !== card.specimen;
+
+    if (card.noGrowth) {
+      const specimenLine = card.specimen
+        ? `<div class="culture-neg__sample"><span>${escapeHtml(sampleLbl)}</span> ${escapeHtml(card.specimen)}</div>`
+        : '';
+      return `
+        <div class="culture-card culture-card--neg">
+          ${showTitle ? `<div class="culture-card__title">${escapeHtml(card.title)}</div>` : ''}
+          ${specimenLine}
+          <div class="culture-neg__result">${escapeHtml(card.growth)}</div>
+          ${notes}
+        </div>`;
+    }
+
     const meta = [
       `<div class="culture-meta__item"><span>${escapeHtml(sampleLbl)}</span><strong>${escapeHtml(card.specimen)}</strong></div>`,
       `<div class="culture-meta__item"><span>${escapeHtml(resultLbl)}</span><strong>${escapeHtml(card.growth)}</strong></div>`,
@@ -236,7 +254,7 @@ const buildCultureAstSection = (results, lang, sectionTitle) => {
     if (card.gram) {
       meta.push(`<div class="culture-meta__item"><span>${escapeHtml(gramLbl)}</span><strong>${escapeHtml(card.gram)}</strong></div>`);
     }
-    const ast = (!card.noGrowth && card.hasAst)
+    const ast = card.hasAst
       ? `<div class="culture-ast">
           <div class="culture-ast__col culture-ast__col--high">
             <h4>${escapeHtml(highLbl)}</h4>
@@ -252,12 +270,9 @@ const buildCultureAstSection = (results, lang, sectionTitle) => {
           </div>
         </div>`
       : '';
-    const notes = card.notes
-      ? `<p class="culture-notes">${escapeHtml(card.notes)}</p>`
-      : '';
     return `
       <div class="culture-card">
-        ${card.title ? `<div class="culture-card__title">${escapeHtml(card.title)}</div>` : ''}
+        ${showTitle ? `<div class="culture-card__title">${escapeHtml(card.title)}</div>` : ''}
         <div class="culture-meta">${meta.join('')}</div>
         ${ast}
         ${notes}
