@@ -88,7 +88,9 @@ check('legacy single GROWTH row builds a no-growth card', () => {
   ], 'ar');
   assert.ok(card.noGrowth);
   assert.strictEqual(card.growth, 'لا نمو');
-  assert.strictEqual(card.specimen, 'المسحات الرحمية');
+  assert.strictEqual(card.title, 'المسحات الرحمية');
+  assert.strictEqual(card.hasSpecimen, false);
+  assert.strictEqual(card.specimen, '');
   assert.strictEqual(card.hasAst, false);
 });
 
@@ -194,8 +196,10 @@ check('isCultureRow uses test name', () => {
     });
     assert.ok(html.includes('section--culture'));
     assert.ok(html.includes('culture-neg__result'));
+    assert.ok(html.includes('نتيجة المزرعة'));
     assert.ok(html.includes('لا نمو'));
     assert.ok(html.includes('المسحات الرحمية'));
+    assert.ok(!html.includes('class="culture-neg__sample"'));
     assert.ok(!html.includes('Highly Sens'));
   });
 

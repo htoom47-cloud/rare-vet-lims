@@ -216,7 +216,10 @@ const cultureList = (items) => (
 const buildCultureAstSection = (results, lang, sectionTitle) => {
   const cards = buildCultureCards(results, lang);
   if (!cards.length) return '';
-  const title = sectionTitle || t(lang, 'Culture & Antibiotic Sensitivity', 'المزرعة وحساسية المضادات');
+  const allNoGrowth = cards.every((card) => card.noGrowth);
+  const title = allNoGrowth
+    ? t(lang, 'Culture Result', 'نتيجة المزرعة')
+    : (sectionTitle || t(lang, 'Culture & Antibiotic Sensitivity', 'المزرعة وحساسية المضادات'));
   const sampleLbl = lang === 'ar' ? 'العينة' : 'Sample';
   const organismLbl = lang === 'ar' ? 'الكائن' : 'Organism';
   const gramLbl = lang === 'ar' ? 'صبغة جرام' : 'Gram stain';
@@ -232,13 +235,14 @@ const buildCultureAstSection = (results, lang, sectionTitle) => {
     const showTitle = card.title && card.title !== card.specimen;
 
     if (card.noGrowth) {
-      const specimenLine = card.specimen
+      const specimenLine = card.hasSpecimen
         ? `<div class="culture-neg__sample"><span>${escapeHtml(sampleLbl)}</span> ${escapeHtml(card.specimen)}</div>`
         : '';
       return `
         <div class="culture-card culture-card--neg">
-          ${showTitle ? `<div class="culture-card__title">${escapeHtml(card.title)}</div>` : ''}
+          ${card.title ? `<div class="culture-card__title">${escapeHtml(card.title)}</div>` : ''}
           ${specimenLine}
+          <div class="culture-neg__label">${escapeHtml(resultLbl)}</div>
           <div class="culture-neg__result">${escapeHtml(card.growth)}</div>
           ${notes}
         </div>`;

@@ -46,7 +46,9 @@ const buildCultureCard = (rows = [], lang = 'ar') => {
 
   const growthRaw = rowValue(growthRow) || rowValue(leftover[0]);
   const noGrowth = isNoGrowthValue(growthRaw);
-  const specimen = rowValue(specimenRow) || testTitle(rows, lang) || '—';
+  const specimenRaw = rowValue(specimenRow);
+  const title = testTitle(rows, lang);
+  const specimen = specimenRaw || (noGrowth ? '' : (title || '—'));
   const leftoverOrganism = !growthRow && leftover[0] && !isNoGrowthValue(growthRaw) && !isGrowthValue(growthRaw)
     ? growthRaw
     : '';
@@ -64,8 +66,9 @@ const buildCultureCard = (rows = [], lang = 'ar') => {
     .filter(Boolean);
 
   return {
-    title: testTitle(rows, lang),
+    title,
     specimen,
+    hasSpecimen: Boolean(specimenRaw),
     growth: displayGrowth(growthRaw, lang),
     growthRaw,
     noGrowth,

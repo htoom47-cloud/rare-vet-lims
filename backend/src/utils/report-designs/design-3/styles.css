@@ -681,11 +681,17 @@ body[dir='rtl'] {
   margin-inline-end: 4px;
 }
 
+.culture-neg__label {
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+  margin-top: var(--space-1);
+}
+
 .culture-neg__result {
   font-size: var(--font-2xl);
   font-weight: 700;
   color: var(--color-navy);
-  padding: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-2);
 }
 
 .culture-meta {
