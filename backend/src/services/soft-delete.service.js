@@ -3,6 +3,7 @@ const { query, getClient, pool } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 const dataPurge = require('./data-purge.service');
+const { syncCustomerArBalance } = require('./accounting.service');
 const logger = require('../config/logger');
 
 const TRASH_TYPES = new Set(['customers', 'samples', 'reports', 'invoices']);
@@ -106,6 +107,7 @@ const deleteEntity = async (type, id, userId) => {
       row = await markDeleted(client, 'reports', id, userId, purgeAfter);
     } else {
       row = await softDeleteInvoice(client, id, userId, purgeAfter);
+      if (row.customer_id) await syncCustomerArBalance(row.customer_id, client);
     }
     await client.query('COMMIT');
     return row;
@@ -156,6 +158,7 @@ const restoreEntity = async (type, id) => {
            AND sample_id IN (SELECT id FROM samples WHERE customer_id = $2)`,
         [purgeAfter, id]
       );
+      await syncCustomerArBalance(id, client);
     } else if (type === 'samples') {
       const { rows } = await client.query(
         'SELECT purge_after FROM samples WHERE id = $1 AND deleted_at IS NOT NULL',
@@ -172,7 +175,8 @@ const restoreEntity = async (type, id) => {
     } else if (type === 'reports') {
       await clearDeleted(client, 'reports', id);
     } else {
-      await clearDeleted(client, 'invoices', id);
+      const restored = await clearDeleted(client, 'invoices', id);
+      if (restored.customer_id) await syncCustomerArBalance(restored.customer_id, client);
     }
 
     await client.query('COMMIT');

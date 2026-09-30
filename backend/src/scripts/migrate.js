@@ -852,6 +852,10 @@ async function applyPatches() {
         ('8f0c1b10-4c11-4a2e-9d01-d15c00000003', 'bulk', 'Large volume discount', 'خصم الاعداد الكبيرة', 35, 10, true, 30)
       ON CONFLICT (code) DO NOTHING
     `);
+    // Recompute stored AR after invoice trash/purge left stale account_balance rows.
+    const { resyncAllCustomerArBalances } = require('../services/accounting.service');
+    const arSync = await resyncAllCustomerArBalances(client);
+    logger.info(`Customer account_balance resynced (${arSync.updated} rows)`);
   } finally {
     client.release();
   }

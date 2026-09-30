@@ -3,6 +3,8 @@
  * Used by purge scripts and soft-delete expiry cron.
  */
 
+const { syncCustomerArBalance } = require('./accounting.service');
+
 async function hardPurgeSample(client, sampleId) {
   // invoices.sample_id FK — unlink before deleting sample
   await client.query('UPDATE invoices SET sample_id = NULL WHERE sample_id = $1', [sampleId]);
@@ -33,6 +35,11 @@ async function hardPurgeSample(client, sampleId) {
 }
 
 async function hardPurgeInvoice(client, invoiceId) {
+  const customerRow = await client.query(
+    'SELECT customer_id FROM invoices WHERE id = $1',
+    [invoiceId]
+  );
+  const customerId = customerRow.rows[0]?.customer_id || null;
   const paymentRows = await client.query('SELECT id FROM payments WHERE invoice_id = $1', [invoiceId]);
   const paymentIds = paymentRows.rows.map((r) => r.id);
   const refundRows = await client.query('SELECT id FROM refunds WHERE invoice_id = $1', [invoiceId]);
@@ -53,6 +60,11 @@ async function hardPurgeInvoice(client, invoiceId) {
   await client.query('DELETE FROM payments WHERE invoice_id = $1', [invoiceId]);
   await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
   await client.query('DELETE FROM invoices WHERE id = $1', [invoiceId]);
+
+  if (customerId) {
+    const still = await client.query('SELECT id FROM customers WHERE id = $1', [customerId]);
+    if (still.rows[0]) await syncCustomerArBalance(customerId, client);
+  }
 }
 
 async function hardPurgeReport(client, reportId) {

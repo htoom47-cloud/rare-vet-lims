@@ -37,6 +37,25 @@ const syncCustomerArBalance = async (customerId, client = null) => {
   );
 };
 
+/** Recompute stored AR for every customer (idempotent; fixes stale balances after purge). */
+const resyncAllCustomerArBalances = async (client = null) => {
+  const q = client ? client.query.bind(client) : query;
+  const withCredits = await creditNotesTableExists(client);
+  const result = await q(
+    `UPDATE customers c SET account_balance = COALESCE((
+      SELECT SUM(${remainingSql(withCredits)})
+      FROM invoices i
+      ${paymentsJoin('p')}
+      ${withCredits ? ISSUED_CREDITS_JOIN : ''}
+      WHERE i.customer_id = c.id
+        AND ${notDeleted('i')}
+        AND i.status = ANY($1::invoice_status[])
+    ), 0), updated_at = NOW()`,
+    [OPEN_INVOICE_STATUSES]
+  );
+  return { updated: result.rowCount || 0 };
+};
+
 const getCustomerStatement = async (customerId) => {
   const customer = await query(
     'SELECT id, full_name, full_name_ar, mobile, credit_limit, account_balance FROM customers WHERE id = $1',
@@ -583,6 +602,7 @@ const getCustomerRevenueReport = async (from, to) => {
 
 module.exports = {
   syncCustomerArBalance,
+  resyncAllCustomerArBalances,
   getCustomerStatement,
   getDailyCollections,
   getArAging,
