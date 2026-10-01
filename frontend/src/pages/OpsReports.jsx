@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, ClipboardList, FlaskConical, Receipt } from 'lucide-react';
+import { BarChart3, ClipboardList, FlaskConical, Printer, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { billingAPI } from '../services/api';
 import PageHeader from '../components/ui/PageHeader';
 import { labDay, labMonth } from '../utils/accountingTime';
+import { printOpsSalesReport } from '../utils/opsSalesReportPrint';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const monthStart = () => `${labMonth()}-01`;
@@ -101,6 +102,53 @@ export default function OpsReports() {
     setServiceKey('all');
   };
 
+  const handlePrintSales = () => {
+    if (!sales) {
+      toast.error(t('opsReports.noData'));
+      return;
+    }
+    try {
+      printOpsSalesReport({
+        from: report?.from || from,
+        to: report?.to || to,
+        sales,
+        isArabic: ar,
+        labels: {
+          title: t('opsReports.printSalesTitle'),
+          range: t('opsReports.printRange'),
+          invoices: t('opsReports.invoices'),
+          invoiced: t('opsReports.invoiced'),
+          collected: t('opsReports.collected'),
+          discount: t('opsReports.discount'),
+          tax: t('opsReports.tax'),
+          cancelled: t('opsReports.cancelledInvoices'),
+          byMethod: t('opsReports.byMethod'),
+          byService: t('opsReports.byService'),
+          byCustomer: t('opsReports.byCustomer'),
+          paymentMethod: t('billing.paymentMethod'),
+          serviceType: t('opsReports.serviceTypeFilter'),
+          service: t('accounting.service'),
+          quantity: t('opsReports.quantity'),
+          revenue: t('opsReports.revenue'),
+          lineCount: t('accounting.lineCount'),
+          customer: t('customers.fullName'),
+          invoiceCount: t('accounting.invoiceCount'),
+          noData: t('opsReports.noData'),
+          footer: t('opsReports.printFooter'),
+          methodLabel: (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method }),
+          serviceTypeLabel: (type) => t(`opsReports.serviceTypes.${type}`, { defaultValue: type }),
+          serviceLabel,
+        },
+      });
+    } catch (err) {
+      if (err?.code === 'POPUP_BLOCKED') {
+        toast.error(t('opsReports.printPopupBlocked'));
+      } else {
+        toast.error(t('opsReports.printFailed'));
+      }
+    }
+  };
+
   const tabs = [
     { id: 'sales', icon: Receipt, label: t('opsReports.sales') },
     { id: 'tests', icon: FlaskConical, label: t('opsReports.tests') },
@@ -133,6 +181,14 @@ export default function OpsReports() {
         </button>
         <button type="button" className="btn-primary" onClick={load} disabled={loading}>
           {t('opsReports.apply')}
+        </button>
+        <button
+          type="button"
+          className="btn-secondary flex items-center gap-2"
+          onClick={handlePrintSales}
+          disabled={loading || !sales}
+        >
+          <Printer size={16} /> {t('opsReports.printMonthlySales')}
         </button>
       </div>
       <p className="text-xs text-gray-500">{t('opsReports.rangeHint')}</p>

@@ -73,4 +73,11 @@ const appSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/App.j
 assert.ok(appSrc.includes('ops-reports'));
 assert.ok(appSrc.includes('OpsReports'));
 
+const pageSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/pages/OpsReports.jsx'), 'utf8');
+const printSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/opsSalesReportPrint.js'), 'utf8');
+assert.ok(pageSrc.includes('printOpsSalesReport'));
+assert.ok(pageSrc.includes('printMonthlySales'));
+assert.ok(printSrc.includes('window.print'));
+assert.ok(!/\b(INSERT|UPDATE|DELETE|ALTER)\b/.test(printSrc));
+
 console.log('ops reports wiring ok');
