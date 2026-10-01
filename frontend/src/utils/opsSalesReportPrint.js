@@ -26,7 +26,7 @@ const summaryHtml = (items) => `
   </div>`;
 
 function openPrintHtml(html) {
-  // Match thermal invoice print: never use noopener (it yields a blank window).
+  // Match thermal invoice print: do not pass a no-opener feature (blank window).
   const win = window.open('about:blank', '_blank', 'width=900,height=1000');
   if (!win) {
     const err = new Error('Popup blocked');
