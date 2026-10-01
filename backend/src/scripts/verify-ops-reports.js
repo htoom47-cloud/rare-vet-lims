@@ -78,6 +78,8 @@ const printSrc = fs.readFileSync(path.join(__dirname, '../../../frontend/src/uti
 assert.ok(pageSrc.includes('printOpsSalesReport'));
 assert.ok(pageSrc.includes('printMonthlySales'));
 assert.ok(printSrc.includes('window.print'));
+assert.ok(printSrc.includes("window.open('about:blank'"));
+assert.ok(!/noopener/.test(printSrc));
 assert.ok(!/\b(INSERT|UPDATE|DELETE|ALTER)\b/.test(printSrc));
 
 console.log('ops reports wiring ok');

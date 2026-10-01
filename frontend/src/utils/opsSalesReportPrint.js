@@ -25,6 +25,20 @@ const summaryHtml = (items) => `
       </div>`).join('')}
   </div>`;
 
+function openPrintHtml(html) {
+  // Match thermal invoice print: never use noopener (it yields a blank window).
+  const win = window.open('about:blank', '_blank', 'width=900,height=1000');
+  if (!win) {
+    const err = new Error('Popup blocked');
+    err.code = 'POPUP_BLOCKED';
+    throw err;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  try { win.focus(); } catch { /* ignore */ }
+}
+
 export function printOpsSalesReport({
   from,
   to,
@@ -48,7 +62,7 @@ export function printOpsSalesReport({
     row.line_count,
   ]);
   const customerRows = (sales.by_customer || []).map((row) => [
-    row.full_name,
+    row.full_name || '—',
     row.invoice_count,
     money(row.invoiced),
     money(row.collected),
@@ -68,6 +82,7 @@ export function printOpsSalesReport({
       margin: 0;
       padding: 12px;
       font-size: 12px;
+      background: #fff;
     }
     h1 { font-size: 18px; margin: 0 0 4px; }
     h2 { font-size: 13px; margin: 18px 0 8px; }
@@ -125,13 +140,5 @@ export function printOpsSalesReport({
 </body>
 </html>`;
 
-  const win = window.open('', '_blank', 'noopener,noreferrer,width=900,height=1000');
-  if (!win) {
-    const err = new Error('Popup blocked');
-    err.code = 'POPUP_BLOCKED';
-    throw err;
-  }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  openPrintHtml(html);
 }
