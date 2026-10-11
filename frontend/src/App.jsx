@@ -36,6 +36,7 @@ import TechnicianWorkbench from './pages/TechnicianWorkbench';
 import VetReview from './pages/VetReview';
 import WorkflowCase from './pages/WorkflowCase';
 import Parasitology from './pages/Parasitology';
+import BrucellaList from './pages/BrucellaList';
 import ParasitologyUpload from './pages/ParasitologyUpload';
 import ReceptionDisplay from './pages/ReceptionDisplay';
 
@@ -75,6 +76,7 @@ export default function App() {
               <Route path="workflow" element={<ProtectedRoute permission="samples.create"><WorkflowCase /></ProtectedRoute>} />
               <Route path="workbench" element={<ProtectedRoute permission="results.enter"><TechnicianWorkbench /></ProtectedRoute>} />
               <Route path="parasitology" element={<ProtectedRoute permissions={['results.enter', 'results.validate']}><Parasitology /></ProtectedRoute>} />
+              <Route path="brucella-list" element={<ProtectedRoute permissions={['results.enter', 'results.validate']}><BrucellaList /></ProtectedRoute>} />
               <Route path="parasitology/upload" element={<ProtectedRoute permission="results.upload_images"><ParasitologyUpload /></ProtectedRoute>} />
               <Route path="vet-review" element={<ProtectedRoute permissions={['results.validate', 'results.edit', 'results.unvalidate', 'results.enter']}><VetReview /></ProtectedRoute>} />
               <Route path="price-list" element={<ProtectedRoute permissions={['price_list.view', 'tests.view']}><PriceList /></ProtectedRoute>} />

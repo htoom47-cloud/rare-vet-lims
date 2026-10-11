@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const service = require('../services/results.service');
+const brucellaList = require('../services/brucella-list.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { resultEntrySchema, resultApproveBatchSchema, resultValidateSchema } = require('../validators/schemas');
@@ -95,6 +96,40 @@ router.get('/sample-test/:id', authorize(PERMISSIONS.RESULTS_VIEW, PERMISSIONS.R
 router.get('/previous/:animalId/:parameterId', authorize(PERMISSIONS.RESULTS_VIEW), async (req, res, next) => {
   try {
     const data = await service.getPreviousResults(req.params.animalId, req.params.parameterId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/brucella-list', authorize(PERMISSIONS.RESULTS_VIEW, PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
+  try {
+    const data = await brucellaList.listForCustomer(req.query.customer_id, {
+      from: req.query.from || null,
+      to: req.query.to || null,
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/brucella-list/save', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_EDIT), async (req, res, next) => {
+  try {
+    const data = await brucellaList.saveRows(
+      req.body.customer_id,
+      req.body.rows,
+      req.user.id,
+      { approve: false }
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/brucella-list/approve', authorize(PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
+  try {
+    const data = await brucellaList.saveRows(
+      req.body.customer_id,
+      req.body.rows,
+      req.user.id,
+      { approve: true }
+    );
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

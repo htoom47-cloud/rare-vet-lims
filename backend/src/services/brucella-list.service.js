@@ -1,0 +1,142 @@
+/**
+ * Brucella herd list: read samples and save qualitative RESULT values
+ * through the existing result engine. Does not generate per-sample reports.
+ */
+const { query } = require('../config/database');
+const { AppError } = require('../middleware/errorHandler');
+const { notDeleted } = require('../utils/soft-delete-sql');
+const { labDateSql } = require('../utils/accounting-time');
+const { enterResults, validateResults } = require('./results.service');
+
+const NEGATIVE = 'لا توجد مالطيه';
+const POSITIVE = 'إيجابي';
+const ALLOWED = new Set([NEGATIVE, POSITIVE]);
+const MAX_ROWS = 400;
+
+const brucellaSql = `
+  t.code NOT ILIKE '%ELISA%'
+  AND (
+    t.code IN ('BRUCELLA', 'BRU-ROSE-BENGAL')
+    OR t.code ILIKE 'BRU%'
+  )
+`;
+
+const listSql = `
+  SELECT s.id AS sample_id, s.sample_code, s.created_at,
+         a.animal_code, a.name_tag AS animal_name,
+         st.id AS sample_test_id, t.code AS test_code,
+         p.id AS result_parameter_id,
+         rv.value AS result_value,
+         COALESCE(r.is_validated, false) AS is_validated
+  FROM sample_tests st
+  JOIN samples s ON s.id = st.sample_id
+  JOIN animals a ON a.id = s.animal_id
+  JOIN tests t ON t.id = st.test_id
+  LEFT JOIN test_parameters p ON p.test_id = t.id AND p.code = 'RESULT' AND p.unit = 'qual'
+  LEFT JOIN results r ON r.sample_test_id = st.id
+  LEFT JOIN result_values rv ON rv.result_id = r.id AND rv.parameter_id = p.id
+  WHERE s.customer_id = $1
+    AND ${notDeleted('s')}
+    AND st.status IS DISTINCT FROM 'cancelled'
+    AND ${brucellaSql}
+`;
+
+const listForCustomer = async (customerId, { from, to } = {}) => {
+  if (!customerId) throw new AppError('Customer is required', 400, 'VALIDATION_ERROR');
+  const params = [customerId];
+  let sql = listSql;
+  if (from) {
+    params.push(from);
+    sql += ` AND ${labDateSql('s.created_at')} >= $${params.length}::date`;
+  }
+  if (to) {
+    params.push(to);
+    sql += ` AND ${labDateSql('s.created_at')} <= $${params.length}::date`;
+  }
+  sql += ' ORDER BY s.created_at ASC, a.animal_code ASC LIMIT 500';
+  const result = await query(sql, params);
+  return result.rows.map((row) => ({
+    ...row,
+    is_validated: row.is_validated === true || row.is_validated === 't',
+  }));
+};
+
+const loadOwnedRow = async (customerId, sampleTestId) => {
+  const result = await query(
+    `${listSql} AND st.id = $2 LIMIT 1`,
+    [customerId, sampleTestId]
+  );
+  return result.rows[0] || null;
+};
+
+const saveRows = async (customerId, rows, userId, { approve = false } = {}) => {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new AppError('No rows to save', 400, 'VALIDATION_ERROR');
+  }
+  if (rows.length > MAX_ROWS) {
+    throw new AppError(`A batch can save at most ${MAX_ROWS} rows`, 400, 'VALIDATION_ERROR');
+  }
+
+  const saved = [];
+  const skipped = [];
+  const failed = [];
+
+  for (const row of rows) {
+    const sampleTestId = row?.sample_test_id;
+    const value = String(row?.value || '').trim();
+    if (!ALLOWED.has(value)) {
+      failed.push({ sample_test_id: sampleTestId, reason: 'invalid_value' });
+      continue;
+    }
+    const current = await loadOwnedRow(customerId, sampleTestId);
+    if (!current) {
+      failed.push({ sample_test_id: sampleTestId, reason: 'not_in_list' });
+      continue;
+    }
+    if (!current.result_parameter_id) {
+      failed.push({ sample_test_id: sampleTestId, reason: 'missing_result_parameter' });
+      continue;
+    }
+    const same = String(current.result_value || '').trim() === value;
+    const validated = current.is_validated === true || current.is_validated === 't';
+    if (validated && !same) {
+      failed.push({ sample_test_id: sampleTestId, reason: 'validated_locked' });
+      continue;
+    }
+    if (same && (validated || !approve)) {
+      skipped.push(sampleTestId);
+      continue;
+    }
+    try {
+      if (!same) {
+        await enterResults({
+          sample_test_id: sampleTestId,
+          values: [{ parameter_id: current.result_parameter_id, value }],
+        }, userId);
+      }
+      if (approve && !validated) {
+        await validateResults(sampleTestId, userId, '');
+      }
+      saved.push(sampleTestId);
+    } catch (err) {
+      failed.push({
+        sample_test_id: sampleTestId,
+        reason: err.code || 'save_failed',
+        message: err.message,
+      });
+    }
+  }
+
+  return {
+    saved: saved.length,
+    skipped: skipped.length,
+    failed,
+  };
+};
+
+module.exports = {
+  NEGATIVE,
+  POSITIVE,
+  listForCustomer,
+  saveRows,
+};
