@@ -100,14 +100,22 @@ export default function BrucellaList() {
         rows: printable,
         labels: {
           title: t('brucellaList.printTitle'),
-          customer: t('customers.fullName'),
+          reportType: t('brucellaList.reportType'),
+          customer: t('brucellaList.owner'),
+          exam: t('brucellaList.exam'),
+          examName: t('parasitology.brucellaSection'),
+          date: t('brucellaList.date'),
+          summary: t('brucellaList.summary'),
           count: t('brucellaList.count'),
           sample: t('brucellaList.sample'),
           animal: t('brucellaList.animal'),
           animalName: t('animals.name'),
           result: t('brucellaList.result'),
+          positive: t('brucellaList.positive'),
+          negative: t('brucellaList.negative'),
           empty: t('brucellaList.empty'),
           note: t('brucellaList.printNote'),
+          disclaimer: t('brucellaList.disclaimer'),
         },
       });
     } catch (err) {

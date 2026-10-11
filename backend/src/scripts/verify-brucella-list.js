@@ -9,6 +9,7 @@ const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '../services/brucella-list.service.js'), 'utf8');
 const routes = fs.readFileSync(path.join(__dirname, '../routes/results.routes.js'), 'utf8');
 const page = fs.readFileSync(path.join(__dirname, '../../../frontend/src/pages/BrucellaList.jsx'), 'utf8');
+const print = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/brucellaListPrint.js'), 'utf8');
 
 assert.ok(src.includes('enterResults'));
 assert.ok(src.includes('validateResults'));
@@ -20,5 +21,10 @@ assert.ok(routes.includes("'/brucella-list'"));
 assert.ok(routes.indexOf("'/brucella-list'") < routes.indexOf("'/enter'"));
 assert.ok(page.includes('printBrucellaList'));
 assert.ok(!/reportsAPI\.generate|generateReport/.test(page));
+assert.ok(print.includes('rpt-header'));
+assert.ok(print.includes('مركز رعاية النوادر البيطري'));
+assert.ok(print.includes("window.open('about:blank'"));
+assert.ok(!/window\.open\([^)]*noopener/.test(print));
+assert.ok(!/INSERT INTO reports|generate\(/.test(print));
 
 console.log('brucella list wiring ok');
