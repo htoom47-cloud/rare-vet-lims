@@ -122,6 +122,17 @@ router.post('/brucella-list/save', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSI
   } catch (err) { next(err); }
 });
 
+router.post('/brucella-list/publish', authorize(PERMISSIONS.RESULTS_VALIDATE, PERMISSIONS.NOTIFICATIONS_SEND_REPORT), async (req, res, next) => {
+  try {
+    const data = await brucellaList.publishForCustomer(
+      req.body.customer_id,
+      req.user.id,
+      { from: req.body.from || null, to: req.body.to || null }
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.post('/brucella-list/approve', authorize(PERMISSIONS.RESULTS_VALIDATE), async (req, res, next) => {
   try {
     const data = await brucellaList.saveRows(

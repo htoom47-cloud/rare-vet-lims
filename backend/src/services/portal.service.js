@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/database');
+const { createReadStream } = require('../config/storage');
 const env = require('../config/env');
 const logger = require('../config/logger');
 const { AppError } = require('../middleware/errorHandler');
@@ -824,6 +825,32 @@ const listDocuments = async (customerIds, { animalId, type } = {}) => {
     })),
   ];
 
+  if (!animalId) {
+    try {
+      const lists = await query(
+        `SELECT id, pdf_url, row_count, published_at
+         FROM customer_brucella_lists
+         WHERE customer_id = ANY($1::uuid[])
+         ORDER BY published_at DESC
+         LIMIT 1`,
+        [ids]
+      );
+      lists.rows.forEach((row) => {
+        docs.push({
+          id: row.id,
+          type: 'pdf',
+          kind: 'brucella',
+          title: 'قائمة نتائج المالطية',
+          subtitle: `${row.row_count} عينة`,
+          url: row.pdf_url,
+          createdAt: row.published_at,
+        });
+      });
+    } catch (err) {
+      logger.warn('Portal documents: brucella list unavailable', { error: err.message });
+    }
+  }
+
   if (type && type !== 'all') {
     docs = docs.filter((d) => d.type === type);
   }
@@ -928,6 +955,28 @@ const listInvoices = async (customerIds, { page, limit } = {}) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
+const serveBrucellaListPdf = async (customerIds, res) => {
+  const ids = asArray(customerIds);
+  const list = await query(
+    `SELECT id, pdf_url FROM customer_brucella_lists
+     WHERE customer_id = ANY($1::uuid[])
+     ORDER BY published_at DESC
+     LIMIT 1`,
+    [ids]
+  );
+  if (!list.rows[0]?.pdf_url) throw new AppError('List not found', 404, 'NOT_FOUND');
+  logPortalAccess(ids[0], 'brucella_list_pdf', list.rows[0].id);
+  const filename = list.rows[0].pdf_url.split('/').pop();
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  const stream = await createReadStream(list.rows[0].pdf_url);
+  await new Promise((resolve, reject) => {
+    stream.on('error', reject);
+    stream.on('end', resolve);
+    stream.pipe(res);
+  });
+};
+
 const serveInvoicePdf = async (invoiceId, customerIds, res) => {
   const ids = asArray(customerIds);
   const invoice = await query(
@@ -953,6 +1002,7 @@ module.exports = {
   getReportPreview,
   getReportHtml,
   serveReportPdf,
+  serveBrucellaListPdf,
   listInvoices,
   serveInvoicePdf,
 };

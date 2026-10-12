@@ -185,6 +185,7 @@ export const resultsAPI = {
   brucellaList: (params) => api.get('/results/brucella-list', { params }),
   saveBrucellaList: (data) => api.post('/results/brucella-list/save', data, { timeout: 180000 }),
   approveBrucellaList: (data) => api.post('/results/brucella-list/approve', data, { timeout: 180000 }),
+  publishBrucellaList: (data) => api.post('/results/brucella-list/publish', data, { timeout: 180000 }),
   clear: (sampleTestId) => api.delete(`/results/sample-test/${sampleTestId}`),
   approveBatch: (items) => api.post('/results/approve-batch', { items }, { timeout: 90000 }),
   validate: (sampleTestId, payload = {}) => api.post(`/results/validate/${sampleTestId}`, payload),

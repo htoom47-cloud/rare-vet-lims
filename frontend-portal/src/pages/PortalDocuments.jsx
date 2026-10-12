@@ -42,6 +42,14 @@ export default function PortalDocuments() {
   };
 
   const handleDownload = async (doc) => {
+    if (doc.kind === 'brucella') {
+      try {
+        await portalDocumentsAPI.openBrucellaList();
+      } catch {
+        toast.error(t('labReport.downloadFailed'));
+      }
+      return;
+    }
     if (doc.type === 'pdf' && doc.url) {
       try {
         await portalReportsAPI.openPdf(doc.url);
@@ -55,9 +63,11 @@ export default function PortalDocuments() {
   };
 
   const handleShare = async (doc) => {
-    const url = doc.type === 'pdf'
-      ? `${window.location.origin}/reports/${doc.reportId}`
-      : resolveUrl(doc.url);
+    const url = doc.kind === 'brucella'
+      ? `${window.location.origin}/documents`
+      : doc.type === 'pdf'
+        ? `${window.location.origin}/reports/${doc.reportId}`
+        : resolveUrl(doc.url);
     if (navigator.share) {
       try {
         await navigator.share({ title: doc.title, url });
@@ -127,9 +137,15 @@ export default function PortalDocuments() {
               <div className="p-4">
                 <p className="font-semibold text-sm font-mono truncate">{doc.title}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {doc.animalCode && `${doc.animalCode} · `}
-                  {animalLabel(doc.animalType, isAr)}
-                  {doc.animalName ? ` · ${doc.animalName}` : ''}
+                  {doc.kind === 'brucella'
+                    ? (doc.subtitle || '')
+                    : (
+                      <>
+                        {doc.animalCode && `${doc.animalCode} · `}
+                        {animalLabel(doc.animalType, isAr)}
+                        {doc.animalName ? ` · ${doc.animalName}` : ''}
+                      </>
+                    )}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">{formatDate(doc.createdAt)}</p>
                 <div className="flex flex-wrap gap-1.5 mt-3">

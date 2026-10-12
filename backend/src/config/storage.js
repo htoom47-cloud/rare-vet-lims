@@ -55,7 +55,7 @@ const parseUploadUrl = (url) => {
 const uploadUrl = (subdir, filename) => `/uploads/${subdir}/${filename}`;
 
 /** Paths that must not be served without staff JWT (reports, invoices, microscope, internal docs). */
-const PROTECTED_UPLOAD_PREFIXES = ['reports/', 'invoices/', 'microscope/', 'ministry-docs/', 'purchases/'];
+const PROTECTED_UPLOAD_PREFIXES = ['reports/', 'invoices/', 'microscope/', 'ministry-docs/', 'purchases/', 'brucella-lists/'];
 
 const isProtectedUploadPath = (rel) =>
   PROTECTED_UPLOAD_PREFIXES.some((prefix) => rel.startsWith(prefix));
@@ -99,7 +99,7 @@ const ensureUploadDir = () => {
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
   }
-  ['reports', 'animals', 'signatures', 'temp', 'microscope', 'purchases'].forEach((subdir) => {
+  ['reports', 'animals', 'signatures', 'temp', 'microscope', 'purchases', 'brucella-lists'].forEach((subdir) => {
     const dir = path.join(uploadPath, subdir);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });

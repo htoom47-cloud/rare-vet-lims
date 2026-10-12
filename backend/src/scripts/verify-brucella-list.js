@@ -14,6 +14,15 @@ const print = fs.readFileSync(path.join(__dirname, '../../../frontend/src/utils/
 assert.ok(src.includes('enterResults'));
 assert.ok(src.includes('validateResults'));
 assert.ok(!/INSERT INTO reports|generate\(/.test(src));
+assert.ok(src.includes('publishForCustomer'));
+assert.ok(src.includes('customer_brucella_lists'));
+const migrate = fs.readFileSync(path.join(__dirname, 'migrate.js'), 'utf8');
+const storage = fs.readFileSync(path.join(__dirname, '../config/storage.js'), 'utf8');
+const portal = fs.readFileSync(path.join(__dirname, '../services/portal.service.js'), 'utf8');
+assert.ok(migrate.includes('CREATE TABLE IF NOT EXISTS customer_brucella_lists'));
+assert.ok(storage.includes('brucella-lists/'));
+assert.ok(portal.includes('customer_brucella_lists'));
+assert.ok(portal.includes('serveBrucellaListPdf'));
 assert.ok(src.includes("لا توجد مالطيه"));
 assert.ok(src.includes('validated_locked'));
 assert.ok(src.includes('notDeleted'));

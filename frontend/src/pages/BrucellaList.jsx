@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Printer, Save, ShieldCheck } from 'lucide-react';
+import { Printer, Save, Send, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CustomerSearch from '../components/customers/CustomerSearch';
 import { resultsAPI } from '../services/api';
@@ -16,6 +16,7 @@ export default function BrucellaList() {
   const { hasPermission } = useAuth();
   const canEnter = hasPermission('results.enter') || hasPermission('results.edit');
   const canApprove = hasPermission('results.validate');
+  const canPublish = canApprove || hasPermission('notifications.send_report');
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [from, setFrom] = useState('');
@@ -87,6 +88,23 @@ export default function BrucellaList() {
       });
       return next;
     });
+  };
+
+  const publish = async () => {
+    const ready = rows.some((row) => row.result_value);
+    if (!customerId || !ready) {
+      toast.error(t('brucellaList.nothingToPrint'));
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await resultsAPI.publishBrucellaList({ customer_id: customerId, from, to });
+      toast.success(t('brucellaList.published', { count: data.data?.row_count || 0 }));
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('brucellaList.publishFailed'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const printList = () => {
@@ -169,6 +187,11 @@ export default function BrucellaList() {
             {canApprove && (
               <button type="button" className="btn-secondary text-sm flex items-center gap-2" onClick={() => save(true)} disabled={saving}>
                 <ShieldCheck size={16} /> {t('brucellaList.approve')}
+              </button>
+            )}
+            {canPublish && (
+              <button type="button" className="btn-secondary text-sm flex items-center gap-2" onClick={publish} disabled={saving}>
+                <Send size={16} /> {t('brucellaList.publish')}
               </button>
             )}
             <button type="button" className="btn-secondary text-sm flex items-center gap-2" onClick={printList}>

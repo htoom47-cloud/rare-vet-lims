@@ -845,6 +845,17 @@ async function applyPatches() {
       )
     `);
     await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_brucella_lists (
+        id UUID PRIMARY KEY,
+        customer_id UUID NOT NULL UNIQUE REFERENCES customers(id),
+        pdf_url TEXT NOT NULL,
+        row_count INTEGER NOT NULL DEFAULT 0,
+        positive_count INTEGER NOT NULL DEFAULT 0,
+        published_by UUID REFERENCES users(id),
+        published_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
       INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order)
       VALUES
         ('8f0c1b10-4c11-4a2e-9d01-d15c00000001', 'opening', 'Opening discount', 'خصم الافتتاح', 20, 0, true, 10),

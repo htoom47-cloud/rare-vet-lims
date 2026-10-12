@@ -42,6 +42,28 @@ export const portalSearchAPI = {
 
 export const portalDocumentsAPI = {
   list: (params) => portalApi.get('/documents', { params }),
+  openBrucellaList: async () => {
+    const token = localStorage.getItem('portalAccessToken');
+    const response = await fetch(`${API_URL}/portal/brucella-list/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const err = new Error('List PDF not found');
+      err.response = { status: response.status };
+      throw err;
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const opened = window.open(objectUrl, '_blank');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'brucella-list.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+  },
 };
 
 export const portalAnimalsAPI = {

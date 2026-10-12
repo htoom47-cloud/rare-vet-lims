@@ -2,10 +2,13 @@
  * Brucella herd list: read samples and save qualitative RESULT values
  * through the existing result engine. Does not generate per-sample reports.
  */
+const { v4: uuidv4 } = require('uuid');
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { saveFile, deleteFile } = require('../config/storage');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { labDateSql } = require('../utils/accounting-time');
+const { buildBrucellaListPdf } = require('../utils/brucella-list-pdf');
 const { enterResults, validateResults } = require('./results.service');
 
 const NEGATIVE = 'لا توجد مالطيه';
@@ -150,9 +153,55 @@ const saveRows = async (customerId, rows, userId, { approve = false } = {}) => {
   };
 };
 
+const publishForCustomer = async (customerId, userId, { from, to } = {}) => {
+  const rows = (await listForCustomer(customerId, { from, to })).filter((row) => hasResultValue(row));
+  if (!rows.length) {
+    throw new AppError('Save results before sending the list to the portal', 400, 'NOTHING_TO_PUBLISH');
+  }
+  const customer = await query(
+    'SELECT full_name_ar, full_name FROM customers WHERE id = $1',
+    [customerId]
+  );
+  if (!customer.rows[0]) throw new AppError('Customer not found', 404, 'NOT_FOUND');
+  const customerName = customer.rows[0].full_name_ar || customer.rows[0].full_name || '';
+  const printedAt = new Date().toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Riyadh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const pdf = await buildBrucellaListPdf({ customerName, rows, printedAt });
+  const positiveCount = rows.filter((row) => /^(positive|إيجابي|\+|pos)$/i.test(String(row.result_value || '').trim())).length;
+  const saved = await saveFile(pdf, 'brucella-lists', 'brucella-list.pdf');
+  const previous = await query(
+    'SELECT pdf_url FROM customer_brucella_lists WHERE customer_id = $1',
+    [customerId]
+  );
+  await query(
+    `INSERT INTO customer_brucella_lists
+       (id, customer_id, pdf_url, row_count, positive_count, published_by, published_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+     ON CONFLICT (customer_id) DO UPDATE SET
+       pdf_url = EXCLUDED.pdf_url,
+       row_count = EXCLUDED.row_count,
+       positive_count = EXCLUDED.positive_count,
+       published_by = EXCLUDED.published_by,
+       published_at = NOW()`,
+    [uuidv4(), customerId, saved.url, rows.length, positiveCount, userId]
+  );
+  const oldUrl = previous.rows[0]?.pdf_url;
+  if (oldUrl && oldUrl !== saved.url) await deleteFile(oldUrl).catch(() => {});
+  return {
+    row_count: rows.length,
+    positive_count: positiveCount,
+    published_at: new Date().toISOString(),
+  };
+};
+
 module.exports = {
   NEGATIVE,
   POSITIVE,
   listForCustomer,
   saveRows,
+  publishForCustomer,
 };
