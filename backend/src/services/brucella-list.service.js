@@ -41,6 +41,24 @@ const listSql = `
     AND ${brucellaSql}
 `;
 
+const hasResultValue = (row) => String(row?.result_value || '').trim() !== '';
+
+/** One row per sample. A joined parameter/value must not list the same sample twice. */
+const collapseBySample = (rows) => {
+  const bySample = new Map();
+  for (const row of rows) {
+    const key = String(row.sample_id);
+    const prev = bySample.get(key);
+    if (!prev || (!hasResultValue(prev) && hasResultValue(row))) bySample.set(key, row);
+  }
+  return [...bySample.values()];
+};
+
+const normalizeRow = (row) => ({
+  ...row,
+  is_validated: row.is_validated === true || row.is_validated === 't',
+});
+
 const listForCustomer = async (customerId, { from, to } = {}) => {
   if (!customerId) throw new AppError('Customer is required', 400, 'VALIDATION_ERROR');
   const params = [customerId];
@@ -53,20 +71,18 @@ const listForCustomer = async (customerId, { from, to } = {}) => {
     params.push(to);
     sql += ` AND ${labDateSql('s.created_at')} <= $${params.length}::date`;
   }
-  sql += ' ORDER BY s.created_at ASC, a.animal_code ASC LIMIT 500';
+  sql += ' ORDER BY s.created_at ASC, a.animal_code ASC, (rv.value IS NULL) ASC LIMIT 1000';
   const result = await query(sql, params);
-  return result.rows.map((row) => ({
-    ...row,
-    is_validated: row.is_validated === true || row.is_validated === 't',
-  }));
+  return collapseBySample(result.rows.map(normalizeRow)).slice(0, 500);
 };
 
 const loadOwnedRow = async (customerId, sampleTestId) => {
   const result = await query(
-    `${listSql} AND st.id = $2 LIMIT 1`,
+    `${listSql} AND st.id = $2 ORDER BY (rv.value IS NULL) ASC`,
     [customerId, sampleTestId]
   );
-  return result.rows[0] || null;
+  const row = result.rows.find(hasResultValue) || result.rows[0];
+  return row ? normalizeRow(row) : null;
 };
 
 const saveRows = async (customerId, rows, userId, { approve = false } = {}) => {

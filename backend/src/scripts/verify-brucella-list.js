@@ -17,6 +17,7 @@ assert.ok(!/INSERT INTO reports|generate\(/.test(src));
 assert.ok(src.includes("لا توجد مالطيه"));
 assert.ok(src.includes('validated_locked'));
 assert.ok(src.includes('notDeleted'));
+assert.ok(src.includes('collapseBySample'));
 assert.ok(routes.includes("'/brucella-list'"));
 assert.ok(routes.indexOf("'/brucella-list'") < routes.indexOf("'/enter'"));
 assert.ok(page.includes('printBrucellaList'));
@@ -25,6 +26,8 @@ assert.ok(print.includes('rpt-header'));
 assert.ok(print.includes('مركز رعاية النوادر البيطري'));
 assert.ok(print.includes("window.open('about:blank'"));
 assert.ok(!/window\.open\([^)]*noopener/.test(print));
+assert.ok(print.includes('.section--results-box { break-inside: auto'));
+assert.ok(!print.includes('.rpt-header, .card, .overview { break-inside: avoid'));
 assert.ok(!/INSERT INTO reports|generate\(/.test(print));
 
 console.log('brucella list wiring ok');

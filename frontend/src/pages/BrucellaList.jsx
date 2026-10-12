@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { printBrucellaList } from '../utils/brucellaListPrint';
 
 const NEGATIVE = 'لا توجد مالطيه';
+const LEGACY_NEGATIVE = 'سلبي';
 const POSITIVE = 'إيجابي';
 
 export default function BrucellaList() {
@@ -203,6 +204,9 @@ export default function BrucellaList() {
                       >
                         <option value="">{t('brucellaList.unset')}</option>
                         <option value={NEGATIVE}>{t('brucellaList.negative')}</option>
+                        {(drafts[row.sample_test_id] === LEGACY_NEGATIVE || row.result_value === LEGACY_NEGATIVE) && (
+                          <option value={LEGACY_NEGATIVE}>{LEGACY_NEGATIVE}</option>
+                        )}
                         <option value={POSITIVE}>{t('brucellaList.positive')}</option>
                       </select>
                     </td>

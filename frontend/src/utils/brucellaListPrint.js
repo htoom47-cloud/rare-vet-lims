@@ -94,7 +94,7 @@ export function printBrucellaList({ customerName, rows, labels }) {
       display: inline-flex; align-items: center; padding: 4px 10px; font-size: 10px; font-weight: 700;
       border-radius: 999px; background: var(--color-navy); color: #fff;
     }
-    .card { border: 1px solid var(--color-border); border-radius: 8px; background: #fff; overflow: hidden; }
+    .card { border: 1px solid var(--color-border); border-radius: 8px; background: #fff; }
     .card__body { padding: 8px 16px; }
     .patient-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 12px; }
     .patient-field { display: grid; grid-template-columns: 72px 1fr; gap: 4px; align-items: baseline; }
@@ -110,7 +110,7 @@ export function printBrucellaList({ customerName, rows, labels }) {
     .stat-pill { padding: 4px 12px; font-size: 12px; font-weight: 700; border-radius: 4px; border: 1px solid transparent; }
     .stat-pill--high { background: #fef2f2; color: var(--color-high); border-color: #fecaca; }
     .stat-pill--normal { background: #f0fdf4; color: var(--color-normal); border-color: #bbf7d0; }
-    .section--results-box { border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
+    .section--results-box { border: 1px solid var(--color-border); border-radius: 8px; overflow: visible; }
     .section__head {
       padding: 8px 12px; background: var(--color-navy); color: #fff;
       font-weight: 700; text-align: center;
@@ -136,8 +136,10 @@ export function printBrucellaList({ customerName, rows, labels }) {
       font-size: 10px; color: var(--color-muted); text-align: center; line-height: 1.5;
     }
     @media print {
-      .rpt-header, .card, .overview { break-inside: avoid; }
-      .results-table tbody tr { break-inside: avoid; }
+      .rpt-header, .patient-card, .overview { break-inside: avoid; page-break-inside: avoid; height: auto; }
+      .section--results-box { break-inside: auto; page-break-inside: auto; overflow: visible; }
+      .results-table { page-break-inside: auto; }
+      .results-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
     }
   </style>
 </head>
@@ -164,7 +166,7 @@ export function printBrucellaList({ customerName, rows, labels }) {
         <span class="badge">${escapeHtml(labels.examName || 'المالطية روز بنغال')}</span>
       </div>
     </header>
-    <section class="card">
+    <section class="card patient-card">
       <div class="card__body patient-grid">
         <div class="patient-field">
           <span class="patient-field__label">${escapeHtml(labels.customer)}</span>
