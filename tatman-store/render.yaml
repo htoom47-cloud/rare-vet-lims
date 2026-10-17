@@ -1,0 +1,34 @@
+# Tatman Vet Store — Render Web Service (admin + dual-country store)
+# Recreate as a Web Service, not a Static Site.
+# Branch must stay cursor/tatman-vet-store-8ce2 until tatman-store is on main.
+
+services:
+  - type: web
+    name: tatman-vet-web
+    runtime: node
+    plan: starter
+    region: frankfurt
+    rootDir: tatman-store
+    branch: cursor/tatman-vet-store-8ce2
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - tatman-store/**
+    disk:
+      name: tatman-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
