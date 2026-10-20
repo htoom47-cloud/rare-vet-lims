@@ -69,6 +69,8 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
+  const [listSearch, setListSearch] = useState('');
+  const [debouncedListSearch, setDebouncedListSearch] = useState('');
   const [sampleSearch, setSampleSearch] = useState('');
   const [samplePage, setSamplePage] = useState(1);
   const [samplePagination, setSamplePagination] = useState({ total: 0, page: 1, limit: SAMPLE_PAGE_SIZE, totalPages: 0 });
@@ -96,7 +98,11 @@ export default function Reports() {
 
   const load = () => {
     setLoading(true);
-    reportsAPI.list({ page, limit: PAGE_SIZE })
+    reportsAPI.list({
+      page,
+      limit: PAGE_SIZE,
+      search: debouncedListSearch.trim() || undefined,
+    })
       .then(({ data }) => {
         setReports(data.data || []);
         setPagination(data.pagination || { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
@@ -121,7 +127,16 @@ export default function Reports() {
       .finally(() => setSamplesLoading(false));
   };
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedListSearch(listSearch.trim()), listSearch.trim() ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [listSearch]);
+
+  useEffect(() => {
+    setPage((current) => (current === 1 ? current : 1));
+  }, [debouncedListSearch]);
+
+  useEffect(() => { load(); }, [page, debouncedListSearch]);
 
   useEffect(() => {
     if (!generateOpen || selectedSample) return undefined;
@@ -271,6 +286,11 @@ export default function Reports() {
     { key: 'report_number', label: t('reports.reportNo') },
     { key: 'sample_code', label: t('reports.sampleNo') },
     { key: 'customer_name', label: t('customers.fullName') },
+    {
+      key: 'animal',
+      label: t('reports.animal'),
+      render: (r) => [r.animal_code, r.animal_name].filter(Boolean).join(' — ') || '—',
+    },
     { key: 'language', label: t('reports.language'), render: (r) => (r.language === 'ar' ? 'عربي' : 'EN') },
     ...(prelimEnabled ? [{
       key: 'is_final',
@@ -371,6 +391,22 @@ export default function Reports() {
             <p>{verifyResult.report_number} | {verifyResult.sample_code} | {verifyResult.customer_name}</p>
           </div>
         )}
+      </div>
+
+      <div className="card mb-4">
+        <label className="block text-sm font-medium mb-2" htmlFor="report-list-search">
+          {t('reports.searchList')}
+        </label>
+        <div className="relative">
+          <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            id="report-list-search"
+            value={listSearch}
+            onChange={(e) => setListSearch(e.target.value)}
+            placeholder={t('reports.searchListPlaceholder')}
+            className="input-field w-full ps-9"
+          />
+        </div>
       </div>
 
       <DataTable columns={columns} data={reports} loading={loading} />

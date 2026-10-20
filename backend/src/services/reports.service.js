@@ -4,7 +4,7 @@ const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const env = require('../config/env');
 const logger = require('../config/logger');
-const { generateCode, paginate, buildPagination } = require('../utils/helpers');
+const { generateCode, paginate, buildPagination, normalizeMobileDigits } = require('../utils/helpers');
 const { generateReportPDF } = require('../utils/pdf');
 const { ensureUploadDir, persistLocalFile, deleteFile, createReadStream, fileExists, readImageBuffer } = require('../config/storage');
 const { compareByNormaOrder, filterCbcReportRows, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
@@ -98,6 +98,7 @@ const buildApprovalFields = (reportRow, isArabic) => ({
 
 const REPORT_SELECT = `
   SELECT r.*, s.sample_code, c.full_name as customer_name,
+         a.animal_code, a.name_tag as animal_name,
          u.full_name as generated_by_name,
          lab_u.full_name as lab_specialist_name,
          lab_u.full_name_ar as lab_specialist_name_ar,
@@ -106,21 +107,56 @@ const REPORT_SELECT = `
   FROM reports r
   LEFT JOIN samples s ON r.sample_id = s.id
   LEFT JOIN customers c ON s.customer_id = c.id
+  LEFT JOIN animals a ON s.animal_id = a.id
   LEFT JOIN users u ON r.generated_by = u.id
   LEFT JOIN users lab_u ON r.lab_specialist_approved_by = lab_u.id
   LEFT JOIN users vet_u ON r.vet_approved_by = vet_u.id
 `;
 
-const list = async ({ page, limit }) => {
+const list = async ({ page, limit, search }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
-  const countResult = await query(`SELECT COUNT(*) FROM reports r WHERE ${notDeleted('r')}`);
+  const params = [];
+  const filters = [notDeleted('r')];
+  const term = String(search || '').trim();
+  if (term) {
+    params.push(`%${term}%`);
+    const likeIdx = params.length;
+    const searchParts = [
+      `r.report_number ILIKE $${likeIdx}`,
+      `s.sample_code ILIKE $${likeIdx}`,
+      `s.barcode ILIKE $${likeIdx}`,
+      `c.full_name ILIKE $${likeIdx}`,
+      `c.full_name_ar ILIKE $${likeIdx}`,
+      `c.mobile ILIKE $${likeIdx}`,
+      `a.animal_code ILIKE $${likeIdx}`,
+      `a.name_tag ILIKE $${likeIdx}`,
+    ];
+    const mobileDigits = normalizeMobileDigits(term);
+    if (mobileDigits.length >= 4) {
+      params.push(`%${mobileDigits}%`);
+      searchParts.push(`regexp_replace(COALESCE(c.mobile, ''), '[^0-9]', '', 'g') LIKE $${params.length}`);
+    }
+    filters.push(`(${searchParts.join(' OR ')})`);
+  }
+
+  const where = filters.join(' AND ');
+  const countResult = await query(
+    `SELECT COUNT(*)
+     FROM reports r
+     LEFT JOIN samples s ON r.sample_id = s.id
+     LEFT JOIN customers c ON s.customer_id = c.id
+     LEFT JOIN animals a ON s.animal_id = a.id
+     WHERE ${where}`,
+    params
+  );
   const total = parseInt(countResult.rows[0].count, 10);
 
   const result = await query(
     `${REPORT_SELECT}
-     WHERE ${notDeleted('r')}
-     ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`,
-    [l, offset]
+     WHERE ${where}
+     ORDER BY r.created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, l, offset]
   );
 
   return { data: result.rows, pagination: buildPagination(total, p, l) };
