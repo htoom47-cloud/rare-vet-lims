@@ -16,7 +16,6 @@ import {
 } from '../utils/elisaEntry';
 import {
   isCultureTest,
-  CULTURE_ANTIBIOTICS,
   GRAM_PRESETS,
   GROWTH_NO,
   GROWTH_YES,
@@ -24,6 +23,8 @@ import {
   cultureFormFromFields,
   culturePayloadFromForm,
   cultureFormHasValue,
+  addCultureAntibiotic,
+  removeCultureAntibiotic,
 } from '../utils/cultureEntry';
 
 export default function TechnicianWorkbench() {
@@ -40,6 +41,7 @@ export default function TechnicianWorkbench() {
   const [selectedSample, setSelectedSample] = useState(null);
   const [resultForm, setResultForm] = useState({});
   const [cultureForm, setCultureForm] = useState({});
+  const [newAntibiotic, setNewAntibiotic] = useState({});
   const [testValidated, setTestValidated] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -131,6 +133,7 @@ export default function TechnicianWorkbench() {
     setTestValidated(validated);
     setResultForm(form);
     setCultureForm(nextCulture);
+    setNewAntibiotic({});
   };
 
   const submitAllResults = async () => {
@@ -338,8 +341,34 @@ export default function TechnicianWorkbench() {
     });
   };
 
+  const handleAddAntibiotic = (testId) => {
+    const current = cultureForm[testId] || emptyCultureForm();
+    const { form, error } = addCultureAntibiotic(current, newAntibiotic[testId]);
+    if (error === 'empty') {
+      toast.error(isAr ? 'أدخل اسم المضاد' : 'Enter antibiotic name');
+      return;
+    }
+    if (error === 'duplicate') {
+      toast.error(isAr ? 'المضاد موجود مسبقاً' : 'Antibiotic already listed');
+      return;
+    }
+    setCultureForm((prev) => ({ ...prev, [testId]: form }));
+    setNewAntibiotic((prev) => ({ ...prev, [testId]: '' }));
+  };
+
+  const handleRemoveAntibiotic = (testId, antibiotic) => {
+    const current = cultureForm[testId] || emptyCultureForm();
+    setCultureForm((prev) => ({
+      ...prev,
+      [testId]: removeCultureAntibiotic(current, antibiotic),
+    }));
+  };
+
   const renderCultureFields = (test) => {
     const form = cultureForm[test.id] || emptyCultureForm();
+    const antibiotics = Array.isArray(form.antibiotics) && form.antibiotics.length
+      ? form.antibiotics
+      : Object.keys(form.ast || {});
     const locked = !!testValidated[test.id];
     const noGrowth = form.growth === GROWTH_NO;
     return (
@@ -407,10 +436,11 @@ export default function TechnicianWorkbench() {
                     <th className="px-2 py-1.5">{isAr ? 'حساس جداً' : 'Highly Sens.'}</th>
                     <th className="px-2 py-1.5">{isAr ? 'ضعيف' : 'Weak Sens.'}</th>
                     <th className="px-2 py-1.5">{isAr ? 'مقاوم' : 'Resistant'}</th>
+                    <th className="px-2 py-1.5">{isAr ? 'حذف' : 'Remove'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {CULTURE_ANTIBIOTICS.map((ab) => (
+                  {antibiotics.map((ab) => (
                     <tr key={ab} className="border-t">
                       <td className="px-2 py-1.5 font-medium">{ab}</td>
                       {['', 'high', 'weak', 'res'].map((rank) => (
@@ -424,11 +454,51 @@ export default function TechnicianWorkbench() {
                           />
                         </td>
                       ))}
+                      <td className="px-2 py-1.5 text-center">
+                        <button
+                          type="button"
+                          disabled={locked}
+                          onClick={() => handleRemoveAntibiotic(test.id, ab)}
+                          className="text-red-600 text-xs disabled:opacity-40"
+                        >
+                          {isAr ? 'حذف' : 'Remove'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
+                  {!antibiotics.length && (
+                    <tr className="border-t">
+                      <td colSpan={6} className="px-2 py-3 text-center text-gray-500">
+                        {isAr ? 'لا توجد مضادات — أضف مضاداً أدناه' : 'No antibiotics — add one below'}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+            {!locked && (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  className="input-field flex-1"
+                  value={newAntibiotic[test.id] || ''}
+                  placeholder={isAr ? 'اسم مضاد جديد...' : 'New antibiotic name...'}
+                  onChange={(e) => setNewAntibiotic((prev) => ({ ...prev, [test.id]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddAntibiotic(test.id);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddAntibiotic(test.id)}
+                  className="btn-secondary whitespace-nowrap"
+                >
+                  {isAr ? 'إضافة مضاد' : 'Add antibiotic'}
+                </button>
+              </div>
+            )}
           </>
         )}
         <div>

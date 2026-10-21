@@ -57,16 +57,38 @@ const splitList = (value) => String(value || '')
   .map((v) => v.trim())
   .filter(Boolean);
 
-const emptyAst = () => Object.fromEntries(CULTURE_ANTIBIOTICS.map((ab) => [ab, '']));
+const normalizeAbName = (name) => String(name || '').trim();
 
-export const emptyCultureForm = () => ({
-  specimen: '',
-  growth: '',
-  organism: '',
-  gram: '',
-  ast: emptyAst(),
-  notes: '',
-});
+const uniqueAntibiotics = (names = []) => {
+  const out = [];
+  const seen = new Set();
+  for (const raw of names) {
+    const name = normalizeAbName(raw);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+};
+
+const emptyAst = (antibiotics = CULTURE_ANTIBIOTICS) => (
+  Object.fromEntries(antibiotics.map((ab) => [ab, '']))
+);
+
+export const emptyCultureForm = () => {
+  const antibiotics = [...CULTURE_ANTIBIOTICS];
+  return {
+    specimen: '',
+    growth: '',
+    organism: '',
+    gram: '',
+    antibiotics,
+    ast: emptyAst(antibiotics),
+    notes: '',
+  };
+};
 
 export const cultureFormFromFields = (fields = [], test = {}) => {
   const form = emptyCultureForm();
@@ -83,9 +105,18 @@ export const cultureFormFromFields = (fields = [], test = {}) => {
   form.gram = byCode.get('GRAM')?.value || '';
   form.notes = byCode.get('CULT_NOTES')?.value || byCode.get('NOTES')?.value || '';
 
+  const savedNames = [
+    ...splitList(byCode.get('SENS_HIGH')?.value),
+    ...splitList(byCode.get('SENS_WEAK')?.value),
+    ...splitList(byCode.get('SENS_RES')?.value),
+  ];
+  form.antibiotics = uniqueAntibiotics([...CULTURE_ANTIBIOTICS, ...savedNames]);
+  form.ast = emptyAst(form.antibiotics);
+
   const assign = (list, rank) => {
     for (const name of splitList(list)) {
-      if (form.ast[name] !== undefined) form.ast[name] = rank;
+      const match = form.antibiotics.find((ab) => ab.toLowerCase() === name.toLowerCase());
+      if (match) form.ast[match] = rank;
     }
   };
   assign(byCode.get('SENS_HIGH')?.value, 'high');
@@ -94,11 +125,21 @@ export const cultureFormFromFields = (fields = [], test = {}) => {
   return form;
 };
 
+const antibioticOrder = (form = emptyCultureForm()) => {
+  if (Array.isArray(form.antibiotics) && form.antibiotics.length) {
+    return uniqueAntibiotics(form.antibiotics);
+  }
+  return uniqueAntibiotics([
+    ...CULTURE_ANTIBIOTICS,
+    ...Object.keys(form.ast || {}),
+  ]);
+};
+
 export const culturePayloadFromForm = (form = emptyCultureForm()) => {
   const highly = [];
   const weak = [];
   const resistant = [];
-  for (const name of CULTURE_ANTIBIOTICS) {
+  for (const name of antibioticOrder(form)) {
     const rank = form.ast?.[name];
     if (rank === 'high') highly.push(name);
     else if (rank === 'weak') weak.push(name);
@@ -125,4 +166,33 @@ export const cultureFormHasValue = (form) => {
   if (String(form.gram || '').trim()) return true;
   if (String(form.notes || '').trim()) return true;
   return Object.values(form.ast || {}).some(Boolean);
+};
+
+export const addCultureAntibiotic = (form = emptyCultureForm(), name) => {
+  const nextName = normalizeAbName(name);
+  if (!nextName) return { form, error: 'empty' };
+  const antibiotics = antibioticOrder(form);
+  if (antibiotics.some((ab) => ab.toLowerCase() === nextName.toLowerCase())) {
+    return { form, error: 'duplicate' };
+  }
+  return {
+    form: {
+      ...form,
+      antibiotics: [...antibiotics, nextName],
+      ast: { ...(form.ast || {}), [nextName]: '' },
+    },
+    error: null,
+  };
+};
+
+export const removeCultureAntibiotic = (form = emptyCultureForm(), name) => {
+  const target = normalizeAbName(name);
+  const antibiotics = antibioticOrder(form).filter(
+    (ab) => ab.toLowerCase() !== target.toLowerCase()
+  );
+  const ast = { ...(form.ast || {}) };
+  for (const key of Object.keys(ast)) {
+    if (key.toLowerCase() === target.toLowerCase()) delete ast[key];
+  }
+  return { ...form, antibiotics, ast };
 };
