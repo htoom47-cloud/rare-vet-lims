@@ -1,6 +1,7 @@
 export const FIELD_VISIT_CODE = 'FIELD-VISIT';
 
 export const DEFAULT_DISTANCE_TIERS = [
+  { max_km: 15, price: 100 },
   { max_km: 30, price: 150 },
   { max_km: 60, price: 200 },
   { max_km: 80, price: 250 },
