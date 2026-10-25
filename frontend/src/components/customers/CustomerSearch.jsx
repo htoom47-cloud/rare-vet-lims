@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Phone, X } from 'lucide-react';
 import { customersAPI } from '../../services/api';
 
-export default function CustomerSearch({ value, onChange, placeholder, required = false, autoFocus = false, knownCustomer = null }) {
+export default function CustomerSearch({
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  autoFocus = false,
+  knownCustomer = null,
+  kind = null,
+}) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -34,6 +42,7 @@ export default function CustomerSearch({ value, onChange, placeholder, required 
       const trimmed = query.trim();
       const looksLikeMobile = /^[\d+\s()-]{3,}$/.test(trimmed);
       const params = looksLikeMobile ? { mobile: trimmed, limit: 15 } : { search: trimmed, limit: 15 };
+      if (kind) params.kind = kind;
       customersAPI.list(params)
         .then(({ data }) => {
           setResults(data.data);
@@ -50,7 +59,7 @@ export default function CustomerSearch({ value, onChange, placeholder, required 
         .finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, kind]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -114,7 +123,12 @@ export default function CustomerSearch({ value, onChange, placeholder, required 
                 onClick={() => selectCustomer(c)}
                 className="w-full text-start px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between gap-2"
               >
-                <span className="font-medium">{c.full_name}</span>
+                <span className="font-medium">
+                  {c.full_name}
+                  {c.kind === 'veterinarian' ? (
+                    <span className="ms-2 text-xs text-primary-600">{t('customers.kindVeterinarian')}</span>
+                  ) : null}
+                </span>
                 <span className="text-sm text-gray-500 font-mono">{c.mobile}</span>
               </button>
             </li>

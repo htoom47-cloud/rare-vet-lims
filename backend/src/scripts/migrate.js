@@ -855,6 +855,29 @@ async function applyPatches() {
         published_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+
+    // Vet-supervised samples: end-client owns sample; veterinarian may pay and see portal reports.
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'customer'
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE customers
+          ADD CONSTRAINT customers_kind_check
+          CHECK (kind IN ('customer', 'veterinarian'));
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `);
+    await client.query(`
+      ALTER TABLE samples
+        ADD COLUMN IF NOT EXISTS supervising_veterinarian_id UUID REFERENCES customers(id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_samples_supervising_veterinarian
+        ON samples(supervising_veterinarian_id)
+        WHERE supervising_veterinarian_id IS NOT NULL
+    `);
     await client.query(`
       INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order)
       VALUES

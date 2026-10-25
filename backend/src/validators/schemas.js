@@ -23,6 +23,8 @@ const customerSchema = Joi.object({
   farm_company: Joi.string().allow('', null),
   notes: Joi.string().allow('', null),
   credit_limit: Joi.number().min(0).default(0),
+  /** Optional: omit on update to keep existing kind; create defaults to customer in service. */
+  kind: Joi.string().valid('customer', 'veterinarian').allow(null, '').empty(''),
 });
 
 const { ANIMAL_TYPE_CODES } = require('../constants/animal-types');
@@ -55,6 +57,7 @@ const sampleSchema = Joi.object({
   department: Joi.string().allow('', null),
   priority: Joi.string().valid('normal', 'urgent', 'stat').default('normal'),
   notes: Joi.string().allow('', null),
+  supervising_veterinarian_id: Joi.string().uuid().allow(null, '').empty('').default(null),
 }).custom((value, helpers) => {
   const hasTests = (value.test_ids || []).length > 0;
   const hasPackages = (value.package_ids || []).length > 0;
@@ -66,6 +69,10 @@ const sampleSchema = Joi.object({
 
 const sampleReassignAnimalSchema = Joi.object({
   animal_id: Joi.string().uuid().required(),
+});
+
+const sampleSupervisorSchema = Joi.object({
+  supervising_veterinarian_id: Joi.string().uuid().allow(null, '').empty('').default(null),
 });
 
 const testSchema = Joi.object({
@@ -156,6 +163,10 @@ const resultApproveBatchSchema = Joi.object({
 const invoiceSchema = Joi.object({
   customer_id: Joi.string().uuid().required(),
   sample_id: Joi.string().uuid().allow(null, '').empty('').default(null),
+  /** When VET_SUPERVISED_SAMPLES: bill this veterinarian instead of customer_id when set. */
+  supervising_veterinarian_id: Joi.string().uuid().allow(null, '').empty('').default(null),
+  /** End-client id for invoice note when billing a supervising veterinarian. */
+  sample_owner_customer_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   items: Joi.array().items(Joi.object({
     test_id: Joi.string().uuid().allow(null),
     package_id: Joi.string().uuid().allow(null),
@@ -454,6 +465,7 @@ module.exports = {
   animalSchema,
   sampleSchema,
   sampleReassignAnimalSchema,
+  sampleSupervisorSchema,
   testSchema,
   testCategorySchema,
   packageSchema,

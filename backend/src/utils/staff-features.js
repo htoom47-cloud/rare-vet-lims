@@ -26,6 +26,8 @@ const getStaffFeatures = () => ({
   preliminaryReports: !!env.features?.preliminaryReports,
   /** When true: culture/smear workbench + AST report layout */
   cultureAstReport: !!env.features?.cultureAstReport,
+  /** When true: supervising veterinarian on samples; invoice bills vet; both see portal reports */
+  vetSupervisedSamples: !!env.features?.vetSupervisedSamples,
 });
 
 module.exports = { getStaffFeatures };

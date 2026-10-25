@@ -61,6 +61,7 @@ export default function WorkflowCase() {
   const [packages, setPackages] = useState([]);
 
   const [customerId, setCustomerId] = useState(prefillCustomer || '');
+  const [supervisingVetId, setSupervisingVetId] = useState('');
   const [selectedAnimalIds, setSelectedAnimalIds] = useState([]);
   const [animalTests, setAnimalTests] = useState({});
   const [animalPackages, setAnimalPackages] = useState({});
@@ -338,8 +339,11 @@ export default function WorkflowCase() {
         items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
         { catalogPrices: true },
       );
+      const billToVet = features.vetSupervisedSamples && supervisingVetId;
       const { data } = await billingAPI.createInvoice({
-        customer_id: customerId,
+        customer_id: billToVet ? supervisingVetId : customerId,
+        supervising_veterinarian_id: billToVet ? supervisingVetId : null,
+        sample_owner_customer_id: billToVet ? customerId : null,
         items,
         ...discountFields,
         discount_preset_id: serviceDiscountPreset?.id || null,
@@ -369,6 +373,9 @@ export default function WorkflowCase() {
           package_ids: animalPackages[animalId] || [],
           invoice_id: invoiceId,
           priority: 'normal',
+          ...(features.vetSupervisedSamples && supervisingVetId
+            ? { supervising_veterinarian_id: supervisingVetId }
+            : {}),
         });
         created.push(data.data);
       }
@@ -506,11 +513,26 @@ export default function WorkflowCase() {
                 setSelectedAnimalIds([]);
                 setAnimalTests({});
                 setAnimalPackages({});
-                if (!id) setFieldVisitKm('');
+                if (!id) {
+                  setFieldVisitKm('');
+                  setSupervisingVetId('');
+                }
                 if (id && receptionMode) setStep(1);
               }}
               autoFocus
             />
+            {features.vetSupervisedSamples && customerId && (
+              <div className="rounded-lg border border-primary-200 dark:border-primary-800 p-3 space-y-2 bg-white dark:bg-primary-900/10">
+                <label className="block text-sm font-medium">{t('customers.supervisingVeterinarian')}</label>
+                <p className="text-xs text-primary-500">{t('customers.supervisingVeterinarianHint')}</p>
+                <CustomerSearch
+                  value={supervisingVetId}
+                  kind="veterinarian"
+                  onChange={(id) => setSupervisingVetId(id || '')}
+                  placeholder={t('customers.supervisingVeterinarian')}
+                />
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setShowNewCustomer(!showNewCustomer)}
@@ -782,6 +804,14 @@ export default function WorkflowCase() {
                     <span>{invoiceTotal().toFixed(2)} {t('reception.sar')}</span>
                   </div>
                 </div>
+                {features.vetSupervisedSamples && supervisingVetId && (
+                  <p className="text-sm text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/20 rounded-lg p-3">
+                    {t('customers.sampleBilledToVet', {
+                      client: t('customers.kindCustomer'),
+                      vet: t('customers.kindVeterinarian'),
+                    })}
+                  </p>
+                )}
                 <div className="flex justify-end pt-2 border-t">
                   <button
                     onClick={createInvoice}

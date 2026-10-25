@@ -300,11 +300,18 @@ export default function Samples() {
 
       }));
 
+      const vetId = detailSample.supervising_veterinarian_id || null;
+      const billToVet = !!user?.features?.vetSupervisedSamples && !!vetId;
+
       await billingAPI.createInvoice({
 
-        customer_id: detailSample.customer_id,
+        customer_id: billToVet ? vetId : detailSample.customer_id,
 
         sample_id: detailSample.id,
+
+        supervising_veterinarian_id: billToVet ? vetId : null,
+
+        sample_owner_customer_id: billToVet ? detailSample.customer_id : null,
 
         items,
 
@@ -322,6 +329,18 @@ export default function Samples() {
 
     }
 
+  };
+
+  const saveSampleSupervisor = async (vetId) => {
+    if (!detailSample || !user?.features?.vetSupervisedSamples) return;
+    try {
+      const { data } = await samplesAPI.setSupervisor(detailSample.id, vetId || null);
+      setDetailSample(data.data);
+      toast.success(t('common.save'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    }
   };
 
 
@@ -731,6 +750,29 @@ export default function Samples() {
               <div><span className="text-gray-500">{t('customers.fullName')}:</span> {detailSample.customer_name}</div>
 
               <div><span className="text-gray-500">{t('animals.animalId')}:</span> {detailSample.animal_code}{detailSample.animal_name ? ` · ${detailSample.animal_name}` : ''}</div>
+
+              {!!user?.features?.vetSupervisedSamples && (
+                <div className="col-span-2 space-y-2 rounded-lg border border-primary-200 dark:border-primary-800 p-3">
+                  <div className="text-sm font-medium">{t('customers.supervisingVeterinarian')}</div>
+                  <p className="text-xs text-primary-500">{t('customers.supervisingVeterinarianHint')}</p>
+                  {detailSample.supervising_veterinarian_name && (
+                    <p className="text-sm">
+                      {detailSample.supervising_veterinarian_name}
+                      {detailSample.supervising_veterinarian_mobile
+                        ? ` — ${detailSample.supervising_veterinarian_mobile}`
+                        : ''}
+                    </p>
+                  )}
+                  {hasPermission('samples.update') && (
+                    <CustomerSearch
+                      value={detailSample.supervising_veterinarian_id || ''}
+                      kind="veterinarian"
+                      onChange={(id) => saveSampleSupervisor(id)}
+                      placeholder={t('customers.supervisingVeterinarian')}
+                    />
+                  )}
+                </div>
+              )}
 
               {hasPermission('samples.update') && detailAnimals.length > 0 && (
                 <div className="col-span-2 flex flex-wrap items-end gap-2">

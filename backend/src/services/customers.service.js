@@ -7,15 +7,21 @@ const portalSync = require('./portal-sync.service');
 const { notDeleted } = require('../utils/soft-delete-sql');
 const { uuidv4 } = require('../utils/uuid');
 const { getCustomerStatement } = require('./accounting.service');
+const { CUSTOMER_KINDS, normalizeCustomerKind } = require('../utils/vet-supervised');
 
 const visibilitySql = portalSync.portalVisibilitySql('r').replace(/\s+/g, ' ').trim();
 
 const isReadyToSendFilter = (value) => value === true || value === 'true' || value === '1';
 
-const list = async ({ search, mobile, page, limit, readyToSend }) => {
+const list = async ({ search, mobile, page, limit, readyToSend, kind }) => {
   const { offset, page: p, limit: l } = paginate(page, limit);
   const params = [];
   let where = `WHERE c.is_active = true AND ${notDeleted('c')}`;
+
+  if (kind && CUSTOMER_KINDS.includes(String(kind))) {
+    params.push(kind);
+    where += ` AND c.kind = $${params.length}`;
+  }
 
   if (mobile) {
     const digits = normalizeMobileDigits(mobile);
@@ -135,20 +141,25 @@ const create = async (data, userId, { role } = {}) => {
     }
   }
 
+  const kind = normalizeCustomerKind(data.kind || 'customer');
   const result = await query(
-    `INSERT INTO customers (id, full_name, full_name_ar, mobile, city, farm_company, notes, credit_limit, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [uuidv4(), data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit || 0, userId]
+    `INSERT INTO customers (id, full_name, full_name_ar, mobile, city, farm_company, notes, credit_limit, kind, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    [uuidv4(), data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit || 0, kind, userId]
   );
   return result.rows[0];
 };
 
 const update = async (id, data) => {
-  await getById(id);
+  const existing = await getById(id);
+  // Preserve veterinarian/customer kind when callers omit the field (e.g. older clients).
+  const kind = (data.kind != null && String(data.kind).trim() !== '')
+    ? normalizeCustomerKind(data.kind)
+    : normalizeCustomerKind(existing.kind || 'customer');
   const result = await query(
     `UPDATE customers SET full_name=$1, full_name_ar=$2, mobile=$3, city=$4, farm_company=$5,
-     notes=$6, credit_limit=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
-    [data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit, id]
+     notes=$6, credit_limit=$7, kind=$8, updated_at=NOW() WHERE id=$9 RETURNING *`,
+    [data.full_name, data.full_name_ar, data.mobile, data.city, data.farm_company, data.notes, data.credit_limit, kind, id]
   );
   const lifecycle = require('./report-lifecycle.service');
   await lifecycle.markReportsNeedsUpdateByCustomerId(id, 'CUSTOMER');

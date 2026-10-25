@@ -12,7 +12,7 @@ import { invoiceDisplayStatus } from '../utils/invoiceDisplay';
 
 const fmt = (n) => `SAR ${parseFloat(n || 0).toFixed(2)}`;
 const emptyForm = () => ({
-  full_name: '', full_name_ar: '', mobile: '', city: '', farm_company: '', notes: '', credit_limit: 0,
+  full_name: '', full_name_ar: '', mobile: '', city: '', farm_company: '', notes: '', credit_limit: 0, kind: 'customer',
 });
 
 const DISPATCH_STATUS_META = {
@@ -44,6 +44,7 @@ export default function Customers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dispatchFilter, setDispatchFilter] = useState('all'); // all | ready
+  const [kindFilter, setKindFilter] = useState('all'); // all | customer | veterinarian
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 0 });
   const [modalOpen, setModalOpen] = useState(false);
@@ -85,6 +86,7 @@ export default function Customers() {
       ? { mobile: trimmed, page, limit: PAGE_SIZE }
       : { search: trimmed, page, limit: PAGE_SIZE };
     if (dispatchFilter === 'ready') params.readyToSend = true;
+    if (kindFilter === 'customer' || kindFilter === 'veterinarian') params.kind = kindFilter;
     customersAPI.list(params)
       .then(({ data }) => {
         setCustomers(data.data || []);
@@ -96,7 +98,7 @@ export default function Customers() {
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, page, dispatchFilter]);
+  }, [search, page, dispatchFilter, kindFilter]);
 
   const unsentReports = readyReports.filter((r) => !r.previously_sent);
 
@@ -130,6 +132,7 @@ export default function Customers() {
       farm_company: customer.farm_company || '',
       notes: customer.notes || '',
       credit_limit: customer.credit_limit ?? 0,
+      kind: customer.kind === 'veterinarian' ? 'veterinarian' : 'customer',
     });
     setModalOpen(true);
   };
@@ -354,6 +357,11 @@ export default function Customers() {
     { key: 'full_name', label: t('customers.fullName') },
     { key: 'mobile', label: t('customers.mobile') },
     {
+      key: 'kind',
+      label: t('customers.kind'),
+      render: (r) => (r.kind === 'veterinarian' ? t('customers.kindVeterinarian') : t('customers.kindCustomer')),
+    },
+    {
       key: 'report_dispatch_status',
       label: t('customers.reportDispatchStatus'),
       render: (r) => renderDispatchStatus(r.report_dispatch_status),
@@ -401,6 +409,16 @@ export default function Customers() {
           >
             <option value="all">{t('customers.dispatchFilterAll')}</option>
             <option value="ready">{t('customers.dispatchFilterReady')}</option>
+          </select>
+          <select
+            value={kindFilter}
+            onChange={(e) => { setKindFilter(e.target.value); setPage(1); }}
+            className="input-field w-full sm:w-auto"
+            aria-label={t('customers.kindFilterLabel')}
+          >
+            <option value="all">{t('customers.kindFilterAll')}</option>
+            <option value="customer">{t('customers.kindCustomer')}</option>
+            <option value="veterinarian">{t('customers.kindVeterinarian')}</option>
           </select>
           <button onClick={openCreate} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> {t('common.add')}
@@ -474,6 +492,17 @@ export default function Customers() {
               <label className="block text-sm font-medium mb-1">{t('customers.creditLimit')}</label>
               <input type="number" min="0" step="0.01" value={form.credit_limit} onChange={(e) => setForm({ ...form, credit_limit: e.target.value })} className="input-field" />
             </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('customers.kind')}</label>
+              <select
+                value={form.kind || 'customer'}
+                onChange={(e) => setForm({ ...form, kind: e.target.value })}
+                className="input-field"
+              >
+                <option value="customer">{t('customers.kindCustomer')}</option>
+                <option value="veterinarian">{t('customers.kindVeterinarian')}</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('common.notes')}</label>
@@ -504,6 +533,10 @@ export default function Customers() {
               <div><span className="text-gray-500">{t('customers.mobile')}:</span> {selected.mobile}</div>
               <div><span className="text-gray-500">{t('customers.city')}:</span> {selected.city || '—'}</div>
               <div><span className="text-gray-500">{t('customers.farm')}:</span> {selected.farm_company || '—'}</div>
+              <div>
+                <span className="text-gray-500">{t('customers.kind')}:</span>{' '}
+                {selected.kind === 'veterinarian' ? t('customers.kindVeterinarian') : t('customers.kindCustomer')}
+              </div>
               <div><span className="text-gray-500">{t('customers.balance')}:</span> {fmt(selected.account_balance)}</div>
               <div><span className="text-gray-500">{t('customers.creditLimit')}:</span> {fmt(selected.credit_limit)}</div>
             </div>

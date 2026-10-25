@@ -13,6 +13,7 @@ const billingService = require('./billing.service');
 const notificationProvider = require('./notification-providers');
 const entitlements = require('./entitlements.service');
 const { resolveCustomerIdsByMobile } = require('../utils/customer-scope');
+const { samplePortalAccessSql, animalPortalAccessSql } = require('../utils/vet-supervised');
 const {
   PANELS,
   panelStatusFromResults,
@@ -238,7 +239,7 @@ const assertReportOwnership = async (reportId, customerIds) => {
   const result = await query(
     `SELECT r.id FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE r.id = $1 AND s.customer_id = ANY($2::uuid[])
+     WHERE r.id = $1 AND ${samplePortalAccessSql('s', '$2')}
        AND ${notDeleted('r')} AND ${notDeleted('s')}`,
     [reportId, ids]
   );
@@ -271,7 +272,7 @@ const listReports = async (customerIds, { page, limit, animalId }) => {
   const ids = asArray(customerIds);
   const { offset, page: p, limit: l } = paginate(page, limit);
 
-  const filters = ['s.customer_id = ANY($1::uuid[])', portalReportFilter, notDeleted('r'), notDeleted('s')];
+  const filters = [samplePortalAccessSql('s', '$1'), portalReportFilter, notDeleted('r'), notDeleted('s')];
   const params = [ids];
   if (animalId) {
     params.push(animalId);
@@ -303,7 +304,7 @@ const assertAnimalOwnership = async (animalId, customerIds) => {
             c.full_name as owner_name, c.full_name_ar as owner_name_ar, c.farm_company
      FROM animals a
      JOIN customers c ON a.owner_id = c.id
-     WHERE a.id = $1 AND a.owner_id = ANY($2::uuid[]) AND a.is_active = true`,
+     WHERE a.id = $1 AND ${animalPortalAccessSql('a', '$2')} AND a.is_active = true`,
     [animalId, ids]
   );
   if (!result.rows[0]) throw new AppError('Animal not found', 404, 'NOT_FOUND');
@@ -312,7 +313,7 @@ const assertAnimalOwnership = async (animalId, customerIds) => {
 
 const fetchAnimalReports = async (customerIds, animalId, limit = 20) => {
   const ids = asArray(customerIds);
-  const where = `s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}`;
+  const where = `${samplePortalAccessSql('s', '$1')} AND s.animal_id = $2 AND ${portalReportFilter}`;
   const params = [ids, animalId];
   let limitSql = '';
   if (limit) {
@@ -365,9 +366,9 @@ const listAnimals = async (customerIds) => {
             COUNT(DISTINCT s.id)::int AS report_count,
             MAX(r.created_at) AS latest_report_at
      FROM animals a
-     JOIN samples s ON s.animal_id = a.id
+     JOIN samples s ON s.animal_id = a.id AND ${samplePortalAccessSql('s', '$1')}
      JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
-     WHERE a.owner_id = ANY($1::uuid[]) AND a.is_active = true
+     WHERE a.is_active = true AND ${animalPortalAccessSql('a', '$1')}
      GROUP BY a.id
      ORDER BY latest_report_at DESC NULLS LAST, a.animal_code`,
     [ids]
@@ -386,7 +387,7 @@ const getComparison = async (customerIds, animalId, reportIds = []) => {
       SELECT r.id, r.report_number, r.created_at, s.sample_code
       FROM reports r
       JOIN samples s ON r.sample_id = s.id
-      WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND r.id = ANY($3::uuid[])
+      WHERE ${samplePortalAccessSql('s', '$1')} AND s.animal_id = $2 AND r.id = ANY($3::uuid[])
         AND ${portalReportFilter}
       ORDER BY r.created_at ASC`;
     reportsParams = [ids, animalId, reportIds];
@@ -395,7 +396,7 @@ const getComparison = async (customerIds, animalId, reportIds = []) => {
       SELECT r.id, r.report_number, r.created_at, s.sample_code
       FROM reports r
       JOIN samples s ON r.sample_id = s.id
-      WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}
+      WHERE ${samplePortalAccessSql('s', '$1')} AND s.animal_id = $2 AND ${portalReportFilter}
       ORDER BY r.created_at DESC
       LIMIT 5`;
     reportsParams = [ids, animalId];
@@ -529,12 +530,12 @@ const getDashboard = async (customerIds) => {
          r.id, r.created_at
        FROM samples s
        JOIN reports r ON r.sample_id = s.id AND ${portalReportFilter}
-       WHERE s.customer_id = ANY($1::uuid[])
+       WHERE ${samplePortalAccessSql('s', '$1')}
        ORDER BY s.id, r.created_at DESC
      )
      SELECT
        (SELECT COUNT(*)::int FROM portal_reports) AS report_count,
-       (SELECT COUNT(*)::int FROM animals WHERE owner_id = ANY($1::uuid[]) AND is_active = true) AS animal_count,
+       (SELECT COUNT(*)::int FROM animals a WHERE a.is_active = true AND ${animalPortalAccessSql('a', '$1')}) AS animal_count,
        (SELECT COUNT(*)::int FROM portal_reports WHERE created_at > NOW() - INTERVAL '7 days') AS new_reports_7d`,
     [ids]
   );
@@ -698,7 +699,7 @@ const getTrends = async (customerIds, animalId, parameterCode, limit = 15) => {
     `SELECT r.id, r.report_number, r.created_at
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = ANY($1::uuid[]) AND s.animal_id = $2 AND ${portalReportFilter}
+     WHERE ${samplePortalAccessSql('s', '$1')} AND s.animal_id = $2 AND ${portalReportFilter}
      ORDER BY r.created_at ASC
      LIMIT $3`,
     [ids, animalId, capped]
@@ -745,7 +746,7 @@ const getTrends = async (customerIds, animalId, parameterCode, limit = 15) => {
 
 const listDocuments = async (customerIds, { animalId, type } = {}) => {
   const ids = asArray(customerIds);
-  const filters = ['s.customer_id = ANY($1::uuid[])'];
+  const filters = [samplePortalAccessSql('s', '$1')];
   const params = [ids];
   if (animalId) {
     params.push(animalId);
@@ -765,7 +766,7 @@ const listDocuments = async (customerIds, { animalId, type } = {}) => {
     params
   );
 
-  const attachFilters = ['s.customer_id = ANY($1::uuid[])'];
+  const attachFilters = [samplePortalAccessSql('s', '$1')];
   const attachParams = [ids];
   if (animalId) {
     attachParams.push(animalId);
@@ -871,7 +872,7 @@ const searchPortal = async (customerIds, q) => {
   const animals = await query(
     `SELECT DISTINCT a.id, a.animal_code, a.name_tag, a.animal_type, a.rfid_chip
      FROM animals a
-     WHERE a.owner_id = ANY($1::uuid[]) AND a.is_active = true
+     WHERE a.is_active = true AND ${animalPortalAccessSql('a', '$1')}
        AND (a.animal_code ILIKE $2 OR a.name_tag ILIKE $2 OR a.rfid_chip ILIKE $2)
      ORDER BY a.animal_code
      LIMIT 8`,
@@ -883,7 +884,7 @@ const searchPortal = async (customerIds, q) => {
      FROM reports r
      JOIN samples s ON r.sample_id = s.id
      LEFT JOIN animals a ON s.animal_id = a.id
-     WHERE s.customer_id = ANY($1::uuid[])
+     WHERE ${samplePortalAccessSql('s', '$1')}
        AND (r.report_number ILIKE $2 OR s.sample_code ILIKE $2)
        AND ${portalReportFilter}
      ORDER BY r.created_at DESC
@@ -917,7 +918,7 @@ const serveReportPdf = async (filename, customerIds, res) => {
   const report = await query(
     `SELECT r.id, r.pdf_url FROM reports r
      JOIN samples s ON r.sample_id = s.id
-     WHERE s.customer_id = ANY($1::uuid[]) AND r.pdf_url LIKE $2 AND ${portalReportFilter}`,
+     WHERE ${samplePortalAccessSql('s', '$1')} AND r.pdf_url LIKE $2 AND ${portalReportFilter}`,
     [ids, `%${filename}`]
   );
 

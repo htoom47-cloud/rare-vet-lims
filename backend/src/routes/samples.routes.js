@@ -3,7 +3,7 @@ const service = require('../services/samples.service');
 const testMgmt = require('../services/sample-test-management.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { sampleSchema, sampleReassignAnimalSchema } = require('../validators/schemas');
+const { sampleSchema, sampleReassignAnimalSchema, sampleSupervisorSchema } = require('../validators/schemas');
 const { PERMISSIONS } = require('../utils/permissions');
 const { auditLog } = require('../middleware/audit');
 
@@ -98,6 +98,16 @@ router.patch('/:id/animal', authorize(PERMISSIONS.SAMPLES_UPDATE), validate(samp
       req.user.id,
       req.user.role_name,
       { ip: req.ip, userAgent: req.get('user-agent') }
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.patch('/:id/supervisor', authorize(PERMISSIONS.SAMPLES_UPDATE), validate(sampleSupervisorSchema), auditLog('set_sample_supervisor', 'samples'), async (req, res, next) => {
+  try {
+    const data = await service.setSupervisingVeterinarian(
+      req.params.id,
+      req.body.supervising_veterinarian_id
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }

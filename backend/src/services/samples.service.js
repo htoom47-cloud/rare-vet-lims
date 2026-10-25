@@ -166,6 +166,8 @@ const getById = async (id) => {
   const result = await query(
     `SELECT s.*, c.full_name as customer_name, c.mobile as customer_mobile,
             a.animal_code, a.animal_type, a.name_tag as animal_name,
+            sv.full_name as supervising_veterinarian_name,
+            sv.mobile as supervising_veterinarian_mobile,
             inv.id as invoice_id, inv.invoice_number, inv.status as invoice_status, inv.total as invoice_total,
             (SELECT COUNT(DISTINCT st.test_id) FROM results r
              JOIN sample_tests st ON r.sample_test_id = st.id WHERE st.sample_id = s.id) as results_count,
@@ -180,6 +182,7 @@ const getById = async (id) => {
              WHERE nq.metadata::jsonb->>'sample_id' = s.id::text) as notifications_count
      FROM samples s
      LEFT JOIN customers c ON s.customer_id = c.id
+     LEFT JOIN customers sv ON s.supervising_veterinarian_id = sv.id
      LEFT JOIN animals a ON s.animal_id = a.id
      LEFT JOIN LATERAL (
        SELECT id, invoice_number, status, total
@@ -286,10 +289,27 @@ const create = async (data, userId) => {
       throw new AppError('Could not generate unique barcode', 500, 'BARCODE_COLLISION');
     }
 
+    let supervisingVeterinarianId = null;
+    if (data.supervising_veterinarian_id) {
+      const { assertSupervisingVeterinarian, isVetSupervisedEnabled } = require('../utils/vet-supervised');
+      if (!isVetSupervisedEnabled()) {
+        throw new AppError('Supervising veterinarian is not enabled', 400, 'FEATURE_DISABLED');
+      }
+      if (data.supervising_veterinarian_id === data.customer_id) {
+        throw new AppError(
+          'Supervising veterinarian must be different from the end client',
+          400,
+          'SUPERVISOR_SAME_AS_CLIENT'
+        );
+      }
+      await assertSupervisingVeterinarian(client, data.supervising_veterinarian_id);
+      supervisingVeterinarianId = data.supervising_veterinarian_id;
+    }
+
     const sampleResult = await client.query(
-      `INSERT INTO samples (id, sample_code, barcode, customer_id, animal_id, department, priority, notes, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9) RETURNING *`,
-      [uuidv4(), sampleCode, barcode, data.customer_id, data.animal_id, data.department, data.priority, data.notes, userId]
+      `INSERT INTO samples (id, sample_code, barcode, customer_id, animal_id, department, priority, notes, status, created_by, supervising_veterinarian_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10) RETURNING *`,
+      [uuidv4(), sampleCode, barcode, data.customer_id, data.animal_id, data.department, data.priority, data.notes, userId, supervisingVeterinarianId]
     );
 
     const sample = sampleResult.rows[0];
@@ -687,6 +707,30 @@ const alignCustomerToAnimalOwner = async (sampleId, userId, userRole, auditCtx =
   };
 };
 
+const setSupervisingVeterinarian = async (sampleId, supervisingVeterinarianId) => {
+  const { assertSupervisingVeterinarian, isVetSupervisedEnabled } = require('../utils/vet-supervised');
+  if (!isVetSupervisedEnabled()) {
+    throw new AppError('Supervising veterinarian is not enabled', 400, 'FEATURE_DISABLED');
+  }
+  const sample = await getById(sampleId);
+  let vetId = supervisingVeterinarianId || null;
+  if (vetId) {
+    if (vetId === sample.customer_id) {
+      throw new AppError(
+        'Supervising veterinarian must be different from the end client',
+        400,
+        'SUPERVISOR_SAME_AS_CLIENT'
+      );
+    }
+    await assertSupervisingVeterinarian(query, vetId);
+  }
+  await query(
+    `UPDATE samples SET supervising_veterinarian_id = $1, updated_at = NOW() WHERE id = $2`,
+    [vetId, sampleId]
+  );
+  return getById(sampleId);
+};
+
 module.exports = {
   list,
   getById,
@@ -695,6 +739,7 @@ module.exports = {
   updateStatus,
   reassignAnimal,
   alignCustomerToAnimalOwner,
+  setSupervisingVeterinarian,
   recordLabHandover,
   reconcileSampleStatuses,
   getQueue,

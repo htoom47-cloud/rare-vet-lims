@@ -142,6 +142,9 @@ export const samplesAPI = {
   create: (data) => api.post('/samples', data),
   updateStatus: (id, data) => api.patch(`/samples/${id}/status`, data),
   reassignAnimal: (id, animalId) => api.patch(`/samples/${id}/animal`, { animal_id: animalId }),
+  setSupervisor: (id, supervisingVeterinarianId) => api.patch(`/samples/${id}/supervisor`, {
+    supervising_veterinarian_id: supervisingVeterinarianId || null,
+  }),
   alignCustomer: (id) => api.post(`/samples/${id}/align-customer`),
   labHandover: (id) => api.post(`/samples/${id}/lab-handover`),
   getQueue: () => api.get('/samples/queue'),

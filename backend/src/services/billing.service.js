@@ -197,6 +197,63 @@ const getInvoiceById = async (id, options = {}) => {
   };
 };
 
+const resolveSupervisedBilling = async (client, data) => {
+  const {
+    assertSupervisingVeterinarian,
+    isVetSupervisedEnabled,
+    buildSampleOwnerInvoiceNote,
+  } = require('../utils/vet-supervised');
+
+  let customerId = data.customer_id;
+  let notes = String(data.notes || '').trim();
+  let ownerName = null;
+  let ownerMobile = null;
+
+  if (!isVetSupervisedEnabled()) {
+    return { customerId, notes };
+  }
+
+  let supervisingId = data.supervising_veterinarian_id || null;
+  let ownerId = data.sample_owner_customer_id || null;
+
+  if (data.sample_id) {
+    const sampleResult = await client.query(
+      `SELECT s.customer_id, s.supervising_veterinarian_id,
+              c.full_name AS owner_name, c.mobile AS owner_mobile
+       FROM samples s
+       LEFT JOIN customers c ON s.customer_id = c.id
+       WHERE s.id = $1 AND s.deleted_at IS NULL`,
+      [data.sample_id]
+    );
+    const sample = sampleResult.rows[0];
+    if (sample?.supervising_veterinarian_id) {
+      supervisingId = sample.supervising_veterinarian_id;
+      ownerId = sample.customer_id;
+      ownerName = sample.owner_name;
+      ownerMobile = sample.owner_mobile;
+    }
+  }
+
+  if (supervisingId) {
+    await assertSupervisingVeterinarian(client, supervisingId);
+    customerId = supervisingId;
+    if (ownerId && !ownerName) {
+      const ownerResult = await client.query(
+        `SELECT full_name, mobile FROM customers WHERE id = $1`,
+        [ownerId]
+      );
+      ownerName = ownerResult.rows[0]?.full_name || null;
+      ownerMobile = ownerResult.rows[0]?.mobile || null;
+    }
+    const ownerNote = buildSampleOwnerInvoiceNote({ ownerName, ownerMobile });
+    if (ownerNote && !notes.includes(ownerNote)) {
+      notes = notes ? `${notes}\n${ownerNote}` : ownerNote;
+    }
+  }
+
+  return { customerId, notes };
+};
+
 const createInvoice = async (data, userId, options = {}) => {
   const issued = await withBillingClient(options.client, async (client) => {
     const invoiceNumber = generateCode('INV');
@@ -205,16 +262,17 @@ const createInvoice = async (data, userId, options = {}) => {
     });
     const catalogItems = prepareCatalogItems(discounted.items);
     const totals = calcDocumentTotals(catalogItems, discounted);
+    const { customerId, notes } = await resolveSupervisedBilling(client, data);
 
     const invoiceId = uuidv4();
     const invoiceResult = await client.query(
       `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, discount_percent, field_visit_discount_amount, field_visit_discount_percent, tax_rate, tax_amount, total, status, notes, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'issued',$13,$14) RETURNING *`,
       [
-        invoiceId, invoiceNumber, data.customer_id, data.sample_id,
+        invoiceId, invoiceNumber, customerId, data.sample_id,
         totals.subtotal, totals.discount_amount, totals.discount_percent,
         totals.field_visit_discount_amount, totals.field_visit_discount_percent,
-        totals.taxRate, totals.taxAmount, totals.total, data.notes, userId,
+        totals.taxRate, totals.taxAmount, totals.total, notes || null, userId,
       ]
     );
 
@@ -233,13 +291,13 @@ const createInvoice = async (data, userId, options = {}) => {
 
     const issued = { ...invoice, vat_qr_data: vatQR, items: catalogItems };
     await ledger.postInvoice(issued, userId, client);
-    await syncCustomerArBalance(data.customer_id, client);
+    await syncCustomerArBalance(customerId, client);
     await logBillingAudit({
       userId,
       action: 'create_invoice',
       entityType: 'invoice',
       entityId: invoice.id,
-      newValues: { invoice_number: invoiceNumber, total: totals.total, customer_id: data.customer_id },
+      newValues: { invoice_number: invoiceNumber, total: totals.total, customer_id: customerId },
       client,
       required: true,
     });

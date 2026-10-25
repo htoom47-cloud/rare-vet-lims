@@ -157,6 +157,11 @@ const env = {
      */
     cultureAstReport: process.env.CULTURE_AST_REPORT === 'true',
     /**
+     * When true: samples may link a supervising veterinarian (payer + portal reports).
+     * End client keeps sample ownership; invoices bill the vet. Default false.
+     */
+    vetSupervisedSamples: process.env.VET_SUPERVISED_SAMPLES === 'true',
+    /**
      * When true: live invoice reporting/clearance to Fatoora is allowed.
      * Default false — sandbox device onboarding only until explicitly enabled.
      */
