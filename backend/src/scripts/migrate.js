@@ -909,12 +909,13 @@ async function applyPatches() {
         ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'tests'
     `);
     await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE discount_presets
-          ADD CONSTRAINT discount_presets_scope_check
-          CHECK (scope IN ('tests', 'packages', 'field_visit'));
-      EXCEPTION WHEN duplicate_object THEN NULL;
-      END $$
+      ALTER TABLE discount_presets
+        DROP CONSTRAINT IF EXISTS discount_presets_scope_check
+    `);
+    await client.query(`
+      ALTER TABLE discount_presets
+        ADD CONSTRAINT discount_presets_scope_check
+        CHECK (scope IN ('tests', 'packages', 'services', 'field_visit'))
     `);
     // One-time: visit-named presets → field_visit; everything else stays tests (DEFAULT).
     await client.query(`

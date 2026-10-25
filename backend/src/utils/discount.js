@@ -25,12 +25,13 @@ const isFieldVisitDiscountPreset = (preset) => {
 
 const DISCOUNT_SCOPE_TESTS = 'tests';
 const DISCOUNT_SCOPE_PACKAGES = 'packages';
+const DISCOUNT_SCOPE_SERVICES = 'services'; // packages + individual tests
 const DISCOUNT_SCOPE_FIELD_VISIT = 'field_visit';
 
 const normalizeDiscountScope = (scope) => {
   const value = String(scope || DISCOUNT_SCOPE_TESTS).trim().toLowerCase();
-  if (value === 'services') return DISCOUNT_SCOPE_TESTS; // legacy alias
   if (value === DISCOUNT_SCOPE_PACKAGES) return DISCOUNT_SCOPE_PACKAGES;
+  if (value === DISCOUNT_SCOPE_SERVICES) return DISCOUNT_SCOPE_SERVICES;
   if (value === DISCOUNT_SCOPE_FIELD_VISIT) return DISCOUNT_SCOPE_FIELD_VISIT;
   return DISCOUNT_SCOPE_TESTS;
 };
@@ -42,10 +43,20 @@ const resolvePresetScope = (preset) => {
   return DISCOUNT_SCOPE_TESTS;
 };
 
+/** Match document field scope: tests/packages also accept combined "services" presets. */
+const presetMatchesScope = (presetScope, wanted) => {
+  if (presetScope === wanted) return true;
+  if (presetScope === DISCOUNT_SCOPE_SERVICES
+    && (wanted === DISCOUNT_SCOPE_TESTS || wanted === DISCOUNT_SCOPE_PACKAGES)) {
+    return true;
+  }
+  return false;
+};
+
 const filterPresetsByScope = (presets = [], scope = DISCOUNT_SCOPE_TESTS) => {
   const list = Array.isArray(presets) ? presets : [];
   const wanted = normalizeDiscountScope(scope);
-  return list.filter((p) => resolvePresetScope(p) === wanted);
+  return list.filter((p) => presetMatchesScope(resolvePresetScope(p), wanted));
 };
 
 const DISCOUNT_AUDIENCE_CUSTOMER = 'customer';
@@ -236,9 +247,11 @@ module.exports = {
   isFieldVisitDiscountPreset,
   DISCOUNT_SCOPE_TESTS,
   DISCOUNT_SCOPE_PACKAGES,
+  DISCOUNT_SCOPE_SERVICES,
   DISCOUNT_SCOPE_FIELD_VISIT,
   normalizeDiscountScope,
   resolvePresetScope,
+  presetMatchesScope,
   filterPresetsByScope,
   DISCOUNT_AUDIENCE_CUSTOMER,
   DISCOUNT_AUDIENCE_VETERINARIAN,

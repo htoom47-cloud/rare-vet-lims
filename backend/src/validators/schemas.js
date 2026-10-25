@@ -224,7 +224,7 @@ const discountPresetSchema = Joi.object({
   sort_order: Joi.number().integer().default(0),
   is_active: Joi.boolean(),
   audience: Joi.string().valid('customer', 'veterinarian').default('customer'),
-  scope: Joi.string().valid('tests', 'packages', 'field_visit').default('tests'),
+  scope: Joi.string().valid('tests', 'packages', 'services', 'field_visit').default('tests'),
 }).or('name', 'name_ar');
 
 const paymentSchema = Joi.object({

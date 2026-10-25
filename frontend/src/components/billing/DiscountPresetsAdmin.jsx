@@ -4,13 +4,14 @@ import toast from 'react-hot-toast';
 import { billingAPI } from '../../services/api';
 
 const normalizeScope = (scope) => {
-  if (scope === 'packages' || scope === 'field_visit') return scope;
+  if (scope === 'packages' || scope === 'field_visit' || scope === 'services') return scope;
   return 'tests';
 };
 
 const scopeLabel = (scope, t) => {
   const s = normalizeScope(scope);
   if (s === 'packages') return t('invoiceSettings.discountScopePackages');
+  if (s === 'services') return t('invoiceSettings.discountScopeServices');
   if (s === 'field_visit') return t('invoiceSettings.discountScopeFieldVisit');
   return t('invoiceSettings.discountScopeTests');
 };
@@ -257,6 +258,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
             >
               <option value="tests">{t('invoiceSettings.discountScopeTests')}</option>
               <option value="packages">{t('invoiceSettings.discountScopePackages')}</option>
+              <option value="services">{t('invoiceSettings.discountScopeServices')}</option>
               <option value="field_visit">{t('invoiceSettings.discountScopeFieldVisit')}</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">{t('invoiceSettings.discountScopeHint')}</p>

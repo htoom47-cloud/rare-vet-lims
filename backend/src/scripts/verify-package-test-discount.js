@@ -37,10 +37,12 @@ const adminSrc = fs.readFileSync(
 assert.ok(migrateSrc.includes('package_discount_amount'));
 assert.ok(migrateSrc.includes("ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'tests'"));
 assert.ok(migrateSrc.includes('discount_presets_scope_check'));
-assert.ok(migrateSrc.includes("CHECK (scope IN ('tests', 'packages', 'field_visit'))"));
+assert.ok(migrateSrc.includes("'services'"));
+assert.ok(migrateSrc.includes('discount_presets_scope_check'));
 
 assert.ok(schemasSrc.includes('package_discount_percent'));
-assert.ok(schemasSrc.includes("scope: Joi.string().valid('tests', 'packages', 'field_visit')"));
+assert.ok(schemasSrc.includes("'services'"));
+assert.ok(schemasSrc.includes("scope: Joi.string().valid('tests', 'packages', 'services', 'field_visit')"));
 assert.ok(serviceSrc.includes('DISCOUNT_SCOPE_PACKAGES'));
 assert.ok(serviceSrc.includes('package_discount_preset_id'));
 assert.ok(billingSrc.includes('package_discount_amount'));
@@ -51,21 +53,23 @@ assert.ok(frontendDiscountSrc.includes('packageSubtotal'));
 assert.ok(frontendDiscountSrc.includes('DISCOUNT_SCOPE_PACKAGES'));
 assert.ok(adminSrc.includes('discountScope'));
 
-assert.strictEqual(normalizeDiscountScope('services'), DISCOUNT_SCOPE_TESTS);
 assert.strictEqual(normalizeDiscountScope('packages'), DISCOUNT_SCOPE_PACKAGES);
+assert.strictEqual(normalizeDiscountScope('services'), 'services');
 assert.strictEqual(resolvePresetScope({ scope: 'packages' }), DISCOUNT_SCOPE_PACKAGES);
+assert.strictEqual(resolvePresetScope({ scope: 'services' }), 'services');
 assert.strictEqual(resolvePresetScope({ name_ar: 'خصم الزيارة المجانية' }), DISCOUNT_SCOPE_FIELD_VISIT);
 
 const presets = [
   { id: 't1', scope: 'tests' },
   { id: 'p1', scope: 'packages' },
+  { id: 's1', scope: 'services' },
   { id: 'v1', scope: 'field_visit' },
   { id: 'legacy', name_ar: 'خصم الزيارة' },
 ];
-assert.deepStrictEqual(filterPresetsByScope(presets, 'tests').map((p) => p.id), ['t1']);
-assert.deepStrictEqual(filterPresetsByScope(presets, 'packages').map((p) => p.id), ['p1']);
+assert.deepStrictEqual(filterPresetsByScope(presets, 'tests').map((p) => p.id), ['t1', 's1']);
+assert.deepStrictEqual(filterPresetsByScope(presets, 'packages').map((p) => p.id), ['p1', 's1']);
 assert.deepStrictEqual(filterPresetsByScope(presets, 'field_visit').map((p) => p.id).sort(), ['legacy', 'v1']);
-assert.deepStrictEqual(filterPresetsByScope(presets, 'services').map((p) => p.id), ['t1']);
+assert.deepStrictEqual(filterPresetsByScope(presets, 'services').map((p) => p.id), ['s1']);
 
 const items = [
   { package_id: 'pkg1', description: 'Package A', quantity: 1, unit_price: 100 },

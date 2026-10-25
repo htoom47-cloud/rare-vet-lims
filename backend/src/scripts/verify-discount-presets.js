@@ -17,11 +17,21 @@ assert.strictEqual(filterPresetsByScope([
   { id: '1', name_ar: 'خصم الطبيب' },
   { id: '2', name_ar: 'خصم الزيارة المجانية' },
   { id: '3', name_ar: 'خصم الاعداد الكبيرة' },
-], 'services').map((p) => p.id).join(','), '1,3');
+], 'tests').map((p) => p.id).join(','), '1,3');
 assert.strictEqual(filterPresetsByScope([
   { id: '1', name_ar: 'خصم الطبيب' },
   { id: '2', name_ar: 'خصم الزيارة المجانية' },
 ], 'field_visit').map((p) => p.id).join(','), '2');
+assert.strictEqual(filterPresetsByScope([
+  { id: '1', scope: 'tests' },
+  { id: '2', scope: 'services' },
+  { id: '3', scope: 'packages' },
+], 'tests').map((p) => p.id).join(','), '1,2');
+assert.strictEqual(filterPresetsByScope([
+  { id: '1', scope: 'tests' },
+  { id: '2', scope: 'services' },
+  { id: '3', scope: 'packages' },
+], 'packages').map((p) => p.id).join(','), '2,3');
 
 assert.strictEqual(countDistinctAnimals([
   { animal_id: 'a' },
