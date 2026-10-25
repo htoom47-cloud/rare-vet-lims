@@ -8,6 +8,11 @@ const normalizeScope = (scope) => {
   return 'tests';
 };
 
+const normalizeAudience = (audience) => {
+  if (audience === 'veterinarian' || audience === 'customer' || audience === 'all') return audience;
+  return 'all';
+};
+
 const scopeLabel = (scope, t) => {
   const s = normalizeScope(scope);
   if (s === 'packages') return t('invoiceSettings.discountScopePackages');
@@ -16,13 +21,20 @@ const scopeLabel = (scope, t) => {
   return t('invoiceSettings.discountScopeTests');
 };
 
+const audienceLabel = (audience, t) => {
+  const a = normalizeAudience(audience);
+  if (a === 'veterinarian') return t('invoiceSettings.discountAudienceVeterinarian');
+  if (a === 'customer') return t('invoiceSettings.discountAudienceCustomer');
+  return t('invoiceSettings.discountAudienceAll');
+};
+
 const emptyForm = () => ({
   name: '',
   name_ar: '',
   percent: '',
   min_animal_count: 0,
   sort_order: 0,
-  audience: 'customer',
+  audience: 'all',
   scope: 'tests',
 });
 
@@ -52,7 +64,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
       percent: String(parseFloat(preset.percent) || ''),
       min_animal_count: parseInt(preset.min_animal_count, 10) || 0,
       sort_order: parseInt(preset.sort_order, 10) || 0,
-      audience: preset.audience === 'veterinarian' ? 'veterinarian' : 'customer',
+      audience: normalizeAudience(preset.audience),
       scope: normalizeScope(preset.scope),
       is_active: preset.is_active !== false,
     });
@@ -83,7 +95,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
         percent,
         min_animal_count: Math.max(0, parseInt(form.min_animal_count, 10) || 0),
         sort_order: parseInt(form.sort_order, 10) || 0,
-        audience: form.audience === 'veterinarian' ? 'veterinarian' : 'customer',
+        audience: normalizeAudience(form.audience),
         scope: normalizeScope(form.scope),
         is_active: form.is_active !== false,
       };
@@ -123,7 +135,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
         percent: parseFloat(preset.percent),
         min_animal_count: parseInt(preset.min_animal_count, 10) || 0,
         sort_order: parseInt(preset.sort_order, 10) || 0,
-        audience: preset.audience === 'veterinarian' ? 'veterinarian' : 'customer',
+        audience: normalizeAudience(preset.audience),
         scope: normalizeScope(preset.scope),
         is_active: true,
       });
@@ -168,11 +180,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
                 <td className="p-2">{preset.name || preset.name_ar}</td>
                 <td className="p-2">{parseFloat(preset.percent)}%</td>
                 <td className="p-2">{scopeLabel(preset.scope, t)}</td>
-                <td className="p-2">
-                  {preset.audience === 'veterinarian'
-                    ? t('invoiceSettings.discountAudienceVeterinarian')
-                    : t('invoiceSettings.discountAudienceCustomer')}
-                </td>
+                <td className="p-2">{audienceLabel(preset.audience, t)}</td>
                 <td className="p-2">
                   {(parseInt(preset.min_animal_count, 10) || 0) > 0
                     ? t('billing.discountMinAnimals', { count: parseInt(preset.min_animal_count, 10) })
@@ -267,9 +275,10 @@ export default function DiscountPresetsAdmin({ canEdit }) {
             <label className="block text-sm font-medium mb-1">{t('invoiceSettings.discountAudience')}</label>
             <select
               className="input-field w-full"
-              value={form.audience || 'customer'}
+              value={form.audience || 'all'}
               onChange={(e) => setForm({ ...form, audience: e.target.value })}
             >
+              <option value="all">{t('invoiceSettings.discountAudienceAll')}</option>
               <option value="customer">{t('invoiceSettings.discountAudienceCustomer')}</option>
               <option value="veterinarian">{t('invoiceSettings.discountAudienceVeterinarian')}</option>
             </select>

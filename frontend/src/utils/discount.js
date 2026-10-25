@@ -78,12 +78,13 @@ export function filterPresetsByScope(presets = [], scope = DISCOUNT_SCOPE_TESTS)
 
 export const DISCOUNT_AUDIENCE_CUSTOMER = 'customer';
 export const DISCOUNT_AUDIENCE_VETERINARIAN = 'veterinarian';
+export const DISCOUNT_AUDIENCE_ALL = 'all';
 
 export function normalizeDiscountAudience(audience) {
-  const value = String(audience || DISCOUNT_AUDIENCE_CUSTOMER).trim().toLowerCase();
-  return value === DISCOUNT_AUDIENCE_VETERINARIAN
-    ? DISCOUNT_AUDIENCE_VETERINARIAN
-    : DISCOUNT_AUDIENCE_CUSTOMER;
+  const value = String(audience || DISCOUNT_AUDIENCE_ALL).trim().toLowerCase();
+  if (value === DISCOUNT_AUDIENCE_VETERINARIAN) return DISCOUNT_AUDIENCE_VETERINARIAN;
+  if (value === DISCOUNT_AUDIENCE_CUSTOMER) return DISCOUNT_AUDIENCE_CUSTOMER;
+  return DISCOUNT_AUDIENCE_ALL;
 }
 
 export function normalizePayerKind(kind) {
@@ -93,14 +94,15 @@ export function normalizePayerKind(kind) {
     : DISCOUNT_AUDIENCE_CUSTOMER;
 }
 
-/** Vets see customer + veterinarian presets; regular customers see customer-only. */
+/** all → both; customer → customer payers only; veterinarian → vet payers only. */
 export function filterPresetsByAudience(presets = [], payerKind = DISCOUNT_AUDIENCE_CUSTOMER) {
   const list = Array.isArray(presets) ? presets : [];
   const kind = normalizePayerKind(payerKind);
-  if (kind === DISCOUNT_AUDIENCE_VETERINARIAN) return list;
-  return list.filter(
-    (p) => normalizeDiscountAudience(p?.audience) !== DISCOUNT_AUDIENCE_VETERINARIAN
-  );
+  return list.filter((p) => {
+    const audience = normalizeDiscountAudience(p?.audience);
+    if (audience === DISCOUNT_AUDIENCE_ALL) return true;
+    return audience === kind;
+  });
 }
 
 export function isDiscountPresetAllowed(preset, volumeCount) {

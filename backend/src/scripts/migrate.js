@@ -879,18 +879,35 @@ async function applyPatches() {
         WHERE supervising_veterinarian_id IS NOT NULL
     `);
 
-    // Discount presets: customer (everyone) vs veterinarian-only (vets may also use customer presets).
+    // Discount presets audience: customer | veterinarian | all (legacy customer = everyone → all once).
     await client.query(`
       ALTER TABLE discount_presets
         ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'customer'
     `);
     await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE discount_presets
-          ADD CONSTRAINT discount_presets_audience_check
-          CHECK (audience IN ('customer', 'veterinarian'));
-      EXCEPTION WHEN duplicate_object THEN NULL;
+      DO $$
+      DECLARE
+        def text;
+      BEGIN
+        SELECT pg_get_constraintdef(c.oid) INTO def
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE t.relname = 'discount_presets' AND c.conname = 'discount_presets_audience_check';
+
+        IF def IS NULL OR position('''all''' in def) = 0 THEN
+          ALTER TABLE discount_presets DROP CONSTRAINT IF EXISTS discount_presets_audience_check;
+          UPDATE discount_presets
+            SET audience = 'all', updated_at = NOW()
+            WHERE audience = 'customer';
+          ALTER TABLE discount_presets
+            ADD CONSTRAINT discount_presets_audience_check
+            CHECK (audience IN ('customer', 'veterinarian', 'all'));
+        END IF;
       END $$
+    `);
+    await client.query(`
+      ALTER TABLE discount_presets
+        ALTER COLUMN audience SET DEFAULT 'all'
     `);
 
     // Package vs individual-test discounts (field visit remains separate).
