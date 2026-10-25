@@ -282,8 +282,10 @@ export default function WorkflowCase() {
     try {
       const { data } = await customersAPI.create(newCustomer);
       setCustomerId(data.data.id);
+      setCustomerKind(data.data?.kind === 'veterinarian' ? 'veterinarian' : 'customer');
       setShowNewCustomer(false);
-      setStep(1);
+      // Stay on customer step when vet-supervised is on so reception can pick supervising vet.
+      if (!(receptionMode && features.vetSupervisedSamples)) setStep(1);
       toast.success(t('workflow.customerCreated'));
     } catch (err) {
       toast.error(err.response?.data?.error?.message || 'خطأ');
@@ -547,7 +549,8 @@ export default function WorkflowCase() {
                   setFieldVisitKm('');
                   setSupervisingVetId('');
                 }
-                if (id && receptionMode) setStep(1);
+                // Reception normally skips ahead; keep this step when vet-supervised so the doctor field is usable.
+                if (id && receptionMode && !features.vetSupervisedSamples) setStep(1);
               }}
               autoFocus
             />
@@ -562,6 +565,15 @@ export default function WorkflowCase() {
                   placeholder={t('customers.supervisingVeterinarian')}
                 />
               </div>
+            )}
+            {receptionMode && features.vetSupervisedSamples && customerId && (
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="btn-primary w-full py-3"
+              >
+                {t('reception.continueWithCustomer')}
+              </button>
             )}
             <button
               type="button"
