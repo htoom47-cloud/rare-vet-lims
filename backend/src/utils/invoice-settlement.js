@@ -3,6 +3,8 @@ const { toHalalas, fromHalalas } = require('./money');
 const DISCOUNT_KEYS = [
   'discount_amount',
   'discount_percent',
+  'package_discount_amount',
+  'package_discount_percent',
   'field_visit_discount_amount',
   'field_visit_discount_percent',
 ];

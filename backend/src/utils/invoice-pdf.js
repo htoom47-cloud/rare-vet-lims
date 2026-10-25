@@ -225,9 +225,15 @@ const generateInvoicePDF = async (invoice, outputDir, options = {}) => {
     totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(invoice.subtotal));
     if (parseFloat(invoice.discount_amount) > 0) {
       const pct = parseFloat(invoice.discount_percent) || 0;
-      const discEn = pct > 0 ? `Services discount (${pct}%)` : 'Services discount';
-      const discAr = pct > 0 ? `خصم الخدمات (${pct}%)` : 'خصم الخدمات';
+      const discEn = pct > 0 ? `Tests discount (${pct}%)` : 'Tests discount';
+      const discAr = pct > 0 ? `خصم الفحوصات (${pct}%)` : 'خصم الفحوصات';
       totalLine(discEn, discAr, `- ${fmtMoney(invoice.discount_amount)}`);
+    }
+    if (parseFloat(invoice.package_discount_amount) > 0) {
+      const pct = parseFloat(invoice.package_discount_percent) || 0;
+      const discEn = pct > 0 ? `Packages discount (${pct}%)` : 'Packages discount';
+      const discAr = pct > 0 ? `خصم الباقات (${pct}%)` : 'خصم الباقات';
+      totalLine(discEn, discAr, `- ${fmtMoney(invoice.package_discount_amount)}`);
     }
     if (parseFloat(invoice.field_visit_discount_amount) > 0) {
       const pct = parseFloat(invoice.field_visit_discount_percent) || 0;

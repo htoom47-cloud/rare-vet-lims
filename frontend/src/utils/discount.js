@@ -37,11 +37,32 @@ export function isFieldVisitDiscountPreset(preset) {
   return /زيار|visit|field[_\s-]?visit|free[_\s-]?visit/i.test(s);
 }
 
-export function filterPresetsByScope(presets = [], scope = 'services') {
+export function isPackageItem(item) {
+  return Boolean(item?.package_id) && !isFieldVisitItem(item);
+}
+
+export const DISCOUNT_SCOPE_TESTS = 'tests';
+export const DISCOUNT_SCOPE_PACKAGES = 'packages';
+export const DISCOUNT_SCOPE_FIELD_VISIT = 'field_visit';
+
+export function normalizeDiscountScope(scope) {
+  const value = String(scope || DISCOUNT_SCOPE_TESTS).trim().toLowerCase();
+  if (value === 'services') return DISCOUNT_SCOPE_TESTS;
+  if (value === DISCOUNT_SCOPE_PACKAGES) return DISCOUNT_SCOPE_PACKAGES;
+  if (value === DISCOUNT_SCOPE_FIELD_VISIT) return DISCOUNT_SCOPE_FIELD_VISIT;
+  return DISCOUNT_SCOPE_TESTS;
+}
+
+export function resolvePresetScope(preset) {
+  if (preset?.scope) return normalizeDiscountScope(preset.scope);
+  if (isFieldVisitDiscountPreset(preset)) return DISCOUNT_SCOPE_FIELD_VISIT;
+  return DISCOUNT_SCOPE_TESTS;
+}
+
+export function filterPresetsByScope(presets = [], scope = DISCOUNT_SCOPE_TESTS) {
   const list = Array.isArray(presets) ? presets : [];
-  if (scope === 'field_visit') return list.filter(isFieldVisitDiscountPreset);
-  if (scope === 'services') return list.filter((p) => !isFieldVisitDiscountPreset(p));
-  return list;
+  const wanted = normalizeDiscountScope(scope);
+  return list.filter((p) => resolvePresetScope(p) === wanted);
 }
 
 export const DISCOUNT_AUDIENCE_CUSTOMER = 'customer';
@@ -96,18 +117,23 @@ const lineNetTotal = (item, catalogPrices, taxRate = VAT_RATE) => {
 };
 
 /**
- * Split line subtotals (excl. VAT) for services vs field visit.
+ * Split line subtotals (excl. VAT) for packages, individual tests, and field visit.
  * @param {boolean} catalogPrices — true when unit_price is VAT-inclusive (catalog / new quote lines)
  */
 export function splitLineSubtotals(items = [], { catalogPrices = false, taxRate = VAT_RATE } = {}) {
-  let serviceSubtotal = 0;
+  let packageSubtotal = 0;
+  let testSubtotal = 0;
   let fieldVisitSubtotal = 0;
   for (const item of items) {
     const line = lineNetTotal(item, catalogPrices, taxRate);
     if (isFieldVisitItem(item)) fieldVisitSubtotal += line;
-    else serviceSubtotal += line;
+    else if (isPackageItem(item)) packageSubtotal += line;
+    else testSubtotal += line;
   }
+  const serviceSubtotal = packageSubtotal + testSubtotal;
   return {
+    packageSubtotal,
+    testSubtotal,
     serviceSubtotal,
     fieldVisitSubtotal,
     subtotal: serviceSubtotal + fieldVisitSubtotal,
@@ -171,20 +197,32 @@ function resolveVatInclusiveTotal(items, taxableRaw, taxRate, catalogPrices) {
 
 export function calcSplitTotals(
   items,
-  serviceDiscountType,
-  serviceDiscountValue,
+  testDiscountType,
+  testDiscountValue,
   fieldVisitDiscountType,
   fieldVisitDiscountValue,
   taxRate = VAT_RATE,
   options = {},
 ) {
-  const { catalogPrices = false } = options;
+  const {
+    catalogPrices = false,
+    packageDiscountType = DISCOUNT_TYPES.NONE,
+    packageDiscountValue = '',
+  } = options;
   const list = items || [];
-  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitLineSubtotals(list, { catalogPrices, taxRate });
-  const discountAmount = resolveDiscountAmount(serviceSubtotal, serviceDiscountType, serviceDiscountValue);
+  const {
+    packageSubtotal,
+    testSubtotal,
+    serviceSubtotal,
+    fieldVisitSubtotal,
+    subtotal: subtotalRaw,
+  } = splitLineSubtotals(list, { catalogPrices, taxRate });
+  const discountAmount = resolveDiscountAmount(testSubtotal, testDiscountType, testDiscountValue);
+  const packageDiscountAmount = resolveDiscountAmount(packageSubtotal, packageDiscountType, packageDiscountValue);
   const fieldVisitDiscountAmount = resolveDiscountAmount(fieldVisitSubtotal, fieldVisitDiscountType, fieldVisitDiscountValue);
   const rate = parseFloat(taxRate) || 15;
-  const taxableRaw = Math.max(0, serviceSubtotal - discountAmount)
+  const taxableRaw = Math.max(0, testSubtotal - discountAmount)
+    + Math.max(0, packageSubtotal - packageDiscountAmount)
     + Math.max(0, fieldVisitSubtotal - fieldVisitDiscountAmount);
   const subtotal = roundMoney(subtotalRaw);
   const total = resolveVatInclusiveTotal(list, taxableRaw, rate, catalogPrices);
@@ -192,14 +230,19 @@ export function calcSplitTotals(
   const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   const factor = 1 + rate / 100;
   const discountAmountGross = snapHalalaDrift(roundMoney(discountAmount * factor));
+  const packageDiscountAmountGross = snapHalalaDrift(roundMoney(packageDiscountAmount * factor));
   const fieldVisitDiscountAmountGross = snapHalalaDrift(roundMoney(fieldVisitDiscountAmount * factor));
   return {
     subtotal,
+    packageSubtotal: roundMoney(packageSubtotal),
+    testSubtotal: roundMoney(testSubtotal),
     serviceSubtotal: roundMoney(serviceSubtotal),
     fieldVisitSubtotal: roundMoney(fieldVisitSubtotal),
     discountAmount,
+    packageDiscountAmount,
     fieldVisitDiscountAmount,
     discountAmountGross,
+    packageDiscountAmountGross,
     fieldVisitDiscountAmountGross,
     taxAmount,
     total,
@@ -214,17 +257,25 @@ export function buildDiscountPayload(subtotal, type, value) {
   return { discount_amount, discount_percent };
 }
 
-/** Build API payload with separate service and field-visit discounts. */
-export function buildSplitDiscountPayload(items, serviceType, serviceValue, fvType, fvValue, options = {}) {
-  const { catalogPrices = true } = options;
-  const { serviceSubtotal, fieldVisitSubtotal } = splitLineSubtotals(items, { catalogPrices });
-  const discount_amount = resolveDiscountAmount(serviceSubtotal, serviceType, serviceValue);
-  const discount_percent = serviceType === DISCOUNT_TYPES.PERCENT ? (parseFloat(serviceValue) || 0) : 0;
+/** Build API payload with separate test, package, and field-visit discounts. */
+export function buildSplitDiscountPayload(items, testType, testValue, fvType, fvValue, options = {}) {
+  const {
+    catalogPrices = true,
+    packageType = DISCOUNT_TYPES.NONE,
+    packageValue = '',
+  } = options;
+  const { packageSubtotal, testSubtotal, fieldVisitSubtotal } = splitLineSubtotals(items, { catalogPrices });
+  const discount_amount = resolveDiscountAmount(testSubtotal, testType, testValue);
+  const discount_percent = testType === DISCOUNT_TYPES.PERCENT ? (parseFloat(testValue) || 0) : 0;
+  const package_discount_amount = resolveDiscountAmount(packageSubtotal, packageType, packageValue);
+  const package_discount_percent = packageType === DISCOUNT_TYPES.PERCENT ? (parseFloat(packageValue) || 0) : 0;
   const field_visit_discount_amount = resolveDiscountAmount(fieldVisitSubtotal, fvType, fvValue);
   const field_visit_discount_percent = fvType === DISCOUNT_TYPES.PERCENT ? (parseFloat(fvValue) || 0) : 0;
   return {
     discount_amount,
     discount_percent,
+    package_discount_amount,
+    package_discount_percent,
     field_visit_discount_amount,
     field_visit_discount_percent,
   };
@@ -250,6 +301,16 @@ export function initFieldVisitDiscountFromInvoice(invoice) {
   return { type: DISCOUNT_TYPES.NONE, value: '' };
 }
 
+/** Initialize package discount field state from an existing invoice. */
+export function initPackageDiscountFromInvoice(invoice) {
+  if (!invoice) return { type: DISCOUNT_TYPES.NONE, value: '' };
+  const pct = parseFloat(invoice.package_discount_percent) || 0;
+  const amt = parseFloat(invoice.package_discount_amount) || 0;
+  if (pct > 0) return { type: DISCOUNT_TYPES.PERCENT, value: String(pct) };
+  if (amt > 0) return { type: DISCOUNT_TYPES.AMOUNT, value: String(amt) };
+  return { type: DISCOUNT_TYPES.NONE, value: '' };
+}
+
 /** Preview invoice totals with split discounts before/at payment. */
 export function calcInvoiceTotals(
   subtotal,
@@ -267,7 +328,11 @@ export function calcInvoiceTotals(
       options.fvDiscountType || DISCOUNT_TYPES.NONE,
       options.fvDiscountValue || '',
       taxRate,
-      { catalogPrices: options.catalogPrices === true },
+      {
+        catalogPrices: options.catalogPrices === true,
+        packageDiscountType: options.packageDiscountType || DISCOUNT_TYPES.NONE,
+        packageDiscountValue: options.packageDiscountValue || '',
+      },
     );
     const paid = parseFloat(alreadyPaid) || 0;
     return { ...totals, balanceDue: Math.max(0, totals.total - paid) };

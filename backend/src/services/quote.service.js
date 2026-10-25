@@ -109,12 +109,15 @@ const createQuote = async (data, userId, options = {}) => {
     const quoteResult = await client.query(
       `INSERT INTO price_quotes (
         id, quote_number, customer_id, customer_name, customer_name_ar, customer_mobile,
-        subtotal, discount_amount, discount_percent, field_visit_discount_amount, field_visit_discount_percent,
+        subtotal, discount_amount, discount_percent,
+        package_discount_amount, package_discount_percent,
+        field_visit_discount_amount, field_visit_discount_percent,
         tax_rate, tax_amount, total, notes, valid_until, status, created_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'sent',$17) RETURNING *`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'sent',$19) RETURNING *`,
       [
         quoteId, quoteNumber, customerId, customerName, customerNameAr, customerMobile,
         totals.subtotal, totals.discount_amount, totals.discount_percent,
+        totals.package_discount_amount, totals.package_discount_percent,
         totals.field_visit_discount_amount, totals.field_visit_discount_percent,
         totals.taxRate, totals.taxAmount, totals.total, data.notes || null, validUntil, userId,
       ]
@@ -135,6 +138,7 @@ const createQuote = async (data, userId, options = {}) => {
 
     const quote = await discountPresets.resolveQuoteDiscountLabels(await getQuoteById(quoteId), {
       discount_preset_id: discounted.discount_preset_id,
+      package_discount_preset_id: discounted.package_discount_preset_id,
       field_visit_discount_preset_id: discounted.field_visit_discount_preset_id,
     });
     const settings = await invoiceSettingsService.getInvoiceSettings();

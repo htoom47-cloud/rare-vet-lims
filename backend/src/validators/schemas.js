@@ -179,6 +179,9 @@ const invoiceSchema = Joi.object({
   discount_amount: Joi.number().min(0).default(0),
   discount_percent: Joi.number().min(0).max(100).default(0),
   discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
+  package_discount_amount: Joi.number().min(0).default(0),
+  package_discount_percent: Joi.number().min(0).max(100).default(0),
+  package_discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   field_visit_discount_amount: Joi.number().min(0).default(0),
   field_visit_discount_percent: Joi.number().min(0).max(100).default(0),
   field_visit_discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
@@ -202,6 +205,9 @@ const quoteSchema = Joi.object({
   discount_amount: Joi.number().min(0).default(0),
   discount_percent: Joi.number().min(0).max(100).default(0),
   discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
+  package_discount_amount: Joi.number().min(0).default(0),
+  package_discount_percent: Joi.number().min(0).max(100).default(0),
+  package_discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
   field_visit_discount_amount: Joi.number().min(0).default(0),
   field_visit_discount_percent: Joi.number().min(0).max(100).default(0),
   field_visit_discount_preset_id: Joi.string().uuid().allow(null, '').empty('').default(null),
@@ -218,6 +224,7 @@ const discountPresetSchema = Joi.object({
   sort_order: Joi.number().integer().default(0),
   is_active: Joi.boolean(),
   audience: Joi.string().valid('customer', 'veterinarian').default('customer'),
+  scope: Joi.string().valid('tests', 'packages', 'field_visit').default('tests'),
 }).or('name', 'name_ar');
 
 const paymentSchema = Joi.object({
@@ -228,6 +235,8 @@ const paymentSchema = Joi.object({
   notes: Joi.string().allow('', null),
   discount_amount: Joi.forbidden(),
   discount_percent: Joi.forbidden(),
+  package_discount_amount: Joi.forbidden(),
+  package_discount_percent: Joi.forbidden(),
   field_visit_discount_amount: Joi.forbidden(),
   field_visit_discount_percent: Joi.forbidden(),
 });

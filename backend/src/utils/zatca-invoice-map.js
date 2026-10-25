@@ -72,9 +72,10 @@ const buildLiveInvoice = ({ invoice, items, cfg, customerName, invoiceCounterVal
   }
 
   const lineExtensionAmount = roundMoney(lines.reduce((sum, line) => sum + line.lineTotal, 0));
-  const serviceDiscount = roundMoney(parseFloat(invoice.discount_amount) || 0);
+  const testDiscount = roundMoney(parseFloat(invoice.discount_amount) || 0);
+  const packageDiscount = roundMoney(parseFloat(invoice.package_discount_amount) || 0);
   const visitDiscount = roundMoney(parseFloat(invoice.field_visit_discount_amount) || 0);
-  const allowanceTotal = roundMoney(serviceDiscount + visitDiscount);
+  const allowanceTotal = roundMoney(testDiscount + packageDiscount + visitDiscount);
   const taxExclusiveAmount = roundMoney(Math.max(0, lineExtensionAmount - allowanceTotal));
   const taxTotal = roundMoney(parseFloat(invoice.tax_amount) || 0);
   const taxInclusiveAmount = roundMoney(parseFloat(invoice.total) || 0);
@@ -83,8 +84,11 @@ const buildLiveInvoice = ({ invoice, items, cfg, customerName, invoiceCounterVal
   }
 
   const allowances = [];
-  if (serviceDiscount > 0) {
-    allowances.push({ amount: serviceDiscount, reason: 'Service discount', vatCategory: 'S', vatPercent: 15 });
+  if (testDiscount > 0) {
+    allowances.push({ amount: testDiscount, reason: 'Tests discount', vatCategory: 'S', vatPercent: 15 });
+  }
+  if (packageDiscount > 0) {
+    allowances.push({ amount: packageDiscount, reason: 'Packages discount', vatCategory: 'S', vatPercent: 15 });
   }
   if (visitDiscount > 0) {
     allowances.push({ amount: visitDiscount, reason: 'Field visit discount', vatCategory: 'S', vatPercent: 15 });

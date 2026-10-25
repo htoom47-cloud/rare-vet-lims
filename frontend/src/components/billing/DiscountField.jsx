@@ -28,7 +28,7 @@ export default function DiscountField({
   labelKey = 'billing.discountType',
   animalCount = 0,
   onPresetChange,
-  scope = 'services',
+  scope = 'tests',
   allowOpen = false,
   payerKind = DISCOUNT_AUDIENCE_CUSTOMER,
 }) {

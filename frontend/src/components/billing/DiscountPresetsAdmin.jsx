@@ -3,6 +3,18 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { billingAPI } from '../../services/api';
 
+const normalizeScope = (scope) => {
+  if (scope === 'packages' || scope === 'field_visit') return scope;
+  return 'tests';
+};
+
+const scopeLabel = (scope, t) => {
+  const s = normalizeScope(scope);
+  if (s === 'packages') return t('invoiceSettings.discountScopePackages');
+  if (s === 'field_visit') return t('invoiceSettings.discountScopeFieldVisit');
+  return t('invoiceSettings.discountScopeTests');
+};
+
 const emptyForm = () => ({
   name: '',
   name_ar: '',
@@ -10,6 +22,7 @@ const emptyForm = () => ({
   min_animal_count: 0,
   sort_order: 0,
   audience: 'customer',
+  scope: 'tests',
 });
 
 export default function DiscountPresetsAdmin({ canEdit }) {
@@ -39,6 +52,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
       min_animal_count: parseInt(preset.min_animal_count, 10) || 0,
       sort_order: parseInt(preset.sort_order, 10) || 0,
       audience: preset.audience === 'veterinarian' ? 'veterinarian' : 'customer',
+      scope: normalizeScope(preset.scope),
       is_active: preset.is_active !== false,
     });
   };
@@ -69,6 +83,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
         min_animal_count: Math.max(0, parseInt(form.min_animal_count, 10) || 0),
         sort_order: parseInt(form.sort_order, 10) || 0,
         audience: form.audience === 'veterinarian' ? 'veterinarian' : 'customer',
+        scope: normalizeScope(form.scope),
         is_active: form.is_active !== false,
       };
       if (editingId) {
@@ -108,6 +123,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
         min_animal_count: parseInt(preset.min_animal_count, 10) || 0,
         sort_order: parseInt(preset.sort_order, 10) || 0,
         audience: preset.audience === 'veterinarian' ? 'veterinarian' : 'customer',
+        scope: normalizeScope(preset.scope),
         is_active: true,
       });
       toast.success(t('invoiceSettings.discountSaved'));
@@ -137,6 +153,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
               <th className="p-2 text-start">{t('invoiceSettings.discountNameAr')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountNameEn')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountPercentLabel')}</th>
+              <th className="p-2 text-start">{t('invoiceSettings.discountScope')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountAudience')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountMinAnimals')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountActive')}</th>
@@ -149,6 +166,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
                 <td className="p-2">{preset.name_ar || preset.name}</td>
                 <td className="p-2">{preset.name || preset.name_ar}</td>
                 <td className="p-2">{parseFloat(preset.percent)}%</td>
+                <td className="p-2">{scopeLabel(preset.scope, t)}</td>
                 <td className="p-2">
                   {preset.audience === 'veterinarian'
                     ? t('invoiceSettings.discountAudienceVeterinarian')
@@ -229,6 +247,19 @@ export default function DiscountPresetsAdmin({ canEdit }) {
               onChange={(e) => setForm({ ...form, min_animal_count: e.target.value })}
             />
             <p className="text-xs text-gray-500 mt-1">{t('invoiceSettings.discountMinAnimalsHint')}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('invoiceSettings.discountScope')}</label>
+            <select
+              className="input-field w-full"
+              value={form.scope || 'tests'}
+              onChange={(e) => setForm({ ...form, scope: e.target.value })}
+            >
+              <option value="tests">{t('invoiceSettings.discountScopeTests')}</option>
+              <option value="packages">{t('invoiceSettings.discountScopePackages')}</option>
+              <option value="field_visit">{t('invoiceSettings.discountScopeFieldVisit')}</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{t('invoiceSettings.discountScopeHint')}</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('invoiceSettings.discountAudience')}</label>

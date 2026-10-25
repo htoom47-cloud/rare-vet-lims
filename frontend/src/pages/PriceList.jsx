@@ -29,8 +29,28 @@ const defaultValidUntil = () => {
   return d.toISOString().slice(0, 10);
 };
 
-const calcTotals = (items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue) => (
-  calcSplitTotals(items, serviceDiscountType, serviceDiscountValue, fvDiscountType, fvDiscountValue, VAT_RATE, { catalogPrices: true })
+const calcTotals = (
+  items,
+  testDiscountType,
+  testDiscountValue,
+  fvDiscountType,
+  fvDiscountValue,
+  packageDiscountType = DISCOUNT_TYPES.NONE,
+  packageDiscountValue = '',
+) => (
+  calcSplitTotals(
+    items,
+    testDiscountType,
+    testDiscountValue,
+    fvDiscountType,
+    fvDiscountValue,
+    VAT_RATE,
+    {
+      catalogPrices: true,
+      packageDiscountType,
+      packageDiscountValue,
+    },
+  )
 );
 
 const newLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -61,6 +81,8 @@ export default function PriceList() {
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [discountValue, setDiscountValue] = useState('');
+  const [packageDiscountType, setPackageDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [packageDiscountValue, setPackageDiscountValue] = useState('');
   const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
   const [notes, setNotes] = useState('');
@@ -72,6 +94,7 @@ export default function PriceList() {
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
   const [serviceDiscountPreset, setServiceDiscountPreset] = useState(null);
+  const [packageDiscountPreset, setPackageDiscountPreset] = useState(null);
   const [fieldVisitDiscountPreset, setFieldVisitDiscountPreset] = useState(null);
 
   const displayName = (item) => (i18n.language === 'ar' && item?.name_ar ? item.name_ar : item?.name);
@@ -139,8 +162,15 @@ export default function PriceList() {
 
   const lineSubtotals = useMemo(() => splitLineSubtotals(lineItems, { catalogPrices: true }), [lineItems]);
   const totals = useMemo(
-    () => calcTotals(lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue),
-    [lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
+    () => calcTotals(
+      lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
+      packageDiscountType, packageDiscountValue,
+    ),
+    [
+      lineItems, discountType, discountValue,
+      packageDiscountType, packageDiscountValue,
+      fieldVisitDiscountType, fieldVisitDiscountValue,
+    ],
   );
   const totalTests = filtered.length;
 
@@ -219,9 +249,12 @@ export default function PriceList() {
     setLineItems([]);
     setDiscountType(DISCOUNT_TYPES.NONE);
     setDiscountValue('');
+    setPackageDiscountType(DISCOUNT_TYPES.NONE);
+    setPackageDiscountValue('');
     setFieldVisitDiscountType(DISCOUNT_TYPES.NONE);
     setFieldVisitDiscountValue('');
     setServiceDiscountPreset(null);
+    setPackageDiscountPreset(null);
     setFieldVisitDiscountPreset(null);
     setNotes('');
     setValidUntil(defaultValidUntil());
@@ -254,7 +287,11 @@ export default function PriceList() {
     try {
       const discountFields = buildSplitDiscountPayload(
         lineItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
-        { catalogPrices: true },
+        {
+          catalogPrices: true,
+          packageType: packageDiscountType,
+          packageValue: packageDiscountValue,
+        },
       );
       const payload = {
         customer_id: customerId || null,
@@ -271,6 +308,7 @@ export default function PriceList() {
         })),
         ...discountFields,
         discount_preset_id: serviceDiscountPreset?.id || null,
+        package_discount_preset_id: packageDiscountPreset?.id || null,
         field_visit_discount_preset_id: fieldVisitDiscountPreset?.id || null,
         notes: notes.trim() || null,
         valid_until: validUntil || null,
@@ -521,17 +559,30 @@ export default function PriceList() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <DiscountField
-                subtotal={lineSubtotals.serviceSubtotal}
+                subtotal={lineSubtotals.testSubtotal}
                 type={discountType}
                 value={discountValue}
                 onTypeChange={setDiscountType}
                 onValueChange={setDiscountValue}
                 onPresetChange={setServiceDiscountPreset}
-                labelKey="billing.servicesDiscount"
+                labelKey="billing.testsDiscount"
                 animalCount={discountVolumeCount(lineItems)}
-                scope="services"
+                scope="tests"
+                allowOpen={hasPermission('billing.open_discount')}
+                payerKind={customerKind}
+              />
+              <DiscountField
+                subtotal={lineSubtotals.packageSubtotal}
+                type={packageDiscountType}
+                value={packageDiscountValue}
+                onTypeChange={setPackageDiscountType}
+                onValueChange={setPackageDiscountValue}
+                onPresetChange={setPackageDiscountPreset}
+                labelKey="billing.packagesDiscount"
+                animalCount={discountVolumeCount(lineItems)}
+                scope="packages"
                 allowOpen={hasPermission('billing.open_discount')}
                 payerKind={customerKind}
               />
@@ -563,7 +614,7 @@ export default function PriceList() {
 
             <div className="bg-primary-50 rounded-lg p-4 space-y-1 text-sm max-w-xs ms-auto">
               <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(totals.subtotal)}</span></div>
-              {(totals.discountAmount > 0 || totals.fieldVisitDiscountAmount > 0) && (
+              {(totals.discountAmount > 0 || totals.packageDiscountAmount > 0 || totals.fieldVisitDiscountAmount > 0) && (
                 <div className="flex justify-between font-medium">
                   <span>{t('priceList.totalBeforeDiscount')}</span>
                   <span>{fmtGross(totals.totalBeforeDiscount)}</span>
@@ -574,10 +625,21 @@ export default function PriceList() {
                   <span>
                     {serviceDiscountPreset
                       ? (i18n.language === 'ar' ? (serviceDiscountPreset.name_ar || serviceDiscountPreset.name) : (serviceDiscountPreset.name || serviceDiscountPreset.name_ar))
-                      : t('billing.discountOpen')}
+                      : t('billing.testsDiscount')}
                     {discountType === DISCOUNT_TYPES.PERCENT && discountValue ? ` (${discountValue}%)` : ''}
                   </span>
                   <span>- {fmtGross(totals.discountAmountGross)}</span>
+                </div>
+              )}
+              {totals.packageDiscountAmount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>
+                    {packageDiscountPreset
+                      ? (i18n.language === 'ar' ? (packageDiscountPreset.name_ar || packageDiscountPreset.name) : (packageDiscountPreset.name || packageDiscountPreset.name_ar))
+                      : t('billing.packagesDiscount')}
+                    {packageDiscountType === DISCOUNT_TYPES.PERCENT && packageDiscountValue ? ` (${packageDiscountValue}%)` : ''}
+                  </span>
+                  <span>- {fmtGross(totals.packageDiscountAmountGross)}</span>
                 </div>
               )}
               {totals.fieldVisitDiscountAmount > 0 && (
@@ -594,7 +656,7 @@ export default function PriceList() {
               <div className="flex justify-between"><span>{t('priceList.vat')}</span><span>{fmtNet(totals.taxAmount)}</span></div>
               <div className="flex justify-between font-bold text-base border-t pt-1 mt-1">
                 <span>
-                  {(totals.discountAmount > 0 || totals.fieldVisitDiscountAmount > 0)
+                  {(totals.discountAmount > 0 || totals.packageDiscountAmount > 0 || totals.fieldVisitDiscountAmount > 0)
                     ? t('priceList.totalAfterDiscount')
                     : t('priceList.grandTotal')}
                 </span>

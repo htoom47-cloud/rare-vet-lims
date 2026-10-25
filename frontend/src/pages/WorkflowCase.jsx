@@ -71,9 +71,12 @@ export default function WorkflowCase() {
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [discountValue, setDiscountValue] = useState('');
+  const [packageDiscountType, setPackageDiscountType] = useState(DISCOUNT_TYPES.NONE);
+  const [packageDiscountValue, setPackageDiscountValue] = useState('');
   const [fieldVisitDiscountType, setFieldVisitDiscountType] = useState(DISCOUNT_TYPES.NONE);
   const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
   const [serviceDiscountPreset, setServiceDiscountPreset] = useState(null);
+  const [packageDiscountPreset, setPackageDiscountPreset] = useState(null);
   const [fieldVisitDiscountPreset, setFieldVisitDiscountPreset] = useState(null);
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -250,9 +253,17 @@ export default function WorkflowCase() {
       fieldVisitDiscountType,
       fieldVisitDiscountValue,
       VAT_RATE,
-      { catalogPrices: true },
+      {
+        catalogPrices: true,
+        packageDiscountType,
+        packageDiscountValue,
+      },
     ),
-    [workflowInvoiceItems, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue],
+    [
+      workflowInvoiceItems, discountType, discountValue,
+      packageDiscountType, packageDiscountValue,
+      fieldVisitDiscountType, fieldVisitDiscountValue,
+    ],
   );
 
   const invoiceTotal = () => invoiceTotalsPreview.total;
@@ -344,7 +355,11 @@ export default function WorkflowCase() {
 
       const discountFields = buildSplitDiscountPayload(
         items, discountType, discountValue, fieldVisitDiscountType, fieldVisitDiscountValue,
-        { catalogPrices: true },
+        {
+          catalogPrices: true,
+          packageType: packageDiscountType,
+          packageValue: packageDiscountValue,
+        },
       );
       const billToVet = features.vetSupervisedSamples && supervisingVetId;
       const { data } = await billingAPI.createInvoice({
@@ -354,6 +369,7 @@ export default function WorkflowCase() {
         items,
         ...discountFields,
         discount_preset_id: serviceDiscountPreset?.id || null,
+        package_discount_preset_id: packageDiscountPreset?.id || null,
         field_visit_discount_preset_id: fieldVisitDiscountPreset?.id || null,
       });
       setInvoiceId(data.data.id);
@@ -775,17 +791,30 @@ export default function WorkflowCase() {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-lg border border-primary-100 bg-white dark:bg-primary-900/10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 rounded-lg border border-primary-100 bg-white dark:bg-primary-900/10">
                   <DiscountField
-                    subtotal={invoiceTotalsPreview.serviceSubtotal}
+                    subtotal={invoiceTotalsPreview.testSubtotal}
                     type={discountType}
                     value={discountValue}
                     onTypeChange={setDiscountType}
                     onValueChange={setDiscountValue}
-                    labelKey="billing.servicesDiscount"
+                    labelKey="billing.testsDiscount"
                     animalCount={discountVolumeCount(workflowInvoiceItems, selectedAnimalIds.length)}
                     onPresetChange={setServiceDiscountPreset}
-                    scope="services"
+                    scope="tests"
+                    allowOpen={hasPermission('billing.open_discount')}
+                    payerKind={billPayerKind}
+                  />
+                  <DiscountField
+                    subtotal={invoiceTotalsPreview.packageSubtotal}
+                    type={packageDiscountType}
+                    value={packageDiscountValue}
+                    onTypeChange={setPackageDiscountType}
+                    onValueChange={setPackageDiscountValue}
+                    labelKey="billing.packagesDiscount"
+                    animalCount={discountVolumeCount(workflowInvoiceItems, selectedAnimalIds.length)}
+                    onPresetChange={setPackageDiscountPreset}
+                    scope="packages"
                     allowOpen={hasPermission('billing.open_discount')}
                     payerKind={billPayerKind}
                   />
@@ -807,7 +836,12 @@ export default function WorkflowCase() {
                   <div className="flex justify-between"><span>{t('priceList.subtotal')}</span><span>{fmtNet(invoiceTotalsPreview.subtotal)}</span></div>
                   {invoiceTotalsPreview.discountAmount > 0 && (
                     <div className="flex justify-between text-red-600">
-                      <span>{t('priceList.servicesDiscount')}</span><span>- {fmtNet(invoiceTotalsPreview.discountAmount)}</span>
+                      <span>{t('billing.testsDiscount')}</span><span>- {fmtNet(invoiceTotalsPreview.discountAmount)}</span>
+                    </div>
+                  )}
+                  {invoiceTotalsPreview.packageDiscountAmount > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>{t('billing.packagesDiscount')}</span><span>- {fmtNet(invoiceTotalsPreview.packageDiscountAmount)}</span>
                     </div>
                   )}
                   {invoiceTotalsPreview.fieldVisitDiscountAmount > 0 && (

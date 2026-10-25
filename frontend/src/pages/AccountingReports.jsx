@@ -220,6 +220,7 @@ export default function AccountingReports() {
     return {
       subtotal: parseFloat(selectedInvoice.subtotal) || 0,
       discountAmount: parseFloat(selectedInvoice.discount_amount) || 0,
+      packageDiscountAmount: parseFloat(selectedInvoice.package_discount_amount) || 0,
       fieldVisitDiscountAmount: parseFloat(selectedInvoice.field_visit_discount_amount) || 0,
       taxAmount: parseFloat(selectedInvoice.tax_amount) || 0,
       total,
@@ -871,7 +872,12 @@ export default function AccountingReports() {
               <div className="flex justify-between"><span>{t('billing.subtotal')}</span><span>{fmt(paymentPreview.subtotal)}</span></div>
               {paymentPreview.discountAmount > 0 && (
                 <div className="flex justify-between text-red-600">
-                  <span>{t('billing.servicesDiscount')}</span><span>- {fmt(paymentPreview.discountAmount)}</span>
+                  <span>{t('billing.testsDiscount')}</span><span>- {fmt(paymentPreview.discountAmount)}</span>
+                </div>
+              )}
+              {paymentPreview.packageDiscountAmount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>{t('billing.packagesDiscount')}</span><span>- {fmt(paymentPreview.packageDiscountAmount)}</span>
                 </div>
               )}
               {paymentPreview.fieldVisitDiscountAmount > 0 && (

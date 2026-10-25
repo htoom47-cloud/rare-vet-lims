@@ -893,6 +893,41 @@ async function applyPatches() {
       END $$
     `);
 
+    // Package vs individual-test discounts (field visit remains separate).
+    await client.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS package_discount_amount DECIMAL(12,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS package_discount_percent DECIMAL(5,2) DEFAULT 0
+    `);
+    await client.query(`
+      ALTER TABLE price_quotes
+        ADD COLUMN IF NOT EXISTS package_discount_amount DECIMAL(12,2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS package_discount_percent DECIMAL(5,2) DEFAULT 0
+    `);
+    await client.query(`
+      ALTER TABLE discount_presets
+        ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'tests'
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE discount_presets
+          ADD CONSTRAINT discount_presets_scope_check
+          CHECK (scope IN ('tests', 'packages', 'field_visit'));
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `);
+    // One-time: visit-named presets → field_visit; everything else stays tests (DEFAULT).
+    await client.query(`
+      UPDATE discount_presets
+      SET scope = 'field_visit', updated_at = NOW()
+      WHERE scope = 'tests'
+        AND (
+          code ~* '(visit|field.?visit|free.?visit)'
+          OR name ~* '(visit|field.?visit|free.?visit|زيار)'
+          OR name_ar ~* '(زيار|زيارة)'
+        )
+    `);
+
     await client.query(`
       INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order)
       VALUES

@@ -266,11 +266,18 @@ const createInvoice = async (data, userId, options = {}) => {
 
     const invoiceId = uuidv4();
     const invoiceResult = await client.query(
-      `INSERT INTO invoices (id, invoice_number, customer_id, sample_id, subtotal, discount_amount, discount_percent, field_visit_discount_amount, field_visit_discount_percent, tax_rate, tax_amount, total, status, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'issued',$13,$14) RETURNING *`,
+      `INSERT INTO invoices (
+         id, invoice_number, customer_id, sample_id, subtotal,
+         discount_amount, discount_percent,
+         package_discount_amount, package_discount_percent,
+         field_visit_discount_amount, field_visit_discount_percent,
+         tax_rate, tax_amount, total, status, notes, created_by
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'issued',$15,$16) RETURNING *`,
       [
         invoiceId, invoiceNumber, customerId, data.sample_id,
         totals.subtotal, totals.discount_amount, totals.discount_percent,
+        totals.package_discount_amount, totals.package_discount_percent,
         totals.field_visit_discount_amount, totals.field_visit_discount_percent,
         totals.taxRate, totals.taxAmount, totals.total, notes || null, userId,
       ]

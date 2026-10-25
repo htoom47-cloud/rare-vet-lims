@@ -15,17 +15,37 @@ const isFieldVisitItem = (item) => {
   return /field visit|زيارة ميدانية/i.test(d);
 };
 
-/** Named discount that applies to field visit only (not lab tests). */
+const isPackageItem = (item) => Boolean(item?.package_id) && !isFieldVisitItem(item);
+
+/** Named discount that applies to field visit only (legacy name heuristic). */
 const isFieldVisitDiscountPreset = (preset) => {
   const s = `${preset?.code || ''} ${preset?.name || ''} ${preset?.name_ar || ''}`;
   return /زيار|visit|field[_\s-]?visit|free[_\s-]?visit/i.test(s);
 };
 
-const filterPresetsByScope = (presets = [], scope = 'services') => {
+const DISCOUNT_SCOPE_TESTS = 'tests';
+const DISCOUNT_SCOPE_PACKAGES = 'packages';
+const DISCOUNT_SCOPE_FIELD_VISIT = 'field_visit';
+
+const normalizeDiscountScope = (scope) => {
+  const value = String(scope || DISCOUNT_SCOPE_TESTS).trim().toLowerCase();
+  if (value === 'services') return DISCOUNT_SCOPE_TESTS; // legacy alias
+  if (value === DISCOUNT_SCOPE_PACKAGES) return DISCOUNT_SCOPE_PACKAGES;
+  if (value === DISCOUNT_SCOPE_FIELD_VISIT) return DISCOUNT_SCOPE_FIELD_VISIT;
+  return DISCOUNT_SCOPE_TESTS;
+};
+
+/** Resolve preset scope from DB column, with name fallback for field visit. */
+const resolvePresetScope = (preset) => {
+  if (preset?.scope) return normalizeDiscountScope(preset.scope);
+  if (isFieldVisitDiscountPreset(preset)) return DISCOUNT_SCOPE_FIELD_VISIT;
+  return DISCOUNT_SCOPE_TESTS;
+};
+
+const filterPresetsByScope = (presets = [], scope = DISCOUNT_SCOPE_TESTS) => {
   const list = Array.isArray(presets) ? presets : [];
-  if (scope === 'field_visit') return list.filter(isFieldVisitDiscountPreset);
-  if (scope === 'services') return list.filter((p) => !isFieldVisitDiscountPreset(p));
-  return list;
+  const wanted = normalizeDiscountScope(scope);
+  return list.filter((p) => resolvePresetScope(p) === wanted);
 };
 
 const DISCOUNT_AUDIENCE_CUSTOMER = 'customer';
@@ -98,14 +118,19 @@ const grossFromNet = (net, taxRate = 15) => {
 };
 
 const splitCatalogSubtotals = (items = []) => {
-  let serviceSubtotal = 0;
+  let packageSubtotal = 0;
+  let testSubtotal = 0;
   let fieldVisitSubtotal = 0;
   for (const item of items) {
     const line = lineNetAmount(item);
     if (isFieldVisitItem(item)) fieldVisitSubtotal += line;
-    else serviceSubtotal += line;
+    else if (isPackageItem(item)) packageSubtotal += line;
+    else testSubtotal += line;
   }
+  const serviceSubtotal = packageSubtotal + testSubtotal;
   return {
+    packageSubtotal,
+    testSubtotal,
     serviceSubtotal,
     fieldVisitSubtotal,
     subtotal: serviceSubtotal + fieldVisitSubtotal,
@@ -151,19 +176,32 @@ const resolveVatInclusiveTotal = (items, taxableRaw, taxRate) => {
   return snapHalalaDrift(candidate);
 };
 
-/** Compute quote/invoice totals with separate service and field-visit discounts. */
+/** Compute quote/invoice totals with separate package, test, and field-visit discounts. */
 const calcDocumentTotals = (items, data = {}) => {
   const list = items || [];
-  const { serviceSubtotal, fieldVisitSubtotal, subtotal: subtotalRaw } = splitCatalogSubtotals(list);
-  const discount_amount = resolveDiscount(serviceSubtotal, data);
+  const {
+    packageSubtotal,
+    testSubtotal,
+    serviceSubtotal,
+    fieldVisitSubtotal,
+    subtotal: subtotalRaw,
+  } = splitCatalogSubtotals(list);
+  // discount_* applies to individual tests only; package_discount_* to packages.
+  const discount_amount = resolveDiscount(testSubtotal, data);
+  const package_discount_amount = resolveDiscount(packageSubtotal, {
+    discount_amount: data.package_discount_amount,
+    discount_percent: data.package_discount_percent,
+  });
   const field_visit_discount_amount = resolveDiscount(fieldVisitSubtotal, {
     discount_amount: data.field_visit_discount_amount,
     discount_percent: data.field_visit_discount_percent,
   });
   const discount_percent = parseFloat(data.discount_percent) || 0;
+  const package_discount_percent = parseFloat(data.package_discount_percent) || 0;
   const field_visit_discount_percent = parseFloat(data.field_visit_discount_percent) || 0;
   const taxRate = parseFloat(data.tax_rate) || 15;
-  const taxableRaw = Math.max(0, serviceSubtotal - discount_amount)
+  const taxableRaw = Math.max(0, testSubtotal - discount_amount)
+    + Math.max(0, packageSubtotal - package_discount_amount)
     + Math.max(0, fieldVisitSubtotal - field_visit_discount_amount);
   const subtotal = roundMoney(subtotalRaw);
   const total = resolveVatInclusiveTotal(list, taxableRaw, taxRate);
@@ -171,11 +209,18 @@ const calcDocumentTotals = (items, data = {}) => {
   const taxAmount = roundMoney(total - roundMoney(taxableRaw));
   return {
     subtotal,
+    packageSubtotal: roundMoney(packageSubtotal),
+    testSubtotal: roundMoney(testSubtotal),
+    serviceSubtotal: roundMoney(serviceSubtotal),
+    fieldVisitSubtotal: roundMoney(fieldVisitSubtotal),
     discount_amount,
     discount_percent,
+    package_discount_amount,
+    package_discount_percent,
     field_visit_discount_amount,
     field_visit_discount_percent,
     discount_amount_gross: grossFromNet(discount_amount, taxRate),
+    package_discount_amount_gross: grossFromNet(package_discount_amount, taxRate),
     field_visit_discount_amount_gross: grossFromNet(field_visit_discount_amount, taxRate),
     taxRate,
     taxAmount,
@@ -187,7 +232,13 @@ const calcDocumentTotals = (items, data = {}) => {
 module.exports = {
   resolveDiscount,
   isFieldVisitItem,
+  isPackageItem,
   isFieldVisitDiscountPreset,
+  DISCOUNT_SCOPE_TESTS,
+  DISCOUNT_SCOPE_PACKAGES,
+  DISCOUNT_SCOPE_FIELD_VISIT,
+  normalizeDiscountScope,
+  resolvePresetScope,
   filterPresetsByScope,
   DISCOUNT_AUDIENCE_CUSTOMER,
   DISCOUNT_AUDIENCE_VETERINARIAN,

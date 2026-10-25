@@ -221,7 +221,13 @@ const generateThermalInvoicePDF = async (invoice, outputDir, options = {}) => {
 
     totalRow('المجموع بدون ضريبة', fmtMoney(invoice.subtotal));
     if (parseFloat(invoice.discount_amount) > 0) {
-      totalRow('الخصم', `- ${fmtMoney(invoice.discount_amount)}`);
+      totalRow('خصم الفحوصات', `- ${fmtMoney(invoice.discount_amount)}`);
+    }
+    if (parseFloat(invoice.package_discount_amount) > 0) {
+      totalRow('خصم الباقات', `- ${fmtMoney(invoice.package_discount_amount)}`);
+    }
+    if (parseFloat(invoice.field_visit_discount_amount) > 0) {
+      totalRow('خصم الزيارة', `- ${fmtMoney(invoice.field_visit_discount_amount)}`);
     }
     totalRow('الضريبة', fmtMoney(invoice.tax_amount));
     totalRow('الإجمالي', fmtMoney(invoice.total), true);

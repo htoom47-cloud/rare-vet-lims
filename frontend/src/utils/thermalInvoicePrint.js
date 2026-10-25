@@ -96,6 +96,7 @@ export function buildThermalInvoiceHtml(invoice, labInput, {
       : Math.max(Number(invoice.total || 0) - paid, 0)
   );
   const discount = Number(invoice.discount_amount || 0)
+    + Number(invoice.package_discount_amount || 0)
     + Number(invoice.field_visit_discount_amount || 0);
   const lastPayment = (invoice.payments || []).slice(-1)[0];
   const methodLabel = paymentMethodLabel

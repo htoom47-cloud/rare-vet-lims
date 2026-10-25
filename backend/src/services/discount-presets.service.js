@@ -8,14 +8,29 @@ const {
   filterPresetsByScope,
   filterPresetsByAudience,
   normalizeDiscountAudience,
+  normalizeDiscountScope,
   normalizePayerKind,
   DISCOUNT_AUDIENCE_CUSTOMER,
   DISCOUNT_AUDIENCE_VETERINARIAN,
+  DISCOUNT_SCOPE_TESTS,
+  DISCOUNT_SCOPE_PACKAGES,
+  DISCOUNT_SCOPE_FIELD_VISIT,
 } = require('../utils/discount');
 
 const isPresetAllowed = (preset, animalCount) => {
   const min = parseInt(preset?.min_animal_count, 10) || 0;
   return min <= 0 || Number(animalCount) > min;
+};
+
+const scopeErrorMessage = (scope) => {
+  const s = normalizeDiscountScope(scope);
+  if (s === DISCOUNT_SCOPE_FIELD_VISIT) {
+    return 'خصم الزيارة يُختار من قائمة خصم الزيارة الميدانية فقط';
+  }
+  if (s === DISCOUNT_SCOPE_PACKAGES) {
+    return 'خصم الباقات يُختار من قائمة خصم الباقات فقط';
+  }
+  return 'خصم الفحوصات يُختار من قائمة خصم الفحوصات الفردية فقط';
 };
 
 const list = async ({ includeInactive } = {}) => {
@@ -32,7 +47,7 @@ const getById = async (id) => {
   return result.rows[0];
 };
 
-const findActiveByPercent = async (percent, scope = 'services', payerKind = DISCOUNT_AUDIENCE_CUSTOMER) => {
+const findActiveByPercent = async (percent, scope = DISCOUNT_SCOPE_TESTS, payerKind = DISCOUNT_AUDIENCE_CUSTOMER) => {
   const pct = parseFloat(percent);
   if (!(pct > 0)) return null;
   const result = await query(
@@ -92,11 +107,12 @@ const create = async (data) => {
   const minAnimalCount = Math.max(0, parseInt(data.min_animal_count, 10) || 0);
   const sortOrder = parseInt(data.sort_order, 10) || 0;
   const audience = normalizeDiscountAudience(data.audience);
+  const scope = normalizeDiscountScope(data.scope);
   try {
     const result = await query(
-      `INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order, audience)
-       VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8) RETURNING *`,
-      [uuidv4(), code || uuidv4().slice(0, 8), name || nameAr, nameAr || name, percent, minAnimalCount, sortOrder, audience]
+      `INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order, audience, scope)
+       VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9) RETURNING *`,
+      [uuidv4(), code || uuidv4().slice(0, 8), name || nameAr, nameAr || name, percent, minAnimalCount, sortOrder, audience, scope]
     );
     return result.rows[0];
   } catch (err) {
@@ -118,12 +134,13 @@ const update = async (id, data) => {
   const sortOrder = parseInt(data.sort_order, 10) || 0;
   const isActive = data.is_active !== false;
   const audience = normalizeDiscountAudience(data.audience);
+  const scope = normalizeDiscountScope(data.scope);
   const result = await query(
     `UPDATE discount_presets
      SET name = $1, name_ar = $2, percent = $3, min_animal_count = $4,
-         is_active = $5, sort_order = $6, audience = $7, updated_at = NOW()
-     WHERE id = $8 RETURNING *`,
-    [name || nameAr, nameAr || name, percent, minAnimalCount, isActive, sortOrder, audience, id]
+         is_active = $5, sort_order = $6, audience = $7, scope = $8, updated_at = NOW()
+     WHERE id = $9 RETURNING *`,
+    [name || nameAr, nameAr || name, percent, minAnimalCount, isActive, sortOrder, audience, scope, id]
   );
   return result.rows[0];
 };
@@ -161,13 +178,7 @@ const resolvePresetForDocument = async (data, {
     throw new AppError('اختر خصماً من القائمة المعتمدة من مدير النظام', 400, 'DISCOUNT_PRESET_REQUIRED');
   }
   if (filterPresetsByScope([preset], scope).length === 0) {
-    throw new AppError(
-      scope === 'field_visit'
-        ? 'خصم الزيارة يُختار من قائمة خصم الزيارة الميدانية فقط'
-        : 'خصم الزيارة الميدانية لا يُستخدم على فحوصات المختبر',
-      400,
-      'DISCOUNT_SCOPE'
-    );
+    throw new AppError(scopeErrorMessage(scope), 400, 'DISCOUNT_SCOPE');
   }
   if (filterPresetsByAudience([preset], payerKind).length === 0) {
     throw new AppError(
@@ -189,12 +200,21 @@ const resolvePresetForDocument = async (data, {
 const applyToDocumentData = async (data, { allowOpenDiscount = false } = {}) => {
   const animalCount = discountVolumeCount(data.items);
   const payerKind = await resolvePayerKindForDocument(data);
-  const service = await resolvePresetForDocument(data, {
+  const tests = await resolvePresetForDocument(data, {
     presetId: data.discount_preset_id,
     percent: data.discount_percent,
     amount: data.discount_amount,
     animalCount,
-    scope: 'services',
+    scope: DISCOUNT_SCOPE_TESTS,
+    allowOpenDiscount,
+    payerKind,
+  });
+  const packages = await resolvePresetForDocument(data, {
+    presetId: data.package_discount_preset_id,
+    percent: data.package_discount_percent,
+    amount: data.package_discount_amount,
+    animalCount,
+    scope: DISCOUNT_SCOPE_PACKAGES,
     allowOpenDiscount,
     payerKind,
   });
@@ -203,19 +223,23 @@ const applyToDocumentData = async (data, { allowOpenDiscount = false } = {}) => 
     percent: data.field_visit_discount_percent,
     amount: data.field_visit_discount_amount,
     animalCount,
-    scope: 'field_visit',
+    scope: DISCOUNT_SCOPE_FIELD_VISIT,
     allowOpenDiscount,
     payerKind,
   });
   return {
     ...data,
-    discount_percent: service.percent,
-    discount_amount: service.amount,
-    discount_preset_id: service.preset?.id || null,
+    discount_percent: tests.percent,
+    discount_amount: tests.amount,
+    discount_preset_id: tests.preset?.id || null,
+    package_discount_percent: packages.percent,
+    package_discount_amount: packages.amount,
+    package_discount_preset_id: packages.preset?.id || null,
     field_visit_discount_percent: fieldVisit.percent,
     field_visit_discount_amount: fieldVisit.amount,
     field_visit_discount_preset_id: fieldVisit.preset?.id || null,
-    discount_preset: service.preset || null,
+    discount_preset: tests.preset || null,
+    package_discount_preset: packages.preset || null,
     field_visit_discount_preset: fieldVisit.preset || null,
     payer_kind: payerKind,
   };
@@ -227,24 +251,33 @@ const labelsFromPreset = (preset, fallbackAr, fallbackEn) => ({
 });
 
 const resolveQuoteDiscountLabels = async (quote, ids = {}) => {
-  const servicePct = parseFloat(quote.discount_percent) || 0;
+  const testPct = parseFloat(quote.discount_percent) || 0;
+  const pkgPct = parseFloat(quote.package_discount_percent) || 0;
   const fvPct = parseFloat(quote.field_visit_discount_percent) || 0;
-  const servicePreset = (await findByIdSafe(ids.discount_preset_id || quote.discount_preset_id))
-    || (servicePct > 0 ? await findActiveByPercent(servicePct, 'services') : null);
+  const testPreset = (await findByIdSafe(ids.discount_preset_id || quote.discount_preset_id))
+    || (testPct > 0 ? await findActiveByPercent(testPct, DISCOUNT_SCOPE_TESTS) : null);
+  const pkgPreset = (await findByIdSafe(ids.package_discount_preset_id || quote.package_discount_preset_id))
+    || (pkgPct > 0 ? await findActiveByPercent(pkgPct, DISCOUNT_SCOPE_PACKAGES) : null);
   const fvPreset = (await findByIdSafe(ids.field_visit_discount_preset_id || quote.field_visit_discount_preset_id))
-    || (fvPct > 0 ? await findActiveByPercent(fvPct, 'field_visit') : null);
-  const serviceFallback = servicePct > 0
+    || (fvPct > 0 ? await findActiveByPercent(fvPct, DISCOUNT_SCOPE_FIELD_VISIT) : null);
+  const testFallback = testPct > 0
     ? { ar: 'خصم مفتوح', en: 'Open discount' }
-    : { ar: 'خصم الخدمات', en: 'Services discount' };
+    : { ar: 'خصم الفحوصات', en: 'Tests discount' };
+  const pkgFallback = pkgPct > 0
+    ? { ar: 'خصم مفتوح', en: 'Open discount' }
+    : { ar: 'خصم الباقات', en: 'Packages discount' };
   const fvFallback = fvPct > 0
     ? { ar: 'خصم مفتوح', en: 'Open discount' }
     : { ar: 'خصم الزيارة الميدانية', en: 'Field visit discount' };
-  const service = labelsFromPreset(servicePreset, serviceFallback.ar, serviceFallback.en);
+  const tests = labelsFromPreset(testPreset, testFallback.ar, testFallback.en);
+  const packages = labelsFromPreset(pkgPreset, pkgFallback.ar, pkgFallback.en);
   const fv = labelsFromPreset(fvPreset, fvFallback.ar, fvFallback.en);
   return {
     ...quote,
-    discount_name_ar: service.ar,
-    discount_name_en: service.en,
+    discount_name_ar: tests.ar,
+    discount_name_en: tests.en,
+    package_discount_name_ar: packages.ar,
+    package_discount_name_en: packages.en,
     field_visit_discount_name_ar: fv.ar,
     field_visit_discount_name_en: fv.en,
   };
@@ -267,4 +300,7 @@ module.exports = {
   applyToDocumentData,
   DISCOUNT_AUDIENCE_CUSTOMER,
   DISCOUNT_AUDIENCE_VETERINARIAN,
+  DISCOUNT_SCOPE_TESTS,
+  DISCOUNT_SCOPE_PACKAGES,
+  DISCOUNT_SCOPE_FIELD_VISIT,
 };

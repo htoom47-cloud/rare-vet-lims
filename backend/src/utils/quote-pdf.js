@@ -198,29 +198,41 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
       tax_rate: taxRate,
       discount_percent: quote.discount_percent,
       discount_amount: quote.discount_amount,
+      package_discount_percent: quote.package_discount_percent,
+      package_discount_amount: quote.package_discount_amount,
       field_visit_discount_percent: quote.field_visit_discount_percent,
       field_visit_discount_amount: quote.field_visit_discount_amount,
     });
     const totalBefore = computed.total_before_discount;
     const totalAfter = parseFloat(quote.total) || computed.total;
-    const hasServiceDisc = parseFloat(quote.discount_amount) > 0;
+    const hasTestDisc = parseFloat(quote.discount_amount) > 0;
+    const hasPkgDisc = parseFloat(quote.package_discount_amount) > 0;
     const hasFvDisc = parseFloat(quote.field_visit_discount_amount) > 0;
-    const servicePct = parseFloat(quote.discount_percent) || 0;
+    const hasAnyDisc = hasTestDisc || hasPkgDisc || hasFvDisc;
+    const testPct = parseFloat(quote.discount_percent) || 0;
+    const pkgPct = parseFloat(quote.package_discount_percent) || 0;
     const fvPct = parseFloat(quote.field_visit_discount_percent) || 0;
-    const serviceNameAr = quote.discount_name_ar || 'خصم الخدمات';
-    const serviceNameEn = quote.discount_name_en || 'Services discount';
+    const testNameAr = quote.discount_name_ar || 'خصم الفحوصات';
+    const testNameEn = quote.discount_name_en || 'Tests discount';
+    const pkgNameAr = quote.package_discount_name_ar || 'خصم الباقات';
+    const pkgNameEn = quote.package_discount_name_en || 'Packages discount';
     const fvNameAr = quote.field_visit_discount_name_ar || 'خصم الزيارة الميدانية';
     const fvNameEn = quote.field_visit_discount_name_en || 'Field visit discount';
-    const serviceLabelAr = servicePct > 0 ? `${serviceNameAr} (${servicePct}%)` : serviceNameAr;
-    const serviceLabelEn = servicePct > 0 ? `${serviceNameEn} (${servicePct}%)` : serviceNameEn;
+    const testLabelAr = testPct > 0 ? `${testNameAr} (${testPct}%)` : testNameAr;
+    const testLabelEn = testPct > 0 ? `${testNameEn} (${testPct}%)` : testNameEn;
+    const pkgLabelAr = pkgPct > 0 ? `${pkgNameAr} (${pkgPct}%)` : pkgNameAr;
+    const pkgLabelEn = pkgPct > 0 ? `${pkgNameEn} (${pkgPct}%)` : pkgNameEn;
     const fvLabelAr = fvPct > 0 ? `${fvNameAr} (${fvPct}%)` : fvNameAr;
     const fvLabelEn = fvPct > 0 ? `${fvNameEn} (${fvPct}%)` : fvNameEn;
 
     totalLine('Subtotal excl. VAT', 'المجموع (بدون ضريبة)', fmtMoney(quote.subtotal));
-    if (hasServiceDisc || hasFvDisc) {
+    if (hasAnyDisc) {
       totalLine('Total incl. VAT before discount', 'الإجمالي شامل الضريبة قبل الخصم', fmtMoney(totalBefore), true);
-      if (hasServiceDisc) {
-        totalLine(serviceLabelEn, serviceLabelAr, `- ${fmtMoney(computed.discount_amount_gross || grossFromNet(quote.discount_amount, taxRate))}`);
+      if (hasTestDisc) {
+        totalLine(testLabelEn, testLabelAr, `- ${fmtMoney(computed.discount_amount_gross || grossFromNet(quote.discount_amount, taxRate))}`);
+      }
+      if (hasPkgDisc) {
+        totalLine(pkgLabelEn, pkgLabelAr, `- ${fmtMoney(computed.package_discount_amount_gross || grossFromNet(quote.package_discount_amount, taxRate))}`);
       }
       if (hasFvDisc) {
         totalLine(fvLabelEn, fvLabelAr, `- ${fmtMoney(computed.field_visit_discount_amount_gross || grossFromNet(quote.field_visit_discount_amount, taxRate))}`);
@@ -228,8 +240,8 @@ const generateQuotePDF = async (quote, outputDir, options = {}) => {
     }
     totalLine(`VAT ${taxRate}%`, `ضريبة القيمة المضافة ${taxRate}%`, fmtMoney(quote.tax_amount));
     totalLine(
-      hasServiceDisc || hasFvDisc ? 'Total incl. VAT after discount' : 'Total incl. VAT',
-      hasServiceDisc || hasFvDisc ? 'الإجمالي شامل الضريبة بعد الخصم' : 'الإجمالي شامل الضريبة',
+      hasAnyDisc ? 'Total incl. VAT after discount' : 'Total incl. VAT',
+      hasAnyDisc ? 'الإجمالي شامل الضريبة بعد الخصم' : 'الإجمالي شامل الضريبة',
       fmtMoney(totalAfter),
       true,
     );
