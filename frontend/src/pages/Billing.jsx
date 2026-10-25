@@ -82,6 +82,7 @@ export default function Billing() {
   const [fieldVisitDiscountValue, setFieldVisitDiscountValue] = useState('');
   const [serviceDiscountPreset, setServiceDiscountPreset] = useState(null);
   const [fieldVisitDiscountPreset, setFieldVisitDiscountPreset] = useState(null);
+  const [invoicePayerKind, setInvoicePayerKind] = useState('customer');
   const [paymentForm, setPaymentForm] = useState({
     reference_number: '', notes: '',
   });
@@ -274,6 +275,7 @@ export default function Billing() {
       toast.success('تم إنشاء الفاتورة');
       setInvoiceModal(false);
       setInvoiceForm({ customer_id: '', sample_id: '', notes: '', items: [] });
+      setInvoicePayerKind('customer');
       setSelectedPackageId('');
       setPackageQuantity(1);
       setNewItem({ test_id: '', description: '', quantity: 1, unit_price: 0 });
@@ -713,7 +715,10 @@ export default function Billing() {
               <label className="block text-sm font-medium mb-1">{t('customers.fullName')}</label>
               <CustomerSearch
                 value={invoiceForm.customer_id}
-                onChange={(id) => setInvoiceForm({ ...invoiceForm, customer_id: id })}
+                onChange={(id, customer) => {
+                  setInvoiceForm({ ...invoiceForm, customer_id: id });
+                  setInvoicePayerKind(customer?.kind === 'veterinarian' ? 'veterinarian' : 'customer');
+                }}
               />
             </div>
           </div>
@@ -729,6 +734,7 @@ export default function Billing() {
               onPresetChange={setServiceDiscountPreset}
               scope="services"
               allowOpen={hasPermission('billing.open_discount')}
+              payerKind={invoicePayerKind}
             />
             <DiscountField
               subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -741,6 +747,7 @@ export default function Billing() {
               onPresetChange={setFieldVisitDiscountPreset}
               scope="field_visit"
               allowOpen={hasPermission('billing.open_discount')}
+              payerKind={invoicePayerKind}
             />
           </div>
 

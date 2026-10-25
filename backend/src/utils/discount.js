@@ -28,6 +28,37 @@ const filterPresetsByScope = (presets = [], scope = 'services') => {
   return list;
 };
 
+const DISCOUNT_AUDIENCE_CUSTOMER = 'customer';
+const DISCOUNT_AUDIENCE_VETERINARIAN = 'veterinarian';
+
+const normalizeDiscountAudience = (audience) => {
+  const value = String(audience || DISCOUNT_AUDIENCE_CUSTOMER).trim().toLowerCase();
+  return value === DISCOUNT_AUDIENCE_VETERINARIAN
+    ? DISCOUNT_AUDIENCE_VETERINARIAN
+    : DISCOUNT_AUDIENCE_CUSTOMER;
+};
+
+const normalizePayerKind = (kind) => {
+  const value = String(kind || DISCOUNT_AUDIENCE_CUSTOMER).trim().toLowerCase();
+  return value === DISCOUNT_AUDIENCE_VETERINARIAN
+    ? DISCOUNT_AUDIENCE_VETERINARIAN
+    : DISCOUNT_AUDIENCE_CUSTOMER;
+};
+
+/** Vets see customer + veterinarian presets; regular customers see customer-only. */
+const filterPresetsByAudience = (presets = [], payerKind = DISCOUNT_AUDIENCE_CUSTOMER) => {
+  const list = Array.isArray(presets) ? presets : [];
+  const kind = normalizePayerKind(payerKind);
+  if (kind === DISCOUNT_AUDIENCE_VETERINARIAN) return list;
+  return list.filter(
+    (p) => normalizeDiscountAudience(p?.audience) !== DISCOUNT_AUDIENCE_VETERINARIAN
+  );
+};
+
+const isPresetAllowedForPayer = (preset, payerKind = DISCOUNT_AUDIENCE_CUSTOMER) => (
+  filterPresetsByAudience([preset], payerKind).length > 0
+);
+
 const lineNetAmount = (item) => {
   const qty = parseInt(item.quantity, 10) || 1;
   if (item.total_price != null && item.total_price !== '') {
@@ -158,6 +189,12 @@ module.exports = {
   isFieldVisitItem,
   isFieldVisitDiscountPreset,
   filterPresetsByScope,
+  DISCOUNT_AUDIENCE_CUSTOMER,
+  DISCOUNT_AUDIENCE_VETERINARIAN,
+  normalizeDiscountAudience,
+  normalizePayerKind,
+  filterPresetsByAudience,
+  isPresetAllowedForPayer,
   splitCatalogSubtotals,
   calcDocumentTotals,
   countDistinctAnimals,

@@ -61,6 +61,7 @@ export default function WorkflowCase() {
   const [packages, setPackages] = useState([]);
 
   const [customerId, setCustomerId] = useState(prefillCustomer || '');
+  const [customerKind, setCustomerKind] = useState('customer');
   const [supervisingVetId, setSupervisingVetId] = useState('');
   const [selectedAnimalIds, setSelectedAnimalIds] = useState([]);
   const [animalTests, setAnimalTests] = useState({});
@@ -102,11 +103,17 @@ export default function WorkflowCase() {
   useEffect(() => {
     if (customerId) {
       animalsAPI.listByOwner(customerId).then(setAnimals).catch(() => setAnimals([]));
+      customersAPI.get(customerId)
+        .then(({ data }) => {
+          setCustomerKind(data?.data?.kind === 'veterinarian' ? 'veterinarian' : 'customer');
+        })
+        .catch(() => setCustomerKind('customer'));
     } else {
       setAnimals([]);
       setSelectedAnimalIds([]);
       setAnimalTests({});
       setAnimalPackages({});
+      setCustomerKind('customer');
     }
   }, [customerId]);
 
@@ -482,9 +489,15 @@ export default function WorkflowCase() {
     }
   };
 
+  const billPayerKind = (features.vetSupervisedSamples && supervisingVetId)
+    ? 'veterinarian'
+    : (customerKind === 'veterinarian' ? 'veterinarian' : 'customer');
+
   const resetCase = () => {
     setStep(0);
     setCustomerId('');
+    setCustomerKind('customer');
+    setSupervisingVetId('');
     setSelectedAnimalIds([]);
     setAnimalTests({});
     setAnimalPackages({});
@@ -508,8 +521,9 @@ export default function WorkflowCase() {
             <p className="text-sm text-primary-500">{t('customers.searchMobileHint')}</p>
             <CustomerSearch
               value={customerId}
-              onChange={(id) => {
+              onChange={(id, customer) => {
                 setCustomerId(id);
+                setCustomerKind(customer?.kind === 'veterinarian' ? 'veterinarian' : 'customer');
                 setSelectedAnimalIds([]);
                 setAnimalTests({});
                 setAnimalPackages({});
@@ -773,6 +787,7 @@ export default function WorkflowCase() {
                     onPresetChange={setServiceDiscountPreset}
                     scope="services"
                     allowOpen={hasPermission('billing.open_discount')}
+                    payerKind={billPayerKind}
                   />
                   <DiscountField
                     subtotal={invoiceTotalsPreview.fieldVisitSubtotal}
@@ -785,6 +800,7 @@ export default function WorkflowCase() {
                     onPresetChange={setFieldVisitDiscountPreset}
                     scope="field_visit"
                     allowOpen={hasPermission('billing.open_discount')}
+                    payerKind={billPayerKind}
                   />
                 </div>
                 <div className="bg-primary-50 rounded-lg p-3 text-sm space-y-1">

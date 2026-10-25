@@ -44,6 +44,33 @@ export function filterPresetsByScope(presets = [], scope = 'services') {
   return list;
 }
 
+export const DISCOUNT_AUDIENCE_CUSTOMER = 'customer';
+export const DISCOUNT_AUDIENCE_VETERINARIAN = 'veterinarian';
+
+export function normalizeDiscountAudience(audience) {
+  const value = String(audience || DISCOUNT_AUDIENCE_CUSTOMER).trim().toLowerCase();
+  return value === DISCOUNT_AUDIENCE_VETERINARIAN
+    ? DISCOUNT_AUDIENCE_VETERINARIAN
+    : DISCOUNT_AUDIENCE_CUSTOMER;
+}
+
+export function normalizePayerKind(kind) {
+  const value = String(kind || DISCOUNT_AUDIENCE_CUSTOMER).trim().toLowerCase();
+  return value === DISCOUNT_AUDIENCE_VETERINARIAN
+    ? DISCOUNT_AUDIENCE_VETERINARIAN
+    : DISCOUNT_AUDIENCE_CUSTOMER;
+}
+
+/** Vets see customer + veterinarian presets; regular customers see customer-only. */
+export function filterPresetsByAudience(presets = [], payerKind = DISCOUNT_AUDIENCE_CUSTOMER) {
+  const list = Array.isArray(presets) ? presets : [];
+  const kind = normalizePayerKind(payerKind);
+  if (kind === DISCOUNT_AUDIENCE_VETERINARIAN) return list;
+  return list.filter(
+    (p) => normalizeDiscountAudience(p?.audience) !== DISCOUNT_AUDIENCE_VETERINARIAN
+  );
+}
+
 export function isDiscountPresetAllowed(preset, volumeCount) {
   const min = parseInt(preset?.min_animal_count, 10) || 0;
   return min <= 0 || Number(volumeCount) > min;

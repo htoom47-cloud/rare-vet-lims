@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { billingAPI } from '../../services/api';
 import {
   DISCOUNT_TYPES,
+  DISCOUNT_AUDIENCE_CUSTOMER,
   filterPresetsByScope,
+  filterPresetsByAudience,
   isDiscountPresetAllowed,
   resolveDiscountAmount,
 } from '../../utils/discount';
@@ -28,13 +30,17 @@ export default function DiscountField({
   onPresetChange,
   scope = 'services',
   allowOpen = false,
+  payerKind = DISCOUNT_AUDIENCE_CUSTOMER,
 }) {
   const { t, i18n } = useTranslation();
   const [presets, setPresets] = useState([]);
   const [pickedId, setPickedId] = useState('');
   const [loadError, setLoadError] = useState(false);
   const applied = resolveDiscountAmount(subtotal, type, value);
-  const scopedPresets = useMemo(() => filterPresetsByScope(presets, scope), [presets, scope]);
+  const scopedPresets = useMemo(
+    () => filterPresetsByAudience(filterPresetsByScope(presets, scope), payerKind),
+    [presets, scope, payerKind],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -72,10 +78,12 @@ export default function DiscountField({
   }, [type, onTypeChange, onValueChange]);
 
   useEffect(() => {
-    if (!scopedPresets.length || type !== DISCOUNT_TYPES.PERCENT) return;
+    if (type !== DISCOUNT_TYPES.PERCENT) return;
     if (pickedId === OPEN_ID) return;
-    const current = scopedPresets.find((p) => p.id === (pickedId || selectedId));
-    if (current && !isDiscountPresetAllowed(current, animalCount)) {
+    const currentId = pickedId || selectedId;
+    if (!currentId) return;
+    const current = scopedPresets.find((p) => p.id === currentId);
+    if (!current || !isDiscountPresetAllowed(current, animalCount)) {
       setPickedId('');
       onTypeChange?.(DISCOUNT_TYPES.NONE);
       onValueChange?.('');

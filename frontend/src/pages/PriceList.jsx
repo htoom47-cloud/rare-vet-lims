@@ -52,6 +52,7 @@ export default function PriceList() {
 
   // Quote form
   const [customerId, setCustomerId] = useState('');
+  const [customerKind, setCustomerKind] = useState('customer');
   const [customerName, setCustomerName] = useState('');
   const [customerNameAr, setCustomerNameAr] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
@@ -145,6 +146,7 @@ export default function PriceList() {
 
   const handleCustomerChange = (id, customer) => {
     setCustomerId(id || '');
+    setCustomerKind(customer?.kind === 'veterinarian' ? 'veterinarian' : 'customer');
     if (customer) {
       setCustomerName(customer.full_name || '');
       setCustomerNameAr(customer.full_name_ar || '');
@@ -531,6 +533,7 @@ export default function PriceList() {
                 animalCount={discountVolumeCount(lineItems)}
                 scope="services"
                 allowOpen={hasPermission('billing.open_discount')}
+                payerKind={customerKind}
               />
               <DiscountField
                 subtotal={lineSubtotals.fieldVisitSubtotal}
@@ -543,6 +546,7 @@ export default function PriceList() {
                 animalCount={discountVolumeCount(lineItems)}
                 scope="field_visit"
                 allowOpen={hasPermission('billing.open_discount')}
+                payerKind={customerKind}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

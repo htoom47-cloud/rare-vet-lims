@@ -878,6 +878,21 @@ async function applyPatches() {
         ON samples(supervising_veterinarian_id)
         WHERE supervising_veterinarian_id IS NOT NULL
     `);
+
+    // Discount presets: customer (everyone) vs veterinarian-only (vets may also use customer presets).
+    await client.query(`
+      ALTER TABLE discount_presets
+        ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'customer'
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE discount_presets
+          ADD CONSTRAINT discount_presets_audience_check
+          CHECK (audience IN ('customer', 'veterinarian'));
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `);
+
     await client.query(`
       INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order)
       VALUES

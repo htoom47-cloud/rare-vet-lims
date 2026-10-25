@@ -9,6 +9,7 @@ const emptyForm = () => ({
   percent: '',
   min_animal_count: 0,
   sort_order: 0,
+  audience: 'customer',
 });
 
 export default function DiscountPresetsAdmin({ canEdit }) {
@@ -37,6 +38,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
       percent: String(parseFloat(preset.percent) || ''),
       min_animal_count: parseInt(preset.min_animal_count, 10) || 0,
       sort_order: parseInt(preset.sort_order, 10) || 0,
+      audience: preset.audience === 'veterinarian' ? 'veterinarian' : 'customer',
       is_active: preset.is_active !== false,
     });
   };
@@ -66,6 +68,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
         percent,
         min_animal_count: Math.max(0, parseInt(form.min_animal_count, 10) || 0),
         sort_order: parseInt(form.sort_order, 10) || 0,
+        audience: form.audience === 'veterinarian' ? 'veterinarian' : 'customer',
         is_active: form.is_active !== false,
       };
       if (editingId) {
@@ -104,6 +107,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
         percent: parseFloat(preset.percent),
         min_animal_count: parseInt(preset.min_animal_count, 10) || 0,
         sort_order: parseInt(preset.sort_order, 10) || 0,
+        audience: preset.audience === 'veterinarian' ? 'veterinarian' : 'customer',
         is_active: true,
       });
       toast.success(t('invoiceSettings.discountSaved'));
@@ -133,6 +137,7 @@ export default function DiscountPresetsAdmin({ canEdit }) {
               <th className="p-2 text-start">{t('invoiceSettings.discountNameAr')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountNameEn')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountPercentLabel')}</th>
+              <th className="p-2 text-start">{t('invoiceSettings.discountAudience')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountMinAnimals')}</th>
               <th className="p-2 text-start">{t('invoiceSettings.discountActive')}</th>
               {canEdit && <th className="p-2" />}
@@ -144,6 +149,11 @@ export default function DiscountPresetsAdmin({ canEdit }) {
                 <td className="p-2">{preset.name_ar || preset.name}</td>
                 <td className="p-2">{preset.name || preset.name_ar}</td>
                 <td className="p-2">{parseFloat(preset.percent)}%</td>
+                <td className="p-2">
+                  {preset.audience === 'veterinarian'
+                    ? t('invoiceSettings.discountAudienceVeterinarian')
+                    : t('invoiceSettings.discountAudienceCustomer')}
+                </td>
                 <td className="p-2">
                   {(parseInt(preset.min_animal_count, 10) || 0) > 0
                     ? t('billing.discountMinAnimals', { count: parseInt(preset.min_animal_count, 10) })
@@ -219,6 +229,18 @@ export default function DiscountPresetsAdmin({ canEdit }) {
               onChange={(e) => setForm({ ...form, min_animal_count: e.target.value })}
             />
             <p className="text-xs text-gray-500 mt-1">{t('invoiceSettings.discountMinAnimalsHint')}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('invoiceSettings.discountAudience')}</label>
+            <select
+              className="input-field w-full"
+              value={form.audience || 'customer'}
+              onChange={(e) => setForm({ ...form, audience: e.target.value })}
+            >
+              <option value="customer">{t('invoiceSettings.discountAudienceCustomer')}</option>
+              <option value="veterinarian">{t('invoiceSettings.discountAudienceVeterinarian')}</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{t('invoiceSettings.discountAudienceHint')}</p>
           </div>
           <div className="md:col-span-2 flex gap-2">
             <button type="submit" disabled={saving} className="btn-primary">

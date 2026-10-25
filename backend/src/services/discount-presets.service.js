@@ -1,7 +1,17 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { uuidv4 } = require('../utils/uuid');
-const { countDistinctAnimals, discountVolumeCount, isFieldVisitDiscountPreset, filterPresetsByScope } = require('../utils/discount');
+const {
+  countDistinctAnimals,
+  discountVolumeCount,
+  isFieldVisitDiscountPreset,
+  filterPresetsByScope,
+  filterPresetsByAudience,
+  normalizeDiscountAudience,
+  normalizePayerKind,
+  DISCOUNT_AUDIENCE_CUSTOMER,
+  DISCOUNT_AUDIENCE_VETERINARIAN,
+} = require('../utils/discount');
 
 const isPresetAllowed = (preset, animalCount) => {
   const min = parseInt(preset?.min_animal_count, 10) || 0;
@@ -22,7 +32,7 @@ const getById = async (id) => {
   return result.rows[0];
 };
 
-const findActiveByPercent = async (percent, scope = 'services') => {
+const findActiveByPercent = async (percent, scope = 'services', payerKind = DISCOUNT_AUDIENCE_CUSTOMER) => {
   const pct = parseFloat(percent);
   if (!(pct > 0)) return null;
   const result = await query(
@@ -31,13 +41,43 @@ const findActiveByPercent = async (percent, scope = 'services') => {
      ORDER BY sort_order, name`,
     [pct]
   );
-  return filterPresetsByScope(result.rows, scope)[0] || null;
+  const scoped = filterPresetsByScope(result.rows, scope);
+  return filterPresetsByAudience(scoped, payerKind)[0] || null;
 };
 
 const findByIdSafe = async (id) => {
   if (!id) return null;
   const result = await query('SELECT * FROM discount_presets WHERE id = $1', [id]);
   return result.rows[0] || null;
+};
+
+/** Resolve who pays for audience checks (supervising vet overrides when present). */
+const resolvePayerKindForDocument = async (data = {}) => {
+  if (data.payer_kind) return normalizePayerKind(data.payer_kind);
+
+  let payerId = data.customer_id || null;
+  if (data.supervising_veterinarian_id) {
+    payerId = data.supervising_veterinarian_id;
+  } else if (data.sample_id) {
+    const sampleResult = await query(
+      `SELECT supervising_veterinarian_id, customer_id
+       FROM samples WHERE id = $1 AND deleted_at IS NULL`,
+      [data.sample_id]
+    );
+    const sample = sampleResult.rows[0];
+    if (sample?.supervising_veterinarian_id) {
+      payerId = sample.supervising_veterinarian_id;
+    } else if (sample?.customer_id) {
+      payerId = sample.customer_id;
+    }
+  }
+
+  if (!payerId) return DISCOUNT_AUDIENCE_CUSTOMER;
+  const cust = await query(
+    `SELECT kind FROM customers WHERE id = $1 AND deleted_at IS NULL`,
+    [payerId]
+  );
+  return normalizePayerKind(cust.rows[0]?.kind);
 };
 
 const create = async (data) => {
@@ -51,11 +91,12 @@ const create = async (data) => {
   const code = String(data.code || `d${Date.now()}`).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 50);
   const minAnimalCount = Math.max(0, parseInt(data.min_animal_count, 10) || 0);
   const sortOrder = parseInt(data.sort_order, 10) || 0;
+  const audience = normalizeDiscountAudience(data.audience);
   try {
     const result = await query(
-      `INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,true,$7) RETURNING *`,
-      [uuidv4(), code || uuidv4().slice(0, 8), name || nameAr, nameAr || name, percent, minAnimalCount, sortOrder]
+      `INSERT INTO discount_presets (id, code, name, name_ar, percent, min_animal_count, is_active, sort_order, audience)
+       VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8) RETURNING *`,
+      [uuidv4(), code || uuidv4().slice(0, 8), name || nameAr, nameAr || name, percent, minAnimalCount, sortOrder, audience]
     );
     return result.rows[0];
   } catch (err) {
@@ -76,12 +117,13 @@ const update = async (id, data) => {
   const minAnimalCount = Math.max(0, parseInt(data.min_animal_count, 10) || 0);
   const sortOrder = parseInt(data.sort_order, 10) || 0;
   const isActive = data.is_active !== false;
+  const audience = normalizeDiscountAudience(data.audience);
   const result = await query(
     `UPDATE discount_presets
      SET name = $1, name_ar = $2, percent = $3, min_animal_count = $4,
-         is_active = $5, sort_order = $6, updated_at = NOW()
-     WHERE id = $7 RETURNING *`,
-    [name || nameAr, nameAr || name, percent, minAnimalCount, isActive, sortOrder, id]
+         is_active = $5, sort_order = $6, audience = $7, updated_at = NOW()
+     WHERE id = $8 RETURNING *`,
+    [name || nameAr, nameAr || name, percent, minAnimalCount, isActive, sortOrder, audience, id]
   );
   return result.rows[0];
 };
@@ -96,7 +138,7 @@ const deactivate = async (id) => {
 };
 
 const resolvePresetForDocument = async (data, {
-  presetId, percent, amount, animalCount, scope, allowOpenDiscount = false,
+  presetId, percent, amount, animalCount, scope, allowOpenDiscount = false, payerKind = DISCOUNT_AUDIENCE_CUSTOMER,
 }) => {
   const pct = parseFloat(percent) || 0;
   const amt = parseFloat(amount) || 0;
@@ -113,7 +155,7 @@ const resolvePresetForDocument = async (data, {
   if (presetId) {
     preset = await getById(presetId);
   } else if (pct > 0) {
-    preset = await findActiveByPercent(pct, scope);
+    preset = await findActiveByPercent(pct, scope, payerKind);
   }
   if (!preset || preset.is_active === false) {
     throw new AppError('اختر خصماً من القائمة المعتمدة من مدير النظام', 400, 'DISCOUNT_PRESET_REQUIRED');
@@ -125,6 +167,13 @@ const resolvePresetForDocument = async (data, {
         : 'خصم الزيارة الميدانية لا يُستخدم على فحوصات المختبر',
       400,
       'DISCOUNT_SCOPE'
+    );
+  }
+  if (filterPresetsByAudience([preset], payerKind).length === 0) {
+    throw new AppError(
+      'هذا الخصم مخصص للأطباء البيطريين فقط',
+      400,
+      'DISCOUNT_AUDIENCE'
     );
   }
   if (!isPresetAllowed(preset, animalCount)) {
@@ -139,6 +188,7 @@ const resolvePresetForDocument = async (data, {
 
 const applyToDocumentData = async (data, { allowOpenDiscount = false } = {}) => {
   const animalCount = discountVolumeCount(data.items);
+  const payerKind = await resolvePayerKindForDocument(data);
   const service = await resolvePresetForDocument(data, {
     presetId: data.discount_preset_id,
     percent: data.discount_percent,
@@ -146,6 +196,7 @@ const applyToDocumentData = async (data, { allowOpenDiscount = false } = {}) => 
     animalCount,
     scope: 'services',
     allowOpenDiscount,
+    payerKind,
   });
   const fieldVisit = await resolvePresetForDocument(data, {
     presetId: data.field_visit_discount_preset_id,
@@ -154,6 +205,7 @@ const applyToDocumentData = async (data, { allowOpenDiscount = false } = {}) => 
     animalCount,
     scope: 'field_visit',
     allowOpenDiscount,
+    payerKind,
   });
   return {
     ...data,
@@ -165,6 +217,7 @@ const applyToDocumentData = async (data, { allowOpenDiscount = false } = {}) => 
     field_visit_discount_preset_id: fieldVisit.preset?.id || null,
     discount_preset: service.preset || null,
     field_visit_discount_preset: fieldVisit.preset || null,
+    payer_kind: payerKind,
   };
 };
 
@@ -205,10 +258,13 @@ module.exports = {
   getById,
   findActiveByPercent,
   findByIdSafe,
+  resolvePayerKindForDocument,
   resolveQuoteDiscountLabels,
   isFieldVisitDiscountPreset,
   create,
   update,
   deactivate,
   applyToDocumentData,
+  DISCOUNT_AUDIENCE_CUSTOMER,
+  DISCOUNT_AUDIENCE_VETERINARIAN,
 };
