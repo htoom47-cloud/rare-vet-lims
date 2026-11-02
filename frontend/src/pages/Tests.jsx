@@ -9,6 +9,7 @@ import { testsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryEmoji } from '../utils/testCategoryIcons';
 import { fmtCatalog } from '../utils/vat';
+import { entryOptionsFromText, entryOptionsToText } from '../utils/entryOptions';
 
 import { useAnimalSpecies } from '../hooks/useAnimalSpecies';
 
@@ -19,6 +20,7 @@ const emptyTestForm = () => ({
 
 const emptyParamForm = () => ({
   code: '', name: '', name_ar: '', unit: '', sort_order: 0, is_calculated: false, formula: '', decimal_places: 2,
+  entry_options_text: '',
 });
 
 const emptyRangeForm = () => ({
@@ -196,11 +198,13 @@ export default function Tests() {
     e.preventDefault();
     if (!detail?.id) return;
     try {
+      const { entry_options_text, ...rest } = paramForm;
       const payload = {
-        ...paramForm,
+        ...rest,
         sort_order: Number(paramForm.sort_order),
         decimal_places: Number(paramForm.decimal_places),
         formula: paramForm.is_calculated ? paramForm.formula : null,
+        entry_options: entryOptionsFromText(entry_options_text),
       };
       if (editingParamId) {
         await testsAPI.updateParameter(editingParamId, payload);
@@ -229,6 +233,7 @@ export default function Tests() {
       is_calculated: !!param.is_calculated,
       formula: param.formula || '',
       decimal_places: param.decimal_places ?? 2,
+      entry_options_text: entryOptionsToText(param.entry_options),
     });
     setParamOpen(true);
   };
@@ -1140,6 +1145,17 @@ export default function Tests() {
               <option value="%">%</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">{t('tests.unitQualHint')}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('tests.entryOptions')}</label>
+            <textarea
+              className="input-field min-h-[96px]"
+              dir="ltr"
+              value={paramForm.entry_options_text}
+              onChange={(e) => setParamForm({ ...paramForm, entry_options_text: e.target.value })}
+              placeholder={'Nil\n+\n++\n+++'}
+            />
+            <p className="text-xs text-gray-500 mt-1">{t('tests.entryOptionsHint')}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

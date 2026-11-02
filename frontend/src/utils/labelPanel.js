@@ -17,6 +17,7 @@ export const PANEL_CODES = {
   SERO: 'SERO',
   PCR: 'PCR',
   CULT: 'CULT',
+  URINE: 'URINE',
   OTHER: 'LAB',
 };
 
@@ -29,11 +30,12 @@ export const PANEL_LABELS = {
   SERO: { ar: 'أمصال', en: 'Serology' },
   PCR: { ar: 'PCR', en: 'PCR' },
   CULT: { ar: 'مزارع', en: 'Culture' },
+  URINE: { ar: 'تحليل البول', en: 'Urine' },
   OTHER: { ar: 'أخرى', en: 'Other' },
 };
 
 const PANEL_ORDER = {
-  CBC: 0, CHEM: 1, HORM: 2, ELISA: 3, SERO: 4, PCR: 5, MICRO: 6, PARAS: 6, CULT: 7, OTHER: 99,
+  CBC: 0, CHEM: 1, HORM: 2, ELISA: 3, SERO: 4, PCR: 5, MICRO: 6, PARAS: 6, CULT: 7, URINE: 8, OTHER: 99,
 };
 
 export const resolvePanelKey = (test) => {
@@ -119,6 +121,7 @@ const PANEL_FRIENDLY_EN = {
   SERO: 'Serology',
   PCR: 'PCR',
   CULT: 'Culture',
+  URINE: 'Urinalysis',
   OTHER: 'Other',
 };
 

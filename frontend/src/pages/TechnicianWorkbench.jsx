@@ -26,6 +26,11 @@ import {
   addCultureAntibiotic,
   removeCultureAntibiotic,
 } from '../utils/cultureEntry';
+import {
+  normalizeEntryOptions,
+  URINE_ENTRY_SECTIONS,
+  urineSectionLabel,
+} from '../utils/entryOptions';
 
 export default function TechnicianWorkbench() {
   const { t, i18n } = useTranslation();
@@ -112,6 +117,8 @@ export default function TechnicianWorkbench() {
             value: val?.value || '',
             flag: val?.flag,
             reference: val?.reference || catalogRef || '',
+            entry_options: normalizeEntryOptions(p.entry_options),
+            entry_section: p.category || '',
           };
         });
       // Catalog meta for ELISA layout only (does not change save payload)
@@ -192,52 +199,68 @@ export default function TechnicianWorkbench() {
     }
   };
 
-  const renderParamField = (test, param, idx) => (
-    <div key={param.parameter_id}>
-      <label className="text-sm font-medium">
-        {param.name}
-        {param.unit && param.unit !== 'qual' && ` (${param.unit})`}
-        {param.missing_in_db && (
-          <span className="text-xs text-amber-600 ms-1">({t('workbench.paramMissing', { defaultValue: 'not synced' })})</span>
+  const renderParamField = (test, param, idx) => {
+    const options = normalizeEntryOptions(param.entry_options);
+    const hasOptions = options.length > 0;
+    const selectValue = hasOptions && options.includes(param.value) ? param.value : '';
+    return (
+      <div key={param.parameter_id}>
+        <label className="text-sm font-medium">
+          {param.name}
+          {param.unit && param.unit !== 'qual' && ` (${param.unit})`}
+          {param.missing_in_db && (
+            <span className="text-xs text-amber-600 ms-1">({t('workbench.paramMissing', { defaultValue: 'not synced' })})</span>
+          )}
+          {param.reference && (
+            <span className="text-xs font-normal text-gray-500 ms-2">
+              {t('workbench.ref', { defaultValue: 'Ref' })}: {param.reference}
+              {param.flag && param.flag !== 'NORMAL' && param.flag !== '' && (
+                <span className={`ms-1 font-semibold ${['HIGH', 'CRIT_HIGH', 'POS'].includes(param.flag) ? 'text-red-600' : 'text-blue-600'}`}>
+                  {param.flag}
+                </span>
+              )}
+            </span>
+          )}
+        </label>
+        {hasOptions ? (
+          <div className="mt-1 space-y-1">
+            <select
+              value={selectValue}
+              onChange={(e) => updateFieldValue(test, idx, e.target.value)}
+              className="input-field"
+            >
+              <option value="">—</option>
+              {options.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <input
+              value={param.value}
+              onChange={(e) => updateFieldValue(test, idx, e.target.value)}
+              className="input-field"
+              placeholder={t('workbench.entryOptionsCustom', { defaultValue: 'Or type a custom value' })}
+            />
+          </div>
+        ) : param.unit === 'qual' ? (
+          <select
+            value={param.value}
+            onChange={(e) => updateFieldValue(test, idx, e.target.value)}
+            className="input-field mt-1"
+          >
+            <option value="">—</option>
+            <option value="Negative">{t('parasitology.negative', { defaultValue: 'Negative' })}</option>
+            <option value="Positive">{t('parasitology.positive', { defaultValue: 'Positive' })}</option>
+          </select>
+        ) : (
+          <input
+            value={param.value}
+            onChange={(e) => updateFieldValue(test, idx, e.target.value)}
+            className="input-field mt-1"
+          />
         )}
-        {param.reference && (
-          <span className="text-xs font-normal text-gray-500 ms-2">
-            {t('workbench.ref', { defaultValue: 'Ref' })}: {param.reference}
-            {param.flag && param.flag !== 'NORMAL' && param.flag !== '' && (
-              <span className={`ms-1 font-semibold ${['HIGH', 'CRIT_HIGH', 'POS'].includes(param.flag) ? 'text-red-600' : 'text-blue-600'}`}>
-                {param.flag}
-              </span>
-            )}
-          </span>
-        )}
-      </label>
-      {param.unit === 'qual' ? (
-        <select
-          value={param.value}
-          onChange={(e) => {
-            const updated = [...resultForm[test.id]];
-            updated[idx] = { ...param, value: e.target.value };
-            setResultForm({ ...resultForm, [test.id]: updated });
-          }}
-          className="input-field mt-1"
-        >
-          <option value="">—</option>
-          <option value="Negative">{t('parasitology.negative', { defaultValue: 'Negative' })}</option>
-          <option value="Positive">{t('parasitology.positive', { defaultValue: 'Positive' })}</option>
-        </select>
-      ) : (
-        <input
-          value={param.value}
-          onChange={(e) => {
-            const updated = [...resultForm[test.id]];
-            updated[idx] = { ...param, value: e.target.value };
-            setResultForm({ ...resultForm, [test.id]: updated });
-          }}
-          className="input-field mt-1"
-        />
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
 
   const updateFieldValue = (test, idx, value) => {
     const updated = [...resultForm[test.id]];
@@ -522,6 +545,38 @@ export default function TechnicianWorkbench() {
       return renderElisaFields(test, fields);
     }
     if (!isNormaCbcTest(test)) {
+      const hasUrineSections = fields.some((p) => URINE_ENTRY_SECTIONS.includes(p.entry_section));
+      if (hasUrineSections) {
+        return (
+          <div className="space-y-4">
+            {URINE_ENTRY_SECTIONS.map((section) => {
+              const sectionRows = fields
+                .map((param, idx) => ({ param, idx }))
+                .filter(({ param }) => param.entry_section === section);
+              if (!sectionRows.length) return null;
+              return (
+                <div key={section}>
+                  <h5 className="text-sm font-semibold text-primary-700 dark:text-primary-300 mb-2 border-b border-primary-100 dark:border-primary-800 pb-1">
+                    {urineSectionLabel(section, t)}
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {sectionRows.map(({ param, idx }) => renderParamField(test, param, idx))}
+                  </div>
+                </div>
+              );
+            })}
+            {fields.some((p) => !URINE_ENTRY_SECTIONS.includes(p.entry_section)) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {fields.map((param, idx) => (
+                  URINE_ENTRY_SECTIONS.includes(param.entry_section)
+                    ? null
+                    : renderParamField(test, param, idx)
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {fields.map((param, idx) => renderParamField(test, param, idx))}

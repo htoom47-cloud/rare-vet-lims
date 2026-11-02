@@ -8,6 +8,7 @@ const CODE_ICONS = {
   HORM: '💉',
   ELISA: '🛡️',
   SERO: '🛡️',
+  URINE: '🧪',
   PAR: '🪱',
   PARA: '🪱',
   PARAS: '🪱',
@@ -33,6 +34,9 @@ const KEYWORD_ICONS = [
   ['elisa', '🛡️'],
   ['serology', '🛡️'],
   ['sero', '🛡️'],
+  ['urine', '🧪'],
+  ['urinalysis', '🧪'],
+  ['بول', '🧪'],
 ];
 
 const DEFAULT_ICON = '🧫';

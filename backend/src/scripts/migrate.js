@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
 const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ensureElisaCatalog } = require('./ensure-elisa-catalog');
+const { ensureUrineCatalog } = require('./ensure-urine');
 const { syncPermissionsCatalog, syncRolePermissions } = require('../utils/sync-permissions');
 
 async function syncLabContactInfo(client) {
@@ -324,6 +325,11 @@ async function applyPatches() {
     } catch (elisaErr) {
       logger.warn('ELISA catalog ensure failed — continuing migrate', { error: elisaErr.message });
     }
+    try {
+      await ensureUrineCatalog();
+    } catch (urineErr) {
+      logger.warn('Urine catalog ensure failed — continuing migrate', { error: urineErr.message });
+    }
     await syncPermissionsCatalog(client);
     await syncRolePermissions(client);
     await client.query(`
@@ -577,6 +583,10 @@ async function applyPatches() {
         ADD COLUMN IF NOT EXISTS show_in_report BOOLEAN DEFAULT true,
         ADD COLUMN IF NOT EXISTS value_type VARCHAR(20) DEFAULT 'numeric',
         ADD COLUMN IF NOT EXISTS category VARCHAR(50)
+    `);
+    await client.query(`
+      ALTER TABLE test_parameters
+        ADD COLUMN IF NOT EXISTS entry_options JSONB
     `);
     await client.query(`
       UPDATE test_parameters tp

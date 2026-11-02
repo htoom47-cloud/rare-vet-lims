@@ -3,6 +3,7 @@ const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPagination } = require('../utils/helpers');
 const { buildCbcDisplayParameters, DEFAULT_CBC_TEST_CODE } = require('../utils/norma-cbc-map');
 const { upsertReferenceRange } = require('./reference-ranges.service');
+const { normalizeEntryOptions } = require('../utils/entry-options');
 
 const listCategories = async ({ includeInactive } = {}) => {
   const where = includeInactive ? '' : 'WHERE is_active = true';
@@ -149,10 +150,23 @@ const update = async (id, data) => {
 
 const addParameter = async (testId, param) => {
   await getById(testId);
+  const entryOptions = normalizeEntryOptions(param.entry_options);
   const result = await query(
-    `INSERT INTO test_parameters (test_id, code, name, name_ar, unit, sort_order, is_calculated, formula, decimal_places)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [testId, param.code, param.name, param.name_ar, param.unit, param.sort_order || 0, param.is_calculated || false, param.formula, param.decimal_places || 2]
+    `INSERT INTO test_parameters
+       (test_id, code, name, name_ar, unit, sort_order, is_calculated, formula, decimal_places, entry_options)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING *`,
+    [
+      testId,
+      param.code,
+      param.name,
+      param.name_ar,
+      param.unit,
+      param.sort_order || 0,
+      param.is_calculated || false,
+      param.formula,
+      param.decimal_places || 2,
+      entryOptions ? JSON.stringify(entryOptions) : null,
+    ]
   );
   return result.rows[0];
 };
@@ -165,11 +179,14 @@ const getParameterById = async (parameterId) => {
 
 const updateParameter = async (parameterId, param) => {
   const existing = await getParameterById(parameterId);
+  const entryOptions = Object.prototype.hasOwnProperty.call(param, 'entry_options')
+    ? normalizeEntryOptions(param.entry_options)
+    : normalizeEntryOptions(existing.entry_options);
   const result = await query(
     `UPDATE test_parameters
      SET code = $1, name = $2, name_ar = $3, unit = $4, sort_order = $5,
-         is_calculated = $6, formula = $7, decimal_places = $8
-     WHERE id = $9 RETURNING *`,
+         is_calculated = $6, formula = $7, decimal_places = $8, entry_options = $9::jsonb
+     WHERE id = $10 RETURNING *`,
     [
       param.code ?? existing.code,
       param.name ?? existing.name,
@@ -179,6 +196,7 @@ const updateParameter = async (parameterId, param) => {
       param.is_calculated ?? existing.is_calculated,
       param.formula ?? existing.formula,
       param.decimal_places ?? existing.decimal_places,
+      entryOptions ? JSON.stringify(entryOptions) : null,
       parameterId,
     ]
   );

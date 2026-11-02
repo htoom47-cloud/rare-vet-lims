@@ -66,6 +66,7 @@ const bootScripts = [
   'src/scripts/ensure-bun-urea-labels.js',
   'src/scripts/ensure-result-attachments.js',
   'src/scripts/ensure-parasitology.js',
+  'src/scripts/ensure-urine.js',
 ];
 
 if (process.env.RUN_SEED === 'true') {
