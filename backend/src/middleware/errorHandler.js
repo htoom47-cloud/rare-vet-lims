@@ -18,6 +18,14 @@ const errorHandler = (err, req, res, _next) => {
     error = new AppError(`Duplicate ${field} already exists`, 400, 'DUPLICATE', { field });
   } else if (!error.isOperational && error.code === '23503') {
     error = new AppError('Referenced record not found', 400, 'FOREIGN_KEY');
+  } else if (!error.isOperational && error.code === '23502') {
+    error = new AppError(
+      error.column ? `Required field missing: ${error.column}` : 'Required database field is missing',
+      400,
+      'NOT_NULL'
+    );
+  } else if (!error.isOperational && error.code === '22P02') {
+    error = new AppError('Invalid identifier format', 400, 'INVALID_ID');
   } else if (!error.isOperational && error.code === '42703') {
     error = new AppError('Database schema is out of date — run migrations', 500, 'SCHEMA_OUTDATED');
   }

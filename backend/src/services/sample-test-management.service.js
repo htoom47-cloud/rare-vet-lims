@@ -215,7 +215,8 @@ const addTests = async (sampleId, testIds, userId) => {
     throw new AppError('Add test to sample is disabled', 403, 'FEATURE_DISABLED');
   }
 
-  const ids = [...new Set((testIds || []).map(String).filter(Boolean))];
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const ids = [...new Set((testIds || []).map(String).filter((id) => UUID_RE.test(id)))];
   if (!ids.length) {
     throw new AppError('اختر فحصاً واحداً على الأقل', 400, 'NO_TESTS');
   }
@@ -313,8 +314,8 @@ const addTests = async (sampleId, testIds, userId) => {
 
     for (const t of toInsert) {
       const ins = await client.query(
-        `INSERT INTO sample_tests (id, sample_id, test_id, price, status)
-         VALUES ($1, $2, $3, $4, 'pending')
+        `INSERT INTO sample_tests (id, sample_id, test_id, price, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())
          RETURNING id, test_id, price, status`,
         [uuidv4(), sampleId, t.id, t.price || 0]
       );
@@ -340,8 +341,14 @@ const addTests = async (sampleId, testIds, userId) => {
 
     await client.query('COMMIT');
   } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
+    try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+    if (err instanceof AppError) throw err;
+    logger.error('addTests transaction failed', { sampleId, error: err.message, code: err.code });
+    throw new AppError(
+      err.message || 'فشل إضافة الفحص على العينة',
+      500,
+      err.code || 'ADD_TEST_FAILED'
+    );
   } finally {
     client.release();
   }

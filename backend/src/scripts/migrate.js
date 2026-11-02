@@ -325,11 +325,7 @@ async function applyPatches() {
     } catch (elisaErr) {
       logger.warn('ELISA catalog ensure failed — continuing migrate', { error: elisaErr.message });
     }
-    try {
-      await ensureUrineCatalog();
-    } catch (urineErr) {
-      logger.warn('Urine catalog ensure failed — continuing migrate', { error: urineErr.message });
-    }
+    // Urine catalog runs later — after test_parameters.entry_options exists.
     await syncPermissionsCatalog(client);
     await syncRolePermissions(client);
     await client.query(`
@@ -588,6 +584,11 @@ async function applyPatches() {
       ALTER TABLE test_parameters
         ADD COLUMN IF NOT EXISTS entry_options JSONB
     `);
+    try {
+      await ensureUrineCatalog();
+    } catch (urineErr) {
+      logger.warn('Urine catalog ensure failed — continuing migrate', { error: urineErr.message });
+    }
     await client.query(`
       UPDATE test_parameters tp
       SET device_code = dpm.device_parameter_code

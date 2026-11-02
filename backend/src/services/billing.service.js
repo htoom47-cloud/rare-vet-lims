@@ -52,13 +52,20 @@ const { creditNotesTableExists } = require('../utils/credit-notes-schema');
 const creditNotes = require('./credit-note.service');
 const zatcaService = require('./zatca.service');
 
+const tlvField = (tag, value) => {
+  const text = String(value ?? '');
+  const bytes = Buffer.from(text, 'utf8');
+  const len = Math.min(bytes.length, 255);
+  return Buffer.from([tag, len, ...bytes.subarray(0, len)]);
+};
+
 const generateVatQR = (invoice) => {
   const tlv = [
-    Buffer.from([1, env.lab.name.length, ...Buffer.from(env.lab.name)]),
-    Buffer.from([2, env.lab.vatNumber.length, ...Buffer.from(env.lab.vatNumber)]),
-    Buffer.from([3, new Date(invoice.created_at).toISOString().length, ...Buffer.from(new Date(invoice.created_at).toISOString())]),
-    Buffer.from([4, String(invoice.total).length, ...Buffer.from(String(invoice.total))]),
-    Buffer.from([5, String(invoice.tax_amount).length, ...Buffer.from(String(invoice.tax_amount))]),
+    tlvField(1, env.lab.name || ''),
+    tlvField(2, env.lab.vatNumber || ''),
+    tlvField(3, new Date(invoice.created_at || Date.now()).toISOString()),
+    tlvField(4, invoice.total),
+    tlvField(5, invoice.tax_amount),
   ];
   return Buffer.concat(tlv).toString('base64');
 };
