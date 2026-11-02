@@ -26,9 +26,9 @@ const entryFeSrc = fs.readFileSync(
 );
 
 assert.ok(migrateSrc.includes('entry_options JSONB'));
-assert.ok(migrateSrc.includes('ensureUrineCatalog'));
+assert.ok(migrateSrc.includes('await ensureUrineCatalog()'));
 assert.ok(
-  migrateSrc.indexOf('entry_options JSONB') < migrateSrc.indexOf('ensureUrineCatalog'),
+  migrateSrc.indexOf('entry_options JSONB') < migrateSrc.indexOf('await ensureUrineCatalog()'),
   'ensureUrineCatalog must run after entry_options column exists',
 );
 assert.ok(cloudSrc.includes('ensure-urine.js'));
