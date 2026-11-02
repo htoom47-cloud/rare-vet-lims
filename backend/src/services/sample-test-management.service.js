@@ -331,9 +331,10 @@ const addTests = async (sampleId, testIds, userId) => {
       });
     }
 
+    // sample_status enum has no 'reported' — comparing to it raises 22P02.
     await client.query(
       `UPDATE samples SET
-         status = CASE WHEN status IN ('completed', 'reported') THEN 'running' ELSE status END,
+         status = CASE WHEN status = 'completed' THEN 'running'::sample_status ELSE status END,
          updated_at = NOW()
        WHERE id = $1`,
       [sampleId]
