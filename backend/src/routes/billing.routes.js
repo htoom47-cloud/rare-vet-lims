@@ -362,7 +362,8 @@ router.post('/payments', authorize(PERMISSIONS.BILLING_PAYMENT), validate(paymen
 
 router.post('/invoices/:id/tamara/checkout', authorize(PERMISSIONS.BILLING_PAYMENT), async (req, res, next) => {
   try {
-    const data = await tamaraService.createCheckout(req.params.id, req.user.id);
+    const channel = req.body?.channel === 'sms' ? 'sms' : 'whatsapp';
+    const data = await tamaraService.createCheckout(req.params.id, req.user.id, { channel });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 });

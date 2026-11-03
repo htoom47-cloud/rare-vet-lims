@@ -9,6 +9,8 @@ const logger = require('../config/logger');
 const { AppError } = require('../middleware/errorHandler');
 const { uuidv4 } = require('../utils/uuid');
 const { notDeleted } = require('../utils/soft-delete-sql');
+const { formatToE164 } = require('../utils/phone');
+const notifications = require('./notifications.service');
 const billing = require('./billing.service');
 
 const money = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -173,7 +175,70 @@ const buildCheckoutPayload = ({ invoice, customer, balance, phone, orderReferenc
   };
 };
 
-const createCheckout = async (invoiceId, userId) => {
+const buildTamaraCheckoutMessage = ({ customerName, invoiceNumber, checkoutUrl, amount }) => {
+  const name = (customerName || 'العميل').trim();
+  const amountLabel = amount != null ? `المبلغ: ${Number(amount).toFixed(2)} ر.س` : null;
+  return [
+    env.lab?.nameAr || 'مركز رعاية النوادر البيطري',
+    `عزيزي ${name}، رابط دفع فاتورتكم عبر تمارا`,
+    invoiceNumber ? `الفاتورة: ${invoiceNumber}` : null,
+    amountLabel,
+    checkoutUrl,
+    env.lab?.phone ? `للاستفسار: ${env.lab.phone}` : null,
+  ].filter(Boolean).join('\n');
+};
+
+const sendCheckoutLinkToCustomer = async ({
+  customer, invoice, checkoutUrl, amount, channel, userId, tamaraOrderId,
+}) => {
+  const selectedChannel = channel === 'sms' ? 'sms' : 'whatsapp';
+  const e164 = formatToE164(customer.mobile);
+  if (!e164) {
+    throw new AppError('Customer mobile number is missing or invalid', 400, 'NO_RECIPIENT');
+  }
+
+  const body = buildTamaraCheckoutMessage({
+    customerName: customer.full_name_ar || customer.full_name,
+    invoiceNumber: invoice.invoice_number,
+    checkoutUrl,
+    amount,
+  });
+
+  const queued = await notifications.queue({
+    channel: selectedChannel,
+    recipient: e164,
+    subject: 'Tamara checkout',
+    body,
+    metadata: {
+      type: 'tamara_checkout',
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      customer_id: customer.id,
+      tamara_order_id: tamaraOrderId || null,
+      sent_by: userId || null,
+      dry_run: !env.notifications?.sendReal,
+    },
+  });
+
+  const result = await notifications.dispatchOne(queued);
+  logger.info('Tamara checkout link notified', {
+    invoiceId: invoice.id,
+    channel: selectedChannel,
+    dryRun: !env.notifications?.sendReal,
+    notificationId: result.id,
+  });
+
+  return {
+    notificationId: result.id,
+    channel: selectedChannel,
+    recipient: e164,
+    status: result.status,
+    dryRun: Boolean(result.dryRun || !env.notifications?.sendReal),
+    userMessage: result.userMessage || null,
+  };
+};
+
+const createCheckout = async (invoiceId, userId, options = {}) => {
   assertTamaraEnabled();
   const { invoice, customer, balance, phone } = await loadInvoiceForCheckout(invoiceId);
   const orderReferenceId = uuidv4();
@@ -203,11 +268,36 @@ const createCheckout = async (invoiceId, userId) => {
     ]
   );
 
+  let notification = null;
+  try {
+    notification = await sendCheckoutLinkToCustomer({
+      customer,
+      invoice,
+      checkoutUrl: created.checkout_url,
+      amount: balance,
+      channel: options.channel,
+      userId,
+      tamaraOrderId: created.order_id,
+    });
+  } catch (err) {
+    logger.warn('Tamara checkout created but customer notify failed', {
+      invoiceId: invoice.id,
+      message: err.message,
+      code: err.code,
+    });
+    notification = {
+      failed: true,
+      code: err.code || 'NOTIFY_FAILED',
+      message: err.message,
+    };
+  }
+
   return {
     checkout: row.rows[0],
     checkout_url: created.checkout_url,
     tamara_order_id: created.order_id,
     amount: balance,
+    notification,
   };
 };
 

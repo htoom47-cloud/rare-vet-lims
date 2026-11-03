@@ -98,7 +98,8 @@ export default function Billing() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [sendingZatca, setSendingZatca] = useState(false);
   const [tamaraLoading, setTamaraLoading] = useState(false);
-  const [tamaraShare, setTamaraShare] = useState(null); // { invoiceId, url }
+  const [tamaraChannel, setTamaraChannel] = useState('whatsapp');
+  const [tamaraShare, setTamaraShare] = useState(null); // { invoiceId, url, notification }
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
 
@@ -127,13 +128,6 @@ export default function Billing() {
     }
   };
 
-  const toWhatsAppPhone = (raw) => {
-    let digits = String(raw || '').replace(/\D/g, '');
-    if (digits.startsWith('0')) digits = `966${digits.slice(1)}`;
-    if (digits.length === 9) digits = `966${digits}`;
-    return digits;
-  };
-
   const copyTamaraLink = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -143,32 +137,26 @@ export default function Billing() {
     }
   };
 
-  const shareTamaraWhatsApp = (invoice, url) => {
-    const phone = toWhatsAppPhone(invoice?.customer_mobile);
-    const text = encodeURIComponent(
-      t('billing.tamaraShareMessage', {
-        invoice: invoice?.invoice_number || '',
-        url,
-      }),
-    );
-    const wa = phone
-      ? `https://wa.me/${phone}?text=${text}`
-      : `https://wa.me/?text=${text}`;
-    window.open(wa, '_blank', 'noopener,noreferrer');
-  };
-
   const startTamaraCheckout = async (invoice) => {
     if (!invoice?.id || !canTamara) return;
     setTamaraLoading(true);
     try {
-      const { data } = await billingAPI.tamaraCheckout(invoice.id);
-      const url = data.data?.checkout_url;
+      const { data } = await billingAPI.tamaraCheckout(invoice.id, { channel: tamaraChannel });
+      const payload = data.data || {};
+      const url = payload.checkout_url;
       if (!url) throw new Error('missing checkout url');
-      // Link is for the customer — do not open Tamara on the staff machine.
-      setTamaraShare({ invoiceId: invoice.id, url });
-      await copyTamaraLink(url);
-      shareTamaraWhatsApp(invoice, url);
-      toast.success(t('billing.tamaraLinkReady'));
+      const notification = payload.notification || null;
+      setTamaraShare({ invoiceId: invoice.id, url, notification });
+      if (notification?.failed) {
+        toast.error(notification.message || t('billing.tamaraNotifyFailed'));
+        await copyTamaraLink(url);
+      } else if (notification?.dryRun) {
+        toast.success(notification.userMessage || t('billing.tamaraNotifyDryRun'));
+      } else {
+        toast.success(
+          tamaraChannel === 'sms' ? t('billing.tamaraSmsSent') : t('billing.tamaraWhatsappSent'),
+        );
+      }
       if (detailInvoice?.id === invoice.id) {
         await openInvoiceDetail({ id: invoice.id });
       }
@@ -802,6 +790,13 @@ export default function Billing() {
             {canTamara && tamaraShare?.invoiceId === detailInvoice.id && tamaraShare.url && (
               <div className="rounded border border-primary-200 bg-primary-50 dark:bg-primary-900/20 p-3 space-y-2">
                 <p className="text-sm font-medium">{t('billing.tamaraSendToCustomer')}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  {tamaraShare.notification?.failed
+                    ? t('billing.tamaraNotifyFailedHint')
+                    : tamaraShare.notification?.dryRun
+                      ? t('billing.tamaraNotifyDryRun')
+                      : t('billing.tamaraNotifySentHint')}
+                </p>
                 <p className="text-xs break-all text-gray-600 dark:text-gray-300">{tamaraShare.url}</p>
                 <div className="flex flex-wrap gap-2 justify-end">
                   <button
@@ -811,29 +806,34 @@ export default function Billing() {
                   >
                     {t('billing.tamaraCopyLink')}
                   </button>
-                  <button
-                    type="button"
-                    className="btn-primary text-sm"
-                    onClick={() => shareTamaraWhatsApp(detailInvoice, tamaraShare.url)}
-                  >
-                    {t('billing.tamaraSendWhatsApp')}
-                  </button>
                 </div>
               </div>
             )}
 
             {canPay && invoiceNeedsPayment(detailInvoice) && (
-              <div className="flex justify-end gap-2 flex-wrap">
+              <div className="flex justify-end gap-2 flex-wrap items-center">
                 {canTamara && (
-                  <button
-                    type="button"
-                    onClick={() => startTamaraCheckout(detailInvoice)}
-                    disabled={tamaraLoading}
-                    className="btn-secondary flex items-center gap-2"
-                  >
-                    <CreditCard size={16} />
-                    {tamaraLoading ? t('common.loading') : t('billing.payWithTamara')}
-                  </button>
+                  <>
+                    <select
+                      value={tamaraChannel}
+                      onChange={(e) => setTamaraChannel(e.target.value)}
+                      className="input-field w-auto text-sm"
+                      disabled={tamaraLoading}
+                      aria-label={t('billing.tamaraNotifyChannel')}
+                    >
+                      <option value="whatsapp">{t('billing.tamaraChannelWhatsapp')}</option>
+                      <option value="sms">{t('billing.tamaraChannelSms')}</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => startTamaraCheckout(detailInvoice)}
+                      disabled={tamaraLoading}
+                      className="btn-secondary flex items-center gap-2"
+                    >
+                      <CreditCard size={16} />
+                      {tamaraLoading ? t('common.loading') : t('billing.payWithTamara')}
+                    </button>
+                  </>
                 )}
                 <button onClick={() => openPayment(detailInvoice)} className="btn-primary flex items-center gap-2">
                   <CreditCard size={16} /> {t('billing.payment')}
