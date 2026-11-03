@@ -24,7 +24,7 @@ const apiSrc = fs.readFileSync(
   'utf8',
 );
 
-assert.ok(migrateSrc.includes("enumlabel = 'tamara'"));
+assert.ok(migrateSrc.includes("ADD VALUE IF NOT EXISTS 'tamara'") || migrateSrc.includes("ADD VALUE 'tamara'"));
 assert.ok(migrateSrc.includes('CREATE TABLE IF NOT EXISTS tamara_checkouts'));
 assert.ok(envSrc.includes('tamaraPayments: process.env.TAMARA_ENABLED'));
 assert.ok(envSrc.includes('TAMARA_API_TOKEN'));

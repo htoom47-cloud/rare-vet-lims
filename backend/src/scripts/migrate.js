@@ -971,17 +971,14 @@ async function applyPatches() {
     logger.info(`Customer account_balance resynced (${arSync.updated} rows)`);
 
     // Tamara BNPL payment method + checkout tracking
-    await client.query(`
-      DO $$ BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_enum
-          WHERE enumlabel = 'tamara'
-            AND enumtypid = 'payment_method'::regtype
-        ) THEN
-          ALTER TYPE payment_method ADD VALUE 'tamara';
-        END IF;
-      END $$
-    `);
+    // Same pattern as invoice_status / animal_type — avoid DO $$ (ADD VALUE can fail inside it).
+    try {
+      await client.query(`ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'tamara'`);
+    } catch (_) {
+      try {
+        await client.query(`ALTER TYPE payment_method ADD VALUE 'tamara'`);
+      } catch (e) { /* already exists */ }
+    }
     await client.query(`
       CREATE TABLE IF NOT EXISTS tamara_checkouts (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
