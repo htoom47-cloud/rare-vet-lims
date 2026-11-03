@@ -58,6 +58,14 @@ const tamaraFetch = async (path, { method = 'GET', body } = {}) => {
   if (!res.ok) {
     const msg = data?.message || data?.error || data?.raw || `Tamara HTTP ${res.status}`;
     logger.warn('Tamara API error', { path, status: res.status, message: String(msg).slice(0, 200) });
+    const lower = String(msg).toLowerCase();
+    if (res.status === 401 || lower.includes('invalid credentials') || lower.includes('unauthorized')) {
+      throw new AppError(
+        'Tamara rejected the API token — use the API token (not notification/public) that matches TAMARA_API_URL (sandbox vs production)',
+        401,
+        'TAMARA_CREDENTIALS'
+      );
+    }
     throw new AppError(String(msg).slice(0, 300), res.status >= 400 && res.status < 500 ? 400 : 502, 'TAMARA_API');
   }
   return data;

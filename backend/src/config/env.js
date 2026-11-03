@@ -174,9 +174,10 @@ const env = {
   },
   tamara: {
     apiUrl: (process.env.TAMARA_API_URL || 'https://api-sandbox.tamara.co').replace(/\/$/, ''),
-    apiToken: process.env.TAMARA_API_TOKEN || '',
-    notificationToken: process.env.TAMARA_NOTIFICATION_TOKEN || '',
-    publicKey: process.env.TAMARA_PUBLIC_KEY || '',
+    // Strip whitespace / accidental "Bearer " paste from Render env values.
+    apiToken: String(process.env.TAMARA_API_TOKEN || '').trim().replace(/^Bearer\s+/i, ''),
+    notificationToken: String(process.env.TAMARA_NOTIFICATION_TOKEN || '').trim().replace(/^Bearer\s+/i, ''),
+    publicKey: String(process.env.TAMARA_PUBLIC_KEY || '').trim(),
     /** Default instalment count for PAY_BY_INSTALMENTS */
     instalments: Math.max(2, parseInt(process.env.TAMARA_INSTALMENTS || '3', 10) || 3),
   },
