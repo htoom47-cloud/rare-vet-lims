@@ -98,6 +98,7 @@ export default function Billing() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [sendingZatca, setSendingZatca] = useState(false);
   const [tamaraLoading, setTamaraLoading] = useState(false);
+  const [tamaraShare, setTamaraShare] = useState(null); // { invoiceId, url }
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
 
@@ -126,6 +127,36 @@ export default function Billing() {
     }
   };
 
+  const toWhatsAppPhone = (raw) => {
+    let digits = String(raw || '').replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = `966${digits.slice(1)}`;
+    if (digits.length === 9) digits = `966${digits}`;
+    return digits;
+  };
+
+  const copyTamaraLink = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t('billing.tamaraLinkCopied'));
+    } catch {
+      toast.error(t('billing.tamaraLinkCopyFailed'));
+    }
+  };
+
+  const shareTamaraWhatsApp = (invoice, url) => {
+    const phone = toWhatsAppPhone(invoice?.customer_mobile);
+    const text = encodeURIComponent(
+      t('billing.tamaraShareMessage', {
+        invoice: invoice?.invoice_number || '',
+        url,
+      }),
+    );
+    const wa = phone
+      ? `https://wa.me/${phone}?text=${text}`
+      : `https://wa.me/?text=${text}`;
+    window.open(wa, '_blank', 'noopener,noreferrer');
+  };
+
   const startTamaraCheckout = async (invoice) => {
     if (!invoice?.id || !canTamara) return;
     setTamaraLoading(true);
@@ -133,9 +164,11 @@ export default function Billing() {
       const { data } = await billingAPI.tamaraCheckout(invoice.id);
       const url = data.data?.checkout_url;
       if (!url) throw new Error('missing checkout url');
-      const win = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) toast.error(t('billing.popupBlocked'));
-      else toast.success(t('billing.tamaraCheckoutOpened'));
+      // Link is for the customer — do not open Tamara on the staff machine.
+      setTamaraShare({ invoiceId: invoice.id, url });
+      await copyTamaraLink(url);
+      shareTamaraWhatsApp(invoice, url);
+      toast.success(t('billing.tamaraLinkReady'));
       if (detailInvoice?.id === invoice.id) {
         await openInvoiceDetail({ id: invoice.id });
       }
@@ -765,6 +798,29 @@ export default function Billing() {
                 loadInvoices(page);
               }}
             />
+
+            {canTamara && tamaraShare?.invoiceId === detailInvoice.id && tamaraShare.url && (
+              <div className="rounded border border-primary-200 bg-primary-50 dark:bg-primary-900/20 p-3 space-y-2">
+                <p className="text-sm font-medium">{t('billing.tamaraSendToCustomer')}</p>
+                <p className="text-xs break-all text-gray-600 dark:text-gray-300">{tamaraShare.url}</p>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    onClick={() => copyTamaraLink(tamaraShare.url)}
+                  >
+                    {t('billing.tamaraCopyLink')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary text-sm"
+                    onClick={() => shareTamaraWhatsApp(detailInvoice, tamaraShare.url)}
+                  >
+                    {t('billing.tamaraSendWhatsApp')}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {canPay && invoiceNeedsPayment(detailInvoice) && (
               <div className="flex justify-end gap-2 flex-wrap">
