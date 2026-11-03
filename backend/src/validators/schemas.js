@@ -230,7 +230,7 @@ const discountPresetSchema = Joi.object({
 const paymentSchema = Joi.object({
   invoice_id: Joi.string().uuid().required(),
   amount: Joi.number().positive().required(),
-  method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit').required(),
+  method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit', 'tamara').required(),
   reference_number: Joi.string().allow('', null),
   notes: Joi.string().allow('', null),
   discount_amount: Joi.forbidden(),

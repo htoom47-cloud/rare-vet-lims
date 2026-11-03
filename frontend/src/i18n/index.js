@@ -1084,8 +1084,13 @@ const resources = {
         thermalPrintDone: 'Thermal invoice printed',
         popupBlocked: 'Allow pop-ups to print the thermal receipt',
         paymentMethods: {
-          cash: 'Cash', card: 'Network', bank_transfer: 'Bank transfer', credit: 'On account',
+          cash: 'Cash', card: 'Network', bank_transfer: 'Bank transfer', credit: 'On account', tamara: 'Tamara',
         },
+        payWithTamara: 'Pay with Tamara',
+        tamaraCheckoutOpened: 'Tamara checkout opened — complete payment on the customer phone',
+        tamaraCheckoutFailed: 'Could not start Tamara checkout',
+        tamaraPaymentConfirmed: 'Tamara payment confirmed on the invoice',
+        tamaraPaymentFailed: 'Tamara payment ended ({{status}})',
         invoiceStatus: {
           issued: 'Issued', partial: 'Partially paid', paid: 'Paid', credited: 'Settled by credit note', cancelled: 'Cancelled', refunded: 'Refunded',
           partial_refunded: 'Partially refunded',
@@ -2719,8 +2724,13 @@ const resources = {
         thermalPrintDone: 'تمت طباعة الفاتورة الحرارية',
         popupBlocked: 'اسمح بالنوافذ المنبثقة لطباعة الإيصال الحراري',
         paymentMethods: {
-          cash: 'نقدي', card: 'شبكة', bank_transfer: 'تحويل بنكي', credit: 'آجل',
+          cash: 'نقدي', card: 'شبكة', bank_transfer: 'تحويل بنكي', credit: 'آجل', tamara: 'تمارا',
         },
+        payWithTamara: 'ادفع بتمارا',
+        tamaraCheckoutOpened: 'تم فتح صفحة تمارا — أكمل الدفع من جوال العميل',
+        tamaraCheckoutFailed: 'تعذر بدء دفع تمارا',
+        tamaraPaymentConfirmed: 'تم تأكيد دفعة تمارا على الفاتورة',
+        tamaraPaymentFailed: 'انتهى دفع تمارا ({{status}})',
         invoiceStatus: {
           issued: 'غير مدفوعة', partial: 'مدفوعة جزئياً', paid: 'مدفوعة', credited: 'مسددة بإشعار', cancelled: 'ملغاة', refunded: 'مستردة',
           partial_refunded: 'مستردة جزئياً',

@@ -969,6 +969,46 @@ async function applyPatches() {
     const { resyncAllCustomerArBalances } = require('../services/accounting.service');
     const arSync = await resyncAllCustomerArBalances(client);
     logger.info(`Customer account_balance resynced (${arSync.updated} rows)`);
+
+    // Tamara BNPL payment method + checkout tracking
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'tamara'
+            AND enumtypid = 'payment_method'::regtype
+        ) THEN
+          ALTER TYPE payment_method ADD VALUE 'tamara';
+        END IF;
+      END $$
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tamara_checkouts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        order_reference_id UUID NOT NULL,
+        tamara_order_id TEXT,
+        checkout_id TEXT,
+        checkout_url TEXT,
+        amount DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'SAR',
+        status TEXT NOT NULL DEFAULT 'created',
+        payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+        raw_last_event JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT tamara_checkouts_order_reference_id_key UNIQUE (order_reference_id)
+      )
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_tamara_checkouts_tamara_order
+        ON tamara_checkouts (tamara_order_id)
+        WHERE tamara_order_id IS NOT NULL
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_tamara_checkouts_invoice
+        ON tamara_checkouts (invoice_id, created_at DESC)
+    `);
   } finally {
     client.release();
   }

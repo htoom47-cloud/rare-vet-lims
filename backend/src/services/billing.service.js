@@ -335,7 +335,9 @@ const recordPayment = async (data, userId, req = null, options = {}) => {
       throw new AppError('Cannot pay cancelled or refunded invoice', 400, 'INVALID_STATUS');
     }
 
-    await assertDayOpen(labDay(), client);
+    if (!options.skipDayAssert) {
+      await assertDayOpen(labDay(), client);
+    }
 
     const paidResult = await client.query(
       `SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments WHERE invoice_id = $1`,

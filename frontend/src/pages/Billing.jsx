@@ -53,8 +53,9 @@ function groupItemsByAnimal(items, t) {
 
 export default function Billing() {
   const { t, i18n } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canPay = hasPermission('billing.payment');
+  const canTamara = canPay && !!user?.features?.tamaraPayments;
   const statusLabel = (invOrStatus) => {
     const status = typeof invOrStatus === 'string' ? invOrStatus : invoiceDisplayStatus(invOrStatus);
     return t(`billing.invoiceStatus.${status}`, { defaultValue: status });
@@ -96,10 +97,56 @@ export default function Billing() {
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [sendingZatca, setSendingZatca] = useState(false);
+  const [tamaraLoading, setTamaraLoading] = useState(false);
   const [fieldVisit, setFieldVisit] = useState(DEFAULT_FIELD_VISIT);
   const [fieldVisitKm, setFieldVisitKm] = useState('');
 
   const paymentMethodLabel = (method) => t(`billing.paymentMethods.${method}`, { defaultValue: method });
+
+  const pollTamaraStatus = async (invoiceId) => {
+    const delays = [4000, 8000, 12000, 15000];
+    for (const ms of delays) {
+      await new Promise((r) => setTimeout(r, ms));
+      try {
+        const { data } = await billingAPI.tamaraStatus(invoiceId);
+        const status = data.data?.status;
+        if (['authorised', 'captured'].includes(status)) {
+          toast.success(t('billing.tamaraPaymentConfirmed'));
+          if (detailInvoice?.id === invoiceId) await openInvoiceDetail({ id: invoiceId });
+          loadInvoices(page);
+          return;
+        }
+        if (['declined', 'canceled', 'expired'].includes(status)) {
+          toast.error(t('billing.tamaraPaymentFailed', { status }));
+          return;
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
+  };
+
+  const startTamaraCheckout = async (invoice) => {
+    if (!invoice?.id || !canTamara) return;
+    setTamaraLoading(true);
+    try {
+      const { data } = await billingAPI.tamaraCheckout(invoice.id);
+      const url = data.data?.checkout_url;
+      if (!url) throw new Error('missing checkout url');
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) toast.error(t('billing.popupBlocked'));
+      else toast.success(t('billing.tamaraCheckoutOpened'));
+      if (detailInvoice?.id === invoice.id) {
+        await openInvoiceDetail({ id: invoice.id });
+      }
+      loadInvoices(page);
+      void pollTamaraStatus(invoice.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('billing.tamaraCheckoutFailed'));
+    } finally {
+      setTamaraLoading(false);
+    }
+  };
 
   const loadInvoices = (p = page) => {
     setLoading(true);
@@ -720,7 +767,18 @@ export default function Billing() {
             />
 
             {canPay && invoiceNeedsPayment(detailInvoice) && (
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2 flex-wrap">
+                {canTamara && (
+                  <button
+                    type="button"
+                    onClick={() => startTamaraCheckout(detailInvoice)}
+                    disabled={tamaraLoading}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <CreditCard size={16} />
+                    {tamaraLoading ? t('common.loading') : t('billing.payWithTamara')}
+                  </button>
+                )}
                 <button onClick={() => openPayment(detailInvoice)} className="btn-primary flex items-center gap-2">
                   <CreditCard size={16} /> {t('billing.payment')}
                 </button>
@@ -962,6 +1020,7 @@ export default function Billing() {
                     <option value="card">{t('billing.paymentMethods.card')}</option>
                     <option value="bank_transfer">{t('billing.paymentMethods.bank_transfer')}</option>
                     <option value="credit">{t('billing.paymentMethods.credit')}</option>
+                    <option value="tamara">{t('billing.paymentMethods.tamara')}</option>
                   </select>
                 </div>
                 <div>

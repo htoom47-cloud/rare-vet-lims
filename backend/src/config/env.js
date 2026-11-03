@@ -166,6 +166,19 @@ const env = {
      * Default false — sandbox device onboarding only until explicitly enabled.
      */
     zatcaEinvoice: process.env.ZATCA_EINVOICE_ENABLED === 'true',
+    /**
+     * When true: staff may start Tamara checkout from Billing.
+     * Default false — no live Tamara calls until explicitly enabled.
+     */
+    tamaraPayments: process.env.TAMARA_ENABLED === 'true',
+  },
+  tamara: {
+    apiUrl: (process.env.TAMARA_API_URL || 'https://api-sandbox.tamara.co').replace(/\/$/, ''),
+    apiToken: process.env.TAMARA_API_TOKEN || '',
+    notificationToken: process.env.TAMARA_NOTIFICATION_TOKEN || '',
+    publicKey: process.env.TAMARA_PUBLIC_KEY || '',
+    /** Default instalment count for PAY_BY_INSTALMENTS */
+    instalments: Math.max(2, parseInt(process.env.TAMARA_INSTALMENTS || '3', 10) || 3),
   },
   hatif: {
     apiBase: process.env.HATIF_API_BASE || 'https://api.voxa.sa',

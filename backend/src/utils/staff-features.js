@@ -28,6 +28,8 @@ const getStaffFeatures = () => ({
   cultureAstReport: !!env.features?.cultureAstReport,
   /** When true: supervising veterinarian on samples; invoice bills vet; both see portal reports */
   vetSupervisedSamples: !!env.features?.vetSupervisedSamples,
+  /** When true: Billing may start Tamara checkout for unpaid invoices */
+  tamaraPayments: !!env.features?.tamaraPayments,
 });
 
 module.exports = { getStaffFeatures };

@@ -129,8 +129,12 @@ const postInvoice = async (invoice, userId, client) => {
   );
 };
 
+const cashAccountForMethod = (method) => (
+  method === 'bank_transfer' || method === 'tamara' ? '1020' : '1010'
+);
+
 const postPayment = async (payment, invoice, userId, client) => {
-  const cashCode = payment.method === 'bank_transfer' ? '1020' : '1010';
+  const cashCode = cashAccountForMethod(payment.method);
   const cashId = await getAccountId(cashCode, client);
   const arId = await getAccountId('1100', client);
   const lines = buildPaymentJournalLines({ amount: payment.amount, cashId, arId });
@@ -150,7 +154,7 @@ const postRefund = async (refund, invoice, userId, client, method) => {
   if (!method) {
     throw new AppError('Refund journal requires the original payment method', 400, 'PAYMENT_METHOD_REQUIRED');
   }
-  const cashCode = method === 'bank_transfer' ? '1020' : '1010';
+  const cashCode = cashAccountForMethod(method);
   const cashId = await getAccountId(cashCode, client);
   const arId = await getAccountId('1100', client);
   const lines = buildRefundJournalLines({ amount: refund.amount, cashId, arId });

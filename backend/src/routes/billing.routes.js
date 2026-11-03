@@ -10,12 +10,22 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const discountPresetService = require('../services/discount-presets.service');
 const zatcaService = require('../services/zatca.service');
+const tamaraService = require('../services/tamara.service');
 const { invoiceSchema, quoteSchema, paymentSchema, creditNoteSchema, refundSchema, discountPresetSchema } = require('../validators/schemas');
 const creditNoteService = require('../services/credit-note.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { listExtraBillingServices } = require('../constants/fieldVisit');
 
 const router = express.Router();
+
+/** Tamara server-to-server webhook — verified via notification JWT, not staff auth. */
+router.post('/tamara/webhook', async (req, res, next) => {
+  try {
+    const data = await tamaraService.handleWebhook(req);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.use(authenticate);
 
 const canOpenDiscount = (user) =>
@@ -347,6 +357,20 @@ router.post('/payments', authorize(PERMISSIONS.BILLING_PAYMENT), validate(paymen
   try {
     const data = await service.recordPayment(req.body, req.user.id, req);
     res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/invoices/:id/tamara/checkout', authorize(PERMISSIONS.BILLING_PAYMENT), async (req, res, next) => {
+  try {
+    const data = await tamaraService.createCheckout(req.params.id, req.user.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/invoices/:id/tamara/status', authorize(PERMISSIONS.BILLING_VIEW, PERMISSIONS.BILLING_PAYMENT), async (req, res, next) => {
+  try {
+    const data = await tamaraService.getCheckoutStatus(req.params.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
