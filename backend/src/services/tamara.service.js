@@ -8,6 +8,7 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const { AppError } = require('../middleware/errorHandler');
 const { uuidv4 } = require('../utils/uuid');
+const { notDeleted } = require('../utils/soft-delete-sql');
 const billing = require('./billing.service');
 
 const money = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -89,9 +90,10 @@ const loadInvoiceForCheckout = async (invoiceId) => {
   if (!(balance > 0.009)) {
     throw new AppError('Invoice has no balance due', 400, 'ALREADY_PAID');
   }
+  // customers has no email column in this LIMS schema — phone + name only.
   const cust = await query(
-    `SELECT id, full_name, full_name_ar, mobile, email, created_at
-     FROM customers WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, full_name, full_name_ar, mobile, created_at
+     FROM customers WHERE id = $1 AND ${notDeleted()}`,
     [invoice.customer_id]
   );
   const customer = cust.rows[0];
@@ -142,7 +144,6 @@ const buildCheckoutPayload = ({ invoice, customer, balance, phone, orderReferenc
       first_name: name.first_name,
       last_name: name.last_name,
       phone_number: phone,
-      ...(customer.email ? { email: customer.email } : {}),
     },
     shipping_address: address,
     billing_address: address,

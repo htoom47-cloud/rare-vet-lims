@@ -41,6 +41,7 @@ assert.ok(serviceSrc.includes('verifyWebhookToken'));
 assert.ok(serviceSrc.includes('recordTamaraPaymentOnce'));
 assert.ok(serviceSrc.includes('skipDayAssert: true'));
 assert.ok(serviceSrc.includes('alreadyPaidForCheckout'));
+assert.ok(!/SELECT[^;]*\bemail\b[^;]*FROM customers/i.test(serviceSrc));
 assert.ok(ledgerSrc.includes("method === 'tamara'"));
 assert.ok(billingSrc.includes('skipDayAssert'));
 assert.ok(envExample.includes('TAMARA_ENABLED'));
