@@ -21,7 +21,34 @@ const {
   hasCulturePayload,
   ensureCultureParameters,
   mapCultureToValues,
+  CULTURE_ANTIBIOTICS,
+  CULTURE_AST_PANEL_SETTINGS_KEY,
+  splitAntibioticList,
+  normalizePreferredPanel,
 } = require('../utils/culture-ast');
+const logger = require('../config/logger');
+
+const getPreferredAstPanel = async () => {
+  const result = await query(
+    `SELECT value FROM settings WHERE key = $1`,
+    [CULTURE_AST_PANEL_SETTINGS_KEY]
+  );
+  const list = normalizePreferredPanel(result.rows[0]?.value);
+  return list.length ? list : [...CULTURE_ANTIBIOTICS];
+};
+
+const rememberPreferredAstPanel = async (antibiotics, userId = null) => {
+  const list = splitAntibioticList(antibiotics);
+  if (!list.length) return null;
+  await query(
+    `INSERT INTO settings (key, value, updated_by)
+     VALUES ($1, $2::jsonb, $3)
+     ON CONFLICT (key) DO UPDATE
+       SET value = $2::jsonb, updated_by = $3, updated_at = NOW()`,
+    [CULTURE_AST_PANEL_SETTINGS_KEY, JSON.stringify({ antibiotics: list }), userId]
+  );
+  return list;
+};
 
 const formatQualValue = (value, unit) => {
   if (unit !== 'qual' || !value) return value;
@@ -309,6 +336,13 @@ const enterResults = async (data, userId) => {
 
     await client.query('COMMIT');
     committed = true;
+    if (Array.isArray(data.culture?.antibiotics)) {
+      try {
+        await rememberPreferredAstPanel(data.culture.antibiotics, userId);
+      } catch (prefErr) {
+        logger.warn('Could not remember culture AST panel preference', { message: prefErr.message });
+      }
+    }
     const stRow2 = await client.query('SELECT sample_id FROM sample_tests WHERE id = $1', [data.sample_test_id]);
     if (stRow2.rows[0]?.sample_id) {
       const lifecycle = require('./report-lifecycle.service');
@@ -689,4 +723,5 @@ module.exports = {
   getAttachments,
   clearSampleTestResults,
   clearSampleResultsByCode,
+  getPreferredAstPanel,
 };

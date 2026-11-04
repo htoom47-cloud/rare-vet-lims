@@ -50,24 +50,31 @@ export default function TechnicianWorkbench() {
   const [testValidated, setTestValidated] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [preferredAstPanel, setPreferredAstPanel] = useState(null);
 
   const load = () => {
     setLoading(true);
-    Promise.all([
+    const tasks = [
       samplesAPI.getQueue(),
       resultsAPI.critical(),
       samplesAPI.list({ awaiting_validation: true, limit: 50 }),
-    ])
-      .then(([queueRes, critRes, importedRes]) => {
+    ];
+    if (cultureAst) tasks.push(resultsAPI.cultureAstPanel().catch(() => ({ data: { data: null } })));
+    Promise.all(tasks)
+      .then(([queueRes, critRes, importedRes, panelRes]) => {
         setQueue(queueRes.data.data);
         setCritical(critRes.data.data);
         setImported(importedRes.data.data || []);
+        const antibiotics = panelRes?.data?.data?.antibiotics;
+        if (Array.isArray(antibiotics) && antibiotics.length) {
+          setPreferredAstPanel(antibiotics);
+        }
       })
       .catch((err) => toast.error(err.response?.data?.error?.message || t('common.error')))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [cultureAst]);
 
   useEffect(() => {
     const sampleId = searchParams.get('sample');
@@ -127,13 +134,17 @@ export default function TechnicianWorkbench() {
       test.test_name_ar = detail.name_ar || test.test_name_ar;
       test.test_name = detail.name || test.test_name;
       if (cultureAst && isCultureTest({ ...test, ...detail, test_code: detail.code || test.test_code })) {
-        nextCulture[test.id] = cultureFormFromFields(form[test.id], {
-          ...test,
-          test_code: detail.code || test.test_code,
-          category_code: detail.category_code || test.category_code,
-          test_name: detail.name || test.test_name,
-          test_name_ar: detail.name_ar || test.test_name_ar,
-        });
+        nextCulture[test.id] = cultureFormFromFields(
+          form[test.id],
+          {
+            ...test,
+            test_code: detail.code || test.test_code,
+            category_code: detail.category_code || test.category_code,
+            test_name: detail.name || test.test_name,
+            test_name_ar: detail.name_ar || test.test_name_ar,
+          },
+          preferredAstPanel,
+        );
       }
     }
     setSelectedSample({ ...data.data, tests: labTests });
@@ -148,10 +159,10 @@ export default function TechnicianWorkbench() {
 
     const payloads = selectedSample.tests
       .map((test) => {
-        if (cultureAst && isCultureTest(test) && cultureFormHasValue(cultureForm[test.id])) {
+        if (cultureAst && isCultureTest(test) && cultureFormHasValue(cultureForm[test.id], preferredAstPanel)) {
           return {
             sample_test_id: test.id,
-            culture: culturePayloadFromForm(cultureForm[test.id] || emptyCultureForm()),
+            culture: culturePayloadFromForm(cultureForm[test.id] || emptyCultureForm(preferredAstPanel)),
           };
         }
         const fields = resultForm[test.id] || [];
@@ -171,6 +182,9 @@ export default function TechnicianWorkbench() {
     try {
       for (const payload of payloads) {
         await resultsAPI.enter(payload);
+        if (Array.isArray(payload.culture?.antibiotics) && payload.culture.antibiotics.length) {
+          setPreferredAstPanel(payload.culture.antibiotics);
+        }
       }
       toast.success(t('workbench.saved'));
       setSelectedSample(null);
@@ -350,22 +364,24 @@ export default function TechnicianWorkbench() {
     );
   };
 
+  const blankCultureForm = () => emptyCultureForm(preferredAstPanel);
+
   const patchCulture = (testId, patch) => {
     setCultureForm((prev) => ({
       ...prev,
-      [testId]: { ...(prev[testId] || emptyCultureForm()), ...patch },
+      [testId]: { ...(prev[testId] || blankCultureForm()), ...patch },
     }));
   };
 
   const setCultureAst = (testId, antibiotic, rank) => {
-    const current = cultureForm[testId] || emptyCultureForm();
+    const current = cultureForm[testId] || blankCultureForm();
     patchCulture(testId, {
       ast: { ...current.ast, [antibiotic]: rank },
     });
   };
 
   const handleAddAntibiotic = (testId) => {
-    const current = cultureForm[testId] || emptyCultureForm();
+    const current = cultureForm[testId] || blankCultureForm();
     const { form, error } = addCultureAntibiotic(current, newAntibiotic[testId]);
     if (error === 'empty') {
       toast.error(isAr ? 'أدخل اسم المضاد' : 'Enter antibiotic name');
@@ -380,7 +396,7 @@ export default function TechnicianWorkbench() {
   };
 
   const handleRemoveAntibiotic = (testId, antibiotic) => {
-    const current = cultureForm[testId] || emptyCultureForm();
+    const current = cultureForm[testId] || blankCultureForm();
     setCultureForm((prev) => ({
       ...prev,
       [testId]: removeCultureAntibiotic(current, antibiotic),
@@ -388,7 +404,7 @@ export default function TechnicianWorkbench() {
   };
 
   const renderCultureFields = (test) => {
-    const form = cultureForm[test.id] || emptyCultureForm();
+    const form = cultureForm[test.id] || blankCultureForm();
     const antibiotics = Array.isArray(form.antibiotics) && form.antibiotics.length
       ? form.antibiotics
       : Object.keys(form.ast || {});
@@ -672,7 +688,7 @@ export default function TechnicianWorkbench() {
               <div className="flex justify-between items-center mb-3 gap-2">
                 <h4 className="font-semibold">{test.test_name}</h4>
                 {!testValidated[test.id] && (
-                  cultureFormHasValue(cultureForm[test.id])
+                  cultureFormHasValue(cultureForm[test.id], preferredAstPanel)
                   || (resultForm[test.id] || []).some((v) => String(v.value ?? '').trim() !== '')
                 ) && (
                   <button type="button" onClick={() => clearTestResults(test)} className="text-red-600 text-sm hover:underline">

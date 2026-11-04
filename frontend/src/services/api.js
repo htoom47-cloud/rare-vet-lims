@@ -184,6 +184,7 @@ export const testsAPI = {
 
 export const resultsAPI = {
   get: (sampleTestId) => api.get(`/results/sample-test/${sampleTestId}`),
+  cultureAstPanel: () => api.get('/results/culture-ast-panel'),
   enter: (data) => api.post('/results/enter', data),
   brucellaList: (params) => api.get('/results/brucella-list', { params }),
   saveBrucellaList: (data) => api.post('/results/brucella-list/save', data, { timeout: 180000 }),

@@ -44,8 +44,19 @@ withCustom.ast.Ceftiofur = 'high';
 withCustom.growth = 'Growth';
 const payload = culturePayloadFromForm(withCustom);
 same(payload.highly_sensitive, ['Ceftiofur']);
+assert.ok(Array.isArray(payload.antibiotics));
+assert.ok(payload.antibiotics.includes('Ceftiofur'));
+assert.ok(!payload.antibiotics.includes('Penicillin'));
 assert.ok(!payload.resistant.includes('Penicillin'));
 assert.ok(!payload.highly_sensitive.includes('Penicillin'));
+
+const fromPanel = cultureFormFromFields([
+  { code: 'GROWTH', value: 'Growth' },
+  { code: 'AST_PANEL', value: payload.antibiotics.join('\n') },
+  { code: 'SENS_HIGH', value: 'Ceftiofur' },
+]);
+assert.ok(!fromPanel.antibiotics.includes('Penicillin'));
+assert.ok(fromPanel.antibiotics.includes('Ceftiofur'));
 
 const loaded = cultureFormFromFields([
   { code: 'GROWTH', value: 'Growth' },

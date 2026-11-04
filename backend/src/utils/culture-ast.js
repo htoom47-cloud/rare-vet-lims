@@ -5,6 +5,7 @@
 
 const GROWTH_NO = 'No growth';
 const GROWTH_YES = 'Growth';
+const CULTURE_AST_PANEL_SETTINGS_KEY = 'culture_ast_panel';
 
 const CULTURE_ANTIBIOTICS = [
   'Enrofloxacin',
@@ -28,6 +29,7 @@ const CULTURE_PARAM_DEFS = [
   { code: 'GROWTH', name: 'Culture Result', name_ar: 'نتيجة المزرعة' },
   { code: 'ORGANISM', name: 'Organism', name_ar: 'الكائن المعزول' },
   { code: 'GRAM', name: 'Gram Stain', name_ar: 'صبغة جرام' },
+  { code: 'AST_PANEL', name: 'AST Panel', name_ar: 'قائمة المضادات' },
   { code: 'SENS_HIGH', name: 'Highly Sensitive', name_ar: 'حساس جداً' },
   { code: 'SENS_WEAK', name: 'Weakly Sensitive', name_ar: 'ضعيف الحساسية' },
   { code: 'SENS_RES', name: 'Resistant', name_ar: 'مقاوم' },
@@ -132,6 +134,7 @@ const hasCulturePayload = (culture) => {
   if (String(culture.organism || '').trim()) return true;
   if (String(culture.gram || '').trim()) return true;
   if (String(culture.notes || '').trim()) return true;
+  if (Array.isArray(culture.antibiotics)) return true;
   return splitAntibioticList(culture.highly_sensitive).length > 0
     || splitAntibioticList(culture.weak_sensitive).length > 0
     || splitAntibioticList(culture.resistant).length > 0;
@@ -173,6 +176,15 @@ const ensureCultureParameters = async (client, testId) => {
   return { byCode, growthCode };
 };
 
+const normalizePreferredPanel = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return splitAntibioticList(raw);
+  if (typeof raw === 'object') {
+    return splitAntibioticList(raw.antibiotics || raw.panel || raw.names);
+  }
+  return splitAntibioticList(raw);
+};
+
 const mapCultureToValues = (culture, { byCode, growthCode }) => {
   const noGrowth = isNoGrowthValue(culture.growth);
   const pairs = [
@@ -193,6 +205,17 @@ const mapCultureToValues = (culture, { byCode, growthCode }) => {
     if (!param?.id || !value) continue;
     values.push({ parameter_id: param.id, value });
   }
+
+  // Persist editable panel membership (may be empty after removals).
+  if (Array.isArray(culture.antibiotics)) {
+    const panelParam = byCode.get('AST_PANEL');
+    if (panelParam?.id) {
+      values.push({
+        parameter_id: panelParam.id,
+        value: joinAntibioticList(culture.antibiotics),
+      });
+    }
+  }
   return values;
 };
 
@@ -201,6 +224,7 @@ module.exports = {
   GROWTH_YES,
   CULTURE_ANTIBIOTICS,
   CULTURE_PARAM_DEFS,
+  CULTURE_AST_PANEL_SETTINGS_KEY,
   SENS_CODES,
   isCultureTest,
   isCultureRow,
@@ -216,4 +240,5 @@ module.exports = {
   resolveGrowthCode,
   ensureCultureParameters,
   mapCultureToValues,
+  normalizePreferredPanel,
 };

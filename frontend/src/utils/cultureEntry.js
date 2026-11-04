@@ -77,8 +77,12 @@ const emptyAst = (antibiotics = CULTURE_ANTIBIOTICS) => (
   Object.fromEntries(antibiotics.map((ab) => [ab, '']))
 );
 
-export const emptyCultureForm = () => {
-  const antibiotics = [...CULTURE_ANTIBIOTICS];
+export const emptyCultureForm = (preferredAntibiotics = null) => {
+  const antibiotics = uniqueAntibiotics(
+    Array.isArray(preferredAntibiotics) && preferredAntibiotics.length
+      ? preferredAntibiotics
+      : CULTURE_ANTIBIOTICS
+  );
   return {
     specimen: '',
     growth: '',
@@ -90,8 +94,11 @@ export const emptyCultureForm = () => {
   };
 };
 
-export const cultureFormFromFields = (fields = [], test = {}) => {
-  const form = emptyCultureForm();
+export const cultureFormFromFields = (fields = [], test = {}, preferredAntibiotics = null) => {
+  const seedPanel = Array.isArray(preferredAntibiotics) && preferredAntibiotics.length
+    ? preferredAntibiotics
+    : CULTURE_ANTIBIOTICS;
+  const form = emptyCultureForm(seedPanel);
   const byCode = new Map((fields || []).map((p) => [String(p.code || '').toUpperCase(), p]));
   const growthField = byCode.get('GROWTH') || byCode.get('CEC') || byCode.get('RESULT');
   const rawGrowth = growthField?.value || '';
@@ -105,12 +112,16 @@ export const cultureFormFromFields = (fields = [], test = {}) => {
   form.gram = byCode.get('GRAM')?.value || '';
   form.notes = byCode.get('CULT_NOTES')?.value || byCode.get('NOTES')?.value || '';
 
-  const savedNames = [
+  const panelSaved = splitList(byCode.get('AST_PANEL')?.value);
+  const classifiedNames = [
     ...splitList(byCode.get('SENS_HIGH')?.value),
     ...splitList(byCode.get('SENS_WEAK')?.value),
     ...splitList(byCode.get('SENS_RES')?.value),
   ];
-  form.antibiotics = uniqueAntibiotics([...CULTURE_ANTIBIOTICS, ...savedNames]);
+  // Prefer this result's saved panel; else lab preferred panel; else defaults ∪ classified.
+  form.antibiotics = panelSaved.length
+    ? uniqueAntibiotics(panelSaved)
+    : uniqueAntibiotics([...seedPanel, ...classifiedNames]);
   form.ast = emptyAst(form.antibiotics);
 
   const assign = (list, rank) => {
@@ -136,10 +147,11 @@ const antibioticOrder = (form = emptyCultureForm()) => {
 };
 
 export const culturePayloadFromForm = (form = emptyCultureForm()) => {
+  const antibiotics = antibioticOrder(form);
   const highly = [];
   const weak = [];
   const resistant = [];
-  for (const name of antibioticOrder(form)) {
+  for (const name of antibiotics) {
     const rank = form.ast?.[name];
     if (rank === 'high') highly.push(name);
     else if (rank === 'weak') weak.push(name);
@@ -151,6 +163,7 @@ export const culturePayloadFromForm = (form = emptyCultureForm()) => {
     growth: form.growth,
     organism: noGrowth ? '' : String(form.organism || '').trim(),
     gram: noGrowth ? '' : String(form.gram || '').trim(),
+    antibiotics,
     highly_sensitive: noGrowth ? [] : highly,
     weak_sensitive: noGrowth ? [] : weak,
     resistant: noGrowth ? [] : resistant,
@@ -158,14 +171,24 @@ export const culturePayloadFromForm = (form = emptyCultureForm()) => {
   };
 };
 
-export const cultureFormHasValue = (form) => {
+export const cultureFormHasValue = (form, preferredAntibiotics = null) => {
   if (!form) return false;
   if (String(form.growth || '').trim()) return true;
   if (String(form.specimen || '').trim()) return true;
   if (String(form.organism || '').trim()) return true;
   if (String(form.gram || '').trim()) return true;
   if (String(form.notes || '').trim()) return true;
-  return Object.values(form.ast || {}).some(Boolean);
+  if (Object.values(form.ast || {}).some(Boolean)) return true;
+  if (Array.isArray(form.antibiotics)) {
+    const seed = uniqueAntibiotics(
+      Array.isArray(preferredAntibiotics) && preferredAntibiotics.length
+        ? preferredAntibiotics
+        : CULTURE_ANTIBIOTICS
+    ).join('\n').toLowerCase();
+    const current = uniqueAntibiotics(form.antibiotics).join('\n').toLowerCase();
+    if (current !== seed) return true;
+  }
+  return false;
 };
 
 export const addCultureAntibiotic = (form = emptyCultureForm(), name) => {

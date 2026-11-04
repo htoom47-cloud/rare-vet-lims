@@ -110,6 +110,7 @@ const cultureEntrySchema = Joi.object({
   growth: Joi.string().allow('', null),
   organism: Joi.string().allow('', null),
   gram: Joi.string().allow('', null),
+  antibiotics: Joi.array().items(Joi.string().allow('')).optional(),
   highly_sensitive: Joi.array().items(Joi.string().allow('')).default([]),
   weak_sensitive: Joi.array().items(Joi.string().allow('')).default([]),
   resistant: Joi.array().items(Joi.string().allow('')).default([]),
@@ -131,6 +132,7 @@ const resultEntrySchema = Joi.object({
   const hasCulture = [
     culture.growth, culture.specimen, culture.organism, culture.gram, culture.notes,
   ].some((v) => String(v || '').trim() !== '')
+    || Array.isArray(culture.antibiotics)
     || (culture.highly_sensitive || []).some((v) => String(v || '').trim() !== '')
     || (culture.weak_sensitive || []).some((v) => String(v || '').trim() !== '')
     || (culture.resistant || []).some((v) => String(v || '').trim() !== '');

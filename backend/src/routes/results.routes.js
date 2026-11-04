@@ -79,6 +79,13 @@ const handleUpload = (req, res, next) => {
 const router = express.Router();
 router.use(authenticate);
 
+router.get('/culture-ast-panel', authorize(PERMISSIONS.RESULTS_VIEW, PERMISSIONS.RESULTS_ENTER, PERMISSIONS.RESULTS_EDIT), async (req, res, next) => {
+  try {
+    const antibiotics = await service.getPreferredAstPanel();
+    res.json({ success: true, data: { antibiotics } });
+  } catch (err) { next(err); }
+});
+
 router.get('/critical', authorize(PERMISSIONS.RESULTS_VIEW), async (req, res, next) => {
   try {
     const data = await service.getCriticalAlerts();
