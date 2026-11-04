@@ -7,6 +7,7 @@ const { ensureAdmin } = require('./ensure-admin');
 const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ensureElisaCatalog } = require('./ensure-elisa-catalog');
 const { ensureUrineCatalog } = require('./ensure-urine');
+const { ensureDiarrheaCausesCatalog } = require('./ensure-diarrhea-causes');
 const { syncPermissionsCatalog, syncRolePermissions } = require('../utils/sync-permissions');
 
 async function syncLabContactInfo(client) {
@@ -588,6 +589,11 @@ async function applyPatches() {
       await ensureUrineCatalog();
     } catch (urineErr) {
       logger.warn('Urine catalog ensure failed — continuing migrate', { error: urineErr.message });
+    }
+    try {
+      await ensureDiarrheaCausesCatalog();
+    } catch (diarrErr) {
+      logger.warn('Diarrhea causes catalog ensure failed — continuing migrate', { error: diarrErr.message });
     }
     await client.query(`
       UPDATE test_parameters tp

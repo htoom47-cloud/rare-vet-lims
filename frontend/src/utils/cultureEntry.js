@@ -29,6 +29,7 @@ export const GRAM_PRESETS = [
 ];
 
 const PARASITE_EXCLUDE = /PARAS-|BRUCELLA|^BRU-ROSE|ELISA/i;
+const DIARRHEA_AG_EXCLUDE = /DIARR|مسبب.*اسهال|مسبب.*إسهال|diarrhea/i;
 const CULTURE_NAME_RE = /مسح|تزريع|مزرعة|culture|smear/i;
 const BLOOD_SMEAR_ONLY_RE = /طفيلي|parasite|blood smear|مسحة دم/i;
 const UTERINE_OR_CULTURE_RE = /رحم|uterine|تزريع|culture|مزرعة/i;
@@ -38,6 +39,10 @@ export const isCultureTest = (test = {}) => {
   const cat = String(test.category_code || test.categoryCode || '').toUpperCase();
   const name = `${test.test_name || test.name || ''} ${test.test_name_ar || test.name_ar || ''}`;
   if (PARASITE_EXCLUDE.test(code)) return false;
+  // Rapid diarrhea Ag panel uses generic Pos/Neg params — never Culture AST.
+  if (code === 'DIARR-AG' || DIARRHEA_AG_EXCLUDE.test(code) || DIARRHEA_AG_EXCLUDE.test(name)) {
+    return false;
+  }
   if (cat === 'CULT') return true;
   if (/CULT|SMEAR/.test(code)) return true;
   if (CULTURE_NAME_RE.test(name)) {

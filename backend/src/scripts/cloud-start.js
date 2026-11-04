@@ -67,6 +67,7 @@ const bootScripts = [
   'src/scripts/ensure-result-attachments.js',
   'src/scripts/ensure-parasitology.js',
   'src/scripts/ensure-urine.js',
+  'src/scripts/ensure-diarrhea-causes.js',
 ];
 
 if (process.env.RUN_SEED === 'true') {
