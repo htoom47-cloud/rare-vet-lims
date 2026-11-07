@@ -15,17 +15,34 @@ export default function PortalReports() {
   const isAr = i18n.language === 'ar';
 
   useEffect(() => {
-    Promise.all([
-      portalReportsAPI.list({ limit: 100 }),
-      portalDashboardAPI.get(),
-    ])
-      .then(([reportsRes, dashRes]) => {
-        setReports(reportsRes.data.data);
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const reportsRes = await portalReportsAPI.list({ limit: 100 });
+        if (!cancelled) setReports(reportsRes.data.data || []);
+      } catch {
+        if (!cancelled) {
+          setReports([]);
+          toast.error(t('portal.loadFailed'));
+        }
+        return;
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+
+      // Alerts are optional — dashboard failures must not hide the report list.
+      try {
+        const dashRes = await portalDashboardAPI.get();
+        if (cancelled) return;
         const newAlert = dashRes.data.data?.alerts?.find((a) => a.type === 'new_reports');
         setNewReportCount(newAlert?.count || 0);
-      })
-      .catch(() => toast.error(t('portal.loadFailed')))
-      .finally(() => setLoading(false));
+      } catch {
+        if (!cancelled) setNewReportCount(0);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, [t]);
 
   return (

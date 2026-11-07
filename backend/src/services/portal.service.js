@@ -343,15 +343,33 @@ const latestResultsForAnimal = async (customerIds, animalId) => {
   const reports = await fetchAnimalReports(ids, animalId, 1);
   if (!reports[0]) return { results: [], report: null };
   await assertReportOwnership(reports[0].id, ids);
-  const preview = await reportsService.getPreview(reports[0].id);
-  const safe = sanitizePortalPreview(preview);
-  return {
-    results: safe.results || [],
-    sections: safe.sections || [],
-    summary: safe.summary || null,
-    flags: safe.flags || null,
-    report: reports[0],
-  };
+  try {
+    const preview = await reportsService.getPreview(reports[0].id);
+    const safe = sanitizePortalPreview(preview);
+    return {
+      results: safe.results || [],
+      sections: safe.sections || [],
+      summary: safe.summary || null,
+      flags: safe.flags || null,
+      report: reports[0],
+    };
+  } catch (err) {
+    // One corrupt/unreadable report must not break the whole portal dashboard.
+    logger.warn('Portal animal preview failed', {
+      animalId,
+      reportId: reports[0].id,
+      message: err.message,
+      code: err.code,
+    });
+    return {
+      results: [],
+      sections: [],
+      summary: null,
+      flags: null,
+      report: reports[0],
+      previewError: true,
+    };
+  }
 };
 
 const buildPanels = (results) => buildPanelDetails(results);
@@ -542,13 +560,15 @@ const getDashboard = async (customerIds) => {
   const stats = statsResult.rows[0] || { report_count: 0, animal_count: 0, new_reports_7d: 0 };
 
   const animals = await listAnimals(ids);
-  const animalSummaries = await Promise.all(
-    animals.slice(0, 12).map(async (row) => {
+  // Cap and isolate previews: one heavy/corrupt report must not 502 the whole portal.
+  const animalSummaries = [];
+  for (const row of animals.slice(0, 8)) {
+    try {
       const { results } = await latestResultsForAnimal(ids, row.id);
       const panels = buildPanels(results);
       const panelSummary = summarizeResults(results);
       const abnormalPanels = panels.filter((p) => p.status === 'abnormal').length;
-      return {
+      animalSummaries.push({
         id: row.id,
         code: row.animal_code,
         name: row.name_tag,
@@ -562,9 +582,30 @@ const getDashboard = async (customerIds) => {
         criticalCount: countCriticalFlags(results),
         abnormalCount: panelSummary.abnormal,
         overallStatus: panelSummary.overallStatus,
-      };
-    })
-  );
+      });
+    } catch (err) {
+      logger.warn('Portal dashboard animal summary failed', {
+        animalId: row.id,
+        message: err.message,
+        code: err.code,
+      });
+      animalSummaries.push({
+        id: row.id,
+        code: row.animal_code,
+        name: row.name_tag,
+        type: row.animal_type,
+        gender: row.gender,
+        age: row.age,
+        reportCount: row.report_count,
+        latestReportAt: row.latest_report_at,
+        panels: [],
+        hasAbnormal: false,
+        criticalCount: 0,
+        abnormalCount: 0,
+        overallStatus: 'unknown',
+      });
+    }
+  }
 
   const recent = await listReports(ids, { page: 1, limit: 6 });
 
