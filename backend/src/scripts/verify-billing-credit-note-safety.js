@@ -295,7 +295,8 @@ check('ledger createEntry checks duplicate source and balanced lines', () => {
 
 check('invoice and payment ledger posting happen inside the same transaction', () => {
   assert.ok(/ledger\.postInvoice\(issued, userId, client\)/.test(createInvoiceSrc));
-  assert.ok(/syncCustomerArBalance\(data.customer_id, client\)/.test(createInvoiceSrc));
+  // Supervised billing resolves customerId before ledger + AR sync (not always data.customer_id).
+  assert.ok(/syncCustomerArBalance\(customerId, client\)/.test(createInvoiceSrc));
   assert.ok(/withBillingClient/.test(createInvoiceSrc));
   assert.ok(!/ledger optional/.test(createInvoiceSrc));
   assert.ok(/ledger\.postPayment\(payment, invoice, userId, client\)/.test(recordPaymentSrc));

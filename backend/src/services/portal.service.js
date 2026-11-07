@@ -429,12 +429,13 @@ const getComparison = async (customerIds, animalId, reportIds = []) => {
     throw new AppError('At least two reports are required for comparison', 400, 'NEED_MORE_REPORTS');
   }
 
-  const previews = await Promise.all(
-    reports.map(async (row) => {
-      await assertReportOwnership(row.id, ids);
+  const previews = [];
+  for (const row of reports) {
+    await assertReportOwnership(row.id, ids);
+    try {
       const preview = await reportsService.getPreview(row.id);
       const safe = sanitizePortalPreview(preview);
-      return {
+      previews.push({
         id: row.id,
         reportNumber: row.report_number,
         sampleCode: row.sample_code,
@@ -442,9 +443,19 @@ const getComparison = async (customerIds, animalId, reportIds = []) => {
         results: safe.results || [],
         sections: safe.sections || [],
         sectionSignature: safe.sectionSignature || [],
-      };
-    })
-  );
+      });
+    } catch (err) {
+      logger.warn('Portal comparison preview failed', {
+        reportId: row.id,
+        animalId,
+        message: err.message,
+        code: err.code,
+      });
+    }
+  }
+  if (previews.length < 2) {
+    throw new AppError('Could not load enough reports for comparison', 400, 'NEED_MORE_REPORTS');
+  }
 
   const paramMap = new Map();
   for (const report of previews) {
@@ -756,8 +767,19 @@ const getTrends = async (customerIds, animalId, parameterCode, limit = 15) => {
 
   for (const row of reports) {
     await assertReportOwnership(row.id, ids);
-    const preview = await reportsService.getPreview(row.id);
-    const safe = sanitizePortalPreview(preview);
+    let safe;
+    try {
+      const preview = await reportsService.getPreview(row.id);
+      safe = sanitizePortalPreview(preview);
+    } catch (err) {
+      logger.warn('Portal trend preview failed', {
+        reportId: row.id,
+        animalId,
+        message: err.message,
+        code: err.code,
+      });
+      continue;
+    }
     const results = safe.results || [];
     const match = results.find((r) => r.code === parameterCode);
     if (!match) continue;

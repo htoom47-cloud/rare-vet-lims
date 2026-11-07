@@ -15,6 +15,8 @@ const reportsPage = fs.readFileSync(
 assert.ok(portalSrc.includes('Portal animal preview failed'));
 assert.ok(portalSrc.includes('previewError: true'));
 assert.ok(portalSrc.includes('Portal dashboard animal summary failed'));
+assert.ok(portalSrc.includes('Portal comparison preview failed'));
+assert.ok(portalSrc.includes('Portal trend preview failed'));
 assert.ok(portalSrc.includes('animals.slice(0, 8)'));
 
 assert.ok(reportsPage.includes('portalReportsAPI.list'));

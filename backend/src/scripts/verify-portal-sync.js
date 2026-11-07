@@ -74,25 +74,30 @@ check('Results Entered hidden from portal', () => {
 });
 
 check('Approved visible', () => {
-  const row = { lab_specialist_approved_by: 'u1', pdf_url: null, is_final: false };
+  // Portal requires an approved/published report AND a PDF (send-ready).
+  const row = { lab_specialist_approved_by: 'u1', pdf_url: '/uploads/r.pdf', is_final: false };
   const lifecycle = portalSync.resolveReportLifecycle(row, { hasValidatedResults: true });
   assert.strictEqual(lifecycle, portalSync.LIFECYCLE.APPROVED);
-  assert.strictEqual(portalSync.isPortalVisible(lifecycle), true);
+  assert.strictEqual(portalSync.isPortalVisible(lifecycle, row), true);
+  assert.strictEqual(
+    portalSync.isPortalVisible(lifecycle, { ...row, pdf_url: null }),
+    false
+  );
 });
 
 check('Published visible', () => {
   const row = { pdf_url: '/uploads/r.pdf', is_final: true };
   const lifecycle = portalSync.resolveReportLifecycle(row, { hasValidatedResults: true });
   assert.strictEqual(lifecycle, portalSync.LIFECYCLE.PUBLISHED);
-  assert.strictEqual(portalSync.isPortalVisible(lifecycle), true);
+  assert.strictEqual(portalSync.isPortalVisible(lifecycle, row), true);
 });
 
 check('Reviewed hidden unless PORTAL_SHOW_REVIEWED', () => {
   const row = { pdf_url: '/uploads/r.pdf', is_final: false };
   const lifecycle = portalSync.resolveReportLifecycle(row, { hasValidatedResults: true });
   assert.strictEqual(lifecycle, portalSync.LIFECYCLE.REVIEWED);
-  assert.strictEqual(portalSync.isPortalVisible(lifecycle, { showReviewed: false }), false);
-  assert.strictEqual(portalSync.isPortalVisible(lifecycle, { showReviewed: true }), true);
+  assert.strictEqual(portalSync.isPortalVisible(lifecycle, row, { showReviewed: false }), false);
+  assert.strictEqual(portalSync.isPortalVisible(lifecycle, row, { showReviewed: true }), true);
 });
 
 check('PDF url on unified view (pdf_url + pdfUrl)', () => {
