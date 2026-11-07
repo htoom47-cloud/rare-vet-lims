@@ -133,7 +133,8 @@ body[dir='rtl'] {
   margin-top: 6px;
 }
 
-/* Keep recommendations tight against the first results box below */
+/* Keep doctor notes tight against the first results box below */
+.report-main > .section--results-summary + *,
 .report-main > .section--recommendations + * {
   margin-top: 4px;
 }
@@ -344,6 +345,7 @@ body[dir='rtl'] {
   break-inside: auto;
 }
 
+.section--results-summary,
 .section--recommendations {
   margin-bottom: 0;
 }
@@ -1025,6 +1027,7 @@ body[dir='rtl'] {
     margin-top: 6px;
   }
 
+  .report-main > .section--results-summary + *,
   .report-main > .section--recommendations + * {
     margin-top: 4px;
   }

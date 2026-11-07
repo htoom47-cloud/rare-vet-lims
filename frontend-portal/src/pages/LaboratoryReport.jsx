@@ -350,7 +350,7 @@ export default function LaboratoryReport({ initialReport = null, backPath = '/re
 
         {interpretationText && (
           <section className="lab-rpt-recs lab-rpt-recs--interp" dir={isAr ? 'rtl' : 'ltr'}>
-            <div className="lab-rpt-recs-head">{t('labReport.interpretation')}</div>
+            <div className="lab-rpt-recs-head">{t('labReport.resultsSummary')}</div>
             <div className="lab-rpt-recs-body">
               <p className="lab-rpt-recs-text">{interpretationText}</p>
             </div>

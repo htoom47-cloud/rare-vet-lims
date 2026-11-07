@@ -312,6 +312,7 @@ export const reportsAPI = {
   generate: (sampleId, opts = {}) =>
     api.post(`/reports/generate/${sampleId}`, {
       language: opts.language ?? 'ar',
+      ai_interpretation: opts.ai_interpretation ?? '',
       treatment_recommendations: opts.treatment_recommendations ?? '',
       approve_lab: opts.approve_lab ?? false,
       approve_vet: opts.approve_vet ?? false,

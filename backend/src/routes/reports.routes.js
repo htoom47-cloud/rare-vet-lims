@@ -40,6 +40,7 @@ router.post('/generate/:sampleId', authorize(PERMISSIONS.REPORTS_GENERATE), asyn
       req.user.role_name,
       req.body.language || 'ar',
       {
+        ai_interpretation: req.body.ai_interpretation,
         treatment_recommendations: req.body.treatment_recommendations,
         approve_lab: req.body.approve_lab,
         approve_vet: req.body.approve_vet,

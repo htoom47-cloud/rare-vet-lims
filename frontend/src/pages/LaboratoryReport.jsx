@@ -118,6 +118,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   const [exportingPdf, setExportingPdf] = useState(false);
   const [regeneratingPdf, setRegeneratingPdf] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
+  const [summaryValue, setSummaryValue] = useState('');
   const [notesValue, setNotesValue] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -306,6 +307,7 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
   };
 
   const handleEditNotes = () => {
+    setSummaryValue(report?.interpretation || '');
     setNotesValue(report?.recommendations || '');
     setEditingNotes(true);
   };
@@ -314,9 +316,13 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
     if (!id) return;
     setSavingNotes(true);
     try {
-      await reportsAPI.updateNotes(id, { treatment_recommendations: notesValue });
+      await reportsAPI.updateNotes(id, {
+        ai_interpretation: summaryValue,
+        treatment_recommendations: notesValue,
+      });
       setReport((prev) => prev ? {
         ...prev,
+        interpretation: summaryValue || null,
         recommendations: notesValue || null,
         smartLifecycle: prev.smartLifecycle
           ? { ...prev.smartLifecycle, isUpToDate: false, needsUpdate: true }
@@ -408,12 +414,20 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
         <div className="no-print max-w-[210mm] mx-auto mb-4">
           {editingNotes ? (
             <div className="border rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3">
+              <label className="text-sm font-medium">{t('reports.resultsSummarySection')}</label>
+              <textarea
+                value={summaryValue}
+                onChange={(e) => setSummaryValue(e.target.value)}
+                dir={isAr ? 'rtl' : 'ltr'}
+                className="input-field w-full min-h-[90px]"
+                placeholder={t('reports.resultsSummaryPlaceholder')}
+              />
               <label className="text-sm font-medium">{t('reports.treatmentSection')}</label>
               <textarea
                 value={notesValue}
                 onChange={(e) => setNotesValue(e.target.value)}
                 dir={isAr ? 'rtl' : 'ltr'}
-                className="input-field w-full min-h-[100px]"
+                className="input-field w-full min-h-[90px]"
                 placeholder={t('reports.treatmentPlaceholder')}
               />
               <div className="flex gap-2 justify-end">
@@ -626,8 +640,11 @@ export default function LaboratoryReport({ demoMode = false, initialReport = nul
           </section>
         )}
 
-        {(report.recommendations) && (
-          <div className="lab-rpt-notes">
+        {(report.interpretation || report.recommendations) && (
+          <div className="lab-rpt-notes space-y-2">
+            {report.interpretation && (
+              <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.resultsSummary')}:</b> {report.interpretation}</p>
+            )}
             {report.recommendations && (
               <p dir={isAr ? 'rtl' : 'ltr'}><b>{t('labReport.recommendations')}:</b> {report.recommendations}</p>
             )}

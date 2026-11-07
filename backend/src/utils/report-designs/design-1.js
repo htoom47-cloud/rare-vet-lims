@@ -447,17 +447,22 @@ const drawMicroscopeImages = async (doc, attachments) => {
   doc.y = rowY + 2;
 };
 
-const drawNotes = (doc, treatment) => {
-  const treat = (treatment || '').trim();
-  if (!treat) return;
+const drawNotesBlock = (doc, text, titleEn, titleAr) => {
+  const body = (text || '').trim();
+  if (!body) return;
 
   ensureSpace(doc, 30);
   const y = doc.y;
-  bilingualBar(doc, TX, y, TW, 14, 'Recommendations', 'التوصيات العلاجية', BRAND.gold, { size: 7 });
+  bilingualBar(doc, TX, y, TW, 14, titleEn, titleAr, BRAND.gold, { size: 7 });
   doc.y = y + 16;
-  if (hasAr(treat)) flowArabic(doc, treat, TW - 8);
-  else flowLatin(doc, treat, TW - 8);
+  if (hasAr(body)) flowArabic(doc, body, TW - 8);
+  else flowLatin(doc, body, TW - 8);
   doc.y += 4;
+};
+
+const drawNotes = (doc, summary, treatment) => {
+  drawNotesBlock(doc, summary, 'Results Summary', 'ملخص النتائج');
+  drawNotesBlock(doc, treatment, 'Recommendations', 'التوصيات العلاجية');
 };
 
 const drawCheck = (doc, x, y, size = 10) => {
@@ -595,7 +600,7 @@ const generateStandardPDF = async (reportData, outputDir, options = {}) => {
 
       drawResultsTable(doc, reportData.results, reportData);
       await drawMicroscopeImages(doc, reportData.attachments);
-      drawNotes(doc, reportData.treatmentRecommendations);
+      drawNotes(doc, reportData.aiInterpretation, reportData.treatmentRecommendations);
       drawApprovals(doc, reportData);
       await drawFooter(doc, reportData);
       stampPageFooters(doc, reportData);

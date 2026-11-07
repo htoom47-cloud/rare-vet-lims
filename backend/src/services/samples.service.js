@@ -146,6 +146,9 @@ const list = async ({ status, search, awaiting_validation, page, limit, reportab
             (SELECT rep.treatment_recommendations FROM reports rep
              WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
              ORDER BY rep.created_at DESC LIMIT 1) as treatment_recommendations,
+            (SELECT rep.ai_interpretation FROM reports rep
+             WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
+             ORDER BY rep.created_at DESC LIMIT 1) as ai_interpretation,
             (SELECT rep.language FROM reports rep
              WHERE rep.sample_id = s.id AND rep.deleted_at IS NULL
              ORDER BY rep.created_at DESC LIMIT 1) as report_language,

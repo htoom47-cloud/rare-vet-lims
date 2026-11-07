@@ -313,7 +313,7 @@ const drawResultOverview = (doc, y, counts, lang = 'ar') => {
   const h = 26;
   roundRect(doc, TX, y, TW, h, 3, BRAND.slateLight, BRAND.border);
   if (isAr) {
-    cellAr(doc, 'ملخص النتائج', TX + 8, y + 3, 120, { size: FS.sectionHead, weight: 'semibold', color: BRAND.slateDark, align: 'right' });
+    cellAr(doc, 'نظرة عامة على النتائج', TX + 8, y + 3, 120, { size: FS.sectionHead, weight: 'semibold', color: BRAND.slateDark, align: 'right' });
   } else {
     cellEn(doc, 'Result Overview', TX + 8, y + 3, 120, { size: FS.sectionHead, weight: 'semibold', color: BRAND.slateDark });
   }

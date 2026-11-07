@@ -84,6 +84,7 @@ export default function Reports() {
 
   const [selectedSample, setSelectedSample] = useState(null);
   const [language, setLanguage] = useState('ar');
+  const [resultsSummary, setResultsSummary] = useState('');
   const [treatment, setTreatment] = useState('');
   const [approveLabOnGenerate, setApproveLabOnGenerate] = useState(false);
   const [approveVetOnGenerate, setApproveVetOnGenerate] = useState(false);
@@ -153,9 +154,13 @@ export default function Reports() {
 
   const openGenerateForSample = (sample) => {
     setSelectedSample(sample);
-    const fromSample = sample.treatment_recommendations;
-    const fromList = reports.find((r) => r.sample_id === sample.id)?.treatment_recommendations;
-    setTreatment(fromSample || fromList || '');
+    const listRow = reports.find((r) => r.sample_id === sample.id);
+    setResultsSummary(
+      sample.ai_interpretation || listRow?.ai_interpretation || ''
+    );
+    setTreatment(
+      sample.treatment_recommendations || listRow?.treatment_recommendations || ''
+    );
     setLanguage(sample.report_language === 'en' ? 'en' : 'ar');
     setApproveLabOnGenerate(false);
     setApproveVetOnGenerate(false);
@@ -229,6 +234,7 @@ export default function Reports() {
     try {
       const run = () => reportsAPI.generate(selectedSample.id, {
         language,
+        ai_interpretation: resultsSummary,
         treatment_recommendations: treatment,
         approve_lab: approveLabOnGenerate,
         approve_vet: approveVetOnGenerate,
@@ -550,15 +556,29 @@ export default function Reports() {
 
             <div className="border border-primary-300/50 rounded-lg overflow-hidden">
               <div className="bg-primary-400 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
+                <Stethoscope size={16} /> {t('reports.resultsSummarySection')}
+              </div>
+              <textarea
+                value={resultsSummary}
+                onChange={(e) => setResultsSummary(e.target.value)}
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
+                className={`input-field border-0 rounded-none min-h-[100px] ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={t('reports.resultsSummaryPlaceholder')}
+                rows={4}
+              />
+              <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50 border-b border-primary-100">
+                {t('reports.resultsSummaryHint')}
+              </p>
+              <div className="bg-primary-400 text-white px-3 py-2 text-sm font-medium flex items-center gap-2">
                 <Stethoscope size={16} /> {t('reports.treatmentSection')}
               </div>
               <textarea
                 value={treatment}
                 onChange={(e) => setTreatment(e.target.value)}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
-                className={`input-field border-0 rounded-none min-h-[120px] ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`input-field border-0 rounded-none min-h-[100px] ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={t('reports.treatmentPlaceholder')}
-                rows={5}
+                rows={4}
               />
               <p className="text-xs text-primary-500 px-3 py-2 bg-primary-50/50">
                 {selectedSample.latest_report_id || Number(selectedSample.reports_count) > 0

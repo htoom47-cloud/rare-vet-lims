@@ -540,13 +540,29 @@ const loadGenerateEligibility = async (sampleId) => {
 };
 
 const reuseExistingReportRow = async (existing, options) => {
+  const notesPatch = {};
+  let notesChanged = false;
+
   if (options.treatment_recommendations !== undefined) {
     const next = (options.treatment_recommendations || '').trim() || null;
     const prev = (existing.treatment_recommendations || '').trim() || null;
     if (next !== prev) {
-      await updateNotes(existing.id, { treatment_recommendations: options.treatment_recommendations });
-      return regeneratePdfById(existing.id);
+      notesPatch.treatment_recommendations = options.treatment_recommendations;
+      notesChanged = true;
     }
+  }
+  if (options.ai_interpretation !== undefined) {
+    const next = (options.ai_interpretation || '').trim() || null;
+    const prev = (existing.ai_interpretation || '').trim() || null;
+    if (next !== prev) {
+      notesPatch.ai_interpretation = options.ai_interpretation;
+      notesChanged = true;
+    }
+  }
+
+  if (notesChanged) {
+    await updateNotes(existing.id, notesPatch);
+    return regeneratePdfById(existing.id);
   }
   return getById(existing.id);
 };
@@ -561,7 +577,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
 
   if (!prelimEnabled) {
     const existingReport = await query(
-      `SELECT id, treatment_recommendations FROM reports
+      `SELECT id, treatment_recommendations, ai_interpretation FROM reports
        WHERE sample_id = $1 AND deleted_at IS NULL
        ORDER BY created_at DESC LIMIT 1`,
       [sampleId]
@@ -594,7 +610,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
     }
 
     const existingReport = await query(
-      `SELECT id, treatment_recommendations, is_final FROM reports
+      `SELECT id, treatment_recommendations, ai_interpretation, is_final FROM reports
        WHERE sample_id = $1 AND deleted_at IS NULL
        ORDER BY created_at DESC LIMIT 1`,
       [sampleId]
@@ -611,6 +627,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
 
   const reportNumber = generateCode('RPT');
   const verificationCode = uuidv4().slice(0, 12).toUpperCase();
+  const aiInterpretation = (options.ai_interpretation || '').trim();
   const treatmentRecommendations = (options.treatment_recommendations || '').trim();
 
   const approveLab = options.approve_lab && canApproveAsLab(userRole);
@@ -636,6 +653,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
     verificationCode,
     language,
     generatedBy: userId,
+    aiInterpretation,
     treatmentRecommendations,
     labApproval,
     vetApproval,
@@ -654,7 +672,7 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
   }
 
   const dupBeforeInsert = await query(
-    `SELECT id, treatment_recommendations, is_final FROM reports
+    `SELECT id, treatment_recommendations, ai_interpretation, is_final FROM reports
      WHERE sample_id = $1 AND deleted_at IS NULL
      ORDER BY created_at DESC LIMIT 1`,
     [sampleId]
@@ -682,10 +700,11 @@ const generate = async (sampleId, userId, userRole, language = 'ar', options = {
        vet_approved_by, vet_approved_at,
        is_final
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11, $12, $13)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING *`,
     [
       uuidv4(), reportNumber, sampleId, savedPdf.url, verificationCode, userId, language,
+      aiInterpretation || null,
       treatmentRecommendations || null,
       approveLab ? userId : null,
       approveLab ? now : null,

@@ -116,7 +116,7 @@ const buildPatientSection = (data, lang) => {
 };
 
 const buildOverview = (counts, lang) => {
-  const title = t(lang, 'Result Overview', 'ملخص النتائج');
+  const title = t(lang, 'Result Overview', 'نظرة عامة على النتائج');
   const highLbl = t(lang, 'HIGH', 'مرتفع');
   const lowLbl = t(lang, 'LOW', 'منخفض');
   const normLbl = t(lang, 'NORMAL', 'طبيعي');
@@ -419,6 +419,16 @@ const buildPendingTestsSection = (pendingTests, lang) => {
     </section>`;
 };
 
+const buildResultsSummarySection = (text, lang) => {
+  const body = String(text || '').trim();
+  if (!body) return '';
+  return `
+    <section class="section card section--results-summary">
+      <div class="section__head section__head--results-summary">${t(lang, 'Results Summary', 'ملخص النتائج')}</div>
+      <div class="card__body interp-card__body recommendations-body"><p>${escapeHtml(body)}</p></div>
+    </section>`;
+};
+
 const buildTreatmentRecommendationsSection = (text, lang) => {
   const body = String(text || '').trim();
   if (!body) return '';
@@ -506,6 +516,10 @@ const buildReportHtml = async (reportData) => {
     ? await buildDynamicSections(reportData.sections, lang, reportData.sampleCode || '')
     : buildResultsTable(reportData.results || [], lang);
 
+  const resultsSummaryBlock = buildResultsSummarySection(
+    reportData.aiInterpretation,
+    lang
+  );
   const recommendationsText = (cultureAst && isCultureRecommendationDuplicate(
     reportData.treatmentRecommendations,
     reportData.results
@@ -520,6 +534,7 @@ const buildReportHtml = async (reportData) => {
       ${buildHeader(reportData, lab, logoDataUri, barcodeDataUri, lang)}
       ${buildPatientSection(reportData, lang)}
       ${overviewResults.length ? buildOverview(counts, lang) : ''}
+      ${resultsSummaryBlock}
       ${recommendationsBlock}
       ${dynamicSections}
       ${buildPendingTestsSection(reportData.pendingTests, lang)}

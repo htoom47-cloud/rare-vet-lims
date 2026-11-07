@@ -351,6 +351,7 @@ const generateSinglePagePDF = async (reportData, outputDir, options = {}) => {
 
       const tableEndY = drawResultsTable(doc, reportData.results || []);
       y = drawAbnormalSummary(doc, tableEndY + 1, reportData.results || []);
+      y = drawNotesInline(doc, y, reportData.aiInterpretation);
       y = drawNotesInline(doc, y, reportData.treatmentRecommendations);
       y = drawApprovalsInline(doc, y, reportData);
       pinY(doc, y);
