@@ -232,7 +232,7 @@ const discountPresetSchema = Joi.object({
 const paymentSchema = Joi.object({
   invoice_id: Joi.string().uuid().required(),
   amount: Joi.number().positive().required(),
-  method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit', 'tamara').required(),
+  method: Joi.string().valid('cash', 'card', 'bank_transfer', 'credit', 'tamara', 'store_credit').required(),
   reference_number: Joi.string().allow('', null),
   notes: Joi.string().allow('', null),
   discount_amount: Joi.forbidden(),
@@ -241,6 +241,12 @@ const paymentSchema = Joi.object({
   package_discount_percent: Joi.forbidden(),
   field_visit_discount_amount: Joi.forbidden(),
   field_visit_discount_percent: Joi.forbidden(),
+});
+
+const storeCreditDepositSchema = Joi.object({
+  amount: Joi.number().positive().required(),
+  method: Joi.string().valid('cash', 'card', 'bank_transfer', 'tamara').required(),
+  notes: Joi.string().trim().min(3).max(1000).required(),
 });
 
 const creditNoteSchema = Joi.object({
@@ -488,6 +494,7 @@ module.exports = {
   quoteSchema,
   discountPresetSchema,
   paymentSchema,
+  storeCreditDepositSchema,
   creditNoteSchema,
   refundSchema,
   inventorySchema,

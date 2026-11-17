@@ -96,6 +96,15 @@ const getProfile = async (id) => {
   const entitlementsService = require('./entitlements.service');
   const breederEntitlement = await entitlementsService.getBreederEntitlement(id);
 
+  let storeCreditEntries = [];
+  if (require('../config/env').features?.storeCredit) {
+    try {
+      storeCreditEntries = await require('./customer-store-credit.service').listEntries(id, { limit: 50 });
+    } catch {
+      storeCreditEntries = [];
+    }
+  }
+
   return {
     ...customer,
     animals: animals.rows,
@@ -103,6 +112,7 @@ const getProfile = async (id) => {
     payments: statement.payments,
     invoices: statement.invoices,
     financial_statement: statement.summary,
+    store_credit_entries: storeCreditEntries,
     entitlements: {
       breeder_dashboard: breederEntitlement,
     },

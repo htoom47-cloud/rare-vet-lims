@@ -19,12 +19,16 @@ const PAYMENT_METHOD_AR = {
   card: 'شبكة',
   bank_transfer: 'تحويل بنكي',
   credit: 'آجل',
+  tamara: 'تمارا',
+  store_credit: 'رصيد العميل',
 };
 const PAYMENT_METHOD_EN = {
   cash: 'Cash',
   card: 'Card',
   bank_transfer: 'Bank transfer',
   credit: 'On account',
+  tamara: 'Tamara',
+  store_credit: 'Customer credit',
 };
 const STATUS_AR = {
   draft: 'مسودة',

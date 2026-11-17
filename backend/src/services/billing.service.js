@@ -50,6 +50,7 @@ const withBillingClient = async (externalClient, work) => {
 };
 const { creditNotesTableExists } = require('../utils/credit-notes-schema');
 const creditNotes = require('./credit-note.service');
+const storeCredit = require('./customer-store-credit.service');
 const zatcaService = require('./zatca.service');
 
 const tlvField = (tag, value) => {
@@ -130,7 +131,8 @@ const listInvoices = async ({
 const getInvoiceById = async (id, options = {}) => {
   const q = options.client ? options.client.query.bind(options.client) : query;
   const invoiceResult = await q(
-    `SELECT i.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar, c.mobile as customer_mobile
+    `SELECT i.*, c.full_name as customer_name, c.full_name_ar as customer_name_ar, c.mobile as customer_mobile,
+            COALESCE(c.store_credit_balance, 0) AS customer_store_credit_balance
      FROM invoices i
      LEFT JOIN customers c ON i.customer_id = c.id
      WHERE i.id = $1 AND ${notDeleted('i')}`,
@@ -359,6 +361,11 @@ const recordPayment = async (data, userId, req = null, options = {}) => {
     }
 
     const amount = fromHalalas(decision.amountHalalas);
+    const isStoreCredit = data.method === 'store_credit';
+    if (isStoreCredit) {
+      storeCredit.assertEnabled();
+    }
+
     const paymentResult = await client.query(
       `INSERT INTO payments (id, invoice_id, customer_id, amount, method, reference_number, notes, received_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
@@ -373,7 +380,16 @@ const recordPayment = async (data, userId, req = null, options = {}) => {
     );
     await client.query('UPDATE invoices SET status = $1, pdf_url = NULL WHERE id = $2', [status, data.invoice_id]);
 
-    if (data.method !== 'credit') {
+    if (isStoreCredit) {
+      await storeCredit.applyOnPayment(client, {
+        customerId: invoice.customer_id,
+        amountHalalas: decision.amountHalalas,
+        invoiceId: invoice.id,
+        paymentId: payment.id,
+        userId,
+      });
+      await ledger.postStoreCreditApply(payment, invoice, userId, client);
+    } else if (data.method !== 'credit') {
       await ledger.postPayment(payment, invoice, userId, client);
     }
 
@@ -490,6 +506,13 @@ const processRefund = async (data, userId, req, options = {}) => {
     }
     if (payment.method === 'credit') {
       throw new AppError('Cannot refund a credit-term payment. Use a credit note.', 400, 'CANNOT_REFUND_CREDIT_PAYMENT');
+    }
+    if (payment.method === 'store_credit') {
+      throw new AppError(
+        'Cannot refund a store-credit payment. Deposit a new store credit instead.',
+        400,
+        'CANNOT_REFUND_STORE_CREDIT'
+      );
     }
     if (!payment.method) {
       throw new AppError('Payment method is missing; cannot post a refund journal', 400, 'PAYMENT_METHOD_REQUIRED');

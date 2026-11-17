@@ -59,6 +59,9 @@ export const customersAPI = {
   sendReadyReports: (id, body) => api.post(`/customers/${id}/send-ready-reports`, body),
   skipReadyReports: (id, body) => api.post(`/customers/${id}/skip-ready-reports`, body),
   setEntitlement: (id, body) => api.put(`/customers/${id}/entitlements`, body),
+  storeCreditBalance: (id) => api.get(`/customers/${id}/store-credit`),
+  storeCreditEntries: (id) => api.get(`/customers/${id}/store-credit/entries`),
+  depositStoreCredit: (id, body) => api.post(`/customers/${id}/store-credit`, body),
 };
 
 /** Hatif WhatsApp (feature-flagged; no-op until HATIF_WHATSAPP_ENABLED=true) */

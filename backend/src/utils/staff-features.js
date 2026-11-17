@@ -30,6 +30,8 @@ const getStaffFeatures = () => ({
   vetSupervisedSamples: !!env.features?.vetSupervisedSamples,
   /** When true: Billing may start Tamara checkout for unpaid invoices */
   tamaraPayments: !!env.features?.tamaraPayments,
+  /** When true: Customers may hold/deposit store credit; Billing may apply it manually */
+  storeCredit: !!env.features?.storeCredit,
 });
 
 module.exports = { getStaffFeatures };

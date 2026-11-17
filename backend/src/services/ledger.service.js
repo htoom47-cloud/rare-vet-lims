@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { toHalalas, fromHalalas } = require('../utils/money');
 const {
   journalIsBalanced,
   buildInvoiceJournalLines,
@@ -16,6 +17,7 @@ const DEFAULT_ACCOUNTS = [
   { code: '1200', name: 'Inventory', name_ar: 'المخزون', type: 'asset' },
   { code: '2000', name: 'Accounts Payable', name_ar: 'الذمم الدائنة', type: 'liability' },
   { code: '2100', name: 'VAT Payable', name_ar: 'ضريبة القيمة المضافة', type: 'liability' },
+  { code: '2200', name: 'Customer Store Credit', name_ar: 'رصيد دائن للعملاء', type: 'liability' },
   { code: '4100', name: 'Lab Revenue', name_ar: 'إيرادات المختبر', type: 'revenue' },
   { code: '5100', name: 'Direct purchase expense', name_ar: 'مصروف مشتريات مباشر', type: 'expense' },
 ];
@@ -150,6 +152,49 @@ const postPayment = async (payment, invoice, userId, client) => {
   );
 };
 
+/** Deposit cash/bank into customer store-credit liability (2200). */
+const postStoreCreditDeposit = async (entry, userId, client) => {
+  const cashCode = cashAccountForMethod(entry.method);
+  const cashId = await getAccountId(cashCode, client);
+  const liabilityId = await getAccountId('2200', client);
+  const amountHalalas = toHalalas(entry.amount);
+  if (amountHalalas <= 0) return null;
+  const value = fromHalalas(amountHalalas);
+  const lines = [
+    { accountId: cashId, debit: value, credit: 0 },
+    { accountId: liabilityId, debit: 0, credit: value },
+  ];
+  return createEntry(
+    `Store credit deposit ${entry.id}`,
+    'store_credit_deposit',
+    entry.id,
+    userId,
+    lines,
+    client
+  );
+};
+
+/** Apply store credit against AR (Dr 2200 / Cr 1100) — no cash movement. */
+const postStoreCreditApply = async (payment, invoice, userId, client) => {
+  const liabilityId = await getAccountId('2200', client);
+  const arId = await getAccountId('1100', client);
+  const amountHalalas = toHalalas(payment.amount);
+  if (amountHalalas <= 0) return null;
+  const value = fromHalalas(amountHalalas);
+  const lines = [
+    { accountId: liabilityId, debit: value, credit: 0 },
+    { accountId: arId, debit: 0, credit: value },
+  ];
+  return createEntry(
+    `Store credit apply ${invoice.invoice_number}`,
+    'payment',
+    payment.id,
+    userId,
+    lines,
+    client
+  );
+};
+
 const postRefund = async (refund, invoice, userId, client, method) => {
   if (!method) {
     throw new AppError('Refund journal requires the original payment method', 400, 'PAYMENT_METHOD_REQUIRED');
@@ -216,8 +261,11 @@ module.exports = {
   getAccountId,
   postInvoice,
   postPayment,
+  postStoreCreditDeposit,
+  postStoreCreditApply,
   postRefund,
   postCreditNote,
   createEntry,
   listJournalEntries,
+  cashAccountForMethod,
 };

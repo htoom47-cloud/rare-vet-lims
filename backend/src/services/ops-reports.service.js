@@ -132,6 +132,7 @@ const getOperationsReport = async (from, to) => {
       invoiced_total: revenue.invoiced_total,
       tax_total: revenue.tax_total,
       collections_total: revenue.collections_total,
+      store_credit_applied_total: revenue.store_credit_applied_total || 0,
       by_method: revenue.by_method || [],
       by_service: groupServiceRows(serviceLines.rows),
       by_customer: byCustomer.customers || [],

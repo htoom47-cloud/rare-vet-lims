@@ -3,8 +3,9 @@ const service = require('../services/customers.service');
 const reportNotify = require('../services/customer-report-notifications.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { customerSchema, entitlementSchema } = require('../validators/schemas');
+const { customerSchema, entitlementSchema, storeCreditDepositSchema } = require('../validators/schemas');
 const entitlements = require('../services/entitlements.service');
+const storeCredit = require('../services/customer-store-credit.service');
 const { PERMISSIONS } = require('../utils/permissions');
 const { auditLog } = require('../middleware/audit');
 
@@ -94,6 +95,33 @@ router.put('/:id/entitlements', authorize(PERMISSIONS.CUSTOMERS_UPDATE), validat
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
+
+router.get('/:id/store-credit', authorize(PERMISSIONS.CUSTOMERS_VIEW, PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await storeCredit.getBalance(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/store-credit/entries', authorize(PERMISSIONS.CUSTOMERS_VIEW, PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await storeCredit.listEntries(req.params.id, req.query);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post(
+  '/:id/store-credit',
+  authorize(PERMISSIONS.BILLING_PAYMENT),
+  validate(storeCreditDepositSchema),
+  auditLog('create', 'customer_store_credit'),
+  async (req, res, next) => {
+    try {
+      const data = await storeCredit.deposit(req.params.id, req.body, req.user.id, req);
+      res.status(201).json({ success: true, data });
+    } catch (err) { next(err); }
+  }
+);
 
 router.get('/:id', authorize(PERMISSIONS.CUSTOMERS_VIEW), async (req, res, next) => {
   try {

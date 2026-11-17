@@ -56,6 +56,7 @@ export default function Billing() {
   const { hasPermission, user } = useAuth();
   const canPay = hasPermission('billing.payment');
   const canTamara = canPay && !!user?.features?.tamaraPayments;
+  const canStoreCredit = canPay && !!user?.features?.storeCredit;
   const statusLabel = (invOrStatus) => {
     const status = typeof invOrStatus === 'string' ? invOrStatus : invoiceDisplayStatus(invOrStatus);
     return t(`billing.invoiceStatus.${status}`, { defaultValue: status });
@@ -389,6 +390,14 @@ export default function Billing() {
     const sum = lines.reduce((s, l) => s + l.amount, 0);
     if (Math.abs(sum - balance) > 0.02) {
       toast.error(t('billing.splitPaymentSumMismatch', { balance: balance.toFixed(2) }));
+      return;
+    }
+    const storeCreditUsed = lines
+      .filter((l) => l.method === 'store_credit')
+      .reduce((s, l) => s + l.amount, 0);
+    const availableCredit = Number(selectedInvoice?.customer_store_credit_balance || 0);
+    if (storeCreditUsed > 0.009 && storeCreditUsed - availableCredit > 0.02) {
+      toast.error(t('billing.storeCreditExceeds', { available: availableCredit.toFixed(2) }));
       return;
     }
     try {
@@ -1040,6 +1049,12 @@ export default function Billing() {
               <div className="flex justify-between text-primary-700 font-bold border-t pt-1 mt-1">
                 <span>{t('billing.balanceDue')}</span><span>SAR {paymentPreview.balanceDue.toFixed(2)}</span>
               </div>
+              {canStoreCredit && Number(selectedInvoice?.customer_store_credit_balance || 0) > 0.009 && (
+                <div className="flex justify-between text-emerald-700 font-medium">
+                  <span>{t('customers.storeCreditAvailable')}</span>
+                  <span>SAR {Number(selectedInvoice.customer_store_credit_balance).toFixed(2)}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -1077,6 +1092,9 @@ export default function Billing() {
                     <option value="bank_transfer">{t('billing.paymentMethods.bank_transfer')}</option>
                     <option value="credit">{t('billing.paymentMethods.credit')}</option>
                     <option value="tamara">{t('billing.paymentMethods.tamara')}</option>
+                    {canStoreCredit && Number(selectedInvoice?.customer_store_credit_balance || 0) > 0.009 && (
+                      <option value="store_credit">{t('billing.paymentMethods.store_credit')}</option>
+                    )}
                   </select>
                 </div>
                 <div>

@@ -171,6 +171,11 @@ const env = {
      * Default false — no live Tamara calls until explicitly enabled.
      */
     tamaraPayments: process.env.TAMARA_ENABLED === 'true',
+    /**
+     * When true: staff may deposit/apply customer store credit (manual).
+     * Default false — no wallet/credit balance until explicitly enabled.
+     */
+    storeCredit: process.env.STORE_CREDIT_ENABLED === 'true',
   },
   tamara: {
     apiUrl: (process.env.TAMARA_API_URL || 'https://api-sandbox.tamara.co').replace(/\/$/, ''),

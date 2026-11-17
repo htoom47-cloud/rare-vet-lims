@@ -1012,6 +1012,42 @@ async function applyPatches() {
       CREATE INDEX IF NOT EXISTS idx_tamara_checkouts_invoice
         ON tamara_checkouts (invoice_id, created_at DESC)
     `);
+
+    // Customer store credit (prepaid liability) — separate from AR account_balance.
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS store_credit_balance DECIMAL(12,2) NOT NULL DEFAULT 0
+    `);
+    try {
+      await client.query(`ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'store_credit'`);
+    } catch (_) {
+      try {
+        await client.query(`ALTER TYPE payment_method ADD VALUE 'store_credit'`);
+      } catch (e) { /* already exists */ }
+    }
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_store_credit_entries (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        customer_id UUID NOT NULL REFERENCES customers(id),
+        entry_type TEXT NOT NULL CHECK (entry_type IN ('deposit', 'apply')),
+        amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+        method TEXT,
+        invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+        payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+        notes TEXT,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_store_credit_entries_customer
+        ON customer_store_credit_entries (customer_id, created_at DESC)
+    `);
+    await client.query(`
+      INSERT INTO ledger_accounts (code, name, name_ar, type)
+      VALUES ('2200', 'Customer Store Credit', 'رصيد دائن للعملاء', 'liability')
+      ON CONFLICT (code) DO NOTHING
+    `);
   } finally {
     client.release();
   }

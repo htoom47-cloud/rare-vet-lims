@@ -40,7 +40,14 @@ export default function Customers() {
   const canHatifWhatsapp = canSendReports && !!user?.features?.hatifWhatsapp;
   const canHatifCall = canSendReports && !!user?.features?.hatifCall;
   const canHerdGrant = canEdit && !!user?.features?.breederDashboard;
+  const canStoreCredit = !!user?.features?.storeCredit;
+  const canDepositStoreCredit = canStoreCredit && hasPermission('billing.payment');
   const [customers, setCustomers] = useState([]);
+  const [storeCreditOpen, setStoreCreditOpen] = useState(false);
+  const [storeCreditSaving, setStoreCreditSaving] = useState(false);
+  const [storeCreditForm, setStoreCreditForm] = useState({
+    amount: '', method: 'cash', notes: '',
+  });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dispatchFilter, setDispatchFilter] = useState('all'); // all | ready
@@ -539,7 +546,65 @@ export default function Customers() {
               </div>
               <div><span className="text-gray-500">{t('customers.balance')}:</span> {fmt(selected.account_balance)}</div>
               <div><span className="text-gray-500">{t('customers.creditLimit')}:</span> {fmt(selected.credit_limit)}</div>
+              {canStoreCredit && (
+                <div>
+                  <span className="text-gray-500">{t('customers.storeCredit')}:</span>{' '}
+                  <span className="font-semibold text-emerald-700">
+                    {fmt(selected.store_credit_balance ?? selected.financial_statement?.store_credit_balance)}
+                  </span>
+                </div>
+              )}
             </div>
+            {canStoreCredit && (
+              <div className="border rounded-lg p-4 space-y-3 bg-emerald-50/40 dark:bg-emerald-950/20">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-semibold">{t('customers.storeCredit')}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{t('customers.storeCreditHint')}</p>
+                  </div>
+                  {canDepositStoreCredit && (
+                    <button
+                      type="button"
+                      className="btn-primary text-sm"
+                      onClick={() => {
+                        setStoreCreditForm({ amount: '', method: 'cash', notes: '' });
+                        setStoreCreditOpen(true);
+                      }}
+                    >
+                      {t('customers.storeCreditAdd')}
+                    </button>
+                  )}
+                </div>
+                {(selected.store_credit_entries?.length > 0) && (
+                  <div className="border rounded-lg overflow-x-auto text-sm max-h-40 overflow-y-auto bg-white dark:bg-gray-900">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-800 border-b text-start sticky top-0">
+                          <th className="p-2 font-medium">{t('common.date')}</th>
+                          <th className="p-2 font-medium">{t('customers.storeCreditHistory')}</th>
+                          <th className="p-2 font-medium">{t('billing.amount')}</th>
+                          <th className="p-2 font-medium">{t('common.notes')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.store_credit_entries.map((e) => (
+                          <tr key={e.id} className="border-b">
+                            <td className="p-2">{new Date(e.created_at).toLocaleString()}</td>
+                            <td className="p-2">
+                              {e.entry_type === 'deposit'
+                                ? t('customers.storeCreditDeposit')
+                                : `${t('customers.storeCreditApply')}${e.invoice_number ? ` (${e.invoice_number})` : ''}`}
+                            </td>
+                            <td className="p-2">{fmt(e.amount)}</td>
+                            <td className="p-2">{e.notes || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
             {selected.notes && (
               <div className="text-sm"><span className="text-gray-500">{t('common.notes')}:</span> {selected.notes}</div>
             )}
@@ -763,10 +828,13 @@ export default function Customers() {
                 [t('billing.paid'), selected.financial_statement?.total_paid],
                 [t('billing.balanceDue'), selected.financial_statement?.balance_due],
                 [t('customers.creditLimit'), selected.credit_limit],
+                ...(canStoreCredit
+                  ? [[t('customers.storeCredit'), selected.store_credit_balance ?? selected.financial_statement?.store_credit_balance]]
+                  : []),
               ].map(([label, val]) => (
                 <div key={label} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm">
                   <p className="text-gray-500 text-xs mb-1">{label}</p>
-                  <p className={`font-bold ${label === t('billing.balanceDue') ? 'text-amber-700' : ''}`}>{fmt(val)}</p>
+                  <p className={`font-bold ${label === t('billing.balanceDue') ? 'text-amber-700' : label === t('customers.storeCredit') ? 'text-emerald-700' : ''}`}>{fmt(val)}</p>
                 </div>
               ))}
             </div>
@@ -962,6 +1030,85 @@ export default function Customers() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={storeCreditOpen}
+        onClose={() => setStoreCreditOpen(false)}
+        title={t('customers.storeCreditAdd')}
+        size="md"
+      >
+        <form
+          className="space-y-3 text-sm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!selected?.id) return;
+            setStoreCreditSaving(true);
+            try {
+              await customersAPI.depositStoreCredit(selected.id, {
+                amount: Number(storeCreditForm.amount),
+                method: storeCreditForm.method,
+                notes: storeCreditForm.notes,
+              });
+              toast.success(t('customers.storeCreditSaved'));
+              setStoreCreditOpen(false);
+              const { data } = await customersAPI.get(selected.id);
+              setSelected(data.data);
+            } catch (err) {
+              toast.error(err.response?.data?.error?.message || t('common.error'));
+            } finally {
+              setStoreCreditSaving(false);
+            }
+          }}
+        >
+          <p className="text-xs text-gray-600">{t('customers.storeCreditHint')}</p>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('customers.storeCreditAmount')}</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              required
+              value={storeCreditForm.amount}
+              onChange={(e) => setStoreCreditForm((p) => ({ ...p, amount: e.target.value }))}
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('customers.storeCreditMethod')}</label>
+            <select
+              value={storeCreditForm.method}
+              onChange={(e) => setStoreCreditForm((p) => ({ ...p, method: e.target.value }))}
+              className="input-field"
+              required
+            >
+              <option value="cash">{t('billing.paymentMethods.cash')}</option>
+              <option value="card">{t('billing.paymentMethods.card')}</option>
+              <option value="bank_transfer">{t('billing.paymentMethods.bank_transfer')}</option>
+              <option value="tamara">{t('billing.paymentMethods.tamara')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('customers.storeCreditNotes')}</label>
+            <textarea
+              required
+              minLength={3}
+              rows={3}
+              value={storeCreditForm.notes}
+              onChange={(e) => setStoreCreditForm((p) => ({ ...p, notes: e.target.value }))}
+              className="input-field"
+              placeholder={t('customers.storeCreditNotesPlaceholder')}
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-2">
+            <button type="button" onClick={() => setStoreCreditOpen(false)} className="btn-secondary">
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn-primary" disabled={storeCreditSaving}>
+              {storeCreditSaving ? t('common.loading') : t('customers.storeCreditAdd')}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

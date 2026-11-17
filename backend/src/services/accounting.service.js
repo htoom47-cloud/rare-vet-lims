@@ -58,7 +58,9 @@ const resyncAllCustomerArBalances = async (client = null) => {
 
 const getCustomerStatement = async (customerId) => {
   const customer = await query(
-    'SELECT id, full_name, full_name_ar, mobile, credit_limit, account_balance FROM customers WHERE id = $1',
+    `SELECT id, full_name, full_name_ar, mobile, credit_limit, account_balance,
+            COALESCE(store_credit_balance, 0) AS store_credit_balance
+     FROM customers WHERE id = $1`,
     [customerId]
   );
   if (!customer.rows[0]) throw new AppError('Customer not found', 404, 'NOT_FOUND');
@@ -119,6 +121,7 @@ const getCustomerStatement = async (customerId) => {
       total_credited: totalCredited,
       balance_due: balanceDue,
       credit_limit: parseFloat(customer.rows[0].credit_limit || 0),
+      store_credit_balance: parseFloat(customer.rows[0].store_credit_balance || 0),
     },
   };
 };
@@ -148,10 +151,15 @@ const getDailyCollections = async (date) => {
 
   const byMethod = {};
   let paymentsH = 0;
+  let storeCreditAppliedH = 0;
   for (const row of result.rows) {
     const amtH = toHalalas(row.amount);
-    paymentsH += amtH;
     byMethod[row.method] = (byMethod[row.method] || 0) + fromHalalas(amtH);
+    if (row.method === 'store_credit') {
+      storeCreditAppliedH += amtH;
+    } else {
+      paymentsH += amtH;
+    }
   }
   const refundsH = refundsResult.rows.reduce((sum, row) => sum + toHalalas(row.amount), 0);
 
@@ -160,6 +168,7 @@ const getDailyCollections = async (date) => {
     payments: result.rows,
     refunds: refundsResult.rows,
     total: fromHalalas(paymentsH),
+    store_credit_applied_total: fromHalalas(storeCreditAppliedH),
     refunds_total: fromHalalas(refundsH),
     net_total: fromHalalas(paymentsH - refundsH),
     by_method: byMethod,
@@ -203,10 +212,17 @@ const getRevenueSummary = async (from, to) => {
   const { fromDate, toDate } = defaultLabRange(from, to);
   const withCredits = await creditNotesTableExists();
 
-  const [collections, invoiced, byMethod, credits] = await Promise.all([
+  const [collections, storeCreditApplied, invoiced, byMethod, credits] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
-       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date`,
+       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date
+         AND method IS DISTINCT FROM 'store_credit'`,
+      [fromDate, toDate]
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
+       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date
+         AND method = 'store_credit'`,
       [fromDate, toDate]
     ),
     query(
@@ -247,6 +263,7 @@ const getRevenueSummary = async (from, to) => {
     tax_credit_notes: creditTax,
     tax_total: invoicedTax - creditTax,
     collections_total: parseFloat(collections.rows[0].total),
+    store_credit_applied_total: parseFloat(storeCreditApplied.rows[0].total),
     by_method: byMethod.rows,
   };
 };
@@ -299,7 +316,10 @@ const getDailyFullSummary = async (date, client = null) => {
       [day]
     ),
     q(
-      `SELECT COALESCE(SUM(amount), 0) AS collections_total FROM payments WHERE ${labDateSql('created_at')} = $1::date`,
+      `SELECT
+         COALESCE(SUM(amount) FILTER (WHERE method IS DISTINCT FROM 'store_credit'), 0) AS collections_total,
+         COALESCE(SUM(amount) FILTER (WHERE method = 'store_credit'), 0) AS store_credit_applied_total
+       FROM payments WHERE ${labDateSql('created_at')} = $1::date`,
       [day]
     ),
     q(
@@ -327,6 +347,7 @@ const getDailyFullSummary = async (date, client = null) => {
   for (const row of byMethod.rows) by_method[row.method] = parseFloat(row.total);
 
   const collectionsH = toHalalas(payments.rows[0].collections_total);
+  const storeCreditAppliedH = toHalalas(payments.rows[0].store_credit_applied_total);
   const refundsH = toHalalas(refunds.rows[0].refunds_total);
   const cashPurchaseOutflowsH = await sumCashPurchaseOutflowsHalalas(day, client);
   const net_collections = fromHalalas(collectionsH - refundsH);
@@ -346,6 +367,7 @@ const getDailyFullSummary = async (date, client = null) => {
     discount_total: parseFloat(inv.discount_total),
     net_collections,
     collections_total: fromHalalas(collectionsH),
+    store_credit_applied_total: fromHalalas(storeCreditAppliedH),
     refunds_total: fromHalalas(refundsH),
     cash_purchase_outflows,
     expected_cash,
