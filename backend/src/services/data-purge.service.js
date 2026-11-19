@@ -3,6 +3,7 @@
  * Used by purge scripts and soft-delete expiry cron.
  */
 
+const { AppError } = require('../middleware/errorHandler');
 const { syncCustomerArBalance } = require('./accounting.service');
 
 async function hardPurgeSample(client, sampleId) {
@@ -34,7 +35,42 @@ async function hardPurgeSample(client, sampleId) {
   await client.query('DELETE FROM samples WHERE id = $1', [sampleId]);
 }
 
+const deleteJournalsForSources = async (client, sourceIds) => {
+  if (!sourceIds.length) return;
+  await client.query(
+    `DELETE FROM journal_lines
+     WHERE entry_id IN (SELECT id FROM journal_entries WHERE source_id = ANY($1::uuid[]))`,
+    [sourceIds]
+  );
+  await client.query(
+    `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
+    [sourceIds]
+  );
+};
+
+async function assertNoCreditNotes(client, invoiceId) {
+  try {
+    const notes = await client.query(
+      `SELECT credit_note_number, status FROM credit_notes WHERE invoice_id = $1`,
+      [invoiceId]
+    );
+    if (notes.rows.length) {
+      const list = notes.rows.map((n) => n.credit_note_number).join(', ');
+      throw new AppError(
+        `Cannot permanently delete this invoice while credit notes exist (${list})`,
+        409,
+        'HAS_CREDIT_NOTES'
+      );
+    }
+  } catch (err) {
+    if (err.code === '42P01') return;
+    throw err;
+  }
+}
+
 async function hardPurgeInvoice(client, invoiceId) {
+  await assertNoCreditNotes(client, invoiceId);
+
   const customerRow = await client.query(
     'SELECT customer_id FROM invoices WHERE id = $1',
     [invoiceId]
@@ -42,21 +78,32 @@ async function hardPurgeInvoice(client, invoiceId) {
   const customerId = customerRow.rows[0]?.customer_id || null;
   const paymentRows = await client.query('SELECT id FROM payments WHERE invoice_id = $1', [invoiceId]);
   const paymentIds = paymentRows.rows.map((r) => r.id);
-  const refundRows = await client.query('SELECT id FROM refunds WHERE invoice_id = $1', [invoiceId]);
+
+  let refundRows;
+  if (paymentIds.length) {
+    refundRows = await client.query(
+      `SELECT id FROM refunds WHERE invoice_id = $1 OR payment_id = ANY($2::uuid[])`,
+      [invoiceId, paymentIds]
+    );
+  } else {
+    refundRows = await client.query(
+      'SELECT id FROM refunds WHERE invoice_id = $1',
+      [invoiceId]
+    );
+  }
   const refundIds = refundRows.rows.map((r) => r.id);
   const sourceIds = [invoiceId, ...paymentIds, ...refundIds];
 
-  await client.query(
-    `DELETE FROM journal_lines jl
-     USING journal_entries je
-     WHERE jl.entry_id = je.id AND je.source_id = ANY($1::uuid[])`,
-    [sourceIds]
-  );
-  await client.query(
-    `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
-    [sourceIds]
-  );
-  await client.query('DELETE FROM refunds WHERE invoice_id = $1', [invoiceId]);
+  await deleteJournalsForSources(client, sourceIds);
+
+  if (paymentIds.length) {
+    await client.query(
+      'DELETE FROM refunds WHERE invoice_id = $1 OR payment_id = ANY($2::uuid[])',
+      [invoiceId, paymentIds]
+    );
+  } else {
+    await client.query('DELETE FROM refunds WHERE invoice_id = $1', [invoiceId]);
+  }
   await client.query('DELETE FROM payments WHERE invoice_id = $1', [invoiceId]);
   await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
   await client.query('DELETE FROM invoices WHERE id = $1', [invoiceId]);
@@ -89,22 +136,22 @@ async function hardPurgeCustomer(client, customerId) {
       [invoiceIds]
     )).rows.map((r) => r.id);
     const refundIds = (await client.query(
-      'SELECT id FROM refunds WHERE invoice_id = ANY($1::uuid[])',
-      [invoiceIds]
+      paymentIds.length
+        ? 'SELECT id FROM refunds WHERE invoice_id = ANY($1::uuid[]) OR payment_id = ANY($2::uuid[])'
+        : 'SELECT id FROM refunds WHERE invoice_id = ANY($1::uuid[])',
+      paymentIds.length ? [invoiceIds, paymentIds] : [invoiceIds]
     )).rows.map((r) => r.id);
     const sourceIds = [...invoiceIds, ...paymentIds, ...refundIds];
 
-    await client.query(
-      `DELETE FROM journal_lines jl
-       USING journal_entries je
-       WHERE jl.entry_id = je.id AND je.source_id = ANY($1::uuid[])`,
-      [sourceIds]
-    );
-    await client.query(
-      `DELETE FROM journal_entries WHERE source_id = ANY($1::uuid[])`,
-      [sourceIds]
-    );
-    await client.query('DELETE FROM refunds WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
+    await deleteJournalsForSources(client, sourceIds);
+    if (paymentIds.length) {
+      await client.query(
+        'DELETE FROM refunds WHERE invoice_id = ANY($1::uuid[]) OR payment_id = ANY($2::uuid[])',
+        [invoiceIds, paymentIds]
+      );
+    } else {
+      await client.query('DELETE FROM refunds WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
+    }
     await client.query('DELETE FROM payments WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
     await client.query('DELETE FROM invoice_items WHERE invoice_id = ANY($1::uuid[])', [invoiceIds]);
     await client.query('DELETE FROM invoices WHERE id = ANY($1::uuid[])', [invoiceIds]);

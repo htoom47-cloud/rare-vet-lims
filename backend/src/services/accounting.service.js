@@ -131,7 +131,7 @@ const getDailyCollections = async (date) => {
   const result = await query(
     `SELECT p.*, i.invoice_number, c.full_name AS customer_name, u.full_name AS received_by_name
      FROM payments p
-     JOIN invoices i ON p.invoice_id = i.id
+     JOIN invoices i ON p.invoice_id = i.id AND ${notDeleted('i')}
      JOIN customers c ON p.customer_id = c.id
      LEFT JOIN users u ON p.received_by = u.id
      WHERE ${labDateSql('p.created_at')} = $1::date
@@ -142,7 +142,7 @@ const getDailyCollections = async (date) => {
   const refundsResult = await query(
     `SELECT r.*, i.invoice_number, c.full_name AS customer_name
      FROM refunds r
-     JOIN invoices i ON r.invoice_id = i.id
+     JOIN invoices i ON r.invoice_id = i.id AND ${notDeleted('i')}
      LEFT JOIN customers c ON i.customer_id = c.id
      WHERE ${labDateSql('r.created_at')} = $1::date
      ORDER BY r.created_at DESC`,
@@ -214,28 +214,33 @@ const getRevenueSummary = async (from, to) => {
 
   const [collections, storeCreditApplied, invoiced, byMethod, credits] = await Promise.all([
     query(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
-       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date
-         AND method IS DISTINCT FROM 'store_credit'`,
+      `SELECT COALESCE(SUM(p.amount), 0) AS total FROM payments p
+       JOIN invoices i ON i.id = p.invoice_id AND ${notDeleted('i')}
+       WHERE ${labDateSql('p.created_at')} BETWEEN $1::date AND $2::date
+         AND p.method IS DISTINCT FROM 'store_credit'`,
       [fromDate, toDate]
     ),
     query(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
-       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date
-         AND method = 'store_credit'`,
+      `SELECT COALESCE(SUM(p.amount), 0) AS total FROM payments p
+       JOIN invoices i ON i.id = p.invoice_id AND ${notDeleted('i')}
+       WHERE ${labDateSql('p.created_at')} BETWEEN $1::date AND $2::date
+         AND p.method = 'store_credit'`,
       [fromDate, toDate]
     ),
     query(
       `SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(tax_amount), 0) AS tax
        FROM invoices
-       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date AND status NOT IN ('cancelled', 'refunded')`,
+       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date
+         AND ${notDeleted()}
+         AND status NOT IN ('cancelled', 'refunded')`,
       [fromDate, toDate]
     ),
     query(
-      `SELECT method, COALESCE(SUM(amount), 0) AS total
-       FROM payments
-       WHERE ${labDateSql('created_at')} BETWEEN $1::date AND $2::date
-       GROUP BY method`,
+      `SELECT p.method, COALESCE(SUM(p.amount), 0) AS total
+       FROM payments p
+       JOIN invoices i ON i.id = p.invoice_id AND ${notDeleted('i')}
+       WHERE ${labDateSql('p.created_at')} BETWEEN $1::date AND $2::date
+       GROUP BY p.method`,
       [fromDate, toDate]
     ),
     withCredits
@@ -312,32 +317,41 @@ const getDailyFullSummary = async (date, client = null) => {
        FROM invoices i
        ${paymentsJoin('p')}
        ${withCredits ? ISSUED_CREDITS_JOIN : ''}
-       WHERE ${labDateSql('i.created_at')} = $1::date`,
+       WHERE ${labDateSql('i.created_at')} = $1::date
+         AND ${notDeleted('i')}`,
       [day]
     ),
     q(
       `SELECT
-         COALESCE(SUM(amount) FILTER (WHERE method IS DISTINCT FROM 'store_credit'), 0) AS collections_total,
-         COALESCE(SUM(amount) FILTER (WHERE method = 'store_credit'), 0) AS store_credit_applied_total
-       FROM payments WHERE ${labDateSql('created_at')} = $1::date`,
+         COALESCE(SUM(p.amount) FILTER (WHERE p.method IS DISTINCT FROM 'store_credit'), 0) AS collections_total,
+         COALESCE(SUM(p.amount) FILTER (WHERE p.method = 'store_credit'), 0) AS store_credit_applied_total
+       FROM payments p
+       JOIN invoices i ON i.id = p.invoice_id AND ${notDeleted('i')}
+       WHERE ${labDateSql('p.created_at')} = $1::date`,
       [day]
     ),
     q(
-      `SELECT method, COALESCE(SUM(amount), 0) AS total
-       FROM payments WHERE ${labDateSql('created_at')} = $1::date GROUP BY method`,
+      `SELECT p.method, COALESCE(SUM(p.amount), 0) AS total
+       FROM payments p
+       JOIN invoices i ON i.id = p.invoice_id AND ${notDeleted('i')}
+       WHERE ${labDateSql('p.created_at')} = $1::date
+       GROUP BY p.method`,
       [day]
     ),
     withCredits
       ? q(
-        `SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(tax_amount), 0) AS tax, COUNT(*) AS n
-         FROM credit_notes
-         WHERE status = 'issued' AND ${labDateSql('created_at')} = $1::date`,
+        `SELECT COALESCE(SUM(cn.total), 0) AS total, COALESCE(SUM(cn.tax_amount), 0) AS tax, COUNT(*) AS n
+         FROM credit_notes cn
+         JOIN invoices i ON i.id = cn.invoice_id AND ${notDeleted('i')}
+         WHERE cn.status = 'issued' AND ${labDateSql('cn.created_at')} = $1::date`,
         [day]
       )
       : Promise.resolve({ rows: [{ total: 0, tax: 0, n: 0 }] }),
     q(
-      `SELECT COALESCE(SUM(amount), 0) AS refunds_total, COUNT(*) AS refund_count
-       FROM refunds WHERE ${labDateSql('created_at')} = $1::date`,
+      `SELECT COALESCE(SUM(r.amount), 0) AS refunds_total, COUNT(*) AS refund_count
+       FROM refunds r
+       JOIN invoices i ON i.id = r.invoice_id AND ${notDeleted('i')}
+       WHERE ${labDateSql('r.created_at')} = $1::date`,
       [day]
     ),
   ]);

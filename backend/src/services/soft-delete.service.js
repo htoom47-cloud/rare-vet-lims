@@ -387,6 +387,16 @@ const purgeEntity = async (type, id) => {
     return { purged: true, type, id };
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err.isOperational) throw err;
+    if (err.code === '23503') {
+      throw new AppError(
+        err.detail
+          ? `Cannot permanently delete: related records still reference this item (${err.detail})`
+          : 'Cannot permanently delete: related records still reference this item',
+        409,
+        'FOREIGN_KEY'
+      );
+    }
     throw err;
   } finally {
     client.release();
