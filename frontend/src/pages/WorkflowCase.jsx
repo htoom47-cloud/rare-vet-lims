@@ -1079,6 +1079,16 @@ export default function WorkflowCase() {
                     </div>
                   );
                 })}
+                {receptionMode && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(4)}
+                    disabled={features.requireLabHandover && samples.some((s) => !s.lab_handover_at)}
+                    className="btn-primary w-full py-3 text-base mt-2"
+                  >
+                    {t('workflow.continueToDeliver')}
+                  </button>
+                )}
               </div>
             ) : (
               <button onClick={registerAllSamples} disabled={creating || !invoiceId} className="btn-primary w-full py-3 text-base">
@@ -1097,9 +1107,20 @@ export default function WorkflowCase() {
                 {t('workflow.markAllDelivered', { count: samples.length })}
               </button>
             ) : (
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2">
-                <CheckCircle className="text-green-600" size={20} />
-                <span>{t('workflow.allDeliveredConfirmed')}</span>
+              <div className="space-y-3">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2">
+                  <CheckCircle className="text-green-600" size={20} />
+                  <span>{t('workflow.allDeliveredConfirmed')}</span>
+                </div>
+                {receptionMode && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(RECEPTION_STEP_COUNT)}
+                    className="btn-primary w-full py-3 text-base"
+                  >
+                    {t('workflow.finishReception')}
+                  </button>
+                )}
               </div>
             )}
           </div>
