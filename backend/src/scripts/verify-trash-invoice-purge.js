@@ -15,7 +15,11 @@ const soft = read('src/services/soft-delete.service.js');
 
 assert.ok(accounting.includes("JOIN invoices i ON i.id = p.invoice_id AND ${notDeleted('i')}"));
 assert.ok(accounting.includes('getDailyFullSummary'));
-assert.ok(purge.includes('assertNoCreditNotes'));
+assert.ok(purge.includes('purgeCreditNotesForInvoice'));
+assert.ok(purge.includes('purgeCreditNotesForCustomer'));
+assert.ok(purge.includes('DISABLE TRIGGER USER'));
+assert.ok(purge.includes('customer_store_credit_entries'));
+assert.ok(purge.includes('customer_brucella_lists'));
 assert.ok(purge.includes('payment_id = ANY'));
 assert.ok(purge.includes('DELETE FROM journal_lines'));
 assert.ok(soft.includes('FOREIGN_KEY'));
