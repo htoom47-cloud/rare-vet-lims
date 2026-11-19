@@ -892,19 +892,21 @@ const listDocuments = async (customerIds, { animalId, type } = {}) => {
   if (!animalId) {
     try {
       const lists = await query(
-        `SELECT id, pdf_url, row_count, published_at
+        `SELECT id, pdf_url, row_count, published_at,
+                COALESCE(panel, 'rose') AS panel
          FROM customer_brucella_lists
          WHERE customer_id = ANY($1::uuid[])
-         ORDER BY published_at DESC
-         LIMIT 1`,
+         ORDER BY published_at DESC`,
         [ids]
       );
       lists.rows.forEach((row) => {
+        const panel = row.panel === 'elisa' ? 'elisa' : 'rose';
         docs.push({
           id: row.id,
           type: 'pdf',
           kind: 'brucella',
-          title: 'قائمة نتائج المالطية',
+          panel,
+          title: panel === 'elisa' ? 'قائمة إليزا المالطية' : 'قائمة نتائج المالطية (روز بنغال)',
           subtitle: `${row.row_count} عينة`,
           url: row.pdf_url,
           createdAt: row.published_at,
@@ -1019,15 +1021,18 @@ const listInvoices = async (customerIds, { page, limit } = {}) => {
   return { data: result.rows, pagination: buildPagination(total, p, l) };
 };
 
-const serveBrucellaListPdf = async (customerIds, res) => {
+const serveBrucellaListPdf = async (customerIds, res, { panel } = {}) => {
   const ids = asArray(customerIds);
-  const list = await query(
-    `SELECT id, pdf_url FROM customer_brucella_lists
-     WHERE customer_id = ANY($1::uuid[])
-     ORDER BY published_at DESC
-     LIMIT 1`,
-    [ids]
-  );
+  const mode = panel === 'elisa' ? 'elisa' : panel === 'rose' ? 'rose' : null;
+  const params = [ids];
+  let sql = `SELECT id, pdf_url FROM customer_brucella_lists
+     WHERE customer_id = ANY($1::uuid[])`;
+  if (mode) {
+    params.push(mode);
+    sql += ` AND COALESCE(panel, 'rose') = $${params.length}`;
+  }
+  sql += ' ORDER BY published_at DESC LIMIT 1';
+  const list = await query(sql, params);
   if (!list.rows[0]?.pdf_url) throw new AppError('List not found', 404, 'NOT_FOUND');
   logPortalAccess(ids[0], 'brucella_list_pdf', list.rows[0].id);
   const filename = list.rows[0].pdf_url.split('/').pop();

@@ -46,10 +46,25 @@ const EMPTY_ANIMAL = {
   color: '',
 };
 
+const HERD_BULK_MAX = 250;
+
+const parseHerdNameTags = (text) => {
+  const seen = new Set();
+  const tags = [];
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const name_tag = line.trim();
+    if (!name_tag || seen.has(name_tag)) continue;
+    seen.add(name_tag);
+    tags.push(name_tag);
+  }
+  return tags;
+};
+
 export default function WorkflowCase() {
   const { t, i18n } = useTranslation();
   const { user, hasPermission } = useAuth();
   const features = user?.features || {};
+  const herdBulkAnimals = !!features.herdBulkAnimals;
   const receptionMode = isReception(user);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -89,6 +104,9 @@ export default function WorkflowCase() {
   const [creating, setCreating] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewAnimal, setShowNewAnimal] = useState(false);
+  const [animalCreateMode, setAnimalCreateMode] = useState('single');
+  const [bulkPasteText, setBulkPasteText] = useState('');
+  const [bulkProgress, setBulkProgress] = useState(null);
   const [testSearch, setTestSearch] = useState('');
   const { codes: speciesCodes, label: speciesLabel } = useAnimalSpecies();
 
@@ -310,6 +328,84 @@ export default function WorkflowCase() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const createAnimalsBulk = async () => {
+    if (!customerId) {
+      toast.error(t('workflow.pickCustomerFirst'));
+      return;
+    }
+    const tags = parseHerdNameTags(bulkPasteText);
+    if (!tags.length) {
+      toast.error(t('workflow.bulkPasteEmpty'));
+      return;
+    }
+    if (tags.length > HERD_BULK_MAX) {
+      toast.error(t('workflow.bulkLimit', { max: HERD_BULK_MAX }));
+      return;
+    }
+    setCreating(true);
+    setBulkProgress({ done: 0, total: tags.length });
+    const created = [];
+    let failed = 0;
+    const shared = {
+      owner_id: customerId,
+      animal_type: newAnimal.animal_type,
+      gender: newAnimal.gender,
+      age: newAnimal.age || null,
+      breed: newAnimal.breed || null,
+      color: newAnimal.color || null,
+    };
+    for (let i = 0; i < tags.length; i += 1) {
+      try {
+        const { data } = await animalsAPI.create({ ...shared, name_tag: tags[i] });
+        if (data?.data) created.push(data.data);
+      } catch {
+        failed += 1;
+      }
+      setBulkProgress({ done: i + 1, total: tags.length });
+    }
+    if (created.length) {
+      const ids = created.map((a) => a.id);
+      setAnimals((prev) => [...created, ...prev]);
+      setSelectedAnimalIds((prev) => [...new Set([...prev, ...ids])]);
+      setAnimalTests((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => { if (!next[id]) next[id] = []; });
+        return next;
+      });
+      setAnimalPackages((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => { if (!next[id]) next[id] = []; });
+        return next;
+      });
+      setBulkPasteText('');
+    }
+    setBulkProgress(null);
+    setCreating(false);
+    toast.success(t('workflow.bulkCreated', { saved: created.length, failed }));
+  };
+
+  const applyTestsToAll = () => {
+    if (selectedAnimalIds.length < 2) return;
+    const firstId = selectedAnimalIds[0];
+    const testsCopy = [...(animalTests[firstId] || [])];
+    const packagesCopy = [...(animalPackages[firstId] || [])];
+    if (!testsCopy.length && !packagesCopy.length) {
+      toast.error(t('workflow.applyTestsNeedFirst'));
+      return;
+    }
+    setAnimalTests((prev) => {
+      const next = { ...prev };
+      selectedAnimalIds.forEach((id) => { next[id] = [...testsCopy]; });
+      return next;
+    });
+    setAnimalPackages((prev) => {
+      const next = { ...prev };
+      selectedAnimalIds.forEach((id) => { next[id] = [...packagesCopy]; });
+      return next;
+    });
+    toast.success(t('workflow.applyTestsToAllDone', { count: selectedAnimalIds.length }));
   };
 
   const createInvoice = async () => {
@@ -636,6 +732,24 @@ export default function WorkflowCase() {
             </button>
             {showNewAnimal && (
               <div className="border rounded-lg p-4 bg-primary-50/50 space-y-3">
+                {herdBulkAnimals && (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={`text-sm px-3 py-1.5 rounded border ${animalCreateMode === 'single' ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-gray-700 border-gray-300'}`}
+                      onClick={() => setAnimalCreateMode('single')}
+                    >
+                      {t('workflow.bulkModeSingle')}
+                    </button>
+                    <button
+                      type="button"
+                      className={`text-sm px-3 py-1.5 rounded border ${animalCreateMode === 'bulk' ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-gray-700 border-gray-300'}`}
+                      onClick={() => setAnimalCreateMode('bulk')}
+                    >
+                      {t('workflow.bulkModeList')}
+                    </button>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.type')}</label>
@@ -655,10 +769,12 @@ export default function WorkflowCase() {
                     <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.age')}</label>
                     <input value={newAnimal.age} onChange={(e) => setNewAnimal({ ...newAnimal, age: e.target.value })} placeholder={t('animals.agePlaceholder')} className="input-field" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.name')}</label>
-                    <input value={newAnimal.name_tag} onChange={(e) => setNewAnimal({ ...newAnimal, name_tag: e.target.value })} placeholder={t('animals.name')} className="input-field" />
-                  </div>
+                  {(!herdBulkAnimals || animalCreateMode === 'single') && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.name')}</label>
+                      <input value={newAnimal.name_tag} onChange={(e) => setNewAnimal({ ...newAnimal, name_tag: e.target.value })} placeholder={t('animals.name')} className="input-field" />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium mb-1 text-primary-700">{t('animals.breed')}</label>
                     <input value={newAnimal.breed} onChange={(e) => setNewAnimal({ ...newAnimal, breed: e.target.value })} placeholder={t('animals.breed')} className="input-field" />
@@ -668,9 +784,38 @@ export default function WorkflowCase() {
                     <input value={newAnimal.color} onChange={(e) => setNewAnimal({ ...newAnimal, color: e.target.value })} placeholder={t('animals.color')} className="input-field" />
                   </div>
                 </div>
-                <button onClick={createAnimal} disabled={creating || !customerId} className="btn-primary w-full py-3">
-                  {t('workflow.createAnimal')}
-                </button>
+                {herdBulkAnimals && animalCreateMode === 'bulk' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-primary-700">{t('workflow.bulkPasteLabel')}</label>
+                      <textarea
+                        className="input-field min-h-[140px] font-mono text-sm"
+                        value={bulkPasteText}
+                        onChange={(e) => setBulkPasteText(e.target.value)}
+                        placeholder={t('workflow.bulkPasteHint')}
+                        disabled={creating}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{t('workflow.bulkPasteHelp', { max: HERD_BULK_MAX })}</p>
+                    </div>
+                    {bulkProgress && (
+                      <p className="text-sm text-primary-700 font-medium">
+                        {t('workflow.bulkProgress', { done: bulkProgress.done, total: bulkProgress.total })}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={createAnimalsBulk}
+                      disabled={creating || !customerId}
+                      className="btn-primary w-full py-3"
+                    >
+                      {creating ? t('workflow.bulkProgress', { done: bulkProgress?.done || 0, total: bulkProgress?.total || 0 }) : t('workflow.bulkCreateList')}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={createAnimal} disabled={creating || !customerId} className="btn-primary w-full py-3">
+                    {t('workflow.createAnimal')}
+                  </button>
+                )}
               </div>
             )}
             {receptionMode && selectedAnimalIds.length > 0 && (
@@ -710,6 +855,16 @@ export default function WorkflowCase() {
                   placeholder={t('tests.searchPlaceholder')}
                   className="input-field"
                 />
+                {selectedAnimalIds.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm w-full py-2"
+                    onClick={applyTestsToAll}
+                    disabled={creating || !!invoiceId}
+                  >
+                    {t('workflow.applyTestsToAll')}
+                  </button>
+                )}
                 <div className="space-y-3 max-h-80 overflow-y-auto">
                   {selectedAnimalIds.map((animalId) => {
                     const animal = animals.find((a) => a.id === animalId);

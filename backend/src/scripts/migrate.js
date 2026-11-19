@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 const { ensureAdmin } = require('./ensure-admin');
 const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ensureElisaCatalog } = require('./ensure-elisa-catalog');
+const { ensureBruElisaCatalog } = require('./ensure-bru-elisa');
 const { ensureUrineCatalog } = require('./ensure-urine');
 const { ensureDiarrheaCausesCatalog } = require('./ensure-diarrhea-causes');
 const { syncPermissionsCatalog, syncRolePermissions } = require('../utils/sync-permissions');
@@ -325,6 +326,11 @@ async function applyPatches() {
       await ensureElisaCatalog();
     } catch (elisaErr) {
       logger.warn('ELISA catalog ensure failed — continuing migrate', { error: elisaErr.message });
+    }
+    try {
+      await ensureBruElisaCatalog();
+    } catch (bruElisaErr) {
+      logger.warn('BRU-ELISA catalog ensure failed — continuing migrate', { error: bruElisaErr.message });
     }
     // Urine catalog runs later — after test_parameters.entry_options exists.
     await syncPermissionsCatalog(client);
@@ -871,6 +877,19 @@ async function applyPatches() {
         published_by UUID REFERENCES users(id),
         published_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    // Rose vs ELISA herd lists can coexist per customer.
+    await client.query(`
+      ALTER TABLE customer_brucella_lists
+        ADD COLUMN IF NOT EXISTS panel TEXT NOT NULL DEFAULT 'rose'
+    `);
+    await client.query(`
+      ALTER TABLE customer_brucella_lists
+        DROP CONSTRAINT IF EXISTS customer_brucella_lists_customer_id_key
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_brucella_lists_customer_panel
+        ON customer_brucella_lists (customer_id, panel)
     `);
 
     // Vet-supervised samples: end-client owns sample; veterinarian may pay and see portal reports.

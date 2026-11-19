@@ -112,6 +112,7 @@ router.get('/brucella-list', authorize(PERMISSIONS.RESULTS_VIEW, PERMISSIONS.RES
     const data = await brucellaList.listForCustomer(req.query.customer_id, {
       from: req.query.from || null,
       to: req.query.to || null,
+      panel: req.query.panel || 'rose',
     });
     res.json({ success: true, data });
   } catch (err) { next(err); }
@@ -123,7 +124,7 @@ router.post('/brucella-list/save', authorize(PERMISSIONS.RESULTS_ENTER, PERMISSI
       req.body.customer_id,
       req.body.rows,
       req.user.id,
-      { approve: false }
+      { approve: false, panel: req.body.panel || 'rose' }
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }
@@ -134,7 +135,7 @@ router.post('/brucella-list/publish', authorize(PERMISSIONS.RESULTS_VALIDATE, PE
     const data = await brucellaList.publishForCustomer(
       req.body.customer_id,
       req.user.id,
-      { from: req.body.from || null, to: req.body.to || null }
+      { from: req.body.from || null, to: req.body.to || null, panel: req.body.panel || 'rose' }
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }
@@ -146,7 +147,7 @@ router.post('/brucella-list/approve', authorize(PERMISSIONS.RESULTS_VALIDATE), a
       req.body.customer_id,
       req.body.rows,
       req.user.id,
-      { approve: true }
+      { approve: true, panel: req.body.panel || 'rose' }
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }

@@ -63,7 +63,9 @@ router.get('/search', async (req, res, next) => {
 
 router.get('/brucella-list/pdf', async (req, res, next) => {
   try {
-    await portalService.serveBrucellaListPdf(req.portalCustomerIds, res);
+    await portalService.serveBrucellaListPdf(req.portalCustomerIds, res, {
+      panel: req.query.panel || null,
+    });
   } catch (err) { next(err); }
 });
 

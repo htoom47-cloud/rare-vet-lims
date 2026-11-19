@@ -1,5 +1,5 @@
 /**
- * One PDF for a customer's brucella herd list.
+ * One PDF for a customer's brucella herd list (Rose Bengal or ELISA).
  * Not a per-sample laboratory report.
  */
 const PDFDocument = require('pdfkit');
@@ -19,7 +19,7 @@ const ROW_H = 16;
 
 const isPositive = (value) => /^(positive|إيجابي|\+|pos)$/i.test(String(value || '').trim());
 
-const columns = [
+const roseColumns = [
   { key: 'num', width: 36 },
   { key: 'sample', width: 110, label: 'رقم العينة' },
   { key: 'animal', width: 100, label: 'رقم الحيوان' },
@@ -27,7 +27,16 @@ const columns = [
   { key: 'result', width: 120, label: 'النتيجة' },
 ];
 
-const columnXs = () => {
+const elisaColumns = [
+  { key: 'num', width: 32 },
+  { key: 'sample', width: 96, label: 'رقم العينة' },
+  { key: 'animal', width: 88, label: 'رقم الحيوان' },
+  { key: 'name', width: 120, label: 'الاسم' },
+  { key: 'sp', width: 70, label: 'S/P%' },
+  { key: 'result', width: 117, label: 'النتيجة' },
+];
+
+const columnXs = (columns) => {
   let right = MARGIN + TW;
   return columns.map((col) => {
     right -= col.width;
@@ -44,6 +53,8 @@ const drawTableHead = (doc, y, cols) => {
   cols.forEach((col) => {
     if (col.key === 'num') {
       drawEn(doc, '#', col.x, y + 4, { size: 8, color: '#fff', bold: true, width: col.width, align: 'center', fromTop: true });
+    } else if (col.key === 'sp') {
+      drawEn(doc, col.label, col.x, y + 4, { size: 8, color: '#fff', bold: true, width: col.width, align: 'center', fromTop: true });
     } else {
       drawArBox(doc, col.label, col.x + 2, y + 3, col.width - 4, { size: 8, color: '#fff', bold: true, align: 'center', fromTop: true });
     }
@@ -51,10 +62,12 @@ const drawTableHead = (doc, y, cols) => {
   return y + 18;
 };
 
-const buildBrucellaListPdf = async ({ customerName, rows, printedAt }) => {
+const buildBrucellaListPdf = async ({ customerName, rows, printedAt, panel = 'rose', examName }) => {
   const logo = HAS_LOGO ? await getBrandLogoBuffer(BROWN) : null;
   const positiveCount = rows.filter((row) => isPositive(row.result_value)).length;
-  const cols = columnXs();
+  const isElisa = panel === 'elisa';
+  const cols = columnXs(isElisa ? elisaColumns : roseColumns);
+  const titleExam = examName || (isElisa ? 'إليزا المالطية' : 'المالطية روز بنغال');
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: MARGIN });
@@ -76,7 +89,7 @@ const buildBrucellaListPdf = async ({ customerName, rows, printedAt }) => {
     y += 8;
     drawArBox(doc, `المالك: ${customerName || '—'}`, MARGIN, y, TW, { size: 10, color: BROWN, bold: true, align: 'right', fromTop: true });
     y += 16;
-    drawArBox(doc, `الفحص: المالطية روز بنغال    العدد: ${rows.length}    إيجابي: ${positiveCount}`, MARGIN, y, TW * 0.72, { size: 9, color: MUTED, align: 'right', fromTop: true });
+    drawArBox(doc, `الفحص: ${titleExam}    العدد: ${rows.length}    إيجابي: ${positiveCount}`, MARGIN, y, TW * 0.72, { size: 9, color: MUTED, align: 'right', fromTop: true });
     drawEn(doc, printedAt || '', MARGIN, y, { size: 9, color: MUTED, width: TW * 0.28, align: 'left', fromTop: true });
     y += 18;
     y = drawTableHead(doc, y, cols);
@@ -94,6 +107,7 @@ const buildBrucellaListPdf = async ({ customerName, rows, printedAt }) => {
         sample: row.sample_code || '',
         animal: row.animal_code || '',
         name: row.animal_name || '—',
+        sp: row.sp_value == null || row.sp_value === '' ? '—' : String(row.sp_value),
         result: row.result_value || '',
       };
       cols.forEach((col) => {
@@ -108,7 +122,7 @@ const buildBrucellaListPdf = async ({ customerName, rows, printedAt }) => {
       y += ROW_H;
     });
 
-    if (positiveCount) {
+    if (positiveCount && !isElisa) {
       if (y > PAGE_H - 60) {
         doc.addPage();
         y = MARGIN;

@@ -17,32 +17,39 @@ const escapeHtml = (value) => String(value ?? '')
 
 const isPositive = (value) => /^(positive|إيجابي|\+|pos)$/i.test(String(value || '').trim());
 
-export function printBrucellaList({ customerName, rows, labels }) {
+export function printBrucellaList({ customerName, rows, labels, panel = 'rose' }) {
   const printedAt = new Date().toLocaleDateString('en-GB', {
     timeZone: 'Asia/Riyadh',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
+  const isElisa = panel === 'elisa';
   const positiveCount = rows.filter((row) => isPositive(row.result_value)).length;
   const otherCount = rows.length - positiveCount;
   const logo = `${window.location.origin}/logo.png`;
+  const colCount = isElisa ? 6 : 5;
   const body = rows.length
     ? rows.map((row, index) => {
       const positive = isPositive(row.result_value);
+      const spCell = isElisa
+        ? `<td>${escapeHtml(row.sp_value == null || row.sp_value === '' ? '—' : row.sp_value)}</td>`
+        : '';
       return `
       <tr class="results-row">
         <td class="col-num">${index + 1}</td>
         <td>${escapeHtml(row.sample_code)}</td>
         <td>${escapeHtml(row.animal_code)}</td>
         <td class="col-name">${escapeHtml(row.animal_name || '—')}</td>
+        ${spCell}
         <td class="col-result${positive ? ' status-high' : ''}">${escapeHtml(row.result_value)}</td>
       </tr>`;
     }).join('')
-    : `<tr><td colspan="5">${escapeHtml(labels.empty)}</td></tr>`;
-  const note = positiveCount
+    : `<tr><td colspan="${colCount}">${escapeHtml(labels.empty)}</td></tr>`;
+  const note = positiveCount && !isElisa
     ? `<div class="result-note result-note--rose-bengal">${escapeHtml(labels.note || NOTE_AR)}</div>`
     : '';
+  const spHead = isElisa ? `<th>${escapeHtml(labels.sp || 'S/P%')}</th>` : '';
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -198,6 +205,7 @@ export function printBrucellaList({ customerName, rows, labels }) {
             <th>${escapeHtml(labels.sample)}</th>
             <th>${escapeHtml(labels.animal)}</th>
             <th>${escapeHtml(labels.animalName)}</th>
+            ${spHead}
             <th>${escapeHtml(labels.result)}</th>
           </tr>
         </thead>

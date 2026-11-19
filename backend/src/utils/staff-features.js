@@ -32,6 +32,8 @@ const getStaffFeatures = () => ({
   tamaraPayments: !!env.features?.tamaraPayments,
   /** When true: Customers may hold/deposit store credit; Billing may apply it manually */
   storeCredit: !!env.features?.storeCredit,
+  /** When true: Workflow may paste a herd list with shared type/gender */
+  herdBulkAnimals: !!env.features?.herdBulkAnimals,
 });
 
 module.exports = { getStaffFeatures };

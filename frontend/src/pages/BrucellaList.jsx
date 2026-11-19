@@ -17,26 +17,31 @@ export default function BrucellaList() {
   const canEnter = hasPermission('results.enter') || hasPermission('results.edit');
   const canApprove = hasPermission('results.validate');
   const canPublish = canApprove || hasPermission('notifications.send_report');
+  const [panel, setPanel] = useState('rose');
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [rows, setRows] = useState([]);
   const [drafts, setDrafts] = useState({});
+  const [spDrafts, setSpDrafts] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const isElisa = panel === 'elisa';
+  const examName = isElisa ? t('brucellaList.examElisa') : t('brucellaList.examRose');
 
-  const load = async (id = customerId) => {
+  const load = async (id = customerId, mode = panel) => {
     if (!id) {
       toast.error(t('brucellaList.pickCustomer'));
       return;
     }
     setLoading(true);
     try {
-      const { data } = await resultsAPI.brucellaList({ customer_id: id, from, to });
+      const { data } = await resultsAPI.brucellaList({ customer_id: id, from, to, panel: mode });
       const list = data.data || [];
       setRows(list);
       setDrafts(Object.fromEntries(list.map((row) => [row.sample_test_id, row.result_value || ''])));
+      setSpDrafts(Object.fromEntries(list.map((row) => [row.sample_test_id, row.sp_value ?? ''])));
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('brucellaList.loadFailed'));
     } finally {
@@ -44,16 +49,29 @@ export default function BrucellaList() {
     }
   };
 
+  const switchPanel = (mode) => {
+    if (mode === panel) return;
+    setPanel(mode);
+    setRows([]);
+    setDrafts({});
+    setSpDrafts({});
+    if (customerId) load(customerId, mode);
+  };
+
   const changedRows = (approve) => rows
     .map((row) => ({
       sample_test_id: row.sample_test_id,
       value: drafts[row.sample_test_id] || '',
+      sp_value: spDrafts[row.sample_test_id] ?? '',
       previous: row.result_value || '',
+      previous_sp: row.sp_value == null ? '' : String(row.sp_value),
       is_validated: row.is_validated,
     }))
     .filter((row) => {
       if (row.value !== NEGATIVE && row.value !== POSITIVE) return false;
+      if (isElisa && String(row.sp_value).trim() === '') return false;
       if (row.value !== row.previous) return true;
+      if (isElisa && String(row.sp_value).trim() !== String(row.previous_sp).trim()) return true;
       return approve && !row.is_validated;
     });
 
@@ -68,7 +86,12 @@ export default function BrucellaList() {
       const call = approve ? resultsAPI.approveBrucellaList : resultsAPI.saveBrucellaList;
       const { data } = await call({
         customer_id: customerId,
-        rows: payload.map((row) => ({ sample_test_id: row.sample_test_id, value: row.value })),
+        panel,
+        rows: payload.map((row) => ({
+          sample_test_id: row.sample_test_id,
+          value: row.value,
+          ...(isElisa ? { sp_value: row.sp_value } : {}),
+        })),
       });
       const result = data.data || {};
       toast.success(t('brucellaList.saved', { saved: result.saved || 0, failed: result.failed?.length || 0 }));
@@ -91,14 +114,21 @@ export default function BrucellaList() {
   };
 
   const publish = async () => {
-    const ready = rows.some((row) => row.result_value);
+    const ready = isElisa
+      ? rows.some((row) => row.result_value && row.sp_value != null && String(row.sp_value).trim() !== '')
+      : rows.some((row) => row.result_value);
     if (!customerId || !ready) {
       toast.error(t('brucellaList.nothingToPrint'));
       return;
     }
     setSaving(true);
     try {
-      const { data } = await resultsAPI.publishBrucellaList({ customer_id: customerId, from, to });
+      const { data } = await resultsAPI.publishBrucellaList({
+        customer_id: customerId,
+        from,
+        to,
+        panel,
+      });
       toast.success(t('brucellaList.published', { count: data.data?.row_count || 0 }));
     } catch (err) {
       toast.error(err.response?.data?.error?.message || t('brucellaList.publishFailed'));
@@ -108,7 +138,11 @@ export default function BrucellaList() {
   };
 
   const printList = () => {
-    const printable = rows.filter((row) => row.result_value);
+    const printable = rows.filter((row) => {
+      if (!row.result_value) return false;
+      if (isElisa && (row.sp_value == null || String(row.sp_value).trim() === '')) return false;
+      return true;
+    });
     if (!printable.length) {
       toast.error(t('brucellaList.nothingToPrint'));
       return;
@@ -117,23 +151,25 @@ export default function BrucellaList() {
       printBrucellaList({
         customerName,
         rows: printable,
+        panel,
         labels: {
           title: t('brucellaList.printTitle'),
           reportType: t('brucellaList.reportType'),
           customer: t('brucellaList.owner'),
           exam: t('brucellaList.exam'),
-          examName: t('parasitology.brucellaSection'),
+          examName,
           date: t('brucellaList.date'),
           summary: t('brucellaList.summary'),
           count: t('brucellaList.count'),
           sample: t('brucellaList.sample'),
           animal: t('brucellaList.animal'),
           animalName: t('animals.name'),
+          sp: t('brucellaList.spPercent'),
           result: t('brucellaList.result'),
           positive: t('brucellaList.positive'),
           negative: t('brucellaList.negative'),
           empty: t('brucellaList.empty'),
-          note: t('brucellaList.printNote'),
+          note: isElisa ? '' : t('brucellaList.printNote'),
           disclaimer: t('brucellaList.disclaimer'),
         },
       });
@@ -150,12 +186,30 @@ export default function BrucellaList() {
       </div>
 
       <div className="card p-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`text-sm px-3 py-1.5 rounded border ${panel === 'rose' ? 'bg-amber-900 text-white border-amber-900' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => switchPanel('rose')}
+          >
+            {t('brucellaList.panelRose')}
+          </button>
+          <button
+            type="button"
+            className={`text-sm px-3 py-1.5 rounded border ${panel === 'elisa' ? 'bg-amber-900 text-white border-amber-900' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => switchPanel('elisa')}
+          >
+            {t('brucellaList.panelElisa')}
+          </button>
+        </div>
         <CustomerSearch
           value={customerId}
           onChange={(id, customer) => {
             setCustomerId(id || '');
             setCustomerName(customer?.full_name_ar || customer?.full_name || '');
             setRows([]);
+            setDrafts({});
+            setSpDrafts({});
           }}
         />
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -207,6 +261,7 @@ export default function BrucellaList() {
                   <th className="p-3">{t('brucellaList.sample')}</th>
                   <th className="p-3">{t('brucellaList.animal')}</th>
                   <th className="p-3">{t('animals.name')}</th>
+                  {isElisa && <th className="p-3">{t('brucellaList.spPercent')}</th>}
                   <th className="p-3">{t('brucellaList.result')}</th>
                   <th className="p-3">{t('common.status')}</th>
                 </tr>
@@ -218,6 +273,18 @@ export default function BrucellaList() {
                     <td className="p-3 font-mono">{row.sample_code}</td>
                     <td className="p-3 font-mono">{row.animal_code}</td>
                     <td className="p-3">{row.animal_name || '—'}</td>
+                    {isElisa && (
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          step="any"
+                          className="input-field w-24"
+                          value={spDrafts[row.sample_test_id] ?? ''}
+                          disabled={!canEnter || row.is_validated}
+                          onChange={(e) => setSpDrafts((prev) => ({ ...prev, [row.sample_test_id]: e.target.value }))}
+                        />
+                      </td>
+                    )}
                     <td className="p-3">
                       <select
                         className="input-field"

@@ -176,6 +176,11 @@ const env = {
      * Default false — no wallet/credit balance until explicitly enabled.
      */
     storeCredit: process.env.STORE_CREDIT_ENABLED === 'true',
+    /**
+     * When true: Workflow may paste a herd list (shared type/gender + name_tag lines).
+     * Default false — single-animal create until explicitly enabled.
+     */
+    herdBulkAnimals: process.env.HERD_BULK_ANIMALS_ENABLED === 'true',
   },
   tamara: {
     apiUrl: (process.env.TAMARA_API_URL || 'https://api-sandbox.tamara.co').replace(/\/$/, ''),

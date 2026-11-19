@@ -42,9 +42,10 @@ export const portalSearchAPI = {
 
 export const portalDocumentsAPI = {
   list: (params) => portalApi.get('/documents', { params }),
-  openBrucellaList: async () => {
+  openBrucellaList: async (panel) => {
     const token = localStorage.getItem('portalAccessToken');
-    const response = await fetch(`${API_URL}/portal/brucella-list/pdf`, {
+    const qs = panel ? `?panel=${encodeURIComponent(panel)}` : '';
+    const response = await fetch(`${API_URL}/portal/brucella-list/pdf${qs}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) {
@@ -58,7 +59,7 @@ export const portalDocumentsAPI = {
     if (!opened) {
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = 'brucella-list.pdf';
+      link.download = panel === 'elisa' ? 'brucella-elisa-list.pdf' : 'brucella-list.pdf';
       document.body.appendChild(link);
       link.click();
       link.remove();

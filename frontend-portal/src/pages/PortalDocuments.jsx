@@ -44,7 +44,7 @@ export default function PortalDocuments() {
   const handleDownload = async (doc) => {
     if (doc.kind === 'brucella') {
       try {
-        await portalDocumentsAPI.openBrucellaList();
+        await portalDocumentsAPI.openBrucellaList(doc.panel || 'rose');
       } catch {
         toast.error(t('labReport.downloadFailed'));
       }
