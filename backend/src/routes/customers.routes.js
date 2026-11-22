@@ -112,7 +112,7 @@ router.get('/:id/store-credit/entries', authorize(PERMISSIONS.CUSTOMERS_VIEW, PE
 
 router.post(
   '/:id/store-credit',
-  authorize(PERMISSIONS.BILLING_PAYMENT),
+  authorize(PERMISSIONS.BILLING_STORE_CREDIT),
   validate(storeCreditDepositSchema),
   auditLog('create', 'customer_store_credit'),
   async (req, res, next) => {

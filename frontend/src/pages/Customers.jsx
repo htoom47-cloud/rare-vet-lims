@@ -41,7 +41,7 @@ export default function Customers() {
   const canHatifCall = canSendReports && !!user?.features?.hatifCall;
   const canHerdGrant = canEdit && !!user?.features?.breederDashboard;
   const canStoreCredit = !!user?.features?.storeCredit;
-  const canDepositStoreCredit = canStoreCredit && hasPermission('billing.payment');
+  const canDepositStoreCredit = canStoreCredit && hasPermission('billing.store_credit');
   const [customers, setCustomers] = useState([]);
   const [storeCreditOpen, setStoreCreditOpen] = useState(false);
   const [storeCreditSaving, setStoreCreditSaving] = useState(false);

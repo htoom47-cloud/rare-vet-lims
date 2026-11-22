@@ -83,9 +83,9 @@ check('payment schema allows store_credit; deposit schema separate', () => {
   assert.ok(schemasSrc.includes('storeCreditDepositSchema'));
 });
 
-check('customer routes for deposit/list behind billing.payment', () => {
+check('customer routes for deposit behind billing.store_credit', () => {
   assert.ok(routesSrc.includes('/:id/store-credit'));
-  assert.ok(routesSrc.includes('BILLING_PAYMENT'));
+  assert.ok(routesSrc.includes('BILLING_STORE_CREDIT'));
   assert.ok(routesSrc.includes('storeCredit.deposit'));
 });
 
