@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Pencil } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -33,6 +33,7 @@ export default function Animals() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('animals.update');
+  const canDelete = hasPermission('animals.delete');
   const { codes, label } = useAnimalSpecies();
   const isAr = i18n.language === 'ar';
   const [animals, setAnimals] = useState([]);
@@ -141,6 +142,18 @@ export default function Animals() {
     }
   };
 
+  const handleDelete = async (animal) => {
+    const name = animal.name_tag || animal.animal_code || '';
+    if (!window.confirm(t('animals.confirmDeletePermanent', { name }))) return;
+    try {
+      await animalsAPI.remove(animal.id);
+      toast.success(t('animals.deletedPermanent'));
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || t('common.error'));
+    }
+  };
+
   const columns = [
     { key: 'animal_code', label: t('animals.animalId') },
     { key: 'animal_type', label: t('animals.type'), render: (r) => label(r.animal_type, isAr) },
@@ -149,17 +162,30 @@ export default function Animals() {
     { key: 'gender', label: t('animals.gender'), render: (r) => t(`animals.genders.${r.gender}`, { defaultValue: r.gender }) },
     { key: 'owner_name', label: t('animals.owner') },
     { key: 'rfid_chip', label: t('animals.rfid') },
-    ...(canEdit ? [{
+    ...((canEdit || canDelete) ? [{
       key: 'actions',
       label: t('common.actions'),
       render: (r) => (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); openEdit(r); }}
-          className="text-primary-600 text-sm hover:underline inline-flex items-center gap-1"
-        >
-          <Pencil size={14} /> {t('common.edit')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+              className="text-primary-600 text-sm hover:underline inline-flex items-center gap-1"
+            >
+              <Pencil size={14} /> {t('common.edit')}
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleDelete(r); }}
+              className="text-red-600 text-sm hover:underline inline-flex items-center gap-1"
+            >
+              <Trash2 size={14} /> {t('animals.deletePermanent')}
+            </button>
+          )}
+        </div>
       ),
     }] : []),
   ];

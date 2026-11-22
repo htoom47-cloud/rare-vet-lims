@@ -12,7 +12,13 @@ const list = async ({ search, owner_id, animal_type, page, limit }) => {
 
   if (search) {
     params.push(`%${search}%`);
-    where += ` AND (a.animal_code ILIKE $${params.length} OR a.name_tag ILIKE $${params.length} OR a.rfid_chip ILIKE $${params.length})`;
+    where += ` AND (
+      a.animal_code ILIKE $${params.length}
+      OR a.name_tag ILIKE $${params.length}
+      OR a.rfid_chip ILIKE $${params.length}
+      OR c.full_name ILIKE $${params.length}
+      OR c.full_name_ar ILIKE $${params.length}
+    )`;
   }
   if (owner_id) {
     params.push(owner_id);
@@ -23,13 +29,14 @@ const list = async ({ search, owner_id, animal_type, page, limit }) => {
     where += ` AND a.animal_type = $${params.length}`;
   }
 
-  const countResult = await query(`SELECT COUNT(*) FROM animals a ${where}`, params);
+  const fromSql = `FROM animals a LEFT JOIN customers c ON a.owner_id = c.id`;
+  const countResult = await query(`SELECT COUNT(*) ${fromSql} ${where}`, params);
   const total = parseInt(countResult.rows[0].count, 10);
 
   params.push(l, offset);
   const result = await query(
     `SELECT a.*, c.full_name as owner_name, c.mobile as owner_mobile
-     FROM animals a LEFT JOIN customers c ON a.owner_id = c.id
+     ${fromSql}
      ${where} ORDER BY a.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
@@ -120,8 +127,19 @@ const updateImage = async (id, imageUrl) => {
 
 const remove = async (id) => {
   await getById(id);
-  await query('UPDATE animals SET is_active = false WHERE id = $1', [id]);
-  return { message: 'Animal deactivated' };
+  const { hardPurgeAnimal } = require('./data-purge.service');
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await hardPurgeAnimal(client, id);
+    await client.query('COMMIT');
+    return { message: 'Animal permanently deleted' };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const getResultTrends = async (animalId, { test_code, parameter_code } = {}) => {

@@ -120,6 +120,7 @@ export const animalsAPI = {
   trends: (id, params) => api.get(`/animals/${id}/trends`, { params }),
   create: (data) => api.post('/animals', data),
   update: (id, data) => api.put(`/animals/${id}`, data),
+  remove: (id) => api.delete(`/animals/${id}`),
   uploadImage: async (id, file) => {
     const form = new FormData();
     form.append('image', file, file?.name || 'photo.jpg');

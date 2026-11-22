@@ -3,6 +3,7 @@
  * Used by trash permanent-delete and soft-delete expiry cron.
  */
 
+const { AppError } = require('../middleware/errorHandler');
 const { syncCustomerArBalance } = require('./accounting.service');
 
 const tableExists = async (client, name) => {
@@ -140,6 +141,48 @@ async function hardPurgeReport(client, reportId) {
   await client.query('DELETE FROM reports WHERE id = $1', [reportId]);
 }
 
+/**
+ * Permanently delete one animal that has no samples.
+ * Unlinks invoice lines and parent/offspring pointers first.
+ */
+async function hardPurgeAnimal(client, animalId) {
+  const samples = await client.query(
+    'SELECT COUNT(*)::int AS n FROM samples WHERE animal_id = $1',
+    [animalId]
+  );
+  if ((samples.rows[0]?.n || 0) > 0) {
+    throw new AppError(
+      'Cannot permanently delete an animal that has samples (including trashed samples).',
+      409,
+      'HAS_SAMPLES'
+    );
+  }
+
+  await client.query('UPDATE invoice_items SET animal_id = NULL WHERE animal_id = $1', [animalId]);
+  await client.query('UPDATE animals SET sire_id = NULL WHERE sire_id = $1', [animalId]);
+  await client.query('UPDATE animals SET dam_id = NULL WHERE dam_id = $1', [animalId]);
+
+  // Child herd tables use ON DELETE CASCADE when present; delete explicitly if needed.
+  for (const table of [
+    'animal_herd_notes',
+    'animal_vaccinations',
+    'animal_breeding_events',
+  ]) {
+    if (await tableExists(client, table)) {
+      await client.query(`DELETE FROM ${table} WHERE animal_id = $1`, [animalId]);
+    }
+  }
+  if (await tableExists(client, 'animal_births')) {
+    await client.query(
+      `DELETE FROM animal_births
+       WHERE animal_id = $1 OR mother_id = $1 OR father_id = $1 OR offspring_id = $1`,
+      [animalId]
+    );
+  }
+
+  await client.query('DELETE FROM animals WHERE id = $1', [animalId]);
+}
+
 async function hardPurgeCustomer(client, customerId) {
   await purgeCreditNotesForCustomer(client, customerId);
 
@@ -243,5 +286,6 @@ module.exports = {
   hardPurgeSample,
   hardPurgeInvoice,
   hardPurgeReport,
+  hardPurgeAnimal,
   hardPurgeCustomer,
 };
