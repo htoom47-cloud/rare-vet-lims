@@ -208,6 +208,44 @@ const getArAging = async () => {
   return { customers: result.rows, totals };
 };
 
+/** Customers with AR owed and/or prepaid store credit — for accounting balances view. */
+const getCustomerBalances = async () => {
+  const result = await query(
+    `SELECT c.id, c.full_name, c.full_name_ar, c.mobile,
+            COALESCE(c.account_balance, 0) AS account_balance,
+            COALESCE(c.store_credit_balance, 0) AS store_credit_balance
+     FROM customers c
+     WHERE c.is_active = true
+       AND ${notDeleted('c')}
+       AND (
+         COALESCE(c.account_balance, 0) > 0.01
+         OR COALESCE(c.store_credit_balance, 0) > 0.01
+       )
+     ORDER BY c.store_credit_balance DESC, c.account_balance DESC, c.full_name`
+  );
+
+  const totals = result.rows.reduce(
+    (acc, r) => {
+      const ar = parseFloat(r.account_balance) || 0;
+      const credit = parseFloat(r.store_credit_balance) || 0;
+      return {
+        account_balance: acc.account_balance + ar,
+        store_credit_balance: acc.store_credit_balance + credit,
+        customers_with_ar: acc.customers_with_ar + (ar > 0.01 ? 1 : 0),
+        customers_with_credit: acc.customers_with_credit + (credit > 0.01 ? 1 : 0),
+      };
+    },
+    {
+      account_balance: 0,
+      store_credit_balance: 0,
+      customers_with_ar: 0,
+      customers_with_credit: 0,
+    }
+  );
+
+  return { customers: result.rows, totals };
+};
+
 const getRevenueSummary = async (from, to) => {
   const { fromDate, toDate } = defaultLabRange(from, to);
   const withCredits = await creditNotesTableExists();
@@ -401,7 +439,7 @@ const getDashboardSummary = async (date) => {
   const withCredits = await creditNotesTableExists();
   const due = remainingSql(withCredits);
 
-  const [unpaid, cancelled] = await Promise.all([
+  const [unpaid, cancelled, balances] = await Promise.all([
     query(
       `SELECT COUNT(*) AS c FROM invoices i
        ${paymentsJoin('p')}
@@ -409,6 +447,15 @@ const getDashboardSummary = async (date) => {
        WHERE i.status IN ('issued', 'partial') AND ${due} > 0.01`
     ),
     query(`SELECT COUNT(*) AS c FROM invoices WHERE status = 'cancelled' AND ${labDateSql('created_at')} = $1::date`, [day]),
+    query(
+      `SELECT
+         COALESCE(SUM(COALESCE(account_balance, 0)), 0) AS account_balance_total,
+         COALESCE(SUM(COALESCE(store_credit_balance, 0)), 0) AS store_credit_total,
+         COUNT(*) FILTER (WHERE COALESCE(account_balance, 0) > 0.01) AS customers_with_ar,
+         COUNT(*) FILTER (WHERE COALESCE(store_credit_balance, 0) > 0.01) AS customers_with_credit
+       FROM customers
+       WHERE is_active = true AND ${notDeleted()}`
+    ),
   ]);
 
   return {
@@ -416,6 +463,10 @@ const getDashboardSummary = async (date) => {
     today_collections: daily.net_collections,
     unpaid_invoices: parseInt(unpaid.rows[0].c, 10),
     cancelled_today: parseInt(cancelled.rows[0].c, 10),
+    account_balance_total: parseFloat(balances.rows[0].account_balance_total),
+    store_credit_total: parseFloat(balances.rows[0].store_credit_total),
+    customers_with_ar: parseInt(balances.rows[0].customers_with_ar, 10),
+    customers_with_credit: parseInt(balances.rows[0].customers_with_credit, 10),
   };
 };
 
@@ -642,6 +693,7 @@ module.exports = {
   getCustomerStatement,
   getDailyCollections,
   getArAging,
+  getCustomerBalances,
   getRevenueSummary,
   getDailyFullSummary,
   sumCashPurchaseOutflowsHalalas,

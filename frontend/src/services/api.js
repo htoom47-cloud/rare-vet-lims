@@ -453,6 +453,7 @@ export const billingAPI = {
   },
   collectionsReport: (params) => api.get('/billing/reports/collections', { params }),
   arAgingReport: () => api.get('/billing/reports/ar-aging'),
+  customerBalancesReport: () => api.get('/billing/reports/customer-balances'),
   revenueReport: (params) => api.get('/billing/reports/revenue', { params }),
   monthlyReport: (params) => api.get('/billing/reports/monthly', { params }),
   operationsReport: (params) => api.get('/billing/reports/operations', { params }),

@@ -233,6 +233,13 @@ router.get('/reports/ar-aging', authorize(PERMISSIONS.BILLING_VIEW), async (req,
   } catch (err) { next(err); }
 });
 
+router.get('/reports/customer-balances', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
+  try {
+    const data = await accounting.getCustomerBalances();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/reports/revenue', authorize(PERMISSIONS.BILLING_VIEW), async (req, res, next) => {
   try {
     const data = await accounting.getRevenueSummary(req.query.from, req.query.to);

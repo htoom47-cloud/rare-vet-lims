@@ -36,12 +36,13 @@ function SummaryCard({ label, value, accent }) {
 
 export default function AccountingReports() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canPay = hasPermission('billing.payment');
   const canRefund = hasPermission('billing.refund');
   const canCancel = hasPermission('billing.cancel');
   const canCloseDay = hasPermission('billing.day_close');
   const canReopenDay = hasPermission('billing.day_reopen');
+  const canStoreCredit = !!user?.features?.storeCredit;
 
   const [mainTab, setMainTab] = useState('invoices');
   const [reportTab, setReportTab] = useState('collections');
@@ -61,6 +62,7 @@ export default function AccountingReports() {
 
   const [collections, setCollections] = useState(null);
   const [arAging, setArAging] = useState(null);
+  const [customerBalances, setCustomerBalances] = useState(null);
   const [revenue, setRevenue] = useState(null);
   const [journal, setJournal] = useState([]);
   const [unpaidReport, setUnpaidReport] = useState([]);
@@ -140,6 +142,9 @@ export default function AccountingReports() {
       } else if (reportTab === 'ar') {
         const { data } = await billingAPI.arAgingReport();
         setArAging(data.data);
+      } else if (reportTab === 'customerBalances') {
+        const { data } = await billingAPI.customerBalancesReport();
+        setCustomerBalances(data.data);
       } else if (reportTab === 'revenue') {
         const { data } = await billingAPI.revenueReport();
         setRevenue(data.data);
@@ -400,7 +405,7 @@ export default function AccountingReports() {
   const dashboardCards = useMemo(() => {
     const d = dashboard || {};
     const by = d.by_method || {};
-    return [
+    const cards = [
       { label: t('accounting.todayCollection'), value: fmt(d.today_collections), accent: 'text-green-700' },
       { label: t('billing.paymentMethods.cash'), value: fmt(by.cash) },
       { label: t('billing.paymentMethods.card'), value: fmt(by.card) },
@@ -410,8 +415,17 @@ export default function AccountingReports() {
       { label: t('accounting.invoiceCount'), value: d.invoice_count ?? 0 },
       { label: t('accounting.unpaidCount'), value: d.unpaid_invoices ?? 0, accent: 'text-amber-700' },
       { label: t('accounting.cancelledCount'), value: d.cancelled_today ?? 0, accent: 'text-red-700' },
+      { label: t('accounting.totalAr'), value: fmt(d.account_balance_total), accent: 'text-amber-700' },
     ];
-  }, [dashboard, t]);
+    if (canStoreCredit) {
+      cards.push({
+        label: t('accounting.storeCreditTotal'),
+        value: fmt(d.store_credit_total),
+        accent: 'text-emerald-700',
+      });
+    }
+    return cards;
+  }, [dashboard, t, canStoreCredit]);
 
   const mainTabs = [
     { id: 'invoices', icon: Receipt, label: t('accounting.invoicesTab') },
@@ -422,6 +436,7 @@ export default function AccountingReports() {
   const reportTabs = [
     { id: 'collections', icon: Calendar, label: t('accounting.collections') },
     { id: 'ar', icon: Users, label: t('accounting.arAging') },
+    { id: 'customerBalances', icon: Users, label: t('accounting.customerBalances') },
     { id: 'revenue', icon: BarChart3, label: t('accounting.revenue') },
     { id: 'journal', icon: BookOpen, label: t('accounting.journal') },
     { id: 'unpaid', icon: CreditCard, label: t('accounting.unpaidReport') },
@@ -743,6 +758,50 @@ export default function AccountingReports() {
                 headers={[t('customers.fullName'), t('accounting.openInvoices'), t('billing.balanceDue'), '0-30', '31-60', '61+']}
                 rows={(arAging.customers || []).map((c) => [
                   c.customer_name, c.open_invoices, fmt(c.balance_due), fmt(c.bucket_0_30), fmt(c.bucket_31_60), fmt(c.bucket_61_plus),
+                ])}
+                empty={t('accounting.noData')}
+              />
+            </div>
+          )}
+
+          {!loading && reportTab === 'customerBalances' && customerBalances && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: t('accounting.totalAr'), value: fmt(customerBalances.totals?.account_balance) },
+                  ...(canStoreCredit
+                    ? [{
+                      label: t('accounting.storeCreditTotal'),
+                      value: fmt(customerBalances.totals?.store_credit_balance),
+                      accent: 'text-emerald-700',
+                    }]
+                    : []),
+                  { label: t('accounting.customersWithAr'), value: customerBalances.totals?.customers_with_ar ?? 0 },
+                  ...(canStoreCredit
+                    ? [{
+                      label: t('accounting.customersWithCredit'),
+                      value: customerBalances.totals?.customers_with_credit ?? 0,
+                    }]
+                    : []),
+                ].map((card) => (
+                  <div key={card.label} className="card p-4">
+                    <p className="text-xs text-gray-500">{card.label}</p>
+                    <p className={`text-lg font-bold ${card.accent || ''}`}>{card.value}</p>
+                  </div>
+                ))}
+              </div>
+              <ReportTable
+                headers={[
+                  t('customers.fullName'),
+                  t('customers.mobile'),
+                  t('customers.balance'),
+                  ...(canStoreCredit ? [t('customers.storeCredit')] : []),
+                ]}
+                rows={(customerBalances.customers || []).map((c) => [
+                  c.full_name,
+                  c.mobile,
+                  fmt(c.account_balance),
+                  ...(canStoreCredit ? [fmt(c.store_credit_balance)] : []),
                 ])}
                 empty={t('accounting.noData')}
               />

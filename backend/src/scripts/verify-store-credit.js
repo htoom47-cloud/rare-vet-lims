@@ -92,8 +92,20 @@ check('customer routes for deposit behind billing.store_credit', () => {
 check('UI gated by storeCredit feature flag', () => {
   assert.ok(customersUi.includes('storeCredit'));
   assert.ok(customersUi.includes('depositStoreCredit'));
+  assert.ok(customersUi.includes('store_credit_balance'));
   assert.ok(billingUi.includes('canStoreCredit'));
   assert.ok(billingUi.includes('store_credit'));
+});
+
+check('accounting exposes customer balances report + dashboard totals', () => {
+  assert.ok(accountingSrc.includes('getCustomerBalances'));
+  assert.ok(accountingSrc.includes('store_credit_total'));
+  assert.ok(accountingSrc.includes('account_balance_total'));
+  const routes = read('src/routes/billing.routes.js');
+  assert.ok(routes.includes('/reports/customer-balances'));
+  const acctUi = read('../frontend/src/pages/AccountingReports.jsx');
+  assert.ok(acctUi.includes('customerBalances'));
+  assert.ok(acctUi.includes('storeCreditTotal'));
 });
 
 check('account_balance sync path unchanged (no store_credit in remainingSql)', () => {

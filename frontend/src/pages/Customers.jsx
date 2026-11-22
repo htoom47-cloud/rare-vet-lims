@@ -375,7 +375,14 @@ export default function Customers() {
     },
     { key: 'city', label: t('customers.city') },
     { key: 'farm_company', label: t('customers.farm') },
-    { key: 'account_balance', label: t('customers.balance'), render: (r) => `SAR ${parseFloat(r.account_balance).toFixed(2)}` },
+    { key: 'account_balance', label: t('customers.balance'), render: (r) => `SAR ${parseFloat(r.account_balance || 0).toFixed(2)}` },
+    ...(canStoreCredit
+      ? [{
+        key: 'store_credit_balance',
+        label: t('customers.storeCredit'),
+        render: (r) => `SAR ${parseFloat(r.store_credit_balance || 0).toFixed(2)}`,
+      }]
+      : []),
     { key: 'animal_count', label: 'Animals' },
     { key: 'actions', label: t('common.actions'), render: (r) => (
       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
