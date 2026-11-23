@@ -9,6 +9,7 @@ const CODE_ICONS = {
   ELISA: '🛡️',
   SERO: '🛡️',
   URINE: '🧪',
+  SEMEN: '🔬',
   PAR: '🪱',
   PARA: '🪱',
   PARAS: '🪱',
@@ -37,6 +38,8 @@ const KEYWORD_ICONS = [
   ['urine', '🧪'],
   ['urinalysis', '🧪'],
   ['بول', '🧪'],
+  ['semen', '🔬'],
+  ['سائل منوي', '🔬'],
 ];
 
 const DEFAULT_ICON = '🧫';

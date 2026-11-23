@@ -67,6 +67,7 @@ const bootScripts = [
   'src/scripts/ensure-result-attachments.js',
   'src/scripts/ensure-parasitology.js',
   'src/scripts/ensure-urine.js',
+  'src/scripts/ensure-semen.js',
   'src/scripts/ensure-diarrhea-causes.js',
 ];
 

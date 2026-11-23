@@ -135,6 +135,10 @@ const resources = {
         urinePhysical: 'Physical Examination',
         urineChemical: 'Chemical Examination',
         urineMicroscopic: 'Microscopic Examination',
+        semenPhysical: 'Physical Characteristics',
+        semenMicroscopic: 'Microscopic Examination',
+        semenOtherCells: 'Other Cells & Debris',
+        semenImpression: 'Impression & Evaluation',
         entryOptionsCustom: 'Or type a custom value',
       },
       brucellaList: {
@@ -1835,6 +1839,10 @@ const resources = {
         urinePhysical: 'الفحص الفيزيائي',
         urineChemical: 'الفحص الكيميائي',
         urineMicroscopic: 'الفحص المجهري',
+        semenPhysical: 'الخصائص الفيزيائية',
+        semenMicroscopic: 'الفحص المجهري',
+        semenOtherCells: 'الخلايا الأخرى والشوائب',
+        semenImpression: 'التقييم والقرار النهائي',
         entryOptionsCustom: 'أو اكتب قيمة أخرى',
       },
       brucellaList: {

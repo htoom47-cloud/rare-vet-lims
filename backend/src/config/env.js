@@ -181,6 +181,11 @@ const env = {
      * Default false — single-animal create until explicitly enabled.
      */
     herdBulkAnimals: process.env.HERD_BULK_ANIMALS_ENABLED === 'true',
+    /**
+     * When true: seed/show camel semen analysis catalog (SEMEN-CAMEL) with sectioned entry.
+     * Default false — no catalog changes until explicitly enabled.
+     */
+    semenAnalysis: process.env.SEMEN_ANALYSIS_ENABLED === 'true',
   },
   tamara: {
     apiUrl: (process.env.TAMARA_API_URL || 'https://api-sandbox.tamara.co').replace(/\/$/, ''),

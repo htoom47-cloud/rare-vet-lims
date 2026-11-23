@@ -30,6 +30,8 @@ import {
   normalizeEntryOptions,
   URINE_ENTRY_SECTIONS,
   urineSectionLabel,
+  SEMEN_ENTRY_SECTIONS,
+  semenSectionLabel,
 } from '../utils/entryOptions';
 
 export default function TechnicianWorkbench() {
@@ -38,6 +40,7 @@ export default function TechnicianWorkbench() {
   const navigate = useNavigate();
   const elisaSpecial = !!user?.features?.elisaSpecialEntry;
   const cultureAst = !!user?.features?.cultureAstReport;
+  const semenAnalysis = !!user?.features?.semenAnalysis;
   const isAr = i18n.language === 'ar';
   const [searchParams] = useSearchParams();
   const [queue, setQueue] = useState([]);
@@ -561,8 +564,43 @@ export default function TechnicianWorkbench() {
       return renderElisaFields(test, fields);
     }
     if (!isNormaCbcTest(test)) {
+      const isSemenTest = semenAnalysis && (
+        String(test?.category_code || '').toUpperCase() === 'SEMEN'
+        || String(test?.test_code || test?.code || '').toUpperCase().startsWith('SEMEN')
+      );
+      if (isSemenTest && fields.some((p) => SEMEN_ENTRY_SECTIONS.includes(p.entry_section))) {
+        return (
+          <div className="space-y-4">
+            {SEMEN_ENTRY_SECTIONS.map((section) => {
+              const sectionRows = fields
+                .map((param, idx) => ({ param, idx }))
+                .filter(({ param }) => param.entry_section === section);
+              if (!sectionRows.length) return null;
+              return (
+                <div key={section}>
+                  <h5 className="text-sm font-semibold text-primary-700 dark:text-primary-300 mb-2 border-b border-primary-100 dark:border-primary-800 pb-1">
+                    {semenSectionLabel(section, t)}
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {sectionRows.map(({ param, idx }) => renderParamField(test, param, idx))}
+                  </div>
+                </div>
+              );
+            })}
+            {fields.some((p) => !SEMEN_ENTRY_SECTIONS.includes(p.entry_section)) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {fields.map((param, idx) => (
+                  SEMEN_ENTRY_SECTIONS.includes(param.entry_section)
+                    ? null
+                    : renderParamField(test, param, idx)
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
       const hasUrineSections = fields.some((p) => URINE_ENTRY_SECTIONS.includes(p.entry_section));
-      if (hasUrineSections) {
+      if (hasUrineSections && !isSemenTest) {
         return (
           <div className="space-y-4">
             {URINE_ENTRY_SECTIONS.map((section) => {

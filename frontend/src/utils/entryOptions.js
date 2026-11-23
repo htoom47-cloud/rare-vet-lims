@@ -40,3 +40,21 @@ export function urineSectionLabel(section, t) {
   }
   return section;
 }
+
+export const SEMEN_ENTRY_SECTIONS = ['physical', 'microscopic', 'other_cells', 'impression'];
+
+export function semenSectionLabel(section, t) {
+  if (section === 'physical') {
+    return t('workbench.semenPhysical', { defaultValue: 'Physical Characteristics' });
+  }
+  if (section === 'microscopic') {
+    return t('workbench.semenMicroscopic', { defaultValue: 'Microscopic Examination' });
+  }
+  if (section === 'other_cells') {
+    return t('workbench.semenOtherCells', { defaultValue: 'Other Cells & Debris' });
+  }
+  if (section === 'impression') {
+    return t('workbench.semenImpression', { defaultValue: 'Impression & Evaluation' });
+  }
+  return section;
+}

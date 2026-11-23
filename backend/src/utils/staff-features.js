@@ -34,6 +34,8 @@ const getStaffFeatures = () => ({
   storeCredit: !!env.features?.storeCredit,
   /** When true: Workflow may paste a herd list with shared type/gender */
   herdBulkAnimals: !!env.features?.herdBulkAnimals,
+  /** When true: camel semen analysis catalog + sectioned workbench entry */
+  semenAnalysis: !!env.features?.semenAnalysis,
 });
 
 module.exports = { getStaffFeatures };

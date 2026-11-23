@@ -8,6 +8,7 @@ const { ensureParasitologyCatalog } = require('./ensure-parasitology');
 const { ensureElisaCatalog } = require('./ensure-elisa-catalog');
 const { ensureBruElisaCatalog } = require('./ensure-bru-elisa');
 const { ensureUrineCatalog } = require('./ensure-urine');
+const { ensureSemenCatalog } = require('./ensure-semen');
 const { ensureDiarrheaCausesCatalog } = require('./ensure-diarrhea-causes');
 const { syncPermissionsCatalog, syncRolePermissions } = require('../utils/sync-permissions');
 
@@ -595,6 +596,11 @@ async function applyPatches() {
       await ensureUrineCatalog();
     } catch (urineErr) {
       logger.warn('Urine catalog ensure failed — continuing migrate', { error: urineErr.message });
+    }
+    try {
+      await ensureSemenCatalog();
+    } catch (semenErr) {
+      logger.warn('Semen catalog ensure failed — continuing migrate', { error: semenErr.message });
     }
     try {
       await ensureDiarrheaCausesCatalog();

@@ -32,6 +32,7 @@ const INSTRUMENT_BY_CATEGORY = {
   PARAS: 'Microscope',
   CULT: 'Microbiology',
   URINE: 'Microscope',
+  SEMEN: 'Microscope',
 };
 
 const resolveInstrument = (categoryCode, testCode) => {
